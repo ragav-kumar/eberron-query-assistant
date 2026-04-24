@@ -1,14 +1,20 @@
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+
 import { describe, expect, it, vi } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
 import { MemoryProgressReporter } from "../src/progress/reporter.js";
 import { runRuntime } from "../src/runtime/index.js";
 import { runStartupRefresh } from "../src/runtime/refresh.js";
-import { PlaceholderSourceDiscoveryService } from "../src/source-discovery/index.js";
-import { PlaceholderStateStore } from "../src/state/index.js";
+import { FilesystemSourceDiscoveryService, PlaceholderSourceDiscoveryService } from "../src/source-discovery/index.js";
+import { FilesystemStateStore, PlaceholderStateStore } from "../src/state/index.js";
+import { createDefaultRuntimeState } from "../src/state/state-store.js";
+
+const TEST_ROOT = path.resolve(".test-tmp", "runtime");
 
 describe("startup refresh skeleton", () => {
-  it("emits readable placeholder progress", async () => {
+  it("emits readable source inventory progress", async () => {
     const reporter = new MemoryProgressReporter();
 
     await runStartupRefresh(loadDefaultConfig("repo"), { forceReingest: true }, {
@@ -18,12 +24,10 @@ describe("startup refresh skeleton", () => {
     });
 
     expect(reporter.messages).toContain("Starting source inventory checks.");
-    expect(reporter.messages).toContain(
-      "Force re-ingest requested; placeholder refresh will treat all sources as scheduled."
-    );
+    expect(reporter.messages).toContain("Force re-ingest requested; source inventory will schedule all available sources.");
     expect(reporter.messages).toContain("Placeholder retrieval refresh complete.");
     expect(reporter.messages).toContain("Startup refresh complete; entering assistant prompt.");
-    expect(reporter.messages.some((message) => message.startsWith("foundry: placeholder inventory complete"))).toBe(
+    expect(reporter.messages.some((message) => message.startsWith("foundry: placeholder inventory skipped."))).toBe(
       true
     );
   });
@@ -37,8 +41,10 @@ describe("startup refresh skeleton", () => {
       { forceReingest: false },
       {
         config: loadDefaultConfig("repo"),
+        discovery: new PlaceholderSourceDiscoveryService(),
         prompt,
-        reporter: new MemoryProgressReporter()
+        reporter: new MemoryProgressReporter(),
+        stateStore: new PlaceholderStateStore()
       }
     );
 
@@ -46,4 +52,54 @@ describe("startup refresh skeleton", () => {
     expect(summary.degraded).toBe(false);
     expect(summary.inventories).toHaveLength(3);
   });
+
+  it("commits successful source inventory state during startup refresh", async () => {
+    await rm(TEST_ROOT, { force: true, recursive: true });
+
+    try {
+      const config = loadDefaultConfig(TEST_ROOT);
+      const stateStore = new FilesystemStateStore();
+      const initialState = createDefaultRuntimeState();
+      initialState.article.lastSuccessfulIndexScrapeAt = "2026-04-24T10:00:00.000Z";
+
+      await stateStore.save(config, initialState);
+      await writeManifest(config.foundryExportDir, "run-1", "2026-04-24T10:00:00.000Z", 2);
+      await mkdir(config.pdfDir, { recursive: true });
+      await writeFile(path.join(config.pdfDir, "rising.pdf"), "", "utf8");
+
+      const summary = await runStartupRefresh(config, { forceReingest: false }, {
+        discovery: new FilesystemSourceDiscoveryService({ now: () => new Date("2026-04-24T12:00:00.000Z") }),
+        reporter: new MemoryProgressReporter(),
+        stateStore
+      });
+
+      const persisted = await stateStore.load(config);
+
+      expect(summary.degraded).toBe(false);
+      expect(persisted.foundry.lastSuccessfulExport).toEqual({
+        generatedAt: "2026-04-24T10:00:00.000Z",
+        recordCount: 2,
+        runId: "run-1"
+      });
+      expect(persisted.pdf.knownFilenames).toEqual(["rising.pdf"]);
+      expect(persisted.article.lastSuccessfulIndexScrapeAt).toBe("2026-04-24T10:00:00.000Z");
+    } finally {
+      await rm(TEST_ROOT, { force: true, recursive: true });
+    }
+  });
 });
+
+async function writeManifest(foundryExportDir: string, runId: string, generatedAt: string, recordCount: number) {
+  await mkdir(foundryExportDir, { recursive: true });
+  await writeFile(
+    path.join(foundryExportDir, "manifest.json"),
+    `${JSON.stringify({
+      run: {
+        generatedAt,
+        recordCount,
+        runId
+      }
+    })}\n`,
+    "utf8"
+  );
+}

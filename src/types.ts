@@ -14,6 +14,8 @@ export interface RuntimeConfig {
 
 export type SourceType = "foundry" | "pdf" | "article";
 
+export type SourceInventoryStatus = "skipped" | "scheduled" | "missing" | "failed";
+
 export interface SourceInventoryResult {
   sourceType: SourceType;
   discovered: number;
@@ -21,7 +23,9 @@ export interface SourceInventoryResult {
   updated: number;
   removed: number;
   failed: number;
-  status: "placeholder";
+  status: SourceInventoryStatus;
+  message: string;
+  details: string[];
 }
 
 export interface StartupRefreshSummary {

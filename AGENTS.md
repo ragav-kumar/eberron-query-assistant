@@ -86,6 +86,8 @@ Handle partial failures in a source-scoped way. Do not mark incomplete ingest or
 
 Add or update automated tests alongside behavior changes. If a change is intentionally left without automated coverage, document the risk and provide manual verification steps.
 
+For startup, source-discovery, state, CLI, and user-visible runtime behavior changes, do not stop at unit tests. Attempt to run the start command and inspect the terminal output for the expected behavior. When the prompt would otherwise remain interactive, pipe or provide an immediate `exit` input so the verification exercises startup without hanging.
+
 Document assumptions, invariants, and unresolved decisions explicitly in the governing docs rather than leaving them implied in code structure or commit history.
 
 Update `README.md` whenever the final intended user-visible behavior changes.

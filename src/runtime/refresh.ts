@@ -15,26 +15,35 @@ export async function runStartupRefresh(
   dependencies: StartupRefreshDependencies
 ): Promise<StartupRefreshSummary> {
   dependencies.reporter.info("Starting source inventory checks.");
-  await dependencies.stateStore.load(config);
+  const state = await dependencies.stateStore.load(config);
 
   if (options.forceReingest) {
-    dependencies.reporter.info("Force re-ingest requested; placeholder refresh will treat all sources as scheduled.");
+    dependencies.reporter.info("Force re-ingest requested; source inventory will schedule all available sources.");
   }
 
-  const inventories = await dependencies.discovery.inspectSources(config, options);
+  const discovery = await dependencies.discovery.inspectSources(config, options, state);
+  await dependencies.stateStore.save(config, discovery.nextState);
 
-  for (const inventory of inventories) {
-    dependencies.reporter.info(
-      `${inventory.sourceType}: placeholder inventory complete; discovered=${inventory.discovered}, added=${inventory.added}, updated=${inventory.updated}, removed=${inventory.removed}, failed=${inventory.failed}.`
-    );
+  for (const inventory of discovery.inventories) {
+    const report = `${inventory.message} discovered=${inventory.discovered}, added=${inventory.added}, updated=${inventory.updated}, removed=${inventory.removed}, failed=${inventory.failed}, status=${inventory.status}.`;
+
+    if (inventory.status === "failed") {
+      dependencies.reporter.warn(report);
+    } else {
+      dependencies.reporter.info(report);
+    }
   }
 
   dependencies.reporter.info("Placeholder retrieval refresh complete.");
-  dependencies.reporter.info("Startup refresh complete; entering assistant prompt.");
+  dependencies.reporter.info(
+    discovery.degraded
+      ? "Startup refresh complete with degraded source inventory; entering assistant prompt."
+      : "Startup refresh complete; entering assistant prompt."
+  );
 
   return {
     forceReingest: options.forceReingest,
-    inventories,
-    degraded: false
+    inventories: discovery.inventories,
+    degraded: discovery.degraded
   };
 }
