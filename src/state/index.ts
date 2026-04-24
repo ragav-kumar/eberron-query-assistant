@@ -1,15 +1,2 @@
-import type { RuntimeConfig } from "../types.js";
-
-export interface RuntimeState {
-  version: 1;
-}
-
-export interface StateStore {
-  load(config: RuntimeConfig): Promise<RuntimeState>;
-}
-
-export class PlaceholderStateStore implements StateStore {
-  load(): Promise<RuntimeState> {
-    return Promise.resolve({ version: 1 });
-  }
-}
+export { PlaceholderStateStore } from "./placeholder-state-store.js";
+export type { RuntimeState, StateStore } from "./state-store.js";
