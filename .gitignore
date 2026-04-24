@@ -1,4 +1,7 @@
-node_modules
-foundry-export
-pdf
+node_modules/
+dist/
+coverage/
+.eberron-query-assistant/
+foundry-export/
+pdf/
 .env
