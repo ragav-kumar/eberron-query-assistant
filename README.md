@@ -10,6 +10,8 @@ On startup, the application refreshes its retrieval layer before opening chat. I
 
 By default, local runtime state and retrieval artifacts are stored under `.eberron-query-assistant/` in the repository.
 
+Detailed engineering and phased-delivery documentation lives in `docs/specification.md` and the `docs/phase-*.md` files. This README remains focused on the intended finished user experience.
+
 After startup completes, the app opens an interactive terminal session. You can ask direct lore questions, cross-reference campaign data, or ask inference-heavy questions that require combining material across sources. Answers are designed to include a direct response and supporting references when available, such as PDF page citations, article links, or specific foundry entities.
 
 ## What It Is For
