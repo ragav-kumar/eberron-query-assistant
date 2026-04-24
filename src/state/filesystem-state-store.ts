@@ -1,8 +1,15 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
+import { getAppVersion } from "../app-version.js";
 import type { RuntimeConfig } from "../types.js";
-import { createDefaultRuntimeState, type ArticleStateRecord, type RuntimeState, type StateStore } from "./state-store.js";
+import {
+  createDefaultRuntimeState,
+  type ArticleStateRecord,
+  type RuntimeState,
+  type RuntimeStateLoadResult,
+  type StateStore
+} from "./state-store.js";
 
 const STATE_FILENAME = "runtime-state.json";
 
@@ -21,7 +28,7 @@ export class InvalidRuntimeStateError extends Error {
 }
 
 export class FilesystemStateStore implements StateStore {
-  async load(config: RuntimeConfig): Promise<RuntimeState> {
+  async load(config: RuntimeConfig): Promise<RuntimeStateLoadResult> {
     const statePath = getStatePath(config);
 
     let raw: string;
@@ -29,7 +36,11 @@ export class FilesystemStateStore implements StateStore {
       raw = await readFile(statePath, "utf8");
     } catch (error) {
       if (isNodeError(error) && error.code === "ENOENT") {
-        return createDefaultRuntimeState();
+        return {
+          state: createDefaultRuntimeState(),
+          invalidated: false,
+          invalidationReason: null
+        };
       }
 
       throw error;
@@ -49,13 +60,20 @@ export function getStatePath(config: RuntimeConfig): string {
   return path.join(config.stateDir, STATE_FILENAME);
 }
 
-function parseRuntimeState(value: unknown): RuntimeState {
+function parseRuntimeState(value: unknown): RuntimeStateLoadResult {
+  const appVersion = getAppVersion();
   if (!isRecord(value)) {
     throw new InvalidRuntimeStateError("Runtime state file must contain an object.");
   }
 
-  if (value.version !== 1) {
-    throw new UnsupportedStateVersionError(value.version);
+  if (value.appVersion !== appVersion) {
+    const storedVersion =
+      typeof value.appVersion === "string" && value.appVersion.length > 0 ? value.appVersion : "missing";
+    return {
+      state: createDefaultRuntimeState(),
+      invalidated: true,
+      invalidationReason: `runtime state appVersion ${storedVersion} does not match app version ${appVersion}`
+    };
   }
 
   if (!isRecord(value.foundry)) {
@@ -70,27 +88,31 @@ function parseRuntimeState(value: unknown): RuntimeState {
     throw new InvalidRuntimeStateError("Runtime state field article must be an object.");
   }
 
-  return normalizeRuntimeState({
-    version: 1,
-    foundry: {
-      lastSuccessfulExport: parseFoundryMarker(value.foundry.lastSuccessfulExport)
-    },
-    pdf: {
-      knownFilenames: parseStringArray(value.pdf.knownFilenames, "pdf.knownFilenames")
-    },
-    article: {
-      lastSuccessfulIndexScrapeAt: parseNullableString(
-        value.article.lastSuccessfulIndexScrapeAt,
-        "article.lastSuccessfulIndexScrapeAt"
-      ),
-      knownArticles: parseArticleRecords(value.article.knownArticles)
-    }
-  });
+  return {
+    state: normalizeRuntimeState({
+      appVersion,
+      foundry: {
+        lastSuccessfulExport: parseFoundryMarker(value.foundry.lastSuccessfulExport)
+      },
+      pdf: {
+        knownFilenames: parseStringArray(value.pdf.knownFilenames, "pdf.knownFilenames")
+      },
+      article: {
+        lastSuccessfulIndexScrapeAt: parseNullableString(
+          value.article.lastSuccessfulIndexScrapeAt,
+          "article.lastSuccessfulIndexScrapeAt"
+        ),
+        knownArticles: parseArticleRecords(value.article.knownArticles)
+      }
+    }),
+    invalidated: false,
+    invalidationReason: null
+  };
 }
 
 function normalizeRuntimeState(state: RuntimeState): RuntimeState {
   return {
-    version: 1,
+    appVersion: getAppVersion(),
     foundry: {
       lastSuccessfulExport: state.foundry.lastSuccessfulExport
         ? {

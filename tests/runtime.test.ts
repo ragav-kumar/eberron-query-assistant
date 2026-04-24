@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
+import { PlaceholderIngestionService } from "../src/ingestion/index.js";
 import { MemoryProgressReporter } from "../src/progress/reporter.js";
 import { runRuntime } from "../src/runtime/index.js";
 import { runStartupRefresh } from "../src/runtime/refresh.js";
@@ -12,20 +13,22 @@ import { FilesystemStateStore, PlaceholderStateStore } from "../src/state/index.
 import { createDefaultRuntimeState } from "../src/state/state-store.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "runtime");
+const PLACEHOLDER_ROOT = path.resolve(".test-tmp", "runtime-placeholder");
 
 describe("startup refresh skeleton", () => {
   it("emits readable source inventory progress", async () => {
     const reporter = new MemoryProgressReporter();
 
-    await runStartupRefresh(loadDefaultConfig("repo"), { forceReingest: true }, {
+    await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: true }, {
       discovery: new PlaceholderSourceDiscoveryService(),
+      ingestion: new PlaceholderIngestionService(),
       reporter,
       stateStore: new PlaceholderStateStore()
     });
 
     expect(reporter.messages).toContain("Starting source inventory checks.");
     expect(reporter.messages).toContain("Force re-ingest requested; source inventory will schedule all available sources.");
-    expect(reporter.messages).toContain("Placeholder retrieval refresh complete.");
+    expect(reporter.messages).toContain("Ingestion refresh complete.");
     expect(reporter.messages).toContain("Startup refresh complete; entering assistant prompt.");
     expect(reporter.messages.some((message) => message.startsWith("foundry: placeholder inventory skipped."))).toBe(
       true
@@ -40,8 +43,9 @@ describe("startup refresh skeleton", () => {
     const summary = await runRuntime(
       { forceReingest: false },
       {
-        config: loadDefaultConfig("repo"),
+        config: loadDefaultConfig(PLACEHOLDER_ROOT),
         discovery: new PlaceholderSourceDiscoveryService(),
+        ingestion: new PlaceholderIngestionService(),
         prompt,
         reporter: new MemoryProgressReporter(),
         stateStore: new PlaceholderStateStore()
@@ -69,6 +73,7 @@ describe("startup refresh skeleton", () => {
 
       const summary = await runStartupRefresh(config, { forceReingest: false }, {
         discovery: new FilesystemSourceDiscoveryService({ now: () => new Date("2026-04-24T12:00:00.000Z") }),
+        ingestion: new PlaceholderIngestionService(),
         reporter: new MemoryProgressReporter(),
         stateStore
       });
@@ -76,13 +81,13 @@ describe("startup refresh skeleton", () => {
       const persisted = await stateStore.load(config);
 
       expect(summary.degraded).toBe(false);
-      expect(persisted.foundry.lastSuccessfulExport).toEqual({
+      expect(persisted.state.foundry.lastSuccessfulExport).toEqual({
         generatedAt: "2026-04-24T10:00:00.000Z",
         recordCount: 2,
         runId: "run-1"
       });
-      expect(persisted.pdf.knownFilenames).toEqual(["rising.pdf"]);
-      expect(persisted.article.lastSuccessfulIndexScrapeAt).toBe("2026-04-24T10:00:00.000Z");
+      expect(persisted.state.pdf.knownFilenames).toEqual(["rising.pdf"]);
+      expect(persisted.state.article.lastSuccessfulIndexScrapeAt).toBe("2026-04-24T10:00:00.000Z");
     } finally {
       await rm(TEST_ROOT, { force: true, recursive: true });
     }

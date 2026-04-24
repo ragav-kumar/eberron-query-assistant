@@ -44,6 +44,9 @@ The application keeps its local runtime artifacts under `.eberron-query-assistan
 - Module system: ESM-first unless a concrete dependency forces a different layout
 - Test framework: Vitest
 - Linting: ESLint
+- Normalized corpus store: SQLite via `better-sqlite3`
+- PDF parsing: `pdfdataextract`
+- HTML parsing for article discovery and extraction: `cheerio`
 
 Implementation must preserve clear boundaries between configuration, CLI/runtime flow, source discovery, persistence/state, ingestion pipelines, retrieval/indexing, and provider adapters.
 
@@ -86,14 +89,16 @@ When the force flag is present:
 
 ### Persisted Runtime State
 The application must maintain a persisted local state record separate from the Foundry export. This state must include at minimum:
+- app version that wrote the runtime state
 - last processed Foundry export marker
 - known PDF filenames
 - known Keith Baker article URLs and scrape status
 - last successful Keith Baker index scrape timestamp
 - retrieval-layer bookkeeping sufficient to delete stale entries
-- versioning for local state so future migrations are possible
 
 This state is the basis for incremental startup decisions.
+
+Runtime state uses `appVersion` as its compatibility marker. Each implementation phase increments the minor application version to match the phase number. If the stored `appVersion` is missing or differs from the actual app version, startup must invalidate the stored runtime state, clear app-owned runtime artifacts, and continue from default state for the current version.
 
 ### Foundry Export Handling
 The application must inspect `foundry-export/` on every startup.

@@ -33,3 +33,45 @@ export interface StartupRefreshSummary {
   inventories: SourceInventoryResult[];
   degraded: boolean;
 }
+
+export interface CitationMetadata {
+  sourceType: SourceType;
+  label: string;
+  locator: string | null;
+  url: string | null;
+}
+
+export interface CorpusSource {
+  sourceId: string;
+  sourceType: SourceType;
+  sourceKey: string;
+  title: string;
+  metadata: Record<string, unknown>;
+  status: "succeeded" | "failed";
+}
+
+export interface CorpusChunk {
+  chunkId: string;
+  sourceId: string;
+  chunkIndex: number;
+  text: string;
+  citation: CitationMetadata;
+  metadata: Record<string, unknown>;
+}
+
+export interface SourceIngestionSummary {
+  sourceType: SourceType;
+  status: "skipped" | "succeeded" | "failed";
+  discovered: number;
+  ingested: number;
+  removed: number;
+  failed: number;
+  message: string;
+  details: string[];
+}
+
+export interface IngestionSummary {
+  sourceSummaries: SourceIngestionSummary[];
+  degraded: boolean;
+  corpusSourceCount: number;
+}

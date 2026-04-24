@@ -281,7 +281,7 @@ function createInventoryResult(options: {
 
 function cloneRuntimeState(state: RuntimeState): RuntimeState {
   return {
-    version: 1,
+    appVersion: state.appVersion,
     foundry: {
       lastSuccessfulExport: state.foundry.lastSuccessfulExport ? { ...state.foundry.lastSuccessfulExport } : null
     },

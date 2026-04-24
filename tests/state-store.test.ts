@@ -6,8 +6,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { loadDefaultConfig } from "../src/config/index.js";
 import { FilesystemStateStore, getStatePath } from "../src/state/index.js";
 import type { RuntimeState } from "../src/state/index.js";
+import { getAppVersion } from "../src/app-version.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "state-store");
+const APP_VERSION = getAppVersion();
 
 describe("FilesystemStateStore", () => {
   beforeEach(async () => {
@@ -18,20 +20,24 @@ describe("FilesystemStateStore", () => {
     await rm(TEST_ROOT, { force: true, recursive: true });
   });
 
-  it("loads default version 1 state when no state file exists", async () => {
+  it("loads default state when no state file exists", async () => {
     const store = new FilesystemStateStore();
 
     await expect(store.load(loadDefaultConfig(TEST_ROOT))).resolves.toEqual({
-      version: 1,
-      foundry: {
-        lastSuccessfulExport: null
-      },
-      pdf: {
-        knownFilenames: []
-      },
-      article: {
-        lastSuccessfulIndexScrapeAt: null,
-        knownArticles: []
+      invalidated: false,
+      invalidationReason: null,
+      state: {
+        appVersion: APP_VERSION,
+        foundry: {
+          lastSuccessfulExport: null
+        },
+        pdf: {
+          knownFilenames: []
+        },
+        article: {
+          lastSuccessfulIndexScrapeAt: null,
+          knownArticles: []
+        }
       }
     });
   });
@@ -54,7 +60,7 @@ describe("FilesystemStateStore", () => {
       scrapeStatus: "pending" as const
     };
     const state: RuntimeState = {
-      version: 1,
+      appVersion: APP_VERSION,
       foundry: {
         lastSuccessfulExport: {
           generatedAt: "2026-04-24T10:00:00.000Z",
@@ -74,36 +80,47 @@ describe("FilesystemStateStore", () => {
     await store.save(config, state);
 
     await expect(store.load(config)).resolves.toEqual({
-      ...state,
-      pdf: {
-        knownFilenames: ["a.pdf", "z.pdf"]
-      },
-      article: {
-        ...state.article,
-        knownArticles: [articleA, articleB]
+      invalidated: false,
+      invalidationReason: null,
+      state: {
+        ...state,
+        pdf: {
+          knownFilenames: ["a.pdf", "z.pdf"]
+        },
+        article: {
+          ...state.article,
+          knownArticles: [articleA, articleB]
+        }
       }
     });
 
     await expect(mkdir(path.dirname(getStatePath(config)))).rejects.toMatchObject({ code: "EEXIST" });
   });
 
-  it("rejects unsupported state versions", async () => {
+  it("invalidates missing app version state", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = new FilesystemStateStore();
 
     await mkdir(config.stateDir, { recursive: true });
     await writeFile(getStatePath(config), `${JSON.stringify({ version: 2 })}\n`, "utf8");
 
-    await expect(store.load(config)).rejects.toThrow("Unsupported runtime state version: 2.");
+    const result = await store.load(config);
+
+    expect(result.invalidated).toBe(true);
+    expect(result.state.appVersion).toBe(APP_VERSION);
+    expect(result.state.foundry.lastSuccessfulExport).toBeNull();
   });
 
-  it("rejects invalid version 1 state instead of silently defaulting missing sections", async () => {
+  it("invalidates different app version state", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = new FilesystemStateStore();
 
     await mkdir(config.stateDir, { recursive: true });
-    await writeFile(getStatePath(config), `${JSON.stringify({ version: 1 })}\n`, "utf8");
+    await writeFile(getStatePath(config), `${JSON.stringify({ appVersion: "0.2.0" })}\n`, "utf8");
 
-    await expect(store.load(config)).rejects.toThrow("Runtime state field foundry must be an object.");
+    const result = await store.load(config);
+
+    expect(result.invalidated).toBe(true);
+    expect(result.invalidationReason).toContain("0.2.0");
   });
 });

@@ -1,4 +1,5 @@
 import type { RuntimeConfig } from "../types.js";
+import { getAppVersion } from "../app-version.js";
 
 export interface FoundryExportMarker {
   generatedAt: string;
@@ -15,7 +16,7 @@ export interface ArticleStateRecord {
 }
 
 export interface RuntimeState {
-  version: 1;
+  appVersion: string;
   foundry: {
     lastSuccessfulExport: FoundryExportMarker | null;
   };
@@ -28,14 +29,20 @@ export interface RuntimeState {
   };
 }
 
+export interface RuntimeStateLoadResult {
+  state: RuntimeState;
+  invalidated: boolean;
+  invalidationReason: string | null;
+}
+
 export interface StateStore {
-  load(config: RuntimeConfig): Promise<RuntimeState>;
+  load(config: RuntimeConfig): Promise<RuntimeStateLoadResult>;
   save(config: RuntimeConfig, state: RuntimeState): Promise<void>;
 }
 
 export function createDefaultRuntimeState(): RuntimeState {
   return {
-    version: 1,
+    appVersion: getAppVersion(),
     foundry: {
       lastSuccessfulExport: null
     },

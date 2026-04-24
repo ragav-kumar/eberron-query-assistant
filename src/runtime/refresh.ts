@@ -1,3 +1,4 @@
+import type { IngestionService } from "../ingestion/index.js";
 import type { ProgressReporter } from "../progress/reporter.js";
 import type { SourceDiscoveryService } from "../source-discovery/index.js";
 import type { StateStore } from "../state/index.js";
@@ -5,6 +6,7 @@ import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../ty
 
 export interface StartupRefreshDependencies {
   discovery: SourceDiscoveryService;
+  ingestion: IngestionService;
   reporter: ProgressReporter;
   stateStore: StateStore;
 }
@@ -15,14 +17,18 @@ export async function runStartupRefresh(
   dependencies: StartupRefreshDependencies
 ): Promise<StartupRefreshSummary> {
   dependencies.reporter.info("Starting source inventory checks.");
-  const state = await dependencies.stateStore.load(config);
+  const stateLoad = await dependencies.stateStore.load(config);
+  const state = stateLoad.state;
+
+  if (stateLoad.invalidated) {
+    dependencies.reporter.warn(`Runtime state invalidated: ${stateLoad.invalidationReason}.`);
+  }
 
   if (options.forceReingest) {
     dependencies.reporter.info("Force re-ingest requested; source inventory will schedule all available sources.");
   }
 
   const discovery = await dependencies.discovery.inspectSources(config, options, state);
-  await dependencies.stateStore.save(config, discovery.nextState);
 
   for (const inventory of discovery.inventories) {
     const report = `${inventory.message} discovered=${inventory.discovered}, added=${inventory.added}, updated=${inventory.updated}, removed=${inventory.removed}, failed=${inventory.failed}, status=${inventory.status}.`;
@@ -34,9 +40,27 @@ export async function runStartupRefresh(
     }
   }
 
-  dependencies.reporter.info("Placeholder retrieval refresh complete.");
+  const ingestion = await dependencies.ingestion.ingest(config, options, state, discovery, stateLoad.invalidated);
+  await dependencies.stateStore.save(config, ingestion.nextState);
+
+  for (const summary of ingestion.summary.sourceSummaries) {
+    const report = `${summary.message} discovered=${summary.discovered}, ingested=${summary.ingested}, removed=${summary.removed}, failed=${summary.failed}, status=${summary.status}.`;
+
+    if (summary.status === "failed" || summary.failed > 0) {
+      dependencies.reporter.warn(report);
+    } else {
+      dependencies.reporter.info(report);
+    }
+  }
+
+  dependencies.reporter.info("Ingestion refresh complete.");
+
+  if (ingestion.summary.corpusSourceCount === 0) {
+    throw new Error("Startup refresh produced no ingestible corpus sources.");
+  }
+
   dependencies.reporter.info(
-    discovery.degraded
+    discovery.degraded || ingestion.summary.degraded
       ? "Startup refresh complete with degraded source inventory; entering assistant prompt."
       : "Startup refresh complete; entering assistant prompt."
   );
@@ -44,6 +68,6 @@ export async function runStartupRefresh(
   return {
     forceReingest: options.forceReingest,
     inventories: discovery.inventories,
-    degraded: discovery.degraded
+    degraded: discovery.degraded || ingestion.summary.degraded
   };
 }

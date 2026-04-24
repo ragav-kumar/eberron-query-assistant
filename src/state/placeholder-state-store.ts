@@ -1,8 +1,12 @@
-import { createDefaultRuntimeState, type RuntimeState, type StateStore } from "./state-store.js";
+import { createDefaultRuntimeState, type RuntimeStateLoadResult, type StateStore } from "./state-store.js";
 
 export class PlaceholderStateStore implements StateStore {
-  load(): Promise<RuntimeState> {
-    return Promise.resolve(createDefaultRuntimeState());
+  load(): Promise<RuntimeStateLoadResult> {
+    return Promise.resolve({
+      state: createDefaultRuntimeState(),
+      invalidated: false,
+      invalidationReason: null
+    });
   }
 
   save(): Promise<void> {
