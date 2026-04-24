@@ -90,6 +90,8 @@ Document assumptions, invariants, and unresolved decisions explicitly in the gov
 
 Update `README.md` whenever the final intended user-visible behavior changes.
 
+Do not attempt sandboxed runs of commands known to require network access or external write permissions, including `npm install`, `git push`, and similar package-management or remote-publishing commands. Request escalation directly for those commands when they are needed.
+
 ## Coding Best Practices
 Implement the project as TypeScript-first code with explicit types at important boundaries, especially around configuration, state persistence, normalized records, retrieval results, and provider adapters.
 
