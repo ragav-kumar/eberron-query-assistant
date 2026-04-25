@@ -2,7 +2,7 @@ import path from "node:path";
 
 import type { RuntimeConfig } from "../types.js";
 
-export function loadDefaultConfig(repoRoot = process.cwd()): RuntimeConfig {
+export const loadDefaultConfig = (repoRoot = process.cwd()): RuntimeConfig => {
   const runtimeDir = path.join(repoRoot, ".eberron-query-assistant");
 
   return {
@@ -14,4 +14,4 @@ export function loadDefaultConfig(repoRoot = process.cwd()): RuntimeConfig {
     cacheDir: path.join(runtimeDir, "cache"),
     retrievalDir: path.join(runtimeDir, "retrieval")
   };
-}
+};

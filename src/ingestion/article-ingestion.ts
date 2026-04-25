@@ -12,7 +12,7 @@ export interface ArticleFetcher {
   fetchText(url: string): Promise<string>;
 }
 
-export function createFetchArticleFetcher(): ArticleFetcher {
+export const createFetchArticleFetcher = (): ArticleFetcher => {
   return {
     async fetchText(url) {
       const response = await fetch(url);
@@ -26,18 +26,18 @@ export function createFetchArticleFetcher(): ArticleFetcher {
       return response.text();
     }
   };
-}
+};
 
 export interface ArticleDiscoveryResult {
   articles: ArticleStateRecord[];
   discoveredUrls: string[];
 }
 
-export function discoverArticleLinks(
+export const discoverArticleLinks = (
   indexHtml: string,
   previousArticles: ArticleStateRecord[],
   now: string
-): ArticleDiscoveryResult {
+): ArticleDiscoveryResult => {
   const $ = cheerio.load(indexHtml);
   const content = $("main, article, .entry-content, #content").first();
   const root = content.length > 0 ? content : $("body");
@@ -69,9 +69,9 @@ export function discoverArticleLinks(
     articles: [...articles.values()].sort((a, b) => a.canonicalUrl.localeCompare(b.canonicalUrl)),
     discoveredUrls
   };
-}
+};
 
-export function normalizeArticle(
+export const normalizeArticle = (
   url: string,
   html: string,
   previous: ArticleStateRecord | null,
@@ -80,7 +80,7 @@ export function normalizeArticle(
   article: ArticleStateRecord;
   source: CorpusSource;
   chunks: CorpusChunk[];
-} {
+} => {
   const $ = cheerio.load(html);
   const articleElement = $("article, main, .entry-content, #content").first();
   const root = articleElement.length > 0 ? articleElement : $("body");
@@ -155,9 +155,9 @@ export function normalizeArticle(
     source,
     chunks
   };
-}
+};
 
-function canonicalArticleUrl(href: string | undefined): string | null {
+const canonicalArticleUrl = (href: string | undefined): string | null => {
   if (!href) {
     return null;
   }
@@ -180,8 +180,8 @@ function canonicalArticleUrl(href: string | undefined): string | null {
     return null;
   }
   return value;
-}
+};
 
-function hashText(text: string): string {
+const hashText = (text: string): string => {
   return createHash("sha256").update(text).digest("hex").slice(0, 24);
-}
+};

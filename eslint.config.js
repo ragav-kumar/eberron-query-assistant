@@ -20,7 +20,8 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/consistent-type-imports": "error",
       "@typescript-eslint/no-floating-promises": "error",
-      "@typescript-eslint/only-throw-error": "off"
+      "@typescript-eslint/only-throw-error": "off",
+      "func-style": ["error", "expression", { "allowArrowFunctions": true }]
     }
   }
 );

@@ -1,6 +1,6 @@
 import { createDefaultRuntimeState, type RuntimeStateLoadResult, type StateStore } from "./state-store.js";
 
-export function createPlaceholderStateStore(): StateStore {
+export const createPlaceholderStateStore = (): StateStore => {
   return {
     load(): Promise<RuntimeStateLoadResult> {
       return Promise.resolve({
@@ -14,4 +14,4 @@ export function createPlaceholderStateStore(): StateStore {
       return Promise.resolve();
     }
   };
-}
+};

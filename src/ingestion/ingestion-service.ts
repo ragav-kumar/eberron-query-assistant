@@ -29,7 +29,7 @@ export interface IngestionService {
   }>;
 }
 
-export function createFilesystemIngestionService(dependencies: IngestionServiceDependencies): IngestionService {
+export const createFilesystemIngestionService = (dependencies: IngestionServiceDependencies): IngestionService => {
   const articleFetcher = dependencies.articleFetcher ?? createFetchArticleFetcher();
   const corpusStore = dependencies.corpusStore;
   const now = dependencies.now ?? (() => new Date());
@@ -213,9 +213,9 @@ export function createFilesystemIngestionService(dependencies: IngestionServiceD
       };
     }
   };
-}
+};
 
-function skippedSummary(sourceType: SourceIngestionSummary["sourceType"], message: string): SourceIngestionSummary {
+const skippedSummary = (sourceType: SourceIngestionSummary["sourceType"], message: string): SourceIngestionSummary => {
   return {
     sourceType,
     status: "skipped",
@@ -226,16 +226,16 @@ function skippedSummary(sourceType: SourceIngestionSummary["sourceType"], messag
     message,
     details: []
   };
-}
+};
 
-function succeededSummary(
+const succeededSummary = (
   sourceType: SourceIngestionSummary["sourceType"],
   discovered: number,
   ingested: number,
   removed: number,
   message: string,
   details: string[] = []
-): SourceIngestionSummary {
+): SourceIngestionSummary => {
   return {
     sourceType,
     status: "succeeded",
@@ -246,9 +246,9 @@ function succeededSummary(
     message,
     details
   };
-}
+};
 
-function failedSummary(sourceType: SourceIngestionSummary["sourceType"], message: string): SourceIngestionSummary {
+const failedSummary = (sourceType: SourceIngestionSummary["sourceType"], message: string): SourceIngestionSummary => {
   return {
     sourceType,
     status: "failed",
@@ -259,9 +259,9 @@ function failedSummary(sourceType: SourceIngestionSummary["sourceType"], message
     message,
     details: []
   };
-}
+};
 
-function cloneRuntimeState(state: RuntimeState): RuntimeState {
+const cloneRuntimeState = (state: RuntimeState): RuntimeState => {
   return {
     appVersion: state.appVersion,
     foundry: {
@@ -275,8 +275,8 @@ function cloneRuntimeState(state: RuntimeState): RuntimeState {
       knownArticles: state.article.knownArticles.map((article) => ({ ...article }))
     }
   };
-}
+};
 
-function sortArticles(articles: ArticleStateRecord[]): ArticleStateRecord[] {
+const sortArticles = (articles: ArticleStateRecord[]): ArticleStateRecord[] => {
   return articles.sort((a, b) => a.canonicalUrl.localeCompare(b.canonicalUrl));
-}
+};

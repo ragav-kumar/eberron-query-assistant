@@ -12,11 +12,11 @@ export interface StartupRefreshDependencies {
   stateStore: StateStore;
 }
 
-export async function runStartupRefresh(
+export const runStartupRefresh = async (
   config: RuntimeConfig,
   options: RuntimeOptions,
   dependencies: StartupRefreshDependencies
-): Promise<StartupRefreshSummary> {
+): Promise<StartupRefreshSummary> => {
   dependencies.reporter.info("Starting source inventory checks.");
   const stateLoad = await dependencies.stateStore.load(config);
   const state = stateLoad.state;
@@ -71,4 +71,4 @@ export async function runStartupRefresh(
     inventories: discovery.inventories,
     degraded: discovery.degraded || ingestion.summary.degraded
   };
-}
+};

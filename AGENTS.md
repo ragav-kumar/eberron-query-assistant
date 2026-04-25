@@ -101,6 +101,8 @@ Implement the project as TypeScript-first code with explicit types at important 
 
 Prefer functional TypeScript. Model boundaries with interfaces and create concrete implementations with factory functions that return those interfaces. Do not add project-authored classes or constructors unless a later written specification explicitly requires them; third-party and platform constructors may still be used where their APIs require it.
 
+Prefer arrow functions over classic `function` declarations. Use classic functions only when a platform API, TypeScript limitation, or a concrete readability/safety need makes an arrow function unsuitable.
+
 For project-authored errors, prefer discriminated/tagged error values plus structural type guards over custom `Error` subclasses or `instanceof` checks. Formatting and classification should inspect stable fields such as `kind`, `name`, `message`, and Node-style `code`.
 
 Avoid hidden global state outside clearly owned runtime and configuration modules. Prefer explicit dependency passing where it improves testability and behavior clarity.

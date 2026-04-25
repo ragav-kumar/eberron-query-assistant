@@ -6,7 +6,7 @@ export interface TextChunk {
 
 const TARGET_CHUNK_CHARACTERS = 1_600;
 
-export function chunkText(text: string, targetCharacters = TARGET_CHUNK_CHARACTERS): TextChunk[] {
+export const chunkText = (text: string, targetCharacters = TARGET_CHUNK_CHARACTERS): TextChunk[] => {
   const paragraphs = normalizeText(text)
     .split(/\n{2,}/)
     .map((paragraph) => paragraph.trim())
@@ -46,13 +46,13 @@ export function chunkText(text: string, targetCharacters = TARGET_CHUNK_CHARACTE
   }
 
   return chunks;
-}
+};
 
-export function normalizeText(text: string): string {
+export const normalizeText = (text: string): string => {
   return text
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .replace(/[ \t]+\n/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
-}
+};

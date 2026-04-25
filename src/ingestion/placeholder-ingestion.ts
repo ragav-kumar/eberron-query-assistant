@@ -3,7 +3,7 @@ import type { RuntimeState } from "../state/index.js";
 import type { IngestionSummary, RuntimeConfig, RuntimeOptions } from "../types.js";
 import type { IngestionService } from "./ingestion-service.js";
 
-export function createPlaceholderIngestionService(): IngestionService {
+export const createPlaceholderIngestionService = (): IngestionService => {
   return {
     ingest(
       _config: RuntimeConfig,
@@ -30,4 +30,4 @@ export function createPlaceholderIngestionService(): IngestionService {
       });
     }
   };
-}
+};

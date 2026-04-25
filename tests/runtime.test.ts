@@ -94,7 +94,7 @@ describe("startup refresh skeleton", () => {
   });
 });
 
-async function writeManifest(foundryExportDir: string, runId: string, generatedAt: string, recordCount: number) {
+const writeManifest = async (foundryExportDir: string, runId: string, generatedAt: string, recordCount: number) => {
   await mkdir(foundryExportDir, { recursive: true });
   await writeFile(
     path.join(foundryExportDir, "manifest.json"),
@@ -107,4 +107,4 @@ async function writeManifest(foundryExportDir: string, runId: string, generatedA
     })}\n`,
     "utf8"
   );
-}
+};

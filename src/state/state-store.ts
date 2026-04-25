@@ -40,7 +40,7 @@ export interface StateStore {
   save(config: RuntimeConfig, state: RuntimeState): Promise<void>;
 }
 
-export function createDefaultRuntimeState(): RuntimeState {
+export const createDefaultRuntimeState = (): RuntimeState => {
   return {
     appVersion: getAppVersion(),
     foundry: {
@@ -54,4 +54,4 @@ export function createDefaultRuntimeState(): RuntimeState {
       knownArticles: []
     }
   };
-}
+};

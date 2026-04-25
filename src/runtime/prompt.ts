@@ -15,7 +15,7 @@ export interface PromptShellOptions {
   reporter: ProgressReporter;
 }
 
-export function createStubPromptShell(options: PromptShellOptions): PromptShell {
+export const createStubPromptShell = (options: PromptShellOptions): PromptShell => {
   const input = options.input ?? process.stdin;
   const output = options.output ?? process.stdout;
   const reporter = options.reporter;
@@ -53,8 +53,8 @@ export function createStubPromptShell(options: PromptShellOptions): PromptShell 
       }
     }
   };
-}
+};
 
-function isAbortError(error: unknown): boolean {
+const isAbortError = (error: unknown): boolean => {
   return hasErrorName(error, "AbortError");
-}
+};

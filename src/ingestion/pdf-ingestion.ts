@@ -23,7 +23,7 @@ export interface PdfParser {
   parse(filePath: string): Promise<ParsedPdf>;
 }
 
-export function createPdfDataExtractParser(): PdfParser {
+export const createPdfDataExtractParser = (): PdfParser => {
   return {
     async parse(filePath) {
       const data = await PdfData.extract(await readFile(filePath), {
@@ -52,13 +52,13 @@ export function createPdfDataExtractParser(): PdfParser {
       };
     }
   };
-}
+};
 
-export async function normalizePdf(
+export const normalizePdf = async (
   config: RuntimeConfig,
   filename: string,
   parser: PdfParser
-): Promise<{ source: CorpusSource; chunks: CorpusChunk[] }> {
+): Promise<{ source: CorpusSource; chunks: CorpusChunk[] }> => {
   const filePath = path.join(config.pdfDir, filename);
   const parsed = await parser.parse(filePath);
   const title = parsed.title ?? friendlyTitle(filename);
@@ -111,16 +111,16 @@ export async function normalizePdf(
   }
 
   return { source, chunks };
-}
+};
 
-function friendlyTitle(filename: string): string {
+const friendlyTitle = (filename: string): string => {
   return path
     .basename(filename, path.extname(filename))
     .replace(/[-_]+/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-}
+};
 
-function hashText(text: string): string {
+const hashText = (text: string): string => {
   return createHash("sha256").update(text).digest("hex").slice(0, 24);
-}
+};

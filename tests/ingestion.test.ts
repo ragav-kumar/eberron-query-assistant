@@ -173,7 +173,7 @@ describe("Phase 3 ingestion", () => {
   });
 });
 
-function createService(options: { articleFetcher?: ArticleFetcher; pdfParser?: PdfParser } = {}) {
+const createService = (options: { articleFetcher?: ArticleFetcher; pdfParser?: PdfParser } = {}) => {
   const corpusStore = createSqliteCorpusStore();
   stores.push(corpusStore);
   return createFilesystemIngestionService({
@@ -194,9 +194,9 @@ function createService(options: { articleFetcher?: ArticleFetcher; pdfParser?: P
       warn: () => undefined
     }
   });
-}
+};
 
-function scheduledDiscovery(state: RuntimeState, scheduled: Array<"foundry" | "pdf" | "article">): SourceDiscoverySummary {
+const scheduledDiscovery = (state: RuntimeState, scheduled: Array<"foundry" | "pdf" | "article">): SourceDiscoverySummary => {
   const nextState = createDefaultRuntimeState();
   nextState.foundry.lastSuccessfulExport = {
     generatedAt: "2026-04-24T10:00:00.000Z",
@@ -243,18 +243,18 @@ function scheduledDiscovery(state: RuntimeState, scheduled: Array<"foundry" | "p
       }
     ]
   };
-}
+};
 
-function readRows(config: ReturnType<typeof loadDefaultConfig>, sql: string): Array<Record<string, unknown>> {
+const readRows = (config: ReturnType<typeof loadDefaultConfig>, sql: string): Array<Record<string, unknown>> => {
   const database = new Database(getCorpusDatabasePath(config), { readonly: true });
   try {
     return database.prepare(sql).all() as Array<Record<string, unknown>>;
   } finally {
     database.close();
   }
-}
+};
 
-function createMapArticleFetcher(responses: Map<string, string>): ArticleFetcher {
+const createMapArticleFetcher = (responses: Map<string, string>): ArticleFetcher => {
   return {
     fetchText(url) {
       const response = responses.get(url);
@@ -264,4 +264,4 @@ function createMapArticleFetcher(responses: Map<string, string>): ArticleFetcher
       return Promise.resolve(response);
     }
   };
-}
+};

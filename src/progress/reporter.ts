@@ -8,7 +8,7 @@ export interface MemoryProgressReporter extends ProgressReporter {
   readonly warnings: string[];
 }
 
-export function createConsoleProgressReporter(): ProgressReporter {
+export const createConsoleProgressReporter = (): ProgressReporter => {
   return {
     info(message) {
       console.log(message);
@@ -18,9 +18,9 @@ export function createConsoleProgressReporter(): ProgressReporter {
       console.warn(message);
     }
   };
-}
+};
 
-export function createMemoryProgressReporter(): MemoryProgressReporter {
+export const createMemoryProgressReporter = (): MemoryProgressReporter => {
   const messages: string[] = [];
   const warnings: string[] = [];
 
@@ -34,4 +34,4 @@ export function createMemoryProgressReporter(): MemoryProgressReporter {
       warnings.push(message);
     }
   };
-}
+};

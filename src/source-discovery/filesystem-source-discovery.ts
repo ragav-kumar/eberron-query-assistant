@@ -18,9 +18,9 @@ export interface FilesystemSourceDiscoveryOptions {
   now?: () => Date;
 }
 
-export function createFilesystemSourceDiscoveryService(
+export const createFilesystemSourceDiscoveryService = (
   options: FilesystemSourceDiscoveryOptions = {}
-): SourceDiscoveryService {
+): SourceDiscoveryService => {
   const now = options.now ?? (() => new Date());
 
   const inspectFoundry = async (
@@ -214,9 +214,9 @@ export function createFilesystemSourceDiscoveryService(
       };
     }
   };
-}
+};
 
-function parseFoundryManifest(value: unknown): FoundryExportMarker {
+const parseFoundryManifest = (value: unknown): FoundryExportMarker => {
   if (!isRecord(value)) {
     throw createManifestError("manifest must contain an object");
   }
@@ -247,16 +247,16 @@ function parseFoundryManifest(value: unknown): FoundryExportMarker {
     recordCount,
     runId
   };
-}
+};
 
-function markersEqual(
+const markersEqual = (
   left: FoundryExportMarker,
   right: FoundryExportMarker
-): boolean {
+): boolean => {
   return left.generatedAt === right.generatedAt && left.recordCount === right.recordCount && left.runId === right.runId;
-}
+};
 
-function createInventoryResult(options: {
+const createInventoryResult = (options: {
   sourceType: SourceType;
   discovered?: number;
   added?: number;
@@ -266,7 +266,7 @@ function createInventoryResult(options: {
   status: SourceInventoryStatus;
   message: string;
   details?: string[];
-}): SourceInventoryResult {
+}): SourceInventoryResult => {
   return {
     sourceType: options.sourceType,
     discovered: options.discovered ?? 0,
@@ -278,9 +278,9 @@ function createInventoryResult(options: {
     message: options.message,
     details: options.details ?? []
   };
-}
+};
 
-function cloneRuntimeState(state: RuntimeState): RuntimeState {
+const cloneRuntimeState = (state: RuntimeState): RuntimeState => {
   return {
     appVersion: state.appVersion,
     foundry: {
@@ -294,8 +294,8 @@ function cloneRuntimeState(state: RuntimeState): RuntimeState {
       knownArticles: state.article.knownArticles.map((article) => ({ ...article }))
     }
   };
-}
+};
 
-function createManifestError(message: string): unknown {
+const createManifestError = (message: string): unknown => {
   return createTaggedError("invalid-foundry-manifest", message);
-}
+};

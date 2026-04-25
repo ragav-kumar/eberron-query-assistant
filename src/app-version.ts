@@ -1,5 +1,5 @@
 import packageJson from "../package.json" with { type: "json" };
 
-export function getAppVersion(): string {
+export const getAppVersion = (): string => {
   return packageJson.version;
-}
+};

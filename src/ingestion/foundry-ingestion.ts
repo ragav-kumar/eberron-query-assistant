@@ -14,23 +14,23 @@ export interface FoundryIngestionResult {
   }>;
 }
 
-export async function parseFoundryRecords(
+export const parseFoundryRecords = async (
   config: RuntimeConfig,
   exportMarker: FoundryExportMarker
-): Promise<FoundryIngestionResult> {
+): Promise<FoundryIngestionResult> => {
   const recordsPath = path.join(config.foundryExportDir, "records.ndjson");
   const raw = await readFile(recordsPath, "utf8");
   const lines = raw.split(/\r?\n/).filter((line) => line.trim().length > 0);
 
   const sources = lines.map((line, index) => normalizeFoundryLine(line, index, exportMarker));
   return { sources };
-}
+};
 
-function normalizeFoundryLine(
+const normalizeFoundryLine = (
   line: string,
   index: number,
   exportMarker: FoundryExportMarker
-): { source: CorpusSource; chunks: CorpusChunk[] } {
+): { source: CorpusSource; chunks: CorpusChunk[] } => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(line) as unknown;
@@ -88,15 +88,15 @@ function normalizeFoundryLine(
   }));
 
   return { source, chunks };
-}
+};
 
-function extractText(value: unknown): string {
+const extractText = (value: unknown): string => {
   const textParts: string[] = [];
   collectText(value, textParts, new Set());
   return [...new Set(textParts)].join("\n\n");
-}
+};
 
-function collectText(value: unknown, textParts: string[], seen: Set<unknown>): void {
+const collectText = (value: unknown, textParts: string[], seen: Set<unknown>): void => {
   if (typeof value === "string") {
     const text = stripHtml(value).trim();
     if (text.length >= 2) {
@@ -127,9 +127,9 @@ function collectText(value: unknown, textParts: string[], seen: Set<unknown>): v
     }
     collectText(item, textParts, seen);
   }
-}
+};
 
-function firstString(record: Record<string, unknown>, keys: string[]): string | null {
+const firstString = (record: Record<string, unknown>, keys: string[]): string | null => {
   for (const key of keys) {
     const value = record[key];
     if (typeof value === "string" && value.trim().length > 0) {
@@ -137,16 +137,16 @@ function firstString(record: Record<string, unknown>, keys: string[]): string | 
     }
   }
   return null;
-}
+};
 
-function createSourceId(sourceType: string, sourceKey: string): string {
+const createSourceId = (sourceType: string, sourceKey: string): string => {
   return `${sourceType}:${hashText(sourceKey)}`;
-}
+};
 
-function hashText(text: string): string {
+const hashText = (text: string): string => {
   return createHash("sha256").update(text).digest("hex").slice(0, 24);
-}
+};
 
-function stripHtml(value: string): string {
+const stripHtml = (value: string): string => {
   return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
-}
+};

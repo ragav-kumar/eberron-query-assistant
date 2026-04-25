@@ -4,7 +4,7 @@ import type { SourceDiscoveryService, SourceDiscoverySummary } from "./source-di
 
 const SOURCE_TYPES: SourceType[] = ["foundry", "pdf", "article"];
 
-export function createPlaceholderSourceDiscoveryService(): SourceDiscoveryService {
+export const createPlaceholderSourceDiscoveryService = (): SourceDiscoveryService => {
   return {
     inspectSources(_config: unknown, _options: unknown, state: RuntimeState): Promise<SourceDiscoverySummary> {
       return Promise.resolve({
@@ -24,4 +24,4 @@ export function createPlaceholderSourceDiscoveryService(): SourceDiscoveryServic
       });
     }
   };
-}
+};

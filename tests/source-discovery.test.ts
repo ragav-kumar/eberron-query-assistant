@@ -153,18 +153,18 @@ describe("FilesystemSourceDiscoveryService", () => {
   });
 });
 
-async function inspect(
+const inspect = async (
   config = loadDefaultConfig(TEST_ROOT),
   options: {
     forceReingest?: boolean;
     state?: ReturnType<typeof createDefaultRuntimeState>;
   } = {}
-) {
+) => {
   const service = createFilesystemSourceDiscoveryService({ now: () => NOW });
   return service.inspectSources(config, { forceReingest: options.forceReingest ?? false }, options.state ?? createDefaultRuntimeState());
-}
+};
 
-async function writeManifest(foundryExportDir: string, runId: string, generatedAt: string, recordCount: number) {
+const writeManifest = async (foundryExportDir: string, runId: string, generatedAt: string, recordCount: number) => {
   await mkdir(foundryExportDir, { recursive: true });
   await writeFile(
     path.join(foundryExportDir, "manifest.json"),
@@ -177,4 +177,4 @@ async function writeManifest(foundryExportDir: string, runId: string, generatedA
     })}\n`,
     "utf8"
   );
-}
+};

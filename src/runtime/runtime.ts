@@ -19,10 +19,10 @@ export interface RuntimeDependencies {
   stateStore?: StateStore;
 }
 
-export async function runRuntime(
+export const runRuntime = async (
   options: RuntimeOptions,
   dependencies: RuntimeDependencies = {}
-): Promise<StartupRefreshSummary> {
+): Promise<StartupRefreshSummary> => {
   const config = dependencies.config ?? loadDefaultConfig();
   const reporter = dependencies.reporter ?? createConsoleProgressReporter();
   const discovery = dependencies.discovery ?? createFilesystemSourceDiscoveryService();
@@ -45,4 +45,4 @@ export async function runRuntime(
   await prompt.start();
 
   return summary;
-}
+};

@@ -22,7 +22,7 @@ export interface CorpusStore {
   close(): void;
 }
 
-export function createSqliteCorpusStore(): CorpusStore {
+export const createSqliteCorpusStore = (): CorpusStore => {
   let database: Database.Database | null = null;
   let databasePath: string | null = null;
 
@@ -120,9 +120,9 @@ export function createSqliteCorpusStore(): CorpusStore {
 
     close
   };
-}
+};
 
-function insertSource(database: Database.Database, source: CorpusSource, chunks: CorpusChunk[]): void {
+const insertSource = (database: Database.Database, source: CorpusSource, chunks: CorpusChunk[]): void => {
   const now = new Date().toISOString();
   database
     .prepare(
@@ -169,8 +169,8 @@ function insertSource(database: Database.Database, source: CorpusSource, chunks:
       JSON.stringify(chunk.metadata)
     );
   }
-}
+};
 
-export function getCorpusDatabasePath(config: RuntimeConfig): string {
+export const getCorpusDatabasePath = (config: RuntimeConfig): string => {
   return path.join(config.retrievalDir, DATABASE_FILENAME);
-}
+};

@@ -2,7 +2,7 @@ import { parseArgs } from "node:util";
 
 import type { RuntimeOptions } from "../types.js";
 
-export function parseRuntimeOptions(args: string[] = process.argv.slice(2)): RuntimeOptions {
+export const parseRuntimeOptions = (args: string[] = process.argv.slice(2)): RuntimeOptions => {
   const parsed = parseArgs({
     args,
     options: {
@@ -18,4 +18,4 @@ export function parseRuntimeOptions(args: string[] = process.argv.slice(2)): Run
   return {
     forceReingest: parsed.values["force-reingest"] ?? false
   };
-}
+};
