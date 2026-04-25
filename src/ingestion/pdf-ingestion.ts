@@ -23,33 +23,35 @@ export interface PdfParser {
   parse(filePath: string): Promise<ParsedPdf>;
 }
 
-export class PdfDataExtractParser implements PdfParser {
-  async parse(filePath: string): Promise<ParsedPdf> {
-    const data = await PdfData.extract(await readFile(filePath), {
-      sort: true,
-      verbosity: VerbosityLevel.ERRORS,
-      get: {
-        pages: true,
-        text: true,
-        fingerprint: true,
-        info: true,
-        metadata: false,
-        outline: false,
-        permissions: false
-      }
-    });
+export function createPdfDataExtractParser(): PdfParser {
+  return {
+    async parse(filePath) {
+      const data = await PdfData.extract(await readFile(filePath), {
+        sort: true,
+        verbosity: VerbosityLevel.ERRORS,
+        get: {
+          pages: true,
+          text: true,
+          fingerprint: true,
+          info: true,
+          metadata: false,
+          outline: false,
+          permissions: false
+        }
+      });
 
-    const text = data.text ?? [];
-    return {
-      pageCount: data.pages ?? text.length,
-      fingerprint: data.fingerprint ?? null,
-      title: typeof data.info?.Title === "string" && data.info.Title.trim().length > 0 ? data.info.Title.trim() : null,
-      pages: text.map((pageText, index) => ({
-        pageNumber: index + 1,
-        text: normalizeText(pageText)
-      }))
-    };
-  }
+      const text = data.text ?? [];
+      return {
+        pageCount: data.pages ?? text.length,
+        fingerprint: data.fingerprint ?? null,
+        title: typeof data.info?.Title === "string" && data.info.Title.trim().length > 0 ? data.info.Title.trim() : null,
+        pages: text.map((pageText, index) => ({
+          pageNumber: index + 1,
+          text: normalizeText(pageText)
+        }))
+      };
+    }
+  };
 }
 
 export async function normalizePdf(

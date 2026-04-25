@@ -22,13 +22,34 @@ export interface CorpusStore {
   close(): void;
 }
 
-export class SqliteCorpusStore implements CorpusStore {
-  private database: Database.Database | null = null;
-  private databasePath: string | null = null;
+export function createSqliteCorpusStore(): CorpusStore {
+  let database: Database.Database | null = null;
+  let databasePath: string | null = null;
 
-  async initialize(config: RuntimeConfig): Promise<void> {
-    const database = await this.open(config);
-    database.exec(`
+  const close = (): void => {
+    database?.close();
+    database = null;
+    databasePath = null;
+  };
+
+  const open = async (config: RuntimeConfig): Promise<Database.Database> => {
+    const nextDatabasePath = getCorpusDatabasePath(config);
+    if (database && databasePath === nextDatabasePath) {
+      return database;
+    }
+
+    close();
+    await mkdir(config.retrievalDir, { recursive: true });
+    database = new Database(nextDatabasePath);
+    databasePath = nextDatabasePath;
+    database.pragma("foreign_keys = ON");
+    return database;
+  };
+
+  return {
+    async initialize(config) {
+      const openedDatabase = await open(config);
+      openedDatabase.exec(`
       PRAGMA foreign_keys = ON;
 
       CREATE TABLE IF NOT EXISTS sources (
@@ -53,73 +74,52 @@ export class SqliteCorpusStore implements CorpusStore {
         UNIQUE(source_id, chunk_index)
       );
     `);
-  }
+    },
 
-  async clear(config: RuntimeConfig): Promise<void> {
-    const database = await this.open(config);
-    database.transaction(() => {
-      database.prepare("DELETE FROM chunks").run();
-      database.prepare("DELETE FROM sources").run();
-    })();
-  }
+    async clear(config) {
+      const openedDatabase = await open(config);
+      openedDatabase.transaction(() => {
+        openedDatabase.prepare("DELETE FROM chunks").run();
+        openedDatabase.prepare("DELETE FROM sources").run();
+      })();
+    },
 
-  async replaceSource(config: RuntimeConfig, source: CorpusSource, chunks: CorpusChunk[]): Promise<void> {
-    const database = await this.open(config);
-    database.transaction(() => {
-      database.prepare("DELETE FROM sources WHERE source_type = ? AND source_key = ?").run(source.sourceType, source.sourceKey);
-      insertSource(database, source, chunks);
-    })();
-  }
+    async replaceSource(config, source, chunks) {
+      const openedDatabase = await open(config);
+      openedDatabase.transaction(() => {
+        openedDatabase.prepare("DELETE FROM sources WHERE source_type = ? AND source_key = ?").run(source.sourceType, source.sourceKey);
+        insertSource(openedDatabase, source, chunks);
+      })();
+    },
 
-  async replaceSourcesByType(
-    config: RuntimeConfig,
-    sourceType: SourceType,
-    sources: Array<{ source: CorpusSource; chunks: CorpusChunk[] }>
-  ): Promise<void> {
-    const database = await this.open(config);
-    database.transaction(() => {
-      database.prepare("DELETE FROM sources WHERE source_type = ?").run(sourceType);
-      for (const source of sources) {
-        insertSource(database, source.source, source.chunks);
-      }
-    })();
-  }
+    async replaceSourcesByType(config, sourceType, sources) {
+      const openedDatabase = await open(config);
+      openedDatabase.transaction(() => {
+        openedDatabase.prepare("DELETE FROM sources WHERE source_type = ?").run(sourceType);
+        for (const source of sources) {
+          insertSource(openedDatabase, source.source, source.chunks);
+        }
+      })();
+    },
 
-  async removeSource(config: RuntimeConfig, sourceType: SourceType, sourceKey: string): Promise<void> {
-    const database = await this.open(config);
-    database.prepare("DELETE FROM sources WHERE source_type = ? AND source_key = ?").run(sourceType, sourceKey);
-  }
+    async removeSource(config, sourceType, sourceKey) {
+      const openedDatabase = await open(config);
+      openedDatabase.prepare("DELETE FROM sources WHERE source_type = ? AND source_key = ?").run(sourceType, sourceKey);
+    },
 
-  async removeSourcesByType(config: RuntimeConfig, sourceType: SourceType): Promise<void> {
-    const database = await this.open(config);
-    database.prepare("DELETE FROM sources WHERE source_type = ?").run(sourceType);
-  }
+    async removeSourcesByType(config, sourceType) {
+      const openedDatabase = await open(config);
+      openedDatabase.prepare("DELETE FROM sources WHERE source_type = ?").run(sourceType);
+    },
 
-  async countSources(config: RuntimeConfig): Promise<number> {
-    const database = await this.open(config);
-    const result = database.prepare("SELECT COUNT(*) AS count FROM sources").get() as { count: number };
-    return result.count;
-  }
+    async countSources(config) {
+      const openedDatabase = await open(config);
+      const result = openedDatabase.prepare("SELECT COUNT(*) AS count FROM sources").get() as { count: number };
+      return result.count;
+    },
 
-  close(): void {
-    this.database?.close();
-    this.database = null;
-    this.databasePath = null;
-  }
-
-  private async open(config: RuntimeConfig): Promise<Database.Database> {
-    const databasePath = getCorpusDatabasePath(config);
-    if (this.database && this.databasePath === databasePath) {
-      return this.database;
-    }
-
-    this.close();
-    await mkdir(config.retrievalDir, { recursive: true });
-    this.database = new Database(databasePath);
-    this.databasePath = databasePath;
-    this.database.pragma("foreign_keys = ON");
-    return this.database;
-  }
+    close
+  };
 }
 
 function insertSource(database: Database.Database, source: CorpusSource, chunks: CorpusChunk[]): void {

@@ -1,11 +1,12 @@
+import { formatThrownValue } from "../errors.js";
 import type { ProgressReporter } from "../progress/reporter.js";
 import type { SourceDiscoverySummary } from "../source-discovery/index.js";
 import type { ArticleStateRecord, RuntimeState } from "../state/index.js";
 import type { IngestionSummary, RuntimeConfig, RuntimeOptions, SourceIngestionSummary } from "../types.js";
-import { FetchArticleFetcher, KEITH_BAKER_INDEX_URL, type ArticleFetcher, discoverArticleLinks, normalizeArticle } from "./article-ingestion.js";
+import { createFetchArticleFetcher, KEITH_BAKER_INDEX_URL, type ArticleFetcher, discoverArticleLinks, normalizeArticle } from "./article-ingestion.js";
 import type { CorpusStore } from "./corpus-store.js";
 import { parseFoundryRecords } from "./foundry-ingestion.js";
-import { PdfDataExtractParser, type PdfParser, normalizePdf } from "./pdf-ingestion.js";
+import { createPdfDataExtractParser, type PdfParser, normalizePdf } from "./pdf-ingestion.js";
 
 export interface IngestionServiceDependencies {
   articleFetcher?: ArticleFetcher;
@@ -28,59 +29,17 @@ export interface IngestionService {
   }>;
 }
 
-export class FilesystemIngestionService implements IngestionService {
-  private readonly articleFetcher: ArticleFetcher;
-  private readonly corpusStore: CorpusStore;
-  private readonly now: () => Date;
-  private readonly pdfParser: PdfParser;
+export function createFilesystemIngestionService(dependencies: IngestionServiceDependencies): IngestionService {
+  const articleFetcher = dependencies.articleFetcher ?? createFetchArticleFetcher();
+  const corpusStore = dependencies.corpusStore;
+  const now = dependencies.now ?? (() => new Date());
+  const pdfParser = dependencies.pdfParser ?? createPdfDataExtractParser();
 
-  constructor(dependencies: IngestionServiceDependencies) {
-    this.articleFetcher = dependencies.articleFetcher ?? new FetchArticleFetcher();
-    this.corpusStore = dependencies.corpusStore;
-    this.now = dependencies.now ?? (() => new Date());
-    this.pdfParser = dependencies.pdfParser ?? new PdfDataExtractParser();
-  }
-
-  async ingest(
-    config: RuntimeConfig,
-    options: RuntimeOptions,
-    state: RuntimeState,
-    discovery: SourceDiscoverySummary,
-    invalidated = false
-  ): Promise<{
-    summary: IngestionSummary;
-    nextState: RuntimeState;
-  }> {
-    await this.corpusStore.initialize(config);
-    if (options.forceReingest || invalidated) {
-      await this.corpusStore.clear(config);
-    }
-
-    const nextState = cloneRuntimeState(state);
-    const summaries: SourceIngestionSummary[] = [];
-
-    summaries.push(await this.ingestFoundry(config, discovery, nextState));
-    summaries.push(await this.ingestPdf(config, discovery, nextState));
-    summaries.push(await this.ingestArticles(config, options, state, discovery, nextState));
-
-    const sourceCount = await this.corpusStore.countSources(config);
-    const degraded = summaries.some((summary) => summary.status === "failed" || summary.failed > 0) || sourceCount === 0;
-
-    return {
-      summary: {
-        sourceSummaries: summaries,
-        degraded,
-        corpusSourceCount: sourceCount
-      },
-      nextState
-    };
-  }
-
-  private async ingestFoundry(
+  const ingestFoundry = async (
     config: RuntimeConfig,
     discovery: SourceDiscoverySummary,
     nextState: RuntimeState
-  ): Promise<SourceIngestionSummary> {
+  ): Promise<SourceIngestionSummary> => {
     const inventory = discovery.inventories.find((candidate) => candidate.sourceType === "foundry");
     if (!inventory || inventory.status !== "scheduled") {
       return skippedSummary("foundry", "foundry: ingestion skipped.");
@@ -93,19 +52,19 @@ export class FilesystemIngestionService implements IngestionService {
 
     try {
       const parsed = await parseFoundryRecords(config, marker);
-      await this.corpusStore.replaceSourcesByType(config, "foundry", parsed.sources);
+      await corpusStore.replaceSourcesByType(config, "foundry", parsed.sources);
       nextState.foundry.lastSuccessfulExport = marker;
       return succeededSummary("foundry", parsed.sources.length, parsed.sources.length, 0, "foundry: ingested records.ndjson.");
     } catch (error) {
-      return failedSummary("foundry", `foundry: ingestion failed: ${formatError(error)}.`);
+      return failedSummary("foundry", `foundry: ingestion failed: ${formatThrownValue(error)}.`);
     }
-  }
+  };
 
-  private async ingestPdf(
+  const ingestPdf = async (
     config: RuntimeConfig,
     discovery: SourceDiscoverySummary,
     nextState: RuntimeState
-  ): Promise<SourceIngestionSummary> {
+  ): Promise<SourceIngestionSummary> => {
     const inventory = discovery.inventories.find((candidate) => candidate.sourceType === "pdf");
     if (!inventory || inventory.status !== "scheduled") {
       return skippedSummary("pdf", "pdf: ingestion skipped.");
@@ -124,17 +83,17 @@ export class FilesystemIngestionService implements IngestionService {
     const details: string[] = [];
 
     for (const filename of removed) {
-      await this.corpusStore.removeSource(config, "pdf", filename);
+      await corpusStore.removeSource(config, "pdf", filename);
     }
 
     for (const filename of filenames) {
       try {
-        const normalized = await normalizePdf(config, filename, this.pdfParser);
-        await this.corpusStore.replaceSource(config, normalized.source, normalized.chunks);
+        const normalized = await normalizePdf(config, filename, pdfParser);
+        await corpusStore.replaceSource(config, normalized.source, normalized.chunks);
         ingested += 1;
       } catch (error) {
         failed += 1;
-        details.push(`${filename}: ${formatError(error)}`);
+        details.push(`${filename}: ${formatThrownValue(error)}`);
       }
     }
 
@@ -156,24 +115,24 @@ export class FilesystemIngestionService implements IngestionService {
           : "pdf: ingestion failed.",
       details
     };
-  }
+  };
 
-  private async ingestArticles(
+  const ingestArticles = async (
     config: RuntimeConfig,
     options: RuntimeOptions,
     state: RuntimeState,
     discovery: SourceDiscoverySummary,
     nextState: RuntimeState
-  ): Promise<SourceIngestionSummary> {
+  ): Promise<SourceIngestionSummary> => {
     const inventory = discovery.inventories.find((candidate) => candidate.sourceType === "article");
     if (!inventory || inventory.status !== "scheduled") {
       return skippedSummary("article", "article: ingestion skipped.");
     }
 
-    const now = this.now().toISOString();
+    const nowIso = now().toISOString();
     try {
-      const indexHtml = await this.articleFetcher.fetchText(KEITH_BAKER_INDEX_URL);
-      const discovered = discoverArticleLinks(indexHtml, state.article.knownArticles, now);
+      const indexHtml = await articleFetcher.fetchText(KEITH_BAKER_INDEX_URL);
+      const discovered = discoverArticleLinks(indexHtml, state.article.knownArticles, nowIso);
       const articleMap = new Map(discovered.articles.map((article) => [article.canonicalUrl, article]));
       const ingestCandidates = discovered.articles.filter(
         (article) => options.forceReingest || article.scrapeStatus !== "succeeded" || !article.lastIngestedAt
@@ -185,14 +144,14 @@ export class FilesystemIngestionService implements IngestionService {
 
       for (const article of ingestCandidates) {
         try {
-          const html = await this.articleFetcher.fetchText(article.canonicalUrl);
-          const normalized = normalizeArticle(article.canonicalUrl, html, article, now);
-          await this.corpusStore.replaceSource(config, normalized.source, normalized.chunks);
+          const html = await articleFetcher.fetchText(article.canonicalUrl);
+          const normalized = normalizeArticle(article.canonicalUrl, html, article, nowIso);
+          await corpusStore.replaceSource(config, normalized.source, normalized.chunks);
           articleMap.set(article.canonicalUrl, normalized.article);
           ingested += 1;
         } catch (error) {
           failed += 1;
-          details.push(`${article.canonicalUrl}: ${formatError(error)}`);
+          details.push(`${article.canonicalUrl}: ${formatThrownValue(error)}`);
           articleMap.set(article.canonicalUrl, {
             ...article,
             scrapeStatus: "failed"
@@ -200,7 +159,7 @@ export class FilesystemIngestionService implements IngestionService {
         }
       }
 
-      nextState.article.lastSuccessfulIndexScrapeAt = now;
+      nextState.article.lastSuccessfulIndexScrapeAt = nowIso;
       nextState.article.knownArticles = sortArticles([...articleMap.values()]);
 
       return {
@@ -217,9 +176,43 @@ export class FilesystemIngestionService implements IngestionService {
         details
       };
     } catch (error) {
-      return failedSummary("article", `article: ingestion failed: ${formatError(error)}.`);
+      return failedSummary("article", `article: ingestion failed: ${formatThrownValue(error)}.`);
     }
-  }
+  };
+
+  return {
+    async ingest(
+    config: RuntimeConfig,
+    options: RuntimeOptions,
+    state: RuntimeState,
+    discovery: SourceDiscoverySummary,
+    invalidated = false
+    ) {
+      await corpusStore.initialize(config);
+      if (options.forceReingest || invalidated) {
+        await corpusStore.clear(config);
+      }
+
+      const nextState = cloneRuntimeState(state);
+      const summaries: SourceIngestionSummary[] = [];
+
+      summaries.push(await ingestFoundry(config, discovery, nextState));
+      summaries.push(await ingestPdf(config, discovery, nextState));
+      summaries.push(await ingestArticles(config, options, state, discovery, nextState));
+
+      const sourceCount = await corpusStore.countSources(config);
+      const degraded = summaries.some((summary) => summary.status === "failed" || summary.failed > 0) || sourceCount === 0;
+
+      return {
+        summary: {
+          sourceSummaries: summaries,
+          degraded,
+          corpusSourceCount: sourceCount
+        },
+        nextState
+      };
+    }
+  };
 }
 
 function skippedSummary(sourceType: SourceIngestionSummary["sourceType"], message: string): SourceIngestionSummary {
@@ -286,8 +279,4 @@ function cloneRuntimeState(state: RuntimeState): RuntimeState {
 
 function sortArticles(articles: ArticleStateRecord[]): ArticleStateRecord[] {
   return articles.sort((a, b) => a.canonicalUrl.localeCompare(b.canonicalUrl));
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

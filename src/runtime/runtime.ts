@@ -1,13 +1,13 @@
 import { loadDefaultConfig } from "../config/index.js";
-import { FilesystemIngestionService, SqliteCorpusStore, type IngestionService } from "../ingestion/index.js";
-import { ConsoleProgressReporter, type ProgressReporter } from "../progress/reporter.js";
+import { createFilesystemIngestionService, createSqliteCorpusStore, type IngestionService } from "../ingestion/index.js";
+import { createConsoleProgressReporter, type ProgressReporter } from "../progress/reporter.js";
 import {
-  FilesystemSourceDiscoveryService,
+  createFilesystemSourceDiscoveryService,
   type SourceDiscoveryService
 } from "../source-discovery/index.js";
-import { FilesystemStateStore, type StateStore } from "../state/index.js";
+import { createFilesystemStateStore, type StateStore } from "../state/index.js";
 import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
-import { StubPromptShell, type PromptShell } from "./prompt.js";
+import { createStubPromptShell, type PromptShell } from "./prompt.js";
 import { runStartupRefresh } from "./refresh.js";
 
 export interface RuntimeDependencies {
@@ -24,15 +24,15 @@ export async function runRuntime(
   dependencies: RuntimeDependencies = {}
 ): Promise<StartupRefreshSummary> {
   const config = dependencies.config ?? loadDefaultConfig();
-  const reporter = dependencies.reporter ?? new ConsoleProgressReporter();
-  const discovery = dependencies.discovery ?? new FilesystemSourceDiscoveryService();
+  const reporter = dependencies.reporter ?? createConsoleProgressReporter();
+  const discovery = dependencies.discovery ?? createFilesystemSourceDiscoveryService();
   const ingestion =
     dependencies.ingestion ??
-    new FilesystemIngestionService({
-      corpusStore: new SqliteCorpusStore(),
+    createFilesystemIngestionService({
+      corpusStore: createSqliteCorpusStore(),
       reporter
     });
-  const stateStore = dependencies.stateStore ?? new FilesystemStateStore();
+  const stateStore = dependencies.stateStore ?? createFilesystemStateStore();
 
   const summary = await runStartupRefresh(config, options, {
     discovery,
@@ -41,7 +41,7 @@ export async function runRuntime(
     stateStore
   });
 
-  const prompt = dependencies.prompt ?? new StubPromptShell({ reporter });
+  const prompt = dependencies.prompt ?? createStubPromptShell({ reporter });
   await prompt.start();
 
   return summary;

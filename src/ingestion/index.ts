@@ -1,9 +1,9 @@
-export { FilesystemIngestionService } from "./ingestion-service.js";
-export { PlaceholderIngestionService } from "./placeholder-ingestion.js";
-export { SqliteCorpusStore, getCorpusDatabasePath } from "./corpus-store.js";
-export { discoverArticleLinks, normalizeArticle } from "./article-ingestion.js";
+export { createFilesystemIngestionService } from "./ingestion-service.js";
+export { createPlaceholderIngestionService } from "./placeholder-ingestion.js";
+export { createSqliteCorpusStore, getCorpusDatabasePath } from "./corpus-store.js";
+export { createFetchArticleFetcher, discoverArticleLinks, normalizeArticle } from "./article-ingestion.js";
 export { parseFoundryRecords } from "./foundry-ingestion.js";
-export { PdfDataExtractParser, normalizePdf } from "./pdf-ingestion.js";
+export { createPdfDataExtractParser, normalizePdf } from "./pdf-ingestion.js";
 export type { CorpusStore } from "./corpus-store.js";
 export type { ArticleFetcher } from "./article-ingestion.js";
 export type { IngestionService } from "./ingestion-service.js";

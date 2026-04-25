@@ -4,12 +4,12 @@ import path from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
-import { PlaceholderIngestionService } from "../src/ingestion/index.js";
-import { MemoryProgressReporter } from "../src/progress/reporter.js";
+import { createPlaceholderIngestionService } from "../src/ingestion/index.js";
+import { createMemoryProgressReporter } from "../src/progress/reporter.js";
 import { runRuntime } from "../src/runtime/index.js";
 import { runStartupRefresh } from "../src/runtime/refresh.js";
-import { FilesystemSourceDiscoveryService, PlaceholderSourceDiscoveryService } from "../src/source-discovery/index.js";
-import { FilesystemStateStore, PlaceholderStateStore } from "../src/state/index.js";
+import { createFilesystemSourceDiscoveryService, createPlaceholderSourceDiscoveryService } from "../src/source-discovery/index.js";
+import { createFilesystemStateStore, createPlaceholderStateStore } from "../src/state/index.js";
 import { createDefaultRuntimeState } from "../src/state/state-store.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "runtime");
@@ -17,13 +17,13 @@ const PLACEHOLDER_ROOT = path.resolve(".test-tmp", "runtime-placeholder");
 
 describe("startup refresh skeleton", () => {
   it("emits readable source inventory progress", async () => {
-    const reporter = new MemoryProgressReporter();
+    const reporter = createMemoryProgressReporter();
 
     await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: true }, {
-      discovery: new PlaceholderSourceDiscoveryService(),
-      ingestion: new PlaceholderIngestionService(),
+      discovery: createPlaceholderSourceDiscoveryService(),
+      ingestion: createPlaceholderIngestionService(),
       reporter,
-      stateStore: new PlaceholderStateStore()
+      stateStore: createPlaceholderStateStore()
     });
 
     expect(reporter.messages).toContain("Starting source inventory checks.");
@@ -44,11 +44,11 @@ describe("startup refresh skeleton", () => {
       { forceReingest: false },
       {
         config: loadDefaultConfig(PLACEHOLDER_ROOT),
-        discovery: new PlaceholderSourceDiscoveryService(),
-        ingestion: new PlaceholderIngestionService(),
+        discovery: createPlaceholderSourceDiscoveryService(),
+        ingestion: createPlaceholderIngestionService(),
         prompt,
-        reporter: new MemoryProgressReporter(),
-        stateStore: new PlaceholderStateStore()
+        reporter: createMemoryProgressReporter(),
+        stateStore: createPlaceholderStateStore()
       }
     );
 
@@ -62,7 +62,7 @@ describe("startup refresh skeleton", () => {
 
     try {
       const config = loadDefaultConfig(TEST_ROOT);
-      const stateStore = new FilesystemStateStore();
+      const stateStore = createFilesystemStateStore();
       const initialState = createDefaultRuntimeState();
       initialState.article.lastSuccessfulIndexScrapeAt = "2026-04-24T10:00:00.000Z";
 
@@ -72,9 +72,9 @@ describe("startup refresh skeleton", () => {
       await writeFile(path.join(config.pdfDir, "rising.pdf"), "", "utf8");
 
       const summary = await runStartupRefresh(config, { forceReingest: false }, {
-        discovery: new FilesystemSourceDiscoveryService({ now: () => new Date("2026-04-24T12:00:00.000Z") }),
-        ingestion: new PlaceholderIngestionService(),
-        reporter: new MemoryProgressReporter(),
+        discovery: createFilesystemSourceDiscoveryService({ now: () => new Date("2026-04-24T12:00:00.000Z") }),
+        ingestion: createPlaceholderIngestionService(),
+        reporter: createMemoryProgressReporter(),
         stateStore
       });
 

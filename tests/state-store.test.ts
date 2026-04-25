@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
-import { FilesystemStateStore, getStatePath } from "../src/state/index.js";
+import { createFilesystemStateStore, getStatePath } from "../src/state/index.js";
 import type { RuntimeState } from "../src/state/index.js";
 import { getAppVersion } from "../src/app-version.js";
 
@@ -21,7 +21,7 @@ describe("FilesystemStateStore", () => {
   });
 
   it("loads default state when no state file exists", async () => {
-    const store = new FilesystemStateStore();
+    const store = createFilesystemStateStore();
 
     await expect(store.load(loadDefaultConfig(TEST_ROOT))).resolves.toEqual({
       invalidated: false,
@@ -44,7 +44,7 @@ describe("FilesystemStateStore", () => {
 
   it("creates the state directory and round-trips deterministic state", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
-    const store = new FilesystemStateStore();
+    const store = createFilesystemStateStore();
     const articleA = {
       canonicalUrl: "https://keith-baker.com/a",
       title: "A",
@@ -99,7 +99,7 @@ describe("FilesystemStateStore", () => {
 
   it("invalidates missing app version state", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
-    const store = new FilesystemStateStore();
+    const store = createFilesystemStateStore();
 
     await mkdir(config.stateDir, { recursive: true });
     await writeFile(getStatePath(config), `${JSON.stringify({ version: 2 })}\n`, "utf8");
@@ -113,7 +113,7 @@ describe("FilesystemStateStore", () => {
 
   it("invalidates different app version state", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
-    const store = new FilesystemStateStore();
+    const store = createFilesystemStateStore();
 
     await mkdir(config.stateDir, { recursive: true });
     await writeFile(getStatePath(config), `${JSON.stringify({ appVersion: "0.2.0" })}\n`, "utf8");

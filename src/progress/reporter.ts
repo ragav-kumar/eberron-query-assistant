@@ -3,25 +3,35 @@ export interface ProgressReporter {
   warn(message: string): void;
 }
 
-export class ConsoleProgressReporter implements ProgressReporter {
-  info(message: string): void {
-    console.log(message);
-  }
-
-  warn(message: string): void {
-    console.warn(message);
-  }
+export interface MemoryProgressReporter extends ProgressReporter {
+  readonly messages: string[];
+  readonly warnings: string[];
 }
 
-export class MemoryProgressReporter implements ProgressReporter {
-  readonly messages: string[] = [];
-  readonly warnings: string[] = [];
+export function createConsoleProgressReporter(): ProgressReporter {
+  return {
+    info(message) {
+      console.log(message);
+    },
 
-  info(message: string): void {
-    this.messages.push(message);
-  }
+    warn(message) {
+      console.warn(message);
+    }
+  };
+}
 
-  warn(message: string): void {
-    this.warnings.push(message);
-  }
+export function createMemoryProgressReporter(): MemoryProgressReporter {
+  const messages: string[] = [];
+  const warnings: string[] = [];
+
+  return {
+    messages,
+    warnings,
+    info(message) {
+      messages.push(message);
+    },
+    warn(message) {
+      warnings.push(message);
+    }
+  };
 }

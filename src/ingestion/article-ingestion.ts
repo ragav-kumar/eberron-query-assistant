@@ -12,14 +12,20 @@ export interface ArticleFetcher {
   fetchText(url: string): Promise<string>;
 }
 
-export class FetchArticleFetcher implements ArticleFetcher {
-  async fetchText(url: string): Promise<string> {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`GET ${url} failed with ${response.status} ${response.statusText}`);
+export function createFetchArticleFetcher(): ArticleFetcher {
+  return {
+    async fetchText(url) {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw {
+          kind: "http-fetch-failed",
+          message: `GET ${url} failed with ${response.status} ${response.statusText}`,
+          name: "http-fetch-failed"
+        };
+      }
+      return response.text();
     }
-    return response.text();
-  }
+  };
 }
 
 export interface ArticleDiscoveryResult {

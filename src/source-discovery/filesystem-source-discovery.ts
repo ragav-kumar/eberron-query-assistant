@@ -1,6 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { createTaggedError, formatThrownValue, hasErrorCode, isRecord } from "../errors.js";
 import type { FoundryExportMarker, RuntimeState } from "../state/index.js";
 import type {
   RuntimeConfig,
@@ -17,38 +18,17 @@ export interface FilesystemSourceDiscoveryOptions {
   now?: () => Date;
 }
 
-export class FilesystemSourceDiscoveryService implements SourceDiscoveryService {
-  private readonly now: () => Date;
+export function createFilesystemSourceDiscoveryService(
+  options: FilesystemSourceDiscoveryOptions = {}
+): SourceDiscoveryService {
+  const now = options.now ?? (() => new Date());
 
-  constructor(options: FilesystemSourceDiscoveryOptions = {}) {
-    this.now = options.now ?? (() => new Date());
-  }
-
-  async inspectSources(
-    config: RuntimeConfig,
-    options: RuntimeOptions,
-    state: RuntimeState
-  ): Promise<SourceDiscoverySummary> {
-    const nextState = cloneRuntimeState(state);
-    const [foundryInventory, pdfInventory] = await Promise.all([
-      this.inspectFoundry(config, options, state, nextState),
-      this.inspectPdf(config, options, state, nextState)
-    ]);
-    const inventories = [foundryInventory, pdfInventory, this.inspectArticles(options, state)];
-
-    return {
-      inventories,
-      nextState,
-      degraded: inventories.some((inventory) => inventory.status === "failed")
-    };
-  }
-
-  private async inspectFoundry(
+  const inspectFoundry = async (
     config: RuntimeConfig,
     options: RuntimeOptions,
     state: RuntimeState,
     nextState: RuntimeState
-  ): Promise<SourceInventoryResult> {
+  ): Promise<SourceInventoryResult> => {
     const manifestPath = path.join(config.foundryExportDir, "manifest.json");
 
     try {
@@ -80,7 +60,7 @@ export class FilesystemSourceDiscoveryService implements SourceDiscoveryService 
         details: [`runId=${manifest.runId}`, `generatedAt=${manifest.generatedAt}`, `recordCount=${manifest.recordCount}`]
       });
     } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") {
+      if (hasErrorCode(error, "ENOENT")) {
         return createInventoryResult({
           sourceType: "foundry",
           failed: 1,
@@ -93,17 +73,17 @@ export class FilesystemSourceDiscoveryService implements SourceDiscoveryService 
         sourceType: "foundry",
         failed: 1,
         status: "failed",
-        message: `foundry: failed to inspect manifest: ${formatError(error)}.`
+        message: `foundry: failed to inspect manifest: ${formatThrownValue(error)}.`
       });
     }
-  }
+  };
 
-  private async inspectPdf(
+  const inspectPdf = async (
     config: RuntimeConfig,
     options: RuntimeOptions,
     state: RuntimeState,
     nextState: RuntimeState
-  ): Promise<SourceInventoryResult> {
+  ): Promise<SourceInventoryResult> => {
     try {
       const entries = await readdir(config.pdfDir, { withFileTypes: true });
       const filenames = entries
@@ -140,7 +120,7 @@ export class FilesystemSourceDiscoveryService implements SourceDiscoveryService 
         details: [...added.map((filename) => `added:${filename}`), ...removed.map((filename) => `removed:${filename}`)]
       });
     } catch (error) {
-      if (isNodeError(error) && error.code === "ENOENT") {
+      if (hasErrorCode(error, "ENOENT")) {
         nextState.pdf.knownFilenames = [];
         return createInventoryResult({
           sourceType: "pdf",
@@ -158,12 +138,12 @@ export class FilesystemSourceDiscoveryService implements SourceDiscoveryService 
         sourceType: "pdf",
         failed: 1,
         status: "failed",
-        message: `pdf: failed to inspect PDF directory: ${formatError(error)}.`
+        message: `pdf: failed to inspect PDF directory: ${formatThrownValue(error)}.`
       });
     }
-  }
+  };
 
-  private inspectArticles(options: RuntimeOptions, state: RuntimeState): SourceInventoryResult {
+  const inspectArticles = (options: RuntimeOptions, state: RuntimeState): SourceInventoryResult => {
     if (options.forceReingest) {
       return createInventoryResult({
         sourceType: "article",
@@ -195,7 +175,7 @@ export class FilesystemSourceDiscoveryService implements SourceDiscoveryService 
       });
     }
 
-    const ageMs = this.now().getTime() - lastScrapeTime;
+    const ageMs = now().getTime() - lastScrapeTime;
     if (ageMs >= ARTICLE_INDEX_INTERVAL_MS) {
       return createInventoryResult({
         sourceType: "article",
@@ -212,17 +192,38 @@ export class FilesystemSourceDiscoveryService implements SourceDiscoveryService 
       status: "skipped",
       message: "article: recent Keith Baker index scrape recorded; skipping article discovery."
     });
-  }
+  };
+
+  return {
+    async inspectSources(
+    config: RuntimeConfig,
+    options: RuntimeOptions,
+    state: RuntimeState
+    ): Promise<SourceDiscoverySummary> {
+      const nextState = cloneRuntimeState(state);
+      const [foundryInventory, pdfInventory] = await Promise.all([
+        inspectFoundry(config, options, state, nextState),
+        inspectPdf(config, options, state, nextState)
+      ]);
+      const inventories = [foundryInventory, pdfInventory, inspectArticles(options, state)];
+
+      return {
+        inventories,
+        nextState,
+        degraded: inventories.some((inventory) => inventory.status === "failed")
+      };
+    }
+  };
 }
 
 function parseFoundryManifest(value: unknown): FoundryExportMarker {
   if (!isRecord(value)) {
-    throw new Error("manifest must contain an object");
+    throw createManifestError("manifest must contain an object");
   }
 
   const run = value.run;
   if (!isRecord(run)) {
-    throw new Error("manifest.run must contain an object");
+    throw createManifestError("manifest.run must contain an object");
   }
 
   const runId = run.runId;
@@ -230,15 +231,15 @@ function parseFoundryManifest(value: unknown): FoundryExportMarker {
   const recordCount = run.recordCount ?? value.recordCount;
 
   if (typeof runId !== "string" || runId.length === 0) {
-    throw new Error("manifest.run.runId must be a non-empty string");
+    throw createManifestError("manifest.run.runId must be a non-empty string");
   }
 
   if (typeof generatedAt !== "string" || generatedAt.length === 0) {
-    throw new Error("manifest.run.generatedAt must be a non-empty string");
+    throw createManifestError("manifest.run.generatedAt must be a non-empty string");
   }
 
   if (typeof recordCount !== "number" || !Number.isInteger(recordCount) || recordCount < 0) {
-    throw new Error("manifest.run.recordCount must be a non-negative integer");
+    throw createManifestError("manifest.run.recordCount must be a non-negative integer");
   }
 
   return {
@@ -295,14 +296,6 @@ function cloneRuntimeState(state: RuntimeState): RuntimeState {
   };
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isNodeError(error: unknown): error is NodeJS.ErrnoException {
-  return error instanceof Error && "code" in error;
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+function createManifestError(message: string): unknown {
+  return createTaggedError("invalid-foundry-manifest", message);
 }

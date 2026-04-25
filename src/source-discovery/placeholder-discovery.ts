@@ -4,10 +4,10 @@ import type { SourceDiscoveryService, SourceDiscoverySummary } from "./source-di
 
 const SOURCE_TYPES: SourceType[] = ["foundry", "pdf", "article"];
 
-export class PlaceholderSourceDiscoveryService implements SourceDiscoveryService {
-  inspectSources(_config: unknown, _options: unknown, state: RuntimeState): Promise<SourceDiscoverySummary> {
-    return Promise.resolve(
-      {
+export function createPlaceholderSourceDiscoveryService(): SourceDiscoveryService {
+  return {
+    inspectSources(_config: unknown, _options: unknown, state: RuntimeState): Promise<SourceDiscoverySummary> {
+      return Promise.resolve({
         inventories: SOURCE_TYPES.map((sourceType) => ({
           sourceType,
           discovered: 0,
@@ -21,7 +21,7 @@ export class PlaceholderSourceDiscoveryService implements SourceDiscoveryService
         })),
         nextState: state,
         degraded: false
-      }
-    );
-  }
+      });
+    }
+  };
 }

@@ -5,12 +5,14 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
+import { createTaggedError } from "../src/errors.js";
 import {
-  FilesystemIngestionService,
-  SqliteCorpusStore,
+  createFilesystemIngestionService,
+  createSqliteCorpusStore,
   discoverArticleLinks,
   getCorpusDatabasePath,
   type ArticleFetcher,
+  type CorpusStore,
   type PdfParser
 } from "../src/ingestion/index.js";
 import type { SourceDiscoverySummary } from "../src/source-discovery/index.js";
@@ -18,7 +20,7 @@ import { createDefaultRuntimeState, type RuntimeState } from "../src/state/state
 
 const TEST_ROOT = path.resolve(".test-tmp", "ingestion");
 const NOW = new Date("2026-04-24T12:00:00.000Z");
-const stores: SqliteCorpusStore[] = [];
+const stores: CorpusStore[] = [];
 
 describe("Phase 3 ingestion", () => {
   beforeEach(async () => {
@@ -125,7 +127,7 @@ describe("Phase 3 ingestion", () => {
   it("discovers article URLs and ingests new articles while retaining scrape state", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const state = createDefaultRuntimeState();
-    const fetcher = new MapArticleFetcher(
+    const fetcher = createMapArticleFetcher(
       new Map([
         [
           "https://keith-baker.com/eberron-index/",
@@ -172,9 +174,9 @@ describe("Phase 3 ingestion", () => {
 });
 
 function createService(options: { articleFetcher?: ArticleFetcher; pdfParser?: PdfParser } = {}) {
-  const corpusStore = new SqliteCorpusStore();
+  const corpusStore = createSqliteCorpusStore();
   stores.push(corpusStore);
-  return new FilesystemIngestionService({
+  return createFilesystemIngestionService({
     articleFetcher: options.articleFetcher,
     corpusStore,
     now: () => NOW,
@@ -252,14 +254,14 @@ function readRows(config: ReturnType<typeof loadDefaultConfig>, sql: string): Ar
   }
 }
 
-class MapArticleFetcher implements ArticleFetcher {
-  constructor(private readonly responses: Map<string, string>) {}
-
-  fetchText(url: string): Promise<string> {
-    const response = this.responses.get(url);
-    if (!response) {
-      throw new Error(`Missing fixture for ${url}`);
+function createMapArticleFetcher(responses: Map<string, string>): ArticleFetcher {
+  return {
+    fetchText(url) {
+      const response = responses.get(url);
+      if (!response) {
+        throw createTaggedError("missing-article-fixture", `Missing fixture for ${url}`);
+      }
+      return Promise.resolve(response);
     }
-    return Promise.resolve(response);
-  }
+  };
 }

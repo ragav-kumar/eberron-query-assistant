@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+import { createTaggedError, formatThrownValue, isRecord } from "../errors.js";
 import type { FoundryExportMarker } from "../state/index.js";
 import type { CorpusChunk, CorpusSource, RuntimeConfig } from "../types.js";
 import { chunkText } from "./chunking.js";
@@ -34,12 +35,11 @@ function normalizeFoundryLine(
   try {
     parsed = JSON.parse(line) as unknown;
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Invalid foundry NDJSON on line ${index + 1}: ${message}`);
+    throw createTaggedError("invalid-foundry-ndjson", `Invalid foundry NDJSON on line ${index + 1}: ${formatThrownValue(error)}`);
   }
 
   if (!isRecord(parsed)) {
-    throw new Error(`Invalid foundry NDJSON on line ${index + 1}: record must be an object.`);
+    throw createTaggedError("invalid-foundry-ndjson", `Invalid foundry NDJSON on line ${index + 1}: record must be an object.`);
   }
 
   const recordId = firstString(parsed, ["id", "_id", "uuid", "key"]) ?? hashText(line);
@@ -149,8 +149,4 @@ function hashText(text: string): string {
 
 function stripHtml(value: string): string {
   return value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

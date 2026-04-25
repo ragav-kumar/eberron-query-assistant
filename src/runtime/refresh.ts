@@ -3,6 +3,7 @@ import type { ProgressReporter } from "../progress/reporter.js";
 import type { SourceDiscoveryService } from "../source-discovery/index.js";
 import type { StateStore } from "../state/index.js";
 import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
+import { createTaggedError } from "../errors.js";
 
 export interface StartupRefreshDependencies {
   discovery: SourceDiscoveryService;
@@ -56,7 +57,7 @@ export async function runStartupRefresh(
   dependencies.reporter.info("Ingestion refresh complete.");
 
   if (ingestion.summary.corpusSourceCount === 0) {
-    throw new Error("Startup refresh produced no ingestible corpus sources.");
+    throw createTaggedError("empty-corpus", "Startup refresh produced no ingestible corpus sources.");
   }
 
   dependencies.reporter.info(
