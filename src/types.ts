@@ -11,6 +11,14 @@ export interface RuntimeConfig {
   stateDir: string;
   cacheDir: string;
   retrievalDir: string;
+  provider: ProviderConfig;
+}
+
+export interface ProviderConfig {
+  apiKey: string | null;
+  baseUrl: string;
+  chatModel: string;
+  embeddingModel: string;
 }
 
 export type SourceType = "foundry" | "pdf" | "article";

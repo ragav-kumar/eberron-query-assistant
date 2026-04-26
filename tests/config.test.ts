@@ -1,10 +1,32 @@
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
 
+const TEST_ROOT = path.resolve(".test-tmp", "config");
+const ENV_KEYS = [
+  "OPENAI_API_KEY",
+  "OPENAI_BASE_URL",
+  "OPENAI_CHAT_MODEL",
+  "OPENAI_EMBEDDING_MODEL"
+] as const;
+const originalEnv = Object.fromEntries(ENV_KEYS.map((key) => [key, process.env[key]]));
+
 describe("loadDefaultConfig", () => {
+  afterEach(async () => {
+    for (const key of ENV_KEYS) {
+      const original = originalEnv[key];
+      if (original === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = original;
+      }
+    }
+    await rm(TEST_ROOT, { force: true, recursive: true });
+  });
+
   it("resolves documented repo-local default paths", () => {
     const repoRoot = path.resolve("example-repo");
 
@@ -15,7 +37,74 @@ describe("loadDefaultConfig", () => {
       runtimeDir: path.join(repoRoot, ".eberron-query-assistant"),
       stateDir: path.join(repoRoot, ".eberron-query-assistant", "state"),
       cacheDir: path.join(repoRoot, ".eberron-query-assistant", "cache"),
-      retrievalDir: path.join(repoRoot, ".eberron-query-assistant", "retrieval")
+      retrievalDir: path.join(repoRoot, ".eberron-query-assistant", "retrieval"),
+      provider: {
+        apiKey: process.env.OPENAI_API_KEY ?? null,
+        baseUrl: process.env.OPENAI_BASE_URL?.replace(/\/+$/, "") ?? "https://api.openai.com/v1",
+        chatModel: process.env.OPENAI_CHAT_MODEL ?? "gpt-5.2",
+        embeddingModel: process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small"
+      }
+    });
+  });
+
+  it("loads provider settings from .env", async () => {
+    for (const key of ENV_KEYS) {
+      delete process.env[key];
+    }
+
+    await mkdir(TEST_ROOT, { recursive: true });
+    await writeFile(
+      path.join(TEST_ROOT, ".env"),
+      [
+        "OPENAI_API_KEY=sk-test-value",
+        "OPENAI_BASE_URL=https://provider.example/v1/",
+        "OPENAI_CHAT_MODEL=gpt-test-chat",
+        "OPENAI_EMBEDDING_MODEL=gpt-test-embedding"
+      ].join("\n"),
+      "utf8"
+    );
+
+    expect(loadDefaultConfig(TEST_ROOT).provider).toEqual({
+      apiKey: "sk-test-value",
+      baseUrl: "https://provider.example/v1",
+      chatModel: "gpt-test-chat",
+      embeddingModel: "gpt-test-embedding"
+    });
+  });
+
+  it("lets process environment override .env values", async () => {
+    await mkdir(TEST_ROOT, { recursive: true });
+    await writeFile(
+      path.join(TEST_ROOT, ".env"),
+      [
+        "OPENAI_API_KEY=sk-env-file",
+        "OPENAI_BASE_URL=https://env-file.example/v1",
+        "OPENAI_CHAT_MODEL=env-file-chat",
+        "OPENAI_EMBEDDING_MODEL=env-file-embedding"
+      ].join("\n"),
+      "utf8"
+    );
+    process.env.OPENAI_API_KEY = "sk-process";
+    process.env.OPENAI_CHAT_MODEL = "process-chat";
+
+    expect(loadDefaultConfig(TEST_ROOT).provider).toMatchObject({
+      apiKey: "sk-process",
+      baseUrl: "https://env-file.example/v1",
+      chatModel: "process-chat",
+      embeddingModel: "env-file-embedding"
+    });
+  });
+
+  it("uses model defaults when optional .env values are missing", () => {
+    for (const key of ENV_KEYS) {
+      delete process.env[key];
+    }
+
+    expect(loadDefaultConfig(TEST_ROOT).provider).toEqual({
+      apiKey: null,
+      baseUrl: "https://api.openai.com/v1",
+      chatModel: "gpt-5.2",
+      embeddingModel: "text-embedding-3-small"
     });
   });
 });

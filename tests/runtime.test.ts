@@ -61,6 +61,54 @@ describe("startup refresh skeleton", () => {
     expect(summary.inventories).toHaveLength(3);
   });
 
+  it("prints retrieval debug results and skips the prompt", async () => {
+    const prompt = {
+      start: vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
+    };
+    const retrieval = {
+      refresh: vi.fn().mockResolvedValue({ chunkCount: 1, reusedEmbeddings: 0, regeneratedEmbeddings: 1 }),
+      search: vi.fn().mockResolvedValue([
+        {
+          chunkId: "pdf:eberron.pdf:0",
+          sourceId: "pdf:eberron.pdf",
+          sourceType: "pdf" as const,
+          sourceKey: "eberron.pdf",
+          sourceTitle: "Eberron Rising",
+          content: "Aerenal keeps deathless counselors.",
+          citation: {
+            sourceType: "pdf" as const,
+            label: "Eberron Rising",
+            locator: "page 4",
+            url: null
+          },
+          score: 0.9,
+          matchKind: "hybrid" as const
+        }
+      ])
+    };
+    const reporter = createMemoryProgressReporter();
+
+    await runRuntime(
+      { forceReingest: false, retrievalQuery: "aerenal deathless" },
+      {
+        config: loadDefaultConfig(PLACEHOLDER_ROOT),
+        discovery: createPlaceholderSourceDiscoveryService(),
+        ingestion: createPlaceholderIngestionService(),
+        prompt,
+        retrieval,
+        reporter,
+        stateStore: createPlaceholderStateStore()
+      }
+    );
+
+    expect(retrieval.search).toHaveBeenCalledWith({
+      query: "aerenal deathless",
+      limit: 8
+    });
+    expect(prompt.start).not.toHaveBeenCalled();
+    expect(reporter.messages.some((message) => message.startsWith("Results for"))).toBe(true);
+  });
+
   it("commits successful source inventory state during startup refresh", async () => {
     await rm(TEST_ROOT, { force: true, recursive: true });
 

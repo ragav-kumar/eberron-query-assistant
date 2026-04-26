@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdir, readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { loadDefaultConfig } from "../src/config/index.js";
 import { createSqliteCorpusStore, getCorpusDatabasePath, type CorpusStore } from "../src/ingestion/index.js";
 import { createDeterministicEmbeddingAdapter, type EmbeddingAdapter } from "../src/provider/index.js";
+import { createMemoryProgressReporter, type ProgressReporter } from "../src/progress/reporter.js";
 import { createSqliteRetrievalService, getVectorIndexPath } from "../src/retrieval/index.js";
 import type { CorpusChunk, CorpusSource, RuntimeConfig, SourceType } from "../src/types.js";
 
@@ -94,7 +95,7 @@ describe("Phase 4 retrieval", () => {
 
     expect(first).toMatchObject({ chunkCount: 3, reusedEmbeddings: 0, regeneratedEmbeddings: 3 });
     expect(second).toMatchObject({ chunkCount: 3, reusedEmbeddings: 3, regeneratedEmbeddings: 0 });
-    expect(counted.embed).toHaveBeenCalledTimes(3);
+    expect(counted.embedBatch).toHaveBeenCalledTimes(1);
 
     const incompatible = createRetrieval(countingAdapter("model-b", "schema-a").adapter);
     await expect(incompatible.refresh(config)).resolves.toMatchObject({
@@ -141,41 +142,106 @@ describe("Phase 4 retrieval", () => {
     expect(rebuilt.regeneratedEmbeddings).toBe(3);
     expect(after.entries).toHaveLength(3);
   });
+
+  it("checkpoints generated embeddings so an interrupted refresh can resume", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await seedCorpus(config, 65);
+    const interrupted = interruptingBatchAdapter(1);
+    const firstRetrieval = createRetrieval(interrupted.adapter);
+
+    await expect(firstRetrieval.refresh(config)).rejects.toThrow("simulated embedding interruption");
+    const checkpoint = JSON.parse(await readFile(getVectorIndexPath(config), "utf8")) as { entries: unknown[] };
+    expect(checkpoint.entries).toHaveLength(64);
+
+    const resumed = countingAdapter("checkpoint-model", "checkpoint-schema");
+    const secondRetrieval = createRetrieval(resumed.adapter);
+    const summary = await secondRetrieval.refresh(config);
+
+    expect(summary).toMatchObject({ chunkCount: 65, reusedEmbeddings: 64, regeneratedEmbeddings: 1 });
+    expect(resumed.embedBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores stale vector temp files and writes the final index atomically", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await seedCorpus(config);
+    await mkdir(config.retrievalDir, { recursive: true });
+    await writeFile(path.join(config.retrievalDir, "vector-index.json.tmp"), "{not-json", "utf8");
+
+    const retrieval = createRetrieval();
+    await retrieval.refresh(config);
+
+    const index = JSON.parse(await readFile(getVectorIndexPath(config), "utf8")) as { entries: unknown[] };
+    expect(index.entries).toHaveLength(3);
+  });
+
+  it("reports embedding sync start, progress, and final summary", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await seedCorpus(config, 65);
+    const reporter = createMemoryProgressReporter();
+    const retrieval = createRetrieval(createDeterministicEmbeddingAdapter(), reporter);
+
+    await retrieval.refresh(config);
+
+    expect(reporter.messages.some((message) => message.startsWith("Retrieval embedding sync started:"))).toBe(true);
+    expect(reporter.messages.filter((message) => message.startsWith("Retrieval embedding sync progress:"))).toHaveLength(2);
+    expect(reporter.messages.some((message) => message.startsWith("Retrieval vector index synchronized:"))).toBe(true);
+  });
 });
 
-const seedCorpus = async (config: RuntimeConfig): Promise<CorpusStore> => {
+const seedCorpus = async (config: RuntimeConfig, chunkCount = 3): Promise<CorpusStore> => {
   const store = createStore();
   await store.initialize(config);
-  await store.replaceSource(config, source("pdf", "eberron.pdf", "Eberron Rising"), [
-    chunk("pdf:eberron.pdf:0", "pdf:eberron.pdf", 0, "Aerenal keeps deathless counselors.", {
-      sourceType: "pdf",
-      label: "Eberron Rising",
-      locator: "page 4",
-      url: null
-    })
-  ]);
-  await store.replaceSource(config, source("article", "https://keith-baker.com/aerenal/", "Aerenal Notes"), [
-    chunk(
-      "article:https://keith-baker.com/aerenal/:0",
-      "article:https://keith-baker.com/aerenal/",
-      0,
-      "Keith Baker writes about gnomes and the Trust.",
+
+  if (chunkCount === 3) {
+    await store.replaceSource(config, source("pdf", "eberron.pdf", "Eberron Rising"), [
+      chunk("pdf:eberron.pdf:0", "pdf:eberron.pdf", 0, "Aerenal keeps deathless counselors.", {
+        sourceType: "pdf",
+        label: "Eberron Rising",
+        locator: "page 4",
+        url: null
+      })
+    ]);
+    await store.replaceSource(config, source("article", "https://keith-baker.com/aerenal/", "Aerenal Notes"), [
+      chunk(
+        "article:https://keith-baker.com/aerenal/:0",
+        "article:https://keith-baker.com/aerenal/",
+        0,
+        "Keith Baker writes about gnomes and the Trust.",
+        {
+          sourceType: "article",
+          label: "Aerenal Notes",
+          locator: null,
+          url: "https://keith-baker.com/aerenal/"
+        }
+      )
+    ]);
+    await store.replaceSource(config, source("foundry", "actor-ashana", "Ashana"), [
+      chunk("foundry:actor-ashana:0", "foundry:actor-ashana", 0, "Ashana has a contact in Aerenal.", {
+        sourceType: "foundry",
+        label: "Ashana",
+        locator: "Actor",
+        url: null
+      })
+    ]);
+    return store;
+  }
+
+  const chunks = Array.from({ length: chunkCount }, (_, index) => {
+    return chunk(
+      `pdf:eberron.pdf:${index}`,
+      "pdf:eberron.pdf",
+      index,
+      `Aerenal chunk ${index} keeps deathless counselors.`,
       {
-        sourceType: "article",
-        label: "Aerenal Notes",
-        locator: null,
-        url: "https://keith-baker.com/aerenal/"
+        sourceType: "pdf",
+        label: "Eberron Rising",
+        locator: `page ${index + 1}`,
+        url: null
       }
-    )
-  ]);
-  await store.replaceSource(config, source("foundry", "actor-ashana", "Ashana"), [
-    chunk("foundry:actor-ashana:0", "foundry:actor-ashana", 0, "Ashana has a contact in Aerenal.", {
-      sourceType: "foundry",
-      label: "Ashana",
-      locator: "Actor",
-      url: null
-    })
-  ]);
+    );
+  });
+
+  await store.replaceSource(config, source("pdf", "eberron.pdf", "Eberron Rising"), chunks);
   return store;
 };
 
@@ -185,13 +251,16 @@ const createStore = (): CorpusStore => {
   return store;
 };
 
-const createRetrieval = (embeddingAdapter: EmbeddingAdapter = createDeterministicEmbeddingAdapter()) => {
+const createRetrieval = (
+  embeddingAdapter: EmbeddingAdapter = createDeterministicEmbeddingAdapter(),
+  reporter: ProgressReporter = {
+    info: () => undefined,
+    warn: () => undefined
+  }
+) => {
   return createSqliteRetrievalService({
     embeddingAdapter,
-    reporter: {
-      info: () => undefined,
-      warn: () => undefined
-    }
+    reporter
   });
 };
 
@@ -223,16 +292,44 @@ const chunk = (
   };
 };
 
-const countingAdapter = (modelId: string, schemaVersion: string): { adapter: EmbeddingAdapter; embed: ReturnType<typeof vi.fn> } => {
+const countingAdapter = (
+  modelId: string,
+  schemaVersion: string
+): { adapter: EmbeddingAdapter; embed: ReturnType<typeof vi.fn>; embedBatch: ReturnType<typeof vi.fn> } => {
   const base = createDeterministicEmbeddingAdapter();
   const embed = vi.fn((input: string) => base.embed(input));
+  const embedBatch = vi.fn((inputs: string[]) => base.embedBatch(inputs));
   return {
     adapter: {
+      failedRetries: 0,
       modelId,
       schemaVersion,
-      embed
+      embed,
+      embedBatch
     },
-    embed
+    embed,
+    embedBatch
+  };
+};
+
+const interruptingBatchAdapter = (failAfterSuccessfulBatches: number): { adapter: EmbeddingAdapter } => {
+  const base = createDeterministicEmbeddingAdapter();
+  let successfulBatches = 0;
+
+  return {
+    adapter: {
+      failedRetries: 0,
+      modelId: "checkpoint-model",
+      schemaVersion: "checkpoint-schema",
+      embed: (input) => base.embed(input),
+      async embedBatch(inputs) {
+        if (successfulBatches >= failAfterSuccessfulBatches) {
+          throw new Error("simulated embedding interruption");
+        }
+        successfulBatches += 1;
+        return base.embedBatch(inputs);
+      }
+    }
   };
 };
 

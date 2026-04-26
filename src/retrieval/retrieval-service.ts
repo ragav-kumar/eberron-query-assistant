@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import Database from "better-sqlite3";
@@ -16,7 +16,9 @@ import type {
 import { getCorpusDatabasePath } from "../ingestion/index.js";
 
 const VECTOR_INDEX_FILENAME = "vector-index.json";
+const VECTOR_INDEX_TEMP_FILENAME = "vector-index.json.tmp";
 const DEFAULT_LIMIT = 8;
+const EMBEDDING_BATCH_SIZE = 64;
 
 export interface RetrievalSyncSummary {
   chunkCount: number;
@@ -81,9 +83,14 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
       rebuildFts(database);
       const chunks = readAllChunks(database);
       const existingIndex = options.forceRebuild ? null : await loadVectorIndex(nextConfig);
-      const syncedIndex = await syncVectorIndex(chunks, existingIndex, dependencies.embeddingAdapter);
+      const syncedIndex = await syncVectorIndex(
+        chunks,
+        existingIndex,
+        dependencies.embeddingAdapter,
+        dependencies.reporter,
+        async (index) => saveVectorIndex(nextConfig, index)
+      );
       vectorIndex = syncedIndex.index;
-      await saveVectorIndex(nextConfig, vectorIndex);
 
       dependencies.reporter.info(
         `Retrieval vector index synchronized: chunks=${syncedIndex.summary.chunkCount}, reused=${syncedIndex.summary.reusedEmbeddings}, regenerated=${syncedIndex.summary.regeneratedEmbeddings}, model=${dependencies.embeddingAdapter.modelId}.`
@@ -290,7 +297,9 @@ const mergeResults = (
 const syncVectorIndex = async (
   chunks: StoredChunk[],
   existingIndex: VectorIndexFile | null,
-  embeddingAdapter: EmbeddingAdapter
+  embeddingAdapter: EmbeddingAdapter,
+  reporter: ProgressReporter,
+  checkpoint: (index: VectorIndexFile) => Promise<void>
 ): Promise<{ index: VectorIndexFile; summary: RetrievalSyncSummary }> => {
   const compatibleEntries =
     existingIndex?.embeddingModelId === embeddingAdapter.modelId &&
@@ -300,35 +309,85 @@ const syncVectorIndex = async (
 
   let reusedEmbeddings = 0;
   let regeneratedEmbeddings = 0;
-  const entries: VectorIndexEntry[] = [];
+  const entryByChunkId = new Map<string, VectorIndexEntry>();
+  const missingChunks: StoredChunk[] = [];
 
   for (const chunk of chunks) {
     const existingEntry = compatibleEntries.get(chunk.chunkId);
     if (existingEntry?.contentHash === chunk.contentHash) {
-      entries.push(existingEntry);
+      entryByChunkId.set(chunk.chunkId, existingEntry);
       reusedEmbeddings += 1;
       continue;
     }
 
-    entries.push({
-      chunkId: chunk.chunkId,
-      contentHash: chunk.contentHash,
-      embedding: await embeddingAdapter.embed(chunk.content)
-    });
-    regeneratedEmbeddings += 1;
+    missingChunks.push(chunk);
+  }
+
+  reporter.info(
+    `Retrieval embedding sync started: chunks=${chunks.length}, reused=${reusedEmbeddings}, remaining=${missingChunks.length}, model=${embeddingAdapter.modelId}.`
+  );
+
+  if (missingChunks.length === 0) {
+    const index = createVectorIndex(chunks, entryByChunkId, embeddingAdapter);
+    await checkpoint(index);
+    return {
+      index,
+      summary: {
+        chunkCount: chunks.length,
+        reusedEmbeddings,
+        regeneratedEmbeddings
+      }
+    };
+  }
+
+  for (let offset = 0; offset < missingChunks.length; offset += EMBEDDING_BATCH_SIZE) {
+    const batch = missingChunks.slice(offset, offset + EMBEDDING_BATCH_SIZE);
+    const embeddings = await embeddingAdapter.embedBatch(batch.map((chunk) => chunk.content));
+
+    if (embeddings.length !== batch.length) {
+      throw new Error(`Embedding adapter returned ${embeddings.length} vectors for ${batch.length} chunks.`);
+    }
+
+    for (const [index, chunk] of batch.entries()) {
+      const embedding = embeddings[index];
+      if (!embedding) {
+        throw new Error(`Embedding adapter did not return a vector for chunk ${chunk.chunkId}.`);
+      }
+
+      entryByChunkId.set(chunk.chunkId, {
+        chunkId: chunk.chunkId,
+        contentHash: chunk.contentHash,
+        embedding
+      });
+      regeneratedEmbeddings += 1;
+    }
+
+    const index = createVectorIndex(chunks, entryByChunkId, embeddingAdapter);
+    await checkpoint(index);
+    reporter.info(
+      `Retrieval embedding sync progress: processed=${entryByChunkId.size}/${chunks.length}, reused=${reusedEmbeddings}, regenerated=${regeneratedEmbeddings}, remaining=${chunks.length - entryByChunkId.size}, failedRetries=${embeddingAdapter.failedRetries ?? 0}, model=${embeddingAdapter.modelId}.`
+    );
   }
 
   return {
-    index: {
-      embeddingModelId: embeddingAdapter.modelId,
-      embeddingSchemaVersion: embeddingAdapter.schemaVersion,
-      entries
-    },
+    index: createVectorIndex(chunks, entryByChunkId, embeddingAdapter),
     summary: {
       chunkCount: chunks.length,
       reusedEmbeddings,
       regeneratedEmbeddings
     }
+  };
+};
+
+const createVectorIndex = (
+  chunks: StoredChunk[],
+  entryByChunkId: Map<string, VectorIndexEntry>,
+  embeddingAdapter: EmbeddingAdapter
+): VectorIndexFile => {
+  return {
+    embeddingModelId: embeddingAdapter.modelId,
+    embeddingSchemaVersion: embeddingAdapter.schemaVersion,
+    entries: chunks.map((chunk) => entryByChunkId.get(chunk.chunkId)).filter((entry): entry is VectorIndexEntry => Boolean(entry))
   };
 };
 
@@ -347,7 +406,9 @@ const loadVectorIndex = async (config: RuntimeConfig): Promise<VectorIndexFile |
 
 const saveVectorIndex = async (config: RuntimeConfig, index: VectorIndexFile): Promise<void> => {
   await mkdir(config.retrievalDir, { recursive: true });
-  await writeFile(getVectorIndexPath(config), `${JSON.stringify(index, null, 2)}\n`, "utf8");
+  const tempPath = path.join(config.retrievalDir, VECTOR_INDEX_TEMP_FILENAME);
+  await writeFile(tempPath, `${JSON.stringify(index)}\n`, "utf8");
+  await rename(tempPath, getVectorIndexPath(config));
 };
 
 const buildSqlFilters = (

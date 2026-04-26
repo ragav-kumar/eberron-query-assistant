@@ -1,7 +1,12 @@
 import { loadDefaultConfig } from "../config/index.js";
 import { createFilesystemIngestionService, createSqliteCorpusStore, type IngestionService } from "../ingestion/index.js";
 import { createConsoleProgressReporter, createMemoryProgressReporter, type ProgressReporter } from "../progress/reporter.js";
-import { createDeterministicEmbeddingAdapter } from "../provider/index.js";
+import {
+  createOpenAiChatAdapter,
+  createOpenAiEmbeddingAdapter,
+  type ChatAdapter,
+  type EmbeddingAdapter
+} from "../provider/index.js";
 import { createSqliteRetrievalService, type RetrievalService } from "../retrieval/index.js";
 import {
   createFilesystemSourceDiscoveryService,
@@ -9,12 +14,14 @@ import {
 } from "../source-discovery/index.js";
 import { createFilesystemStateStore, type StateStore } from "../state/index.js";
 import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
-import { createStubPromptShell, type PromptShell } from "./prompt.js";
+import { createAssistantPromptShell, type PromptShell } from "./prompt.js";
 import { runStartupRefresh } from "./refresh.js";
 
 export interface RuntimeDependencies {
+  chat?: ChatAdapter;
   config?: RuntimeConfig;
   discovery?: SourceDiscoveryService;
+  embedding?: EmbeddingAdapter;
   ingestion?: IngestionService;
   prompt?: PromptShell;
   reporter?: ProgressReporter;
@@ -40,7 +47,7 @@ export const runRuntime = async (
   const retrieval =
     dependencies.retrieval ??
     createSqliteRetrievalService({
-      embeddingAdapter: createDeterministicEmbeddingAdapter(),
+      embeddingAdapter: dependencies.embedding ?? createOpenAiEmbeddingAdapter(config.provider),
       reporter: serviceReporter
     });
 
@@ -72,7 +79,13 @@ export const runRuntime = async (
     return summary;
   }
 
-  const prompt = dependencies.prompt ?? createStubPromptShell({ reporter });
+  const prompt =
+    dependencies.prompt ??
+    createAssistantPromptShell({
+      chat: dependencies.chat ?? createOpenAiChatAdapter(config.provider),
+      reporter,
+      retrieval
+    });
   await prompt.start();
 
   return summary;
