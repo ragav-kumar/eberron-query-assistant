@@ -1,6 +1,6 @@
 import type { IngestionService } from "../ingestion/index.js";
 import type { ProgressReporter } from "../progress/reporter.js";
-import type { RetrievalService } from "../retrieval/index.js";
+import type { RetrievalService, RetrievalSyncSummary } from "../retrieval/index.js";
 import type { SourceDiscoveryService } from "../source-discovery/index.js";
 import type { StateStore } from "../state/index.js";
 import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
@@ -62,13 +62,9 @@ export const runStartupRefresh = async (
     throw createTaggedError("empty-corpus", "Startup refresh produced no ingestible corpus sources.");
   }
 
-  if (dependencies.retrieval) {
-    dependencies.reporter.info("Refreshing retrieval indexes.");
-    await dependencies.retrieval.refresh(config, {
-      forceRebuild: options.forceReingest || stateLoad.invalidated
-    });
-    dependencies.reporter.info("Retrieval indexes ready.");
-  }
+  const retrieval = dependencies.retrieval
+    ? await refreshRetrievalIndexes(config, options, stateLoad.invalidated, dependencies)
+    : undefined;
 
   dependencies.reporter.info(
     discovery.degraded || ingestion.summary.degraded
@@ -79,6 +75,25 @@ export const runStartupRefresh = async (
   return {
     forceReingest: options.forceReingest,
     inventories: discovery.inventories,
-    degraded: discovery.degraded || ingestion.summary.degraded
+    degraded: discovery.degraded || ingestion.summary.degraded,
+    ...(retrieval ? { retrieval } : {})
   };
+};
+
+const refreshRetrievalIndexes = async (
+  config: RuntimeConfig,
+  options: RuntimeOptions,
+  invalidated: boolean,
+  dependencies: StartupRefreshDependencies
+): Promise<RetrievalSyncSummary | undefined> => {
+  if (!dependencies.retrieval) {
+    return undefined;
+  }
+
+  dependencies.reporter.info("Refreshing retrieval indexes.");
+  const retrieval = await dependencies.retrieval.refresh(config, {
+    forceRebuild: options.forceReingest || invalidated
+  });
+  dependencies.reporter.info("Retrieval indexes ready.");
+  return retrieval;
 };

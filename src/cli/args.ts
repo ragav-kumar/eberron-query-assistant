@@ -20,6 +20,15 @@ export const parseRuntimeOptions = (args: string[] = process.argv.slice(2)): Run
 
   return {
     forceReingest: parsed.values["force-reingest"] ?? false,
-    retrievalQuery: parsed.values["retrieval-query"] ?? null
+    retrievalQuery: normalizeOptionalString(parsed.values["retrieval-query"])
   };
+};
+
+const normalizeOptionalString = (value: string | undefined): string | null => {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.replaceAll("^", "").trim();
+  return normalized.length > 0 ? normalized : null;
 };

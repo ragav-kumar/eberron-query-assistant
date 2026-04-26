@@ -17,4 +17,11 @@ describe("parseRuntimeOptions", () => {
       retrievalQuery: "aerenal deathless"
     });
   });
+
+  it("normalizes PowerShell caret-escaped retrieval query quotes", () => {
+    expect(parseRuntimeOptions(["--retrieval-query", "^Becoming^ God^"])).toEqual({
+      forceReingest: false,
+      retrievalQuery: "Becoming God"
+    });
+  });
 });

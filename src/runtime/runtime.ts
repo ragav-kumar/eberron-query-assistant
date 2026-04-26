@@ -1,6 +1,6 @@
 import { loadDefaultConfig } from "../config/index.js";
 import { createFilesystemIngestionService, createSqliteCorpusStore, type IngestionService } from "../ingestion/index.js";
-import { createConsoleProgressReporter, type ProgressReporter } from "../progress/reporter.js";
+import { createConsoleProgressReporter, createMemoryProgressReporter, type ProgressReporter } from "../progress/reporter.js";
 import { createDeterministicEmbeddingAdapter } from "../provider/index.js";
 import { createSqliteRetrievalService, type RetrievalService } from "../retrieval/index.js";
 import {
@@ -28,25 +28,26 @@ export const runRuntime = async (
 ): Promise<StartupRefreshSummary> => {
   const config = dependencies.config ?? loadDefaultConfig();
   const reporter = dependencies.reporter ?? createConsoleProgressReporter();
+  const serviceReporter = options.retrievalQuery && !dependencies.reporter ? createMemoryProgressReporter() : reporter;
   const discovery = dependencies.discovery ?? createFilesystemSourceDiscoveryService();
   const ingestion =
     dependencies.ingestion ??
     createFilesystemIngestionService({
       corpusStore: createSqliteCorpusStore(),
-      reporter
+      reporter: serviceReporter
     });
   const stateStore = dependencies.stateStore ?? createFilesystemStateStore();
   const retrieval =
     dependencies.retrieval ??
     createSqliteRetrievalService({
       embeddingAdapter: createDeterministicEmbeddingAdapter(),
-      reporter
+      reporter: serviceReporter
     });
 
   const summary = await runStartupRefresh(config, options, {
     discovery,
     ingestion,
-    reporter,
+    reporter: serviceReporter,
     retrieval,
     stateStore
   });
@@ -56,7 +57,11 @@ export const runRuntime = async (
       query: options.retrievalQuery,
       limit: 8
     });
-    reporter.info(`Retrieval debug results for "${options.retrievalQuery}": ${results.length}.`);
+    const retrievalSummary = summary.retrieval
+      ? ` chunks=${summary.retrieval.chunkCount}, reused=${summary.retrieval.reusedEmbeddings}, regenerated=${summary.retrieval.regeneratedEmbeddings}.`
+      : "";
+    reporter.info(`Retrieval debug refresh complete.${retrievalSummary}`);
+    reporter.info(`Results for "${options.retrievalQuery}": ${results.length}.`);
     for (const [index, result] of results.entries()) {
       const locator = result.citation.locator ? ` ${result.citation.locator}` : "";
       const url = result.citation.url ? ` ${result.citation.url}` : "";

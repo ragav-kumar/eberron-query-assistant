@@ -33,6 +33,11 @@ export interface StartupRefreshSummary {
   forceReingest: boolean;
   inventories: SourceInventoryResult[];
   degraded: boolean;
+  retrieval?: {
+    chunkCount: number;
+    reusedEmbeddings: number;
+    regeneratedEmbeddings: number;
+  };
 }
 
 export interface CitationMetadata {
