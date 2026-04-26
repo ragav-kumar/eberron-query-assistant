@@ -19,7 +19,7 @@ describe("startup refresh skeleton", () => {
   it("emits readable source inventory progress", async () => {
     const reporter = createMemoryProgressReporter();
 
-    await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: true }, {
+    await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: true, retrievalQuery: null }, {
       discovery: createPlaceholderSourceDiscoveryService(),
       ingestion: createPlaceholderIngestionService(),
       reporter,
@@ -41,12 +41,16 @@ describe("startup refresh skeleton", () => {
     };
 
     const summary = await runRuntime(
-      { forceReingest: false },
+      { forceReingest: false, retrievalQuery: null },
       {
         config: loadDefaultConfig(PLACEHOLDER_ROOT),
         discovery: createPlaceholderSourceDiscoveryService(),
         ingestion: createPlaceholderIngestionService(),
         prompt,
+        retrieval: {
+          refresh: vi.fn().mockResolvedValue({ chunkCount: 0, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
+          search: vi.fn().mockResolvedValue([])
+        },
         reporter: createMemoryProgressReporter(),
         stateStore: createPlaceholderStateStore()
       }
@@ -71,7 +75,7 @@ describe("startup refresh skeleton", () => {
       await mkdir(config.pdfDir, { recursive: true });
       await writeFile(path.join(config.pdfDir, "rising.pdf"), "", "utf8");
 
-      const summary = await runStartupRefresh(config, { forceReingest: false }, {
+      const summary = await runStartupRefresh(config, { forceReingest: false, retrievalQuery: null }, {
         discovery: createFilesystemSourceDiscoveryService({ now: () => new Date("2026-04-24T12:00:00.000Z") }),
         ingestion: createPlaceholderIngestionService(),
         reporter: createMemoryProgressReporter(),

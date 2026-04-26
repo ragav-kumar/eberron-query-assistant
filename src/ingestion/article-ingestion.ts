@@ -12,10 +12,21 @@ export interface ArticleFetcher {
   fetchText(url: string): Promise<string>;
 }
 
+const FETCH_TIMEOUT_MS = 30_000;
+
 export const createFetchArticleFetcher = (): ArticleFetcher => {
   return {
     async fetchText(url) {
-      const response = await fetch(url);
+      const abortController = new AbortController();
+      const timeout = setTimeout(() => abortController.abort(), FETCH_TIMEOUT_MS);
+
+      let response: Response;
+      try {
+        response = await fetch(url, { signal: abortController.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
+
       if (!response.ok) {
         throw {
           kind: "http-fetch-failed",
@@ -87,8 +98,11 @@ export const normalizeArticle = (
   root.find("script, style, nav, footer, form, noscript").remove();
 
   const title =
-    normalizeText($("h1.entry-title, h1").first().text()) ||
-    normalizeText($("title").first().text()) ||
+    normalizeText($(".entry-title").first().text()) ||
+    normalizeText($("article h1, main h1").first().text()) ||
+    normalizeText($('meta[property="og:title"]').attr("content") ?? "") ||
+    normalizeText($("h1").first().text()) ||
+    normalizeTitleElement($("title").first().text()) ||
     previous?.title ||
     url;
   const headings = root
@@ -180,6 +194,13 @@ const canonicalArticleUrl = (href: string | undefined): string | null => {
     return null;
   }
   return value;
+};
+
+const normalizeTitleElement = (title: string): string => {
+  return normalizeText(title)
+    .replace(/\s*[-|]\s*Keith Baker'?s Blog$/i, "")
+    .replace(/\s*[-|]\s*Keith Baker.*$/i, "")
+    .trim();
 };
 
 const hashText = (text: string): string => {

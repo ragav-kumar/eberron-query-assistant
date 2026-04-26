@@ -161,7 +161,11 @@ const inspect = async (
   } = {}
 ) => {
   const service = createFilesystemSourceDiscoveryService({ now: () => NOW });
-  return service.inspectSources(config, { forceReingest: options.forceReingest ?? false }, options.state ?? createDefaultRuntimeState());
+  return service.inspectSources(
+    config,
+    { forceReingest: options.forceReingest ?? false, retrievalQuery: null },
+    options.state ?? createDefaultRuntimeState()
+  );
 };
 
 const writeManifest = async (foundryExportDir: string, runId: string, generatedAt: string, recordCount: number) => {

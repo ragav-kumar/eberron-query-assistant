@@ -51,6 +51,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     }
 
     try {
+      dependencies.reporter.info("foundry: ingesting records.ndjson.");
       const parsed = await parseFoundryRecords(config, marker);
       await corpusStore.replaceSourcesByType(config, "foundry", parsed.sources);
       nextState.foundry.lastSuccessfulExport = marker;
@@ -83,16 +84,20 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     const details: string[] = [];
 
     for (const filename of removed) {
+      dependencies.reporter.info(`pdf: removing stale source ${filename}.`);
       await corpusStore.removeSource(config, "pdf", filename);
     }
 
-    for (const filename of filenames) {
+    for (const [index, filename] of filenames.entries()) {
       try {
+        dependencies.reporter.info(`pdf: parsing ${filename} (${index + 1}/${filenames.length}).`);
         const normalized = await normalizePdf(config, filename, pdfParser);
         await corpusStore.replaceSource(config, normalized.source, normalized.chunks);
+        dependencies.reporter.info(`pdf: indexed ${filename} with ${normalized.chunks.length} chunks.`);
         ingested += 1;
       } catch (error) {
         failed += 1;
+        dependencies.reporter.warn(`pdf: failed ${filename}: ${formatThrownValue(error)}.`);
         details.push(`${filename}: ${formatThrownValue(error)}`);
       }
     }
@@ -131,6 +136,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
 
     const nowIso = now().toISOString();
     try {
+      dependencies.reporter.info(`article: fetching Keith Baker index ${KEITH_BAKER_INDEX_URL}.`);
       const indexHtml = await articleFetcher.fetchText(KEITH_BAKER_INDEX_URL);
       const discovered = discoverArticleLinks(indexHtml, state.article.knownArticles, nowIso);
       const articleMap = new Map(discovered.articles.map((article) => [article.canonicalUrl, article]));
@@ -141,16 +147,24 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
       let ingested = 0;
       let failed = 0;
       const details: string[] = [];
+      dependencies.reporter.info(
+        `article: discovered ${discovered.discoveredUrls.length} URLs; ingesting ${ingestCandidates.length} article pages.`
+      );
 
-      for (const article of ingestCandidates) {
+      for (const [index, article] of ingestCandidates.entries()) {
         try {
+          dependencies.reporter.info(`article: fetching ${article.canonicalUrl} (${index + 1}/${ingestCandidates.length}).`);
           const html = await articleFetcher.fetchText(article.canonicalUrl);
           const normalized = normalizeArticle(article.canonicalUrl, html, article, nowIso);
           await corpusStore.replaceSource(config, normalized.source, normalized.chunks);
           articleMap.set(article.canonicalUrl, normalized.article);
+          dependencies.reporter.info(
+            `article: indexed ${normalized.article.title ?? article.canonicalUrl} with ${normalized.chunks.length} chunks.`
+          );
           ingested += 1;
         } catch (error) {
           failed += 1;
+          dependencies.reporter.warn(`article: failed ${article.canonicalUrl}: ${formatThrownValue(error)}.`);
           details.push(`${article.canonicalUrl}: ${formatThrownValue(error)}`);
           articleMap.set(article.canonicalUrl, {
             ...article,

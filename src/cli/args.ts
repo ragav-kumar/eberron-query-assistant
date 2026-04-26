@@ -9,6 +9,9 @@ export const parseRuntimeOptions = (args: string[] = process.argv.slice(2)): Run
       "force-reingest": {
         type: "boolean",
         default: false
+      },
+      "retrieval-query": {
+        type: "string"
       }
     },
     strict: true,
@@ -16,6 +19,7 @@ export const parseRuntimeOptions = (args: string[] = process.argv.slice(2)): Run
   });
 
   return {
-    forceReingest: parsed.values["force-reingest"] ?? false
+    forceReingest: parsed.values["force-reingest"] ?? false,
+    retrievalQuery: parsed.values["retrieval-query"] ?? null
   };
 };

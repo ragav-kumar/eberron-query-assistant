@@ -1,6 +1,8 @@
 import { loadDefaultConfig } from "../config/index.js";
 import { createFilesystemIngestionService, createSqliteCorpusStore, type IngestionService } from "../ingestion/index.js";
 import { createConsoleProgressReporter, type ProgressReporter } from "../progress/reporter.js";
+import { createDeterministicEmbeddingAdapter } from "../provider/index.js";
+import { createSqliteRetrievalService, type RetrievalService } from "../retrieval/index.js";
 import {
   createFilesystemSourceDiscoveryService,
   type SourceDiscoveryService
@@ -16,6 +18,7 @@ export interface RuntimeDependencies {
   ingestion?: IngestionService;
   prompt?: PromptShell;
   reporter?: ProgressReporter;
+  retrieval?: RetrievalService;
   stateStore?: StateStore;
 }
 
@@ -33,13 +36,36 @@ export const runRuntime = async (
       reporter
     });
   const stateStore = dependencies.stateStore ?? createFilesystemStateStore();
+  const retrieval =
+    dependencies.retrieval ??
+    createSqliteRetrievalService({
+      embeddingAdapter: createDeterministicEmbeddingAdapter(),
+      reporter
+    });
 
   const summary = await runStartupRefresh(config, options, {
     discovery,
     ingestion,
     reporter,
+    retrieval,
     stateStore
   });
+
+  if (options.retrievalQuery) {
+    const results = await retrieval.search({
+      query: options.retrievalQuery,
+      limit: 8
+    });
+    reporter.info(`Retrieval debug results for "${options.retrievalQuery}": ${results.length}.`);
+    for (const [index, result] of results.entries()) {
+      const locator = result.citation.locator ? ` ${result.citation.locator}` : "";
+      const url = result.citation.url ? ` ${result.citation.url}` : "";
+      reporter.info(
+        `${index + 1}. [${result.matchKind} ${result.score.toFixed(3)}] ${result.sourceType}:${result.sourceTitle}${locator}${url} chunk=${result.chunkId}`
+      );
+    }
+    return summary;
+  }
 
   const prompt = dependencies.prompt ?? createStubPromptShell({ reporter });
   await prompt.start();

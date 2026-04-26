@@ -11,6 +11,7 @@ import {
   createSqliteCorpusStore,
   discoverArticleLinks,
   getCorpusDatabasePath,
+  normalizeArticle,
   type ArticleFetcher,
   type CorpusStore,
   type PdfParser
@@ -54,7 +55,7 @@ describe("Phase 3 ingestion", () => {
 
     const service = createService();
     const state = createDefaultRuntimeState();
-    const result = await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, ["foundry"]));
+    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["foundry"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
       status: "succeeded",
@@ -79,7 +80,7 @@ describe("Phase 3 ingestion", () => {
 
     const service = createService();
     const state = createDefaultRuntimeState();
-    const result = await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, ["foundry"]));
+    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["foundry"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
       status: "failed",
@@ -109,7 +110,7 @@ describe("Phase 3 ingestion", () => {
       }
     });
 
-    await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, ["pdf"]));
+    await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["pdf"]));
 
     const chunks = readRows(config, "SELECT text, citation_json, metadata_json FROM chunks");
     expect(chunks).toHaveLength(1);
@@ -135,13 +136,13 @@ describe("Phase 3 ingestion", () => {
         ],
         [
           "https://keith-baker.com/new-article/",
-          "<article><h1>New Article</h1><p>The Trust watches Zilargo carefully.</p><h2>Secrets</h2><p>Gnomes keep notes.</p></article>"
+          '<article><h1>New Article</h1><p>The Trust watches Zilargo carefully.</p><a href="/do-not-recurse/">Nested</a><h2>Secrets</h2><p>Gnomes keep notes.</p></article>'
         ]
       ])
     );
 
     const service = createService({ articleFetcher: fetcher });
-    const result = await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, ["article"]));
+    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
 
     expect(result.nextState.article.lastSuccessfulIndexScrapeAt).toBe(NOW.toISOString());
     expect(result.nextState.article.knownArticles).toMatchObject([
@@ -170,6 +171,18 @@ describe("Phase 3 ingestion", () => {
     );
 
     expect(result.discoveredUrls).toEqual(["https://keith-baker.com/a/"]);
+  });
+
+  it("uses article-specific title metadata instead of the generic blog title", () => {
+    const normalized = normalizeArticle(
+      "https://keith-baker.com/example/",
+      '<html><head><title>Example Article - Keith Baker&apos;s Blog</title><meta property="og:title" content="Example Article"></head><body><article><p>Dragonmarks matter.</p></article></body></html>',
+      null,
+      NOW.toISOString()
+    );
+
+    expect(normalized.source.title).toBe("Example Article");
+    expect(normalized.chunks[0]?.citation.label).toBe("Example Article");
   });
 });
 

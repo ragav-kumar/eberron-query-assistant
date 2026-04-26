@@ -1,5 +1,6 @@
 import type { IngestionService } from "../ingestion/index.js";
 import type { ProgressReporter } from "../progress/reporter.js";
+import type { RetrievalService } from "../retrieval/index.js";
 import type { SourceDiscoveryService } from "../source-discovery/index.js";
 import type { StateStore } from "../state/index.js";
 import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
@@ -9,6 +10,7 @@ export interface StartupRefreshDependencies {
   discovery: SourceDiscoveryService;
   ingestion: IngestionService;
   reporter: ProgressReporter;
+  retrieval?: RetrievalService;
   stateStore: StateStore;
 }
 
@@ -58,6 +60,14 @@ export const runStartupRefresh = async (
 
   if (ingestion.summary.corpusSourceCount === 0) {
     throw createTaggedError("empty-corpus", "Startup refresh produced no ingestible corpus sources.");
+  }
+
+  if (dependencies.retrieval) {
+    dependencies.reporter.info("Refreshing retrieval indexes.");
+    await dependencies.retrieval.refresh(config, {
+      forceRebuild: options.forceReingest || stateLoad.invalidated
+    });
+    dependencies.reporter.info("Retrieval indexes ready.");
   }
 
   dependencies.reporter.info(

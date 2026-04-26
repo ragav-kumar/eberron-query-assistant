@@ -1,5 +1,6 @@
 export interface RuntimeOptions {
   forceReingest: boolean;
+  retrievalQuery: string | null;
 }
 
 export interface RuntimeConfig {
@@ -57,6 +58,27 @@ export interface CorpusChunk {
   text: string;
   citation: CitationMetadata;
   metadata: Record<string, unknown>;
+}
+
+export interface RetrievalSearchRequest {
+  query: string;
+  sourceTypes?: SourceType[];
+  sourceKeys?: string[];
+  limit?: number;
+}
+
+export type RetrievalMatchKind = "lexical" | "vector" | "hybrid";
+
+export interface RetrievalResult {
+  chunkId: string;
+  sourceId: string;
+  sourceType: SourceType;
+  sourceKey: string;
+  sourceTitle: string;
+  content: string;
+  citation: CitationMetadata;
+  score: number;
+  matchKind: RetrievalMatchKind;
 }
 
 export interface SourceIngestionSummary {
