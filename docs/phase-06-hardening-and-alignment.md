@@ -24,7 +24,7 @@ Finish operational safeguards, degraded-mode behavior, scenario validation, and 
 At the end of this phase, the repository is aligned around the finished system. Startup behavior is validated across expected operational scenarios, degraded-mode behavior is explicit, and the documentation set accurately describes both the durable rules and the final product.
 
 ## Human Verification
-- Run through unchanged startup, changed foundry export, added PDF, removed PDF, and `--force-reingest` scenarios.
+- Run through unchanged startup, changed foundry export, added PDF, removed PDF, and `npm run reingest` scenarios.
 - Simulate a failing source pipeline and confirm degraded-mode messaging is clear.
 - Review `README.md` against actual CLI behavior and confirm terminology and usage match the finished system.
 - Confirm the docs set consists of `AGENTS.md`, `docs/specification.md`, `docs/phase-*.md`, and `README.md`, with no active `docs/brief.md`.

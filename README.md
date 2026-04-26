@@ -6,7 +6,7 @@ Eberron Query Assistant is a terminal-based lore and campaign assistant for an E
 - local PDFs from `pdf/`
 - Keith Baker articles discovered from the Eberron index
 
-On startup, the application refreshes its retrieval layer before opening chat. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine launches stay fast, and a force-refresh flag is available when a full rebuild is needed.
+On startup, the application refreshes its retrieval layer before opening chat. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine launches stay fast, and a full-refresh script is available when a full rebuild is needed.
 
 By default, local runtime state and retrieval artifacts are stored under `.eberron-query-assistant/` in the repository.
 Runtime state is tied to the application version; when the app version changes, stale local runtime artifacts are invalidated and rebuilt from the configured inputs.
@@ -41,10 +41,16 @@ npm run start
 Run a full rebuild when you want to ignore incremental skip logic:
 
 ```bash
-npm run start -- --force-reingest
+npm run reingest
 ```
 
-The exact script names may evolve with implementation, but the intended workflow stays the same: start the application, let it refresh the corpus, then interact with the assistant in the terminal. The canonical full-refresh flag is `--force-reingest`.
+Inspect retrieval results for a query without entering chat:
+
+```bash
+npm run debug:retrieval -- "aerenal deathless"
+```
+
+The intended workflow is to run the project from this repository: start the application, let it refresh the corpus, then interact with the assistant in the terminal. Use `npm run reingest` when you need a full rebuild.
 
 ## Example Questions
 - What are the names of the clans of the Znir?

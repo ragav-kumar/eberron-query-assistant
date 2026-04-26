@@ -30,7 +30,7 @@ Implement the finalized retrieval layer so normalized sources become queryable w
 - Stale-entry deletion tests
 - Version-mismatch startup tests proving the SQLite corpus store is cleared or recreated before ingestion and indexing resume
 - Stale-schema protection tests using an older or incompatible SQLite artifact and confirming startup rebuilds it cleanly
-- Full rebuild tests proving `--force-reingest` rebuilds SQLite-backed retrieval state, FTS data, and vector artifacts
+- Full rebuild tests proving `npm run reingest` rebuilds SQLite-backed retrieval state, FTS data, and vector artifacts
 - Recovery tests proving the vector index can be rebuilt from authoritative stored corpus records
 - Embedding-cache tests proving compatible embeddings are reused and incompatible embeddings are regenerated
 - Provider-adapter tests proving SQLite and FTS rebuilds do not call the embedding provider
@@ -39,11 +39,11 @@ Implement the finalized retrieval layer so normalized sources become queryable w
 At the end of this phase, the application maintains a working retrieval corpus that can return relevant chunks with provenance and can remove stale data when sources disappear or change. The retrieval stack is ready to be connected to an interactive assistant.
 
 ## Human Verification
-- Run the application in a retrieval-debug or otherwise inspectable mode and confirm relevant chunks are returned for sample questions.
+- Run `npm run debug:retrieval -- "<query>"` and confirm relevant chunks are returned for sample questions.
 - Remove a source and confirm its records no longer appear in retrieval results.
 - Start from an existing `0.3.0` runtime directory and confirm startup reports runtime and retrieval artifact invalidation.
 - Inspect `.eberron-query-assistant/retrieval/` after version invalidation and confirm `corpus.sqlite`, FTS data, and retrieval artifacts were rebuilt.
-- Force a full re-ingest and confirm SQLite-backed retrieval state, FTS data, and vector artifacts are rebuilt cleanly.
+- Run `npm run reingest` and confirm SQLite-backed retrieval state, FTS data, and vector artifacts are rebuilt cleanly.
 - Confirm logs identify whether embeddings were reused or regenerated.
 - Confirm returned records include enough metadata to cite their source.
 

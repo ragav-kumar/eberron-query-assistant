@@ -9,7 +9,9 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "lint": "eslint .",
-    "start": "npm run build -- --pretty false && node dist/cli.js",
+    "start": "npm run build && node dist/cli.js",
+    "reingest": "npm run build && node dist/cli.js --force-reingest",
+    "debug:retrieval": "npm run build && node dist/cli.js --retrieval-query",
     "test": "vitest run"
   },
   "engines": {

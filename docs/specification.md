@@ -57,7 +57,7 @@ The project should be structured so unit tests can cover source-specific logic w
 ### Launch Flow
 Every application start must follow this sequence:
 
-1. Parse CLI flags and initialize logging/progress output.
+1. Resolve runtime options from the repo-local package script and initialize logging/progress output.
 2. Load persisted runtime state.
 3. Refresh source inventories and update the retrieval layer incrementally.
 4. Report startup completion or degraded-state warnings.
@@ -77,9 +77,9 @@ The application must print progress to the terminal during startup work. The out
 If startup proceeds with partial failures, the terminal output must say so clearly and identify which source type degraded.
 
 ### Force Re-Ingest
-The CLI must support a `--force-reingest` flag that triggers a full re-ingest.
+The package scripts must expose a full re-ingest command.
 
-When the force flag is present:
+When full re-ingest is requested:
 - ignore normal incremental skip logic for foundry export, PDFs, and scraped articles
 - rebuild retrieval artifacts from source material
 - refresh scrape targets even if the one-week interval has not elapsed
@@ -150,7 +150,7 @@ Required behavior:
 - Compare discovered article URLs against persisted scrape history.
 - Fetch and ingest only new articles by default.
 - Skip the index scrape entirely if the last completed scrape was less than one week ago.
-- Allow `--force-reingest` to bypass the one-week skip.
+- Allow the full re-ingest command to bypass the one-week skip.
 - Avoid re-scraping previously captured article pages unless a force refresh is requested.
 
 Persist for each article:
@@ -254,10 +254,12 @@ Inference-heavy responses must avoid pretending a conclusion is directly quoted 
 ## Public Interfaces And Configuration
 
 ### CLI Interface
-The exact CLI parser can be chosen during implementation, but the application must expose:
-- a default command that performs startup refresh and enters chat
-- a `--force-reingest` flag
-- optional future flags for verbosity, model/provider selection, or source filtering
+The project is used from the repository through package scripts. The application must expose:
+- `npm run start`: perform startup refresh and enter chat
+- `npm run reingest`: perform a full source re-ingest and retrieval rebuild, then enter chat
+- `npm run debug:retrieval -- "<query>"`: perform startup refresh, print retrieval results for the provided query, and exit without entering chat
+
+Script internals may use CLI flags or other implementation details, but the user-facing command surface should not require routing flags through `npm run ... --` except when passing the retrieval query to `debug:retrieval`.
 
 ### Provider Boundary
 The runtime uses an OpenAI-compatible provider interface for chat and embeddings. Provider integration must be compartmentalized so changing the model provider later only requires touching a small number of files.
@@ -299,7 +301,7 @@ Manual verification across the finished system must include:
 - startup after PDF removals
 - startup with new Keith Baker links discovered
 - startup while the scrape interval has not elapsed
-- startup with `--force-reingest`
+- startup through `npm run reingest`
 - answer generation for both retrieval-heavy and inference-heavy questions
 
 ### Acceptance Scenarios
@@ -343,7 +345,7 @@ The finished system must satisfy these scenarios:
 - Retrieval layer: hybrid SQLite metadata plus vector retrieval
 - Provider model family: OpenAI-compatible chat and embeddings behind a compartmentalized adapter boundary
 - Default runtime state location: `.eberron-query-assistant/`
-- Canonical full-refresh flag: `--force-reingest`
+- Canonical runtime commands: `npm run start`, `npm run reingest`, and `npm run debug:retrieval -- "<query>"`
 
 ## README Alignment Requirements
 When `README.md` is written or updated, it must remain consistent with this specification and present the project as a finished product. It should summarize:
