@@ -65,13 +65,13 @@ const parseRuntimeState = (value: unknown): RuntimeStateLoadResult => {
     throw createInvalidRuntimeStateError("Runtime state file must contain an object.");
   }
 
-  if (value.appVersion !== appVersion) {
+  if (typeof value.appVersion !== "string" || !isCompatibleAppVersion(value.appVersion, appVersion)) {
     const storedVersion =
       typeof value.appVersion === "string" && value.appVersion.length > 0 ? value.appVersion : "missing";
     return {
       state: createDefaultRuntimeState(),
       invalidated: true,
-      invalidationReason: `runtime state appVersion ${storedVersion} does not match app version ${appVersion}`
+      invalidationReason: `runtime state appVersion ${storedVersion} is not compatible with app version ${appVersion}`
     };
   }
 
@@ -106,6 +106,28 @@ const parseRuntimeState = (value: unknown): RuntimeStateLoadResult => {
     }),
     invalidated: false,
     invalidationReason: null
+  };
+};
+
+export const isCompatibleAppVersion = (storedVersion: string, appVersion: string): boolean => {
+  const stored = parseMajorMinorVersion(storedVersion);
+  const current = parseMajorMinorVersion(appVersion);
+  if (!stored || !current) {
+    return false;
+  }
+
+  return stored.major === current.major && stored.minor === current.minor;
+};
+
+const parseMajorMinorVersion = (version: string): { major: number; minor: number } | null => {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(version);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    major: Number(match[1]),
+    minor: Number(match[2])
   };
 };
 

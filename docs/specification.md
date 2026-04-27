@@ -98,7 +98,7 @@ The application must maintain a persisted local state record separate from the F
 
 This state is the basis for incremental startup decisions.
 
-Runtime state uses `appVersion` as its compatibility marker. Each implementation phase increments the minor application version to match the phase number. If the stored `appVersion` is missing or differs from the actual app version, startup must invalidate the stored runtime state, clear app-owned runtime artifacts, and continue from default state for the current version.
+Runtime state uses `appVersion` as its compatibility marker. Each implementation phase increments the minor application version to match the phase number, and patch revisions may be used for migration or hardening work within a phase. If the stored `appVersion` is missing, malformed, or belongs to a different major/minor version line than the actual app version, startup must invalidate the stored runtime state, clear app-owned runtime artifacts, and continue from default state for the current version. Patch-version changes within the same major/minor line are compatible and must not invalidate runtime state unless a later written specification explicitly requires it.
 
 ### Foundry Export Handling
 The application must inspect `foundry-export/` on every startup.
@@ -203,14 +203,14 @@ Reasoning:
 - citation quality and incremental deletions matter
 - keeping metadata authoritative in SQLite makes debugging and removals easier
 
-SQLite is the authoritative persistence layer. The vector index is a retrieval accelerator keyed by `chunk_id` and can be rebuilt from SQLite-backed source and chunk records if needed.
+SQLite is the authoritative persistence layer. The vector store is keyed by `chunk_id`, stored in SQLite alongside corpus metadata, and can be rebuilt from SQLite-backed source and chunk records if needed.
 
 ### Required Retrieval Structures
 The retrieval layer must include:
 - a `sources` table for source-level metadata and ingest status
 - a `chunks` table for normalized chunk content and citation metadata
 - FTS support for lexical fallback and exact-term queries
-- a vector index keyed by `chunk_id`
+- a SQLite vector store keyed by `chunk_id`
 - deletion and update routines driven by source identifiers so stale records are removed cleanly
 
 ## Assistant Runtime

@@ -111,7 +111,30 @@ describe("FilesystemStateStore", () => {
     expect(result.state.foundry.lastSuccessfulExport).toBeNull();
   });
 
-  it("invalidates different app version state", async () => {
+  it("loads compatible patch-version state without invalidation", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const store = createFilesystemStateStore();
+
+    await mkdir(config.stateDir, { recursive: true });
+    await writeFile(
+      getStatePath(config),
+      `${JSON.stringify({
+        appVersion: "0.5.0",
+        foundry: { lastSuccessfulExport: null },
+        pdf: { knownFilenames: ["a.pdf"] },
+        article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }
+      })}\n`,
+      "utf8"
+    );
+
+    const result = await store.load(config);
+
+    expect(result.invalidated).toBe(false);
+    expect(result.state.appVersion).toBe(APP_VERSION);
+    expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
+  });
+
+  it("invalidates different app version line state", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = createFilesystemStateStore();
 
@@ -122,5 +145,18 @@ describe("FilesystemStateStore", () => {
 
     expect(result.invalidated).toBe(true);
     expect(result.invalidationReason).toContain("0.2.0");
+  });
+
+  it("invalidates malformed app version state", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const store = createFilesystemStateStore();
+
+    await mkdir(config.stateDir, { recursive: true });
+    await writeFile(getStatePath(config), `${JSON.stringify({ appVersion: "not-semver" })}\n`, "utf8");
+
+    const result = await store.load(config);
+
+    expect(result.invalidated).toBe(true);
+    expect(result.invalidationReason).toContain("not-semver");
   });
 });

@@ -1,4 +1,5 @@
 import Database from "better-sqlite3";
+import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -127,20 +128,18 @@ describe("Phase 4 retrieval", () => {
     expect(rows).toEqual([{ source_key: "eberron.pdf" }]);
   });
 
-  it("writes a vector artifact that can be rebuilt from SQLite chunks", async () => {
+  it("stores vector embeddings in SQLite instead of rewriting a JSON artifact", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config);
     const retrieval = createRetrieval();
 
     await retrieval.refresh(config);
-    const before = JSON.parse(await readFile(getVectorIndexPath(config), "utf8")) as { entries: unknown[] };
-    await rm(getVectorIndexPath(config), { force: true });
-    const rebuilt = await retrieval.refresh(config);
-    const after = JSON.parse(await readFile(getVectorIndexPath(config), "utf8")) as { entries: unknown[] };
 
-    expect(before.entries).toHaveLength(3);
-    expect(rebuilt.regeneratedEmbeddings).toBe(3);
-    expect(after.entries).toHaveLength(3);
+    await expect(readFile(getVectorIndexPath(config), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    expect(readVectorRows(config)).toHaveLength(3);
+
+    const second = await retrieval.refresh(config);
+    expect(second).toMatchObject({ chunkCount: 3, reusedEmbeddings: 3, regeneratedEmbeddings: 0 });
   });
 
   it("checkpoints generated embeddings so an interrupted refresh can resume", async () => {
@@ -150,8 +149,7 @@ describe("Phase 4 retrieval", () => {
     const firstRetrieval = createRetrieval(interrupted.adapter);
 
     await expect(firstRetrieval.refresh(config)).rejects.toThrow("simulated embedding interruption");
-    const checkpoint = JSON.parse(await readFile(getVectorIndexPath(config), "utf8")) as { entries: unknown[] };
-    expect(checkpoint.entries).toHaveLength(64);
+    expect(readVectorRows(config)).toHaveLength(64);
 
     const resumed = countingAdapter("checkpoint-model", "checkpoint-schema");
     const secondRetrieval = createRetrieval(resumed.adapter);
@@ -161,17 +159,61 @@ describe("Phase 4 retrieval", () => {
     expect(resumed.embedBatch).toHaveBeenCalledTimes(1);
   });
 
-  it("ignores stale vector temp files and writes the final index atomically", async () => {
+  it("leaves legacy vector files untouched during normal refresh", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config);
     await mkdir(config.retrievalDir, { recursive: true });
-    await writeFile(path.join(config.retrievalDir, "vector-index.json.tmp"), "{not-json", "utf8");
+    const legacy = `${JSON.stringify({
+      embeddingModelId: "legacy-model",
+      embeddingSchemaVersion: "legacy-schema",
+      entries: []
+    })}\n`;
+    await writeFile(getVectorIndexPath(config), legacy, "utf8");
 
     const retrieval = createRetrieval();
     await retrieval.refresh(config);
 
-    const index = JSON.parse(await readFile(getVectorIndexPath(config), "utf8")) as { entries: unknown[] };
-    expect(index.entries).toHaveLength(3);
+    await expect(readFile(getVectorIndexPath(config), "utf8")).resolves.toBe(legacy);
+    expect(readVectorRows(config)).toHaveLength(3);
+  });
+
+  it("migrates compatible legacy JSON vector entries into SQLite without provider calls", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await seedCorpus(config);
+    await mkdir(config.retrievalDir, { recursive: true });
+    const counted = countingAdapter("legacy-model", "legacy-schema");
+    await writeFile(
+      getVectorIndexPath(config),
+      `${JSON.stringify({
+        embeddingModelId: "legacy-model",
+        embeddingSchemaVersion: "legacy-schema",
+        entries: [
+          {
+            chunkId: "pdf:eberron.pdf:0",
+            contentHash: hashContent("Aerenal keeps deathless counselors."),
+            embedding: [1, 0, 0]
+          },
+          {
+            chunkId: "article:https://keith-baker.com/aerenal/:0",
+            contentHash: hashContent("Keith Baker writes about gnomes and the Trust."),
+            embedding: [0, 1, 0]
+          },
+          {
+            chunkId: "foundry:actor-ashana:0",
+            contentHash: hashContent("Ashana has a contact in Aerenal."),
+            embedding: [0, 0, 1]
+          }
+        ]
+      })}\n`,
+      "utf8"
+    );
+
+    const retrieval = createRetrieval(counted.adapter);
+    const summary = await retrieval.refresh(config);
+
+    expect(summary).toMatchObject({ chunkCount: 3, reusedEmbeddings: 3, regeneratedEmbeddings: 0 });
+    expect(counted.embedBatch).not.toHaveBeenCalled();
+    expect(readVectorRows(config)).toHaveLength(3);
   });
 
   it("reports embedding sync start, progress, and final summary", async () => {
@@ -185,6 +227,41 @@ describe("Phase 4 retrieval", () => {
     expect(reporter.messages.some((message) => message.startsWith("Retrieval embedding sync started:"))).toBe(true);
     expect(reporter.messages.filter((message) => message.startsWith("Retrieval embedding sync progress:"))).toHaveLength(2);
     expect(reporter.messages.some((message) => message.startsWith("Retrieval vector index synchronized:"))).toBe(true);
+  });
+
+  it("bounds oversized chunk text before requesting embeddings", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const store = createStore();
+    await store.initialize(config);
+    await store.replaceSource(config, source("pdf", "oversized.pdf", "Oversized"), [
+      chunk("pdf:oversized.pdf:0", "pdf:oversized.pdf", 0, "a".repeat(30_000), {
+        sourceType: "pdf",
+        label: "Oversized",
+        locator: "page 1",
+        url: null
+      })
+    ]);
+    const adapter = captureEmbeddingInputAdapter();
+    const retrieval = createRetrieval(adapter.adapter);
+
+    await retrieval.refresh(config);
+
+    expect(adapter.inputs[0]?.[0]).toHaveLength(24_000);
+  });
+
+  it("deletes stale vector rows when chunks are removed", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const store = await seedCorpus(config);
+    const retrieval = createRetrieval();
+
+    await retrieval.refresh(config);
+    expect(readVectorRows(config)).toHaveLength(3);
+
+    await store.removeSource(config, "pdf", "eberron.pdf");
+    await retrieval.refresh(config);
+
+    expect(readVectorRows(config).map((row) => row.chunk_id)).not.toContain("pdf:eberron.pdf:0");
+    expect(readVectorRows(config)).toHaveLength(2);
   });
 });
 
@@ -333,6 +410,25 @@ const interruptingBatchAdapter = (failAfterSuccessfulBatches: number): { adapter
   };
 };
 
+const captureEmbeddingInputAdapter = (): { adapter: EmbeddingAdapter; inputs: string[][] } => {
+  const base = createDeterministicEmbeddingAdapter();
+  const inputs: string[][] = [];
+
+  return {
+    adapter: {
+      failedRetries: 0,
+      modelId: "capture-model",
+      schemaVersion: "capture-schema",
+      embed: (input) => base.embed(input),
+      embedBatch(batchInputs) {
+        inputs.push(batchInputs);
+        return base.embedBatch(batchInputs);
+      }
+    },
+    inputs
+  };
+};
+
 const readRows = (config: RuntimeConfig, sql: string): Array<Record<string, unknown>> => {
   const database = new Database(getCorpusDatabasePath(config), { readonly: true });
   try {
@@ -340,4 +436,15 @@ const readRows = (config: RuntimeConfig, sql: string): Array<Record<string, unkn
   } finally {
     database.close();
   }
+};
+
+const readVectorRows = (config: RuntimeConfig): Array<Record<string, unknown>> => {
+  return readRows(
+    config,
+    "SELECT chunk_id, content_hash, embedding_model_id, embedding_schema_version, embedding_json FROM chunk_vectors ORDER BY chunk_id"
+  );
+};
+
+const hashContent = (content: string): string => {
+  return createHash("sha256").update(content).digest("hex");
 };
