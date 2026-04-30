@@ -1,5 +1,4 @@
 import Database from "better-sqlite3";
-import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -159,10 +158,11 @@ describe("Phase 4 retrieval", () => {
     expect(resumed.embedBatch).toHaveBeenCalledTimes(1);
   });
 
-  it("leaves legacy vector files untouched during normal refresh", async () => {
+  it("deletes legacy vector files during normal refresh and regenerates SQLite rows", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config);
     await mkdir(config.retrievalDir, { recursive: true });
+    const counted = countingAdapter("legacy-delete-model", "legacy-delete-schema");
     const legacy = `${JSON.stringify({
       embeddingModelId: "legacy-model",
       embeddingSchemaVersion: "legacy-schema",
@@ -170,49 +170,12 @@ describe("Phase 4 retrieval", () => {
     })}\n`;
     await writeFile(getVectorIndexPath(config), legacy, "utf8");
 
-    const retrieval = createRetrieval();
-    await retrieval.refresh(config);
-
-    await expect(readFile(getVectorIndexPath(config), "utf8")).resolves.toBe(legacy);
-    expect(readVectorRows(config)).toHaveLength(3);
-  });
-
-  it("migrates compatible legacy JSON vector entries into SQLite without provider calls", async () => {
-    const config = loadDefaultConfig(TEST_ROOT);
-    await seedCorpus(config);
-    await mkdir(config.retrievalDir, { recursive: true });
-    const counted = countingAdapter("legacy-model", "legacy-schema");
-    await writeFile(
-      getVectorIndexPath(config),
-      `${JSON.stringify({
-        embeddingModelId: "legacy-model",
-        embeddingSchemaVersion: "legacy-schema",
-        entries: [
-          {
-            chunkId: "pdf:eberron.pdf:0",
-            contentHash: hashContent("Aerenal keeps deathless counselors."),
-            embedding: [1, 0, 0]
-          },
-          {
-            chunkId: "article:https://keith-baker.com/aerenal/:0",
-            contentHash: hashContent("Keith Baker writes about gnomes and the Trust."),
-            embedding: [0, 1, 0]
-          },
-          {
-            chunkId: "foundry:actor-ashana:0",
-            contentHash: hashContent("Ashana has a contact in Aerenal."),
-            embedding: [0, 0, 1]
-          }
-        ]
-      })}\n`,
-      "utf8"
-    );
-
     const retrieval = createRetrieval(counted.adapter);
     const summary = await retrieval.refresh(config);
 
-    expect(summary).toMatchObject({ chunkCount: 3, reusedEmbeddings: 3, regeneratedEmbeddings: 0 });
-    expect(counted.embedBatch).not.toHaveBeenCalled();
+    await expect(readFile(getVectorIndexPath(config), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    expect(summary).toMatchObject({ chunkCount: 3, reusedEmbeddings: 0, regeneratedEmbeddings: 3 });
+    expect(counted.embedBatch).toHaveBeenCalledTimes(1);
     expect(readVectorRows(config)).toHaveLength(3);
   });
 
@@ -443,8 +406,4 @@ const readVectorRows = (config: RuntimeConfig): Array<Record<string, unknown>> =
     config,
     "SELECT chunk_id, content_hash, embedding_model_id, embedding_schema_version, embedding_json FROM chunk_vectors ORDER BY chunk_id"
   );
-};
-
-const hashContent = (content: string): string => {
-  return createHash("sha256").update(content).digest("hex");
 };

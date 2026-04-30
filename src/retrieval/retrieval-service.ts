@@ -1,7 +1,5 @@
 import { createHash } from "node:crypto";
-import { createReadStream } from "node:fs";
-import { access, mkdir } from "node:fs/promises";
-import { createInterface } from "node:readline";
+import { access, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 
 import Database from "better-sqlite3";
@@ -22,7 +20,6 @@ const DEFAULT_LIMIT = 8;
 const EMBEDDING_BATCH_SIZE = 64;
 const MAX_EMBEDDING_INPUT_CHARACTERS = 24_000;
 const VECTOR_STORE_SCHEMA_VERSION = "sqlite-json-v1";
-const VECTOR_IMPORT_BATCH_SIZE = 256;
 
 export interface RetrievalSyncSummary {
   chunkCount: number;
@@ -57,17 +54,6 @@ interface VectorIndexEntry {
   embedding: number[];
 }
 
-interface VectorIndexNdjsonHeader {
-  format: "vector-index-ndjson-v1";
-  embeddingModelId: string;
-  embeddingSchemaVersion: string;
-}
-
-interface VectorIndexHeader {
-  embeddingModelId: string;
-  embeddingSchemaVersion: string;
-}
-
 interface StoredVectorEntry {
   chunkId: string;
   contentHash: string;
@@ -91,6 +77,7 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
   ): Promise<RetrievalSyncSummary> => {
     config = nextConfig;
     await mkdir(nextConfig.retrievalDir, { recursive: true });
+    await deleteLegacyVectorIndex(nextConfig, dependencies.reporter);
 
     const database = new Database(getCorpusDatabasePath(nextConfig));
     try {
@@ -104,7 +91,6 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
 
       const chunks = readAllChunks(database);
       deleteStaleVectorRows(database);
-      await importLegacyVectorIndexIfNeeded(database, nextConfig, dependencies.embeddingAdapter, dependencies.reporter);
       const summary = await syncVectorStore(chunks, database, dependencies.embeddingAdapter, dependencies.reporter);
 
       dependencies.reporter.info(
@@ -141,6 +127,16 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
 
 export const getVectorIndexPath = (config: RuntimeConfig): string => {
   return path.join(config.retrievalDir, VECTOR_INDEX_FILENAME);
+};
+
+const deleteLegacyVectorIndex = async (config: RuntimeConfig, reporter: ProgressReporter): Promise<void> => {
+  const legacyIndexPath = getVectorIndexPath(config);
+  if (!(await fileExists(legacyIndexPath))) {
+    return;
+  }
+
+  await rm(legacyIndexPath, { force: true });
+  reporter.info("Deleted legacy vector-index.json; missing embeddings will be regenerated into SQLite.");
 };
 
 const rebuildFts = (database: Database.Database): void => {
@@ -481,40 +477,6 @@ const upsertVectorRows = (
   })();
 };
 
-const importLegacyVectorIndexIfNeeded = async (
-  database: Database.Database,
-  config: RuntimeConfig,
-  embeddingAdapter: EmbeddingAdapter,
-  reporter: ProgressReporter
-): Promise<void> => {
-  const compatibleCount = database
-    .prepare(
-      `SELECT COUNT(*) AS count
-       FROM chunk_vectors
-       WHERE embedding_model_id = ?
-         AND embedding_schema_version = ?`
-    )
-    .get(embeddingAdapter.modelId, embeddingAdapter.schemaVersion) as { count: number };
-
-  if (compatibleCount.count > 0) {
-    return;
-  }
-
-  const legacyIndexPath = getVectorIndexPath(config);
-  if (!(await fileExists(legacyIndexPath))) {
-    return;
-  }
-
-  try {
-    const imported = await importLegacyVectorIndex(legacyIndexPath, database, embeddingAdapter);
-    if (imported > 0) {
-      reporter.info(`Imported ${imported} compatible vector embeddings from legacy vector-index.json.`);
-    }
-  } catch (error) {
-    reporter.warn(`Could not import legacy vector-index.json; missing embeddings will be regenerated. ${formatError(error)}`);
-  }
-};
-
 const fileExists = async (filePath: string): Promise<boolean> => {
   try {
     await access(filePath);
@@ -522,243 +484,6 @@ const fileExists = async (filePath: string): Promise<boolean> => {
   } catch {
     return false;
   }
-};
-
-const importLegacyVectorIndex = async (
-  indexPath: string,
-  database: Database.Database,
-  embeddingAdapter: EmbeddingAdapter
-): Promise<number> => {
-  const prefix = await readFilePrefix(indexPath);
-  const trimmedPrefix = prefix.trimStart();
-
-  if (trimmedPrefix.startsWith('{"format":"vector-index-ndjson-v1"')) {
-    return importLegacyVectorIndexNdjson(indexPath, database, embeddingAdapter);
-  }
-
-  return importLegacyVectorIndexJson(indexPath, database, embeddingAdapter);
-};
-
-const importLegacyVectorIndexNdjson = async (
-  indexPath: string,
-  database: Database.Database,
-  embeddingAdapter: EmbeddingAdapter
-): Promise<number> => {
-  const input = createInterface({
-    input: createReadStream(indexPath, { encoding: "utf8" }),
-    crlfDelay: Infinity
-  });
-
-  let header: VectorIndexNdjsonHeader | null = null;
-  let imported = 0;
-  let batch: VectorIndexEntry[] = [];
-
-  for await (const line of input) {
-    if (line.trim().length === 0) {
-      continue;
-    }
-
-    if (!header) {
-      const parsed = JSON.parse(line) as VectorIndexNdjsonHeader;
-      if (parsed.format !== "vector-index-ndjson-v1") {
-        return 0;
-      }
-      header = parsed;
-      if (!isCompatibleVectorHeader(header, embeddingAdapter)) {
-        return 0;
-      }
-      continue;
-    }
-
-    const entry = parseVectorEntry(JSON.parse(line));
-    if (!entry) {
-      continue;
-    }
-
-    batch.push(entry);
-    if (batch.length >= VECTOR_IMPORT_BATCH_SIZE) {
-      upsertVectorRows(database, batch, embeddingAdapter);
-      imported += batch.length;
-      batch = [];
-    }
-  }
-
-  if (batch.length > 0) {
-    upsertVectorRows(database, batch, embeddingAdapter);
-    imported += batch.length;
-  }
-
-  return imported;
-};
-
-const importLegacyVectorIndexJson = async (
-  indexPath: string,
-  database: Database.Database,
-  embeddingAdapter: EmbeddingAdapter
-): Promise<number> => {
-  const stream = createReadStream(indexPath, { encoding: "utf8" });
-  let buffer = "";
-  let header: VectorIndexHeader | null = null;
-  let state: VectorEntryParseState = {
-    objectDepth: 0,
-    objectStart: -1,
-    inString: false,
-    escaped: false
-  };
-  let imported = 0;
-  let batch: VectorIndexEntry[] = [];
-
-  const flushBatch = (): void => {
-    if (batch.length === 0) {
-      return;
-    }
-
-    upsertVectorRows(database, batch, embeddingAdapter);
-    imported += batch.length;
-    batch = [];
-  };
-
-  for await (const chunk of stream) {
-    buffer += chunk;
-
-    if (!header) {
-      const entriesMarker = buffer.indexOf(',"entries":[');
-      if (entriesMarker === -1) {
-        continue;
-      }
-
-      const parsed = JSON.parse(`${buffer.slice(0, entriesMarker)}}`) as VectorIndexHeader;
-      header = {
-        embeddingModelId: parsed.embeddingModelId,
-        embeddingSchemaVersion: parsed.embeddingSchemaVersion
-      };
-      if (!isCompatibleVectorHeader(header, embeddingAdapter)) {
-        return 0;
-      }
-      buffer = buffer.slice(entriesMarker + ',"entries":['.length);
-    }
-
-    const parsed = parseVectorEntriesFromBuffer(buffer, state, (entry) => {
-      batch.push(entry);
-      if (batch.length >= VECTOR_IMPORT_BATCH_SIZE) {
-        flushBatch();
-      }
-    });
-    buffer = parsed.remaining;
-    state = parsed.state;
-  }
-
-  flushBatch();
-  return imported;
-};
-
-const isCompatibleVectorHeader = (header: VectorIndexHeader, embeddingAdapter: EmbeddingAdapter): boolean => {
-  return (
-    header.embeddingModelId === embeddingAdapter.modelId &&
-    header.embeddingSchemaVersion === embeddingAdapter.schemaVersion
-  );
-};
-
-interface VectorEntryParseState {
-  objectDepth: number;
-  objectStart: number;
-  inString: boolean;
-  escaped: boolean;
-}
-
-const parseVectorEntriesFromBuffer = (
-  buffer: string,
-  initialState: VectorEntryParseState,
-  onEntry: (entry: VectorIndexEntry) => void
-): { remaining: string; state: VectorEntryParseState } => {
-  let { escaped, inString, objectDepth, objectStart } = initialState;
-  let consumedThrough = 0;
-
-  for (let index = 0; index < buffer.length; index += 1) {
-    const character = buffer[index];
-
-    if (escaped) {
-      escaped = false;
-      continue;
-    }
-
-    if (character === "\\") {
-      escaped = inString;
-      continue;
-    }
-
-    if (character === '"') {
-      inString = !inString;
-      continue;
-    }
-
-    if (inString) {
-      continue;
-    }
-
-    if (character === "{") {
-      if (objectDepth === 0) {
-        objectStart = index;
-      }
-      objectDepth += 1;
-      continue;
-    }
-
-    if (character === "}") {
-      objectDepth -= 1;
-      if (objectDepth === 0 && objectStart >= 0) {
-        const entry = parseVectorEntry(JSON.parse(buffer.slice(objectStart, index + 1)));
-        if (entry) {
-          onEntry(entry);
-        }
-        consumedThrough = index + 1;
-        objectStart = -1;
-      }
-    }
-  }
-
-  const remaining = objectDepth > 0 && objectStart >= 0 ? buffer.slice(objectStart) : buffer.slice(consumedThrough);
-  return {
-    remaining,
-    state: {
-      escaped,
-      inString,
-      objectDepth,
-      objectStart: objectDepth > 0 ? 0 : -1
-    }
-  };
-};
-
-const parseVectorEntry = (value: unknown): VectorIndexEntry | null => {
-  if (!isRecord(value) || typeof value.chunkId !== "string" || typeof value.contentHash !== "string") {
-    return null;
-  }
-
-  if (!Array.isArray(value.embedding) || !value.embedding.every((item) => typeof item === "number")) {
-    return null;
-  }
-
-  return {
-    chunkId: value.chunkId,
-    contentHash: value.contentHash,
-    embedding: value.embedding
-  };
-};
-
-const readFilePrefix = async (filePath: string, byteCount = 256): Promise<string> => {
-  const stream = createReadStream(filePath, {
-    encoding: "utf8",
-    start: 0,
-    end: byteCount - 1
-  });
-  let prefix = "";
-
-  for await (const chunk of stream) {
-    prefix += chunk;
-    break;
-  }
-
-  return prefix;
 };
 
 const buildSqlFilters = (
@@ -830,12 +555,4 @@ const cosineSimilarity = (left: number[], right: number[]): number => {
 
   const magnitude = Math.sqrt(leftMagnitude) * Math.sqrt(rightMagnitude);
   return magnitude === 0 ? 0 : dot / magnitude;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-};
-
-const formatError = (error: unknown): string => {
-  return error instanceof Error ? error.message : String(error);
 };

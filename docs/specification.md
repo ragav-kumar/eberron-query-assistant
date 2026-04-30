@@ -203,7 +203,7 @@ Reasoning:
 - citation quality and incremental deletions matter
 - keeping metadata authoritative in SQLite makes debugging and removals easier
 
-SQLite is the authoritative persistence layer. The vector store is keyed by `chunk_id`, stored in SQLite alongside corpus metadata, and can be rebuilt from SQLite-backed source and chunk records if needed.
+SQLite is the authoritative persistence layer. The vector store is keyed by `chunk_id`, stored in SQLite alongside corpus metadata, and can be rebuilt from SQLite-backed source and chunk records if needed. Legacy vector artifacts outside SQLite are disposable derived data and may be deleted when storage formats change.
 
 ### Required Retrieval Structures
 The retrieval layer must include:

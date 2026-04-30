@@ -1,7 +1,7 @@
 # Phase 05.5: Vector Storage Migration
 
 ## Goal
-Replace the giant JSON vector index with durable SQLite-backed vector storage so provider-generated embeddings are checkpointed incrementally without large whole-file rewrites, memory pressure, or lost progress after aborts.
+Replace the giant JSON vector index with durable SQLite-backed vector storage so provider-generated embeddings are checkpointed incrementally without large whole-file rewrites, memory pressure, or lost progress after aborts. Existing JSON vector artifacts are discarded and regenerated into SQLite.
 
 ## Current In-Progress State
 - Commit `038b123` contains the completed Phase 05 assistant runtime plus batched, retryable, checkpointed embedding refresh.
@@ -9,13 +9,12 @@ Replace the giant JSON vector index with durable SQLite-backed vector storage so
   - `src/retrieval/retrieval-service.ts`
   - `tests/retrieval.test.ts`
 - Those uncommitted changes attempted a streaming NDJSON vector-index format. Do not continue that approach. Replace or discard those changes before implementing this phase.
-- The existing runtime artifact `.eberron-query-assistant/retrieval/vector-index.json` may contain valuable OpenAI embeddings already generated during interrupted startup runs. Do not delete it during this phase.
+- The existing runtime artifact `.eberron-query-assistant/retrieval/vector-index.json` is disposable derived data. Delete it during retrieval refresh and regenerate missing vectors into SQLite.
 
 ## Scope
 - Convert vector storage from `.eberron-query-assistant/retrieval/vector-index.json` to SQLite rows keyed by `chunk_id`.
 - Store embeddings in SQLite alongside the existing retrieval database unless implementation proves a separate DB is necessary.
-- Preserve already-generated embeddings by migrating compatible entries from the current JSON checkpoint into SQLite before generating missing embeddings.
-- Continue provider-backed embedding refresh from the migrated checkpoint rather than starting from zero.
+- Do not migrate existing JSON vector entries. Regenerate embeddings through the active embedding adapter for any chunks missing compatible SQLite rows.
 - Keep lexical retrieval and corpus metadata behavior unchanged.
 - Keep Phase 05 user-facing commands unchanged:
   - `npm run start`
@@ -48,39 +47,37 @@ Replace the giant JSON vector index with durable SQLite-backed vector storage so
 - Upsert each successful embedding batch in a SQLite transaction.
 - Search should load compatible vectors from SQLite for the current query instead of loading a giant JSON file.
 
-## Migration Requirements
+## Legacy JSON Disposal Requirements
 - On startup, initialize the vector table before vector sync.
-- If the vector table is empty or missing compatible rows, attempt one-time import from existing `.eberron-query-assistant/retrieval/vector-index.json`.
-- The importer must support the current JSON format produced by Phase 05.
-- Import must be streaming or otherwise memory-safe enough for the existing large checkpoint.
-- Imported rows must preserve their original `chunk_id`, `content_hash`, model id, schema version, and embedding vector.
-- After successful import, leave the JSON file in place or rename it to a backup name; do not delete it automatically in the same run.
-- If import fails, report a clear warning and continue by generating only missing embeddings when possible.
+- Delete existing `.eberron-query-assistant/retrieval/vector-index.json` during retrieval refresh.
+- Do not read, parse, validate, migrate, rename, or back up the legacy JSON artifact.
+- Existing compatible SQLite vector rows remain reusable.
+- Chunks without compatible SQLite vector rows must be regenerated through the active embedding adapter.
 
 ## Required Tests
-- Migrates compatible JSON vector entries into SQLite and reuses them without provider calls.
-- Continues embedding generation only for missing chunks after migration.
+- Deletes legacy `vector-index.json` during refresh and regenerates missing embeddings into SQLite.
+- Continues embedding generation only for chunks missing compatible SQLite rows.
 - Deletes stale vector rows when chunks are removed.
 - Upserts vector rows after each successful provider batch so aborting does not lose completed batch progress.
 - Keeps search behavior working across lexical, vector, and hybrid results.
 - Handles an oversized chunk input without provider `8192 tokens` errors by bounding embedding input.
-- Does not load or stringify the full vector index as one giant JSON string during normal refresh.
+- Does not load, parse, or stringify the legacy vector index during normal refresh.
 - Existing retrieval, runtime, provider, config, lint, and build checks continue to pass.
 
 ## Project State At End Of Phase
-At the end of this phase, retrieval vector persistence is SQLite-backed, resumable, and safe for the current corpus size. Existing generated embeddings from the JSON checkpoint have been migrated or safely skipped with clear warnings, and future startup refreshes no longer rewrite a massive vector JSON artifact.
+At the end of this phase, retrieval vector persistence is SQLite-backed, resumable, and safe for the current corpus size. Existing generated embeddings from the JSON checkpoint have been discarded, missing embeddings have been regenerated into SQLite, and future startup refreshes no longer read or write a massive vector JSON artifact.
 
 ## Human Verification
 - Start from the current runtime directory containing `vector-index.json`.
 - Run `npm run start`.
-- Confirm startup reports that vector embeddings were imported or reused from existing storage.
-- Confirm progress continues from the prior checkpoint rather than regenerating all embeddings.
+- Confirm startup deletes `vector-index.json`.
+- Confirm missing embeddings are regenerated into SQLite.
 - Stop during embedding generation with `Ctrl+C`, then run `npm run start` again and confirm completed batches are reused.
 - Run `npm run debug:retrieval -- "aerenal deathless"` and confirm cited retrieval results still appear.
-- Confirm no new massive `vector-index.json` rewrite happens during normal refresh.
+- Confirm no new massive `vector-index.json` read or rewrite happens during normal refresh.
 
 ## Assumptions And Prerequisites
 - Phase 05 is otherwise complete and committed at `038b123`.
-- The existing JSON vector checkpoint may be large but is worth preserving because it contains paid provider-generated embeddings.
+- The existing JSON vector checkpoint may contain paid provider-generated embeddings, but preserving or migrating it is no longer worth the implementation cost.
 - SQLite remains the authoritative corpus metadata store and is acceptable for vector persistence.
 - Binary vector storage can be considered later, but SQLite rows are the preferred durable fix for Phase 05.5.
