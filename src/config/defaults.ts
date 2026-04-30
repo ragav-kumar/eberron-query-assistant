@@ -12,6 +12,7 @@ export const loadDefaultConfig = (repoRoot = process.cwd()): RuntimeConfig => {
     foundryExportDir: path.join(repoRoot, "foundry-export"),
     pdfDir: path.join(repoRoot, "pdf"),
     runtimeDir,
+    logDir: path.join(repoRoot, "logs"),
     stateDir: path.join(runtimeDir, "state"),
     cacheDir: path.join(runtimeDir, "cache"),
     retrievalDir: path.join(runtimeDir, "retrieval"),

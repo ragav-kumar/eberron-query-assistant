@@ -7,6 +7,7 @@ import type { ChatAdapter, ChatMessage } from "../provider/index.js";
 import type { ProgressReporter } from "../progress/reporter.js";
 import type { RetrievalService } from "../retrieval/index.js";
 import type { RetrievalResult } from "../types.js";
+import { createSessionLog, type SessionLog } from "./session-log.js";
 
 export interface PromptShell {
   start(): Promise<void>;
@@ -15,6 +16,7 @@ export interface PromptShell {
 export interface PromptShellOptions {
   chat: ChatAdapter;
   input?: Readable;
+  logDir?: string;
   output?: Writable;
   reporter: ProgressReporter;
   retrieval: RetrievalService;
@@ -28,6 +30,7 @@ export const createAssistantPromptShell = (options: PromptShellOptions): PromptS
   const output = options.output ?? process.stdout;
   const reporter = options.reporter;
   const history: ChatMessage[] = [];
+  let sessionLog: SessionLog | null = null;
 
   return {
     async start() {
@@ -55,14 +58,30 @@ export const createAssistantPromptShell = (options: PromptShellOptions): PromptS
                 query: question,
                 limit: MAX_EVIDENCE_RESULTS
               });
+              const shouldRequestSessionTitle = options.logDir !== undefined && sessionLog === null;
               const messages = buildAssistantMessages({
                 evidence,
                 history,
-                question
+                question,
+                requestSessionTitle: shouldRequestSessionTitle
               });
               const response = await options.chat.complete(messages);
-              output.write(formatAssistantResponse(response));
-              history.push({ role: "user", content: question }, { role: "assistant", content: response });
+              const parsedResponse = shouldRequestSessionTitle ? parseFirstAssistantResponse(response) : null;
+              const assistantResponse = parsedResponse?.answer ?? response;
+              output.write(formatAssistantResponse(assistantResponse));
+              await appendSessionExchange({
+                assistantResponse,
+                fallbackTitle: question,
+                logDir: options.logDir,
+                parsedTitle: parsedResponse?.title,
+                reporter,
+                sessionLog,
+                setSessionLog(value) {
+                  sessionLog = value;
+                },
+                userQuestion: question
+              });
+              history.push({ role: "user", content: question }, { role: "assistant", content: assistantResponse });
               history.splice(0, Math.max(0, history.length - MAX_HISTORY_MESSAGES));
             } catch (error) {
               reporter.warn(`Assistant response failed: ${formatThrownValue(error)}`);
@@ -89,6 +108,7 @@ export interface AssistantMessageBuildRequest {
   evidence: RetrievalResult[];
   history?: ChatMessage[];
   question: string;
+  requestSessionTitle?: boolean;
 }
 
 export const buildAssistantMessages = (request: AssistantMessageBuildRequest): ChatMessage[] => {
@@ -103,7 +123,16 @@ export const buildAssistantMessages = (request: AssistantMessageBuildRequest): C
         "Answer using the retrieved evidence when it is relevant.",
         "Distinguish direct support from inference. Do not describe synthesized conclusions as quoted facts.",
         "Include concise references when evidence is available.",
-        "Use PDF title plus page when present, article title plus URL, and foundry entity name plus type or identifier."
+        "Use PDF title plus page when present, article title plus URL, and foundry entity name plus type or identifier.",
+        request.requestSessionTitle === true
+          ? [
+              "For this first response only, return exactly this Markdown metadata wrapper before the answer:",
+              "<session-title>A concise filesystem-safe title of at most 8 words</session-title>",
+              "<answer>",
+              "Your normal answer.",
+              "</answer>"
+            ].join("\n")
+          : ""
       ].join("\n")
     },
     ...recentHistory,
@@ -117,6 +146,63 @@ export const buildAssistantMessages = (request: AssistantMessageBuildRequest): C
       ].join("\n")
     }
   ];
+};
+
+interface FirstAssistantResponse {
+  answer: string;
+  title: string;
+}
+
+interface AppendSessionExchangeRequest {
+  assistantResponse: string;
+  fallbackTitle: string;
+  logDir: string | undefined;
+  parsedTitle: string | undefined;
+  reporter: ProgressReporter;
+  sessionLog: SessionLog | null;
+  setSessionLog(sessionLog: SessionLog): void;
+  userQuestion: string;
+}
+
+const parseFirstAssistantResponse = (response: string): FirstAssistantResponse | null => {
+  const match = response.match(
+    /^\s*<session-title>(?<title>[\s\S]*?)<\/session-title>\s*<answer>\s*(?<answer>[\s\S]*?)\s*<\/answer>\s*$/i
+  );
+  const title = match?.groups?.title?.trim();
+  const answer = match?.groups?.answer?.trim();
+
+  if (!title || !answer) {
+    return null;
+  }
+
+  return {
+    answer,
+    title
+  };
+};
+
+const appendSessionExchange = async (request: AppendSessionExchangeRequest): Promise<void> => {
+  if (!request.logDir) {
+    return;
+  }
+
+  try {
+    const sessionLog =
+      request.sessionLog ??
+      (await createSessionLog({
+        logDir: request.logDir,
+        title: request.parsedTitle ?? request.fallbackTitle
+      }));
+    if (request.sessionLog === null) {
+      request.setSessionLog(sessionLog);
+    }
+    await sessionLog.append({
+      assistantResponse: request.assistantResponse,
+      userQuestion: request.userQuestion
+    });
+  } catch (error) {
+    request.reporter.warn(`Session log update failed: ${formatThrownValue(error)}`);
+  }
 };
 
 export const formatCitation = (result: RetrievalResult): string => {

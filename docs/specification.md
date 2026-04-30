@@ -16,9 +16,10 @@ This file defines the finished system. Phased delivery is defined separately in 
 - Support incremental updates on startup so unchanged content is skipped.
 - Provide a terminal-only user experience with progress reporting during refresh and an interactive chat session afterward.
 - Support both retrieval questions and synthesis/inference questions across multiple sources.
+- Preserve human-readable local transcripts of interactive sessions without using those transcripts as future prompt memory.
 
 ## Non-Goals
-- Persist chat memory across application runs.
+- Persist chat memory across application runs as future prompt context.
 - Build any GUI.
 - Recompute PDF parsing when the filename is unchanged.
 - Re-scrape Keith Baker articles that were already captured successfully unless a full refresh is forced.
@@ -37,6 +38,8 @@ The application keeps its local runtime artifacts under `.eberron-query-assistan
 - normalized corpus data
 - SQLite and vector retrieval artifacts
 - parse and scrape caches
+
+Interactive session transcripts are stored separately under repo-root `logs/` by default. This directory is local-only and gitignored.
 
 ## Technology Baseline
 - Runtime: Node.js
@@ -223,11 +226,16 @@ The retrieval layer must include:
 After startup refresh completes, the application launches an interactive terminal chat session.
 
 Required behavior:
-- no cross-session memory
+- no cross-session prompt memory
+- each interactive session with at least one successful assistant response is archived as a Markdown transcript under `logs/`
+- transcript files are named `YYYYMMDDHHMMSS <ai generated title>.md`
+- the first assistant response must provide a concise session title for the filename as part of the same model response that answers the first user question
+- transcript files are updated after every successful assistant response and are not updated for failed or incomplete responses
+- transcript files must not be loaded into later prompt context unless a later specification explicitly introduces that behavior
 - session lasts until process termination
 - `Ctrl+C` is sufficient to end the process unless the chosen provider SDK requires explicit shutdown
 
-Conversation state may exist only in memory for the current run.
+Conversation state used for prompting may exist only in memory for the current run.
 
 ### Query Handling
 The assistant must support:
@@ -284,6 +292,7 @@ Default local paths:
 - `.eberron-query-assistant/state/` for runtime state
 - `.eberron-query-assistant/cache/` for scrape and parse caches
 - `.eberron-query-assistant/retrieval/` for SQLite and vector artifacts
+- `logs/` for gitignored Markdown session transcripts
 
 ## Validation Expectations
 
@@ -349,6 +358,7 @@ The finished system must satisfy these scenarios:
 - Retrieval layer: hybrid SQLite metadata plus vector retrieval
 - Provider model family: OpenAI-compatible chat and embeddings behind a compartmentalized adapter boundary
 - Default runtime state location: `.eberron-query-assistant/`
+- Default session transcript location: `logs/`
 - Canonical runtime commands: `npm run start`, `npm run reingest`, and `npm run debug:retrieval -- "<query>"`
 
 ## README Alignment Requirements

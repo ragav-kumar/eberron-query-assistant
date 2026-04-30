@@ -8,6 +8,7 @@ export interface RuntimeConfig {
   foundryExportDir: string;
   pdfDir: string;
   runtimeDir: string;
+  logDir: string;
   stateDir: string;
   cacheDir: string;
   retrievalDir: string;

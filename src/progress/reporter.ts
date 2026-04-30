@@ -96,7 +96,7 @@ const countRenderedRows = (value: string, columns: number | undefined): number =
 };
 
 const stripAnsiCodes = (value: string): string => {
-  return value.replace(/\u001b\[[0-9;]*m/g, "");
+  return value.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g"), "");
 };
 
 const formatInfoMessage = (message: string, colorsEnabled: boolean): string => {

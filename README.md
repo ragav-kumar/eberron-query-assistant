@@ -12,6 +12,7 @@ Startup output reports what was checked, skipped, refreshed, rebuilt, or degrade
 
 By default, local runtime state and retrieval artifacts are stored under `.eberron-query-assistant/` in the repository.
 Runtime state records the application version for diagnostics, but routine version bumps do not discard usable local state or retrieval artifacts.
+Interactive sessions with at least one successful assistant response are archived as local Markdown transcripts under `logs/`, which is gitignored. These transcripts are for review only and are not loaded as future assistant memory.
 
 Detailed engineering and phased-delivery documentation lives in `docs/specification.md` and the `docs/phase-*.md` files. This README remains focused on the intended finished user experience.
 

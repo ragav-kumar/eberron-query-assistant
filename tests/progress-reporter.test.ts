@@ -97,10 +97,10 @@ describe("console progress reporter", () => {
       })
     );
 
-    vi.spyOn(process.stdout, "write").mockImplementation(((chunk: string | Uint8Array) => {
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
       operations.push(`write:${chunk.toString()}`);
       return true;
-    }) as typeof process.stdout.write);
+    });
 
     return operations;
   };

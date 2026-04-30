@@ -35,6 +35,7 @@ describe("loadDefaultConfig", () => {
       foundryExportDir: path.join(repoRoot, "foundry-export"),
       pdfDir: path.join(repoRoot, "pdf"),
       runtimeDir: path.join(repoRoot, ".eberron-query-assistant"),
+      logDir: path.join(repoRoot, "logs"),
       stateDir: path.join(repoRoot, ".eberron-query-assistant", "state"),
       cacheDir: path.join(repoRoot, ".eberron-query-assistant", "cache"),
       retrievalDir: path.join(repoRoot, ".eberron-query-assistant", "retrieval"),

@@ -1,6 +1,9 @@
-import { Readable, Writable } from "node:stream";
+import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
+import { PassThrough, Readable, Writable } from "node:stream";
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ChatAdapter } from "../src/provider/index.js";
 import { createMemoryProgressReporter } from "../src/progress/reporter.js";
@@ -11,6 +14,12 @@ import {
   formatCitation
 } from "../src/runtime/prompt.js";
 import type { RetrievalResult } from "../src/types.js";
+
+const TEST_ROOT = path.resolve(".test-tmp", "prompt");
+
+afterEach(async () => {
+  await rm(TEST_ROOT, { force: true, recursive: true });
+});
 
 describe("assistant prompt assembly", () => {
   it("separates instructions, evidence, and user question", () => {
@@ -77,13 +86,122 @@ describe("assistant prompt shell", () => {
     expect(output.text()).toContain("\nAerenal answer.\nReferences: Eberron Rising, page 4\n\n");
   });
 
+  it("creates a session transcript from first response title metadata without printing the metadata", async () => {
+    const logDir = path.join(TEST_ROOT, "logs-title");
+    const complete = vi.fn<ChatAdapter["complete"]>().mockResolvedValue(
+      [
+        "<session-title>Aerenal Ancestors</session-title>",
+        "<answer>",
+        "Aerenal answer.",
+        "References: Eberron Rising, page 4",
+        "</answer>"
+      ].join("\n")
+    );
+    const output = createWritableCapture();
+
+    await createAssistantPromptShell({
+      chat: { complete },
+      input: Readable.from(["What about Aerenal?\nexit\n"]),
+      logDir,
+      output,
+      reporter: createMemoryProgressReporter(),
+      retrieval: mockRetrieval([result("pdf", "eberron.pdf", "Eberron Rising", "page 4")]).retrieval
+    }).start();
+
+    const filenames = await readdir(logDir);
+    expect(filenames).toHaveLength(1);
+    expect(filenames[0]).toMatch(/^\d{14} Aerenal Ancestors\.md$/);
+    expect(output.text()).toContain("Aerenal answer.");
+    expect(output.text()).not.toContain("<session-title>");
+
+    const logText = await readFile(path.join(logDir, filenames[0] ?? ""), "utf8");
+    expect(logText).toContain("# Aerenal Ancestors");
+    expect(logText).toContain("## User\n\nWhat about Aerenal?");
+    expect(logText).toContain("## Assistant\n\nAerenal answer.\nReferences: Eberron Rising, page 4");
+    expect(logText).not.toContain("<answer>");
+  });
+
+  it("appends later successful responses to the same session transcript", async () => {
+    const logDir = path.join(TEST_ROOT, "logs-append");
+    const input = new PassThrough();
+    const complete = vi
+      .fn<ChatAdapter["complete"]>()
+      .mockResolvedValueOnce("<session-title>Dragonmark Notes</session-title>\n<answer>\nFirst answer.\n</answer>")
+      .mockResolvedValueOnce("Second answer.");
+    const output = createWritableCapture();
+
+    const prompt = createAssistantPromptShell({
+      chat: { complete },
+      input,
+      logDir,
+      output,
+      reporter: createMemoryProgressReporter(),
+      retrieval: mockRetrieval([]).retrieval
+    }).start();
+
+    input.write("First question\n");
+    await waitForCallCount(complete, 1);
+    await waitForPromptCount(output, 2);
+    input.write("Second question\n");
+    await waitForCallCount(complete, 2);
+    await waitForPromptCount(output, 3);
+    input.write("exit\n");
+    await prompt;
+
+    const filenames = await readdir(logDir);
+    expect(filenames).toHaveLength(1);
+
+    const logText = await readFile(path.join(logDir, filenames[0] ?? ""), "utf8");
+    expect(logText.match(/## User/g)).toHaveLength(2);
+    expect(logText).toContain("First question");
+    expect(logText).toContain("First answer.");
+    expect(logText).toContain("Second question");
+    expect(logText).toContain("Second answer.");
+  });
+
+  it("falls back to a sanitized first-question title when title metadata is missing", async () => {
+    const logDir = path.join(TEST_ROOT, "logs-fallback");
+
+    await createAssistantPromptShell({
+      chat: { complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("Plain answer.") },
+      input: Readable.from(["What/about:Aerenal?\nexit\n"]),
+      logDir,
+      output: createWritableCapture(),
+      reporter: createMemoryProgressReporter(),
+      retrieval: mockRetrieval([]).retrieval
+    }).start();
+
+    const filenames = await readdir(logDir);
+    expect(filenames).toHaveLength(1);
+    expect(filenames[0]).toMatch(/^\d{14} What about Aerenal\.md$/);
+  });
+
+  it("does not create an empty session transcript when the user exits before a response", async () => {
+    const logDir = path.join(TEST_ROOT, "logs-empty");
+
+    await createAssistantPromptShell({
+      chat: mockChat().chat,
+      input: Readable.from(["exit\n"]),
+      logDir,
+      output: createWritableCapture(),
+      reporter: createMemoryProgressReporter(),
+      retrieval: mockRetrieval([]).retrieval
+    }).start();
+
+    await expect(readdir(logDir)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("starts each shell with empty in-memory history", async () => {
     const firstChat = mockChat();
     const secondChat = mockChat();
+    const logDir = path.join(TEST_ROOT, "logs-history");
+    await mkdir(logDir, { recursive: true });
+    await writeFile(path.join(logDir, "20260102030405 Old Session.md"), "Old logged question", "utf8");
 
     await createAssistantPromptShell({
       chat: firstChat.chat,
       input: Readable.from(["First question\nexit\n"]),
+      logDir,
       output: createWritableCapture(),
       reporter: createMemoryProgressReporter(),
       retrieval: mockRetrieval([]).retrieval
@@ -91,6 +209,7 @@ describe("assistant prompt shell", () => {
     await createAssistantPromptShell({
       chat: secondChat.chat,
       input: Readable.from(["Second question\nexit\n"]),
+      logDir,
       output: createWritableCapture(),
       reporter: createMemoryProgressReporter(),
       retrieval: mockRetrieval([]).retrieval
@@ -100,6 +219,7 @@ describe("assistant prompt shell", () => {
     const secondMessages = secondChat.complete.mock.calls[0]?.[0] ?? [];
     expect(firstMessages.some((message) => message.content.includes("First question"))).toBe(true);
     expect(secondMessages.some((message) => message.content.includes("First question"))).toBe(false);
+    expect(secondMessages.some((message) => message.content.includes("Old logged question"))).toBe(false);
   });
 });
 
@@ -137,6 +257,27 @@ const mockRetrieval = (
     },
     search
   };
+};
+
+const waitForCallCount = async (fn: { mock: { calls: unknown[] } }, count: number): Promise<void> => {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if (fn.mock.calls.length >= count) {
+      return;
+    }
+    await delay(1);
+  }
+  throw new Error(`Expected mock to be called ${count} time(s), but it was called ${fn.mock.calls.length} time(s).`);
+};
+
+const waitForPromptCount = async (output: { text(): string }, count: number): Promise<void> => {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const prompts = output.text().match(/> /g) ?? [];
+    if (prompts.length >= count) {
+      return;
+    }
+    await delay(1);
+  }
+  throw new Error(`Expected ${count} prompt marker(s), but saw ${output.text()}.`);
 };
 
 const mockChat = (): { chat: ChatAdapter; complete: ReturnType<typeof vi.fn<ChatAdapter["complete"]>> } => {
