@@ -34,7 +34,7 @@ export const createAssistantPromptShell = (options: PromptShellOptions): PromptS
       const rl = createInterface({
         input,
         output,
-        terminal: false
+        terminal: isTty(input) && isTty(output)
       });
 
       try {
@@ -61,7 +61,7 @@ export const createAssistantPromptShell = (options: PromptShellOptions): PromptS
                 question
               });
               const response = await options.chat.complete(messages);
-              output.write(`${response}\n`);
+              output.write(formatAssistantResponse(response));
               history.push({ role: "user", content: question }, { role: "assistant", content: response });
               history.splice(0, Math.max(0, history.length - MAX_HISTORY_MESSAGES));
             } catch (error) {
@@ -79,6 +79,10 @@ export const createAssistantPromptShell = (options: PromptShellOptions): PromptS
       }
     }
   };
+};
+
+const formatAssistantResponse = (response: string): string => {
+  return `\n${response.trimEnd()}\n\n`;
 };
 
 export interface AssistantMessageBuildRequest {
@@ -143,4 +147,8 @@ const isAbortError = (error: unknown): boolean => {
 
 const isReadlineClosedError = (error: unknown): boolean => {
   return error instanceof Error && error.message === "readline was closed";
+};
+
+const isTty = (stream: Readable | Writable): boolean => {
+  return "isTTY" in stream && stream.isTTY === true;
 };

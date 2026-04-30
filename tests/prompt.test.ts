@@ -74,6 +74,7 @@ describe("assistant prompt shell", () => {
     });
     expect(complete).toHaveBeenCalledOnce();
     expect(output.text()).toContain("Aerenal answer.");
+    expect(output.text()).toContain("\nAerenal answer.\nReferences: Eberron Rising, page 4\n\n");
   });
 
   it("starts each shell with empty in-memory history", async () => {
