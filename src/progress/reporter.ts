@@ -13,24 +13,34 @@ export const createConsoleProgressReporter = (): ProgressReporter => {
   const colorsEnabled = shouldUseColor();
   const rewriteProgress = shouldRewriteProgress();
   let hasActiveProgress = false;
+  let activeProgressRows = 0;
 
-  const finishProgressLine = (): void => {
+  const clearActiveProgress = (): void => {
     if (!hasActiveProgress) {
       return;
     }
 
-    process.stdout.write("\n");
+    process.stdout.cursorTo(0);
+    process.stdout.clearLine(0);
+
+    for (let row = 1; row < activeProgressRows; row += 1) {
+      process.stdout.moveCursor(0, -1);
+      process.stdout.clearLine(0);
+    }
+
+    process.stdout.cursorTo(0);
     hasActiveProgress = false;
+    activeProgressRows = 0;
   };
 
   return {
     info(message) {
-      finishProgressLine();
+      clearActiveProgress();
       console.log(formatInfoMessage(message, colorsEnabled));
     },
 
     warn(message) {
-      finishProgressLine();
+      clearActiveProgress();
       console.warn(formatWarningMessage(message, colorsEnabled));
     },
 
@@ -41,10 +51,10 @@ export const createConsoleProgressReporter = (): ProgressReporter => {
         return;
       }
 
-      process.stdout.clearLine(0);
-      process.stdout.cursorTo(0);
+      clearActiveProgress();
       process.stdout.write(formatted);
       hasActiveProgress = true;
+      activeProgressRows = countRenderedRows(formatted, process.stdout.columns);
     }
   };
 };
@@ -74,6 +84,19 @@ const shouldUseColor = (): boolean => {
 
 const shouldRewriteProgress = (): boolean => {
   return Boolean(process.stdout.isTTY);
+};
+
+const countRenderedRows = (value: string, columns: number | undefined): number => {
+  const terminalColumns = columns && columns > 0 ? columns : 80;
+  const visibleLines = stripAnsiCodes(value).split("\n");
+
+  return visibleLines.reduce((rows, line) => {
+    return rows + Math.max(1, Math.ceil(line.length / terminalColumns));
+  }, 0);
+};
+
+const stripAnsiCodes = (value: string): string => {
+  return value.replace(/\u001b\[[0-9;]*m/g, "");
 };
 
 const formatInfoMessage = (message: string, colorsEnabled: boolean): string => {
