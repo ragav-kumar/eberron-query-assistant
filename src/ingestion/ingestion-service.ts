@@ -173,7 +173,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
         }
       }
 
-      nextState.article.lastSuccessfulIndexScrapeAt = nowIso;
+      nextState.article.lastSuccessfulIndexScrapeAt = failed === 0 ? nowIso : state.article.lastSuccessfulIndexScrapeAt;
       nextState.article.knownArticles = sortArticles([...articleMap.values()]);
 
       return {

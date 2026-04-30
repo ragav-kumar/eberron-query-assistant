@@ -60,9 +60,10 @@ Every application start must follow this sequence:
 1. Resolve runtime options from the repo-local package script and initialize logging/progress output.
 2. Load persisted runtime state.
 3. Refresh source inventories and update the retrieval layer incrementally.
-4. Report startup completion or degraded-state warnings.
-5. Launch the interactive assistant loop.
-6. Continue until the process is terminated.
+4. Commit runtime state after ingestion and retrieval refresh have completed successfully enough to trust.
+5. Report startup completion or degraded-state warnings.
+6. Launch the interactive assistant loop.
+7. Continue until the process is terminated.
 
 The refresh step is mandatory on startup unless a later approved change adds an explicit bypass mode. The default behavior is refresh-first, chat-second.
 
@@ -74,7 +75,7 @@ The application must print progress to the terminal during startup work. The out
 - retrieval-layer rebuild or update progress
 - startup completion state before the assistant starts
 
-If startup proceeds with partial failures, the terminal output must say so clearly and identify which source type degraded.
+If startup proceeds with partial failures, the terminal output must say so clearly and identify which source type degraded. When known, degraded output must distinguish discovery failures, ingestion failures, and partial source failures.
 
 ### Force Re-Ingest
 The package scripts must expose a full re-ingest command.
@@ -174,7 +175,10 @@ Required behavior:
 - Failure in one source pipeline must not automatically prevent the others from running.
 - If at least one source remains available, the assistant may start in degraded mode after reporting the failure.
 - If no retrieval corpus can be produced, startup must fail before entering chat.
+- If startup produces an empty corpus, startup must fail before retrieval refresh and before entering chat.
 - Persisted state must only be updated for work that completed successfully enough to trust.
+- Startup must not save source inventory state ahead of retrieval artifacts. If retrieval refresh fails after ingestion, the previous runtime state must remain in place so the next launch retries the refresh path instead of treating the corpus as current.
+- Failed or incomplete source work must not be silently marked current in persisted state.
 
 This requires source-scoped transactions or equivalent safeguards so a failed ingest does not silently mark incomplete work as current.
 

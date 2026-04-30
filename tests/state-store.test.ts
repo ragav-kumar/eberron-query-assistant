@@ -119,7 +119,7 @@ describe("FilesystemStateStore", () => {
     await writeFile(
       getStatePath(config),
       `${JSON.stringify({
-        appVersion: "0.5.0",
+        appVersion: "0.6.1",
         foundry: { lastSuccessfulExport: null },
         pdf: { knownFilenames: ["a.pdf"] },
         article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }

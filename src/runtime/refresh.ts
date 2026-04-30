@@ -3,7 +3,14 @@ import type { ProgressReporter } from "../progress/reporter.js";
 import type { RetrievalService, RetrievalSyncSummary } from "../retrieval/index.js";
 import type { SourceDiscoveryService } from "../source-discovery/index.js";
 import type { StateStore } from "../state/index.js";
-import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
+import type {
+  RuntimeConfig,
+  RuntimeOptions,
+  SourceIngestionSummary,
+  SourceInventoryResult,
+  SourceType,
+  StartupRefreshSummary
+} from "../types.js";
 import { createTaggedError } from "../errors.js";
 
 export interface StartupRefreshDependencies {
@@ -44,7 +51,6 @@ export const runStartupRefresh = async (
   }
 
   const ingestion = await dependencies.ingestion.ingest(config, options, state, discovery, stateLoad.invalidated);
-  await dependencies.stateStore.save(config, ingestion.nextState);
 
   for (const summary of ingestion.summary.sourceSummaries) {
     const report = `${summary.message} discovered=${summary.discovered}, ingested=${summary.ingested}, removed=${summary.removed}, failed=${summary.failed}, status=${summary.status}.`;
@@ -66,16 +72,22 @@ export const runStartupRefresh = async (
     ? await refreshRetrievalIndexes(config, options, stateLoad.invalidated, dependencies)
     : undefined;
 
-  dependencies.reporter.info(
-    discovery.degraded || ingestion.summary.degraded
-      ? "Startup refresh complete with degraded source inventory; entering assistant prompt."
-      : "Startup refresh complete; entering assistant prompt."
-  );
+  await dependencies.stateStore.save(config, ingestion.nextState);
+
+  const degradation = summarizeDegradation(discovery.inventories, ingestion.summary.sourceSummaries);
+  if (degradation.degradedSources.length > 0) {
+    dependencies.reporter.warn(
+      `Startup refresh complete in degraded mode; entering assistant prompt. degradedSources=${degradation.degradedSources.join(", ")}; ${degradation.details.join(" ")}`
+    );
+  } else {
+    dependencies.reporter.info("Startup refresh complete; entering assistant prompt.");
+  }
 
   return {
     forceReingest: options.forceReingest,
     inventories: discovery.inventories,
-    degraded: discovery.degraded || ingestion.summary.degraded,
+    degraded: degradation.degradedSources.length > 0,
+    degradedSources: degradation.degradedSources,
     ...(retrieval ? { retrieval } : {})
   };
 };
@@ -97,3 +109,36 @@ const refreshRetrievalIndexes = async (
   dependencies.reporter.info("Retrieval indexes ready.");
   return retrieval;
 };
+
+const summarizeDegradation = (
+  inventories: SourceInventoryResult[],
+  sourceSummaries: SourceIngestionSummary[]
+): { degradedSources: SourceType[]; details: string[] } => {
+  const degradedSources: SourceType[] = [];
+  const details: string[] = [];
+
+  for (const sourceType of orderedSourceTypes) {
+    const inventory = inventories.find((candidate) => candidate.sourceType === sourceType);
+    const ingestion = sourceSummaries.find((candidate) => candidate.sourceType === sourceType);
+    const sourceDetails: string[] = [];
+
+    if (inventory?.status === "failed" || (inventory?.failed ?? 0) > 0) {
+      sourceDetails.push("discovery failed");
+    }
+
+    if (ingestion?.status === "failed") {
+      sourceDetails.push("ingestion failed");
+    } else if ((ingestion?.failed ?? 0) > 0) {
+      sourceDetails.push("partial ingestion failure");
+    }
+
+    if (sourceDetails.length > 0) {
+      degradedSources.push(sourceType);
+      details.push(`${sourceType}: ${sourceDetails.join(", ")}.`);
+    }
+  }
+
+  return { degradedSources, details };
+};
+
+const orderedSourceTypes: SourceType[] = ["foundry", "pdf", "article"];

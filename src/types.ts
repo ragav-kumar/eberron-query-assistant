@@ -41,6 +41,7 @@ export interface StartupRefreshSummary {
   forceReingest: boolean;
   inventories: SourceInventoryResult[];
   degraded: boolean;
+  degradedSources: SourceType[];
   retrieval?: {
     chunkCount: number;
     reusedEmbeddings: number;

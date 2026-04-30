@@ -10,7 +10,7 @@ import { runRuntime } from "../src/runtime/index.js";
 import { runStartupRefresh } from "../src/runtime/refresh.js";
 import { createFilesystemSourceDiscoveryService, createPlaceholderSourceDiscoveryService } from "../src/source-discovery/index.js";
 import { createFilesystemStateStore, createPlaceholderStateStore } from "../src/state/index.js";
-import { createDefaultRuntimeState } from "../src/state/state-store.js";
+import { createDefaultRuntimeState, type RuntimeState } from "../src/state/state-store.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "runtime");
 const PLACEHOLDER_ROOT = path.resolve(".test-tmp", "runtime-placeholder");
@@ -58,6 +58,7 @@ describe("startup refresh skeleton", () => {
 
     expect(prompt.start).toHaveBeenCalledOnce();
     expect(summary.degraded).toBe(false);
+    expect(summary.degradedSources).toEqual([]);
     expect(summary.inventories).toHaveLength(3);
   });
 
@@ -133,6 +134,7 @@ describe("startup refresh skeleton", () => {
       const persisted = await stateStore.load(config);
 
       expect(summary.degraded).toBe(false);
+      expect(summary.degradedSources).toEqual([]);
       expect(persisted.state.foundry.lastSuccessfulExport).toEqual({
         generatedAt: "2026-04-24T10:00:00.000Z",
         recordCount: 2,
@@ -143,6 +145,163 @@ describe("startup refresh skeleton", () => {
     } finally {
       await rm(TEST_ROOT, { force: true, recursive: true });
     }
+  });
+
+  it("does not save runtime state when retrieval refresh fails", async () => {
+    const state = createDefaultRuntimeState();
+    const nextState = createDefaultRuntimeState();
+    nextState.pdf.knownFilenames = ["new.pdf"];
+    const save = vi.fn<(_config: ReturnType<typeof loadDefaultConfig>, _state: RuntimeState) => Promise<void>>().mockResolvedValue(undefined);
+
+    await expect(
+      runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false, retrievalQuery: null }, {
+        discovery: {
+          inspectSources: vi.fn().mockResolvedValue({
+            degraded: false,
+            nextState,
+            inventories: []
+          })
+        },
+        ingestion: {
+          ingest: vi.fn().mockResolvedValue({
+            nextState,
+            summary: {
+              corpusSourceCount: 1,
+              degraded: false,
+              sourceSummaries: []
+            }
+          })
+        },
+        reporter: createMemoryProgressReporter(),
+        retrieval: {
+          refresh: vi.fn().mockRejectedValue(new Error("simulated retrieval failure")),
+          search: vi.fn().mockResolvedValue([])
+        },
+        stateStore: {
+          load: vi.fn().mockResolvedValue({ state, invalidated: false, invalidationReason: null }),
+          save
+        }
+      })
+    ).rejects.toThrow("simulated retrieval failure");
+
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("does not save runtime state or refresh retrieval when ingestion leaves an empty corpus", async () => {
+    const state = createDefaultRuntimeState();
+    const save = vi.fn<(_config: ReturnType<typeof loadDefaultConfig>, _state: RuntimeState) => Promise<void>>().mockResolvedValue(undefined);
+    const retrieval = {
+      refresh: vi.fn().mockResolvedValue({ chunkCount: 0, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
+      search: vi.fn().mockResolvedValue([])
+    };
+
+    await expect(
+      runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false, retrievalQuery: null }, {
+        discovery: {
+          inspectSources: vi.fn().mockResolvedValue({
+            degraded: false,
+            nextState: state,
+            inventories: []
+          })
+        },
+        ingestion: {
+          ingest: vi.fn().mockResolvedValue({
+            nextState: state,
+            summary: {
+              corpusSourceCount: 0,
+              degraded: true,
+              sourceSummaries: []
+            }
+          })
+        },
+        reporter: createMemoryProgressReporter(),
+        retrieval,
+        stateStore: {
+          load: vi.fn().mockResolvedValue({ state, invalidated: false, invalidationReason: null }),
+          save
+        }
+      })
+    ).rejects.toMatchObject({ kind: "empty-corpus" });
+
+    expect(retrieval.refresh).not.toHaveBeenCalled();
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  it("names degraded source types in startup output", async () => {
+    const state = createDefaultRuntimeState();
+    const reporter = createMemoryProgressReporter();
+
+    const summary = await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false, retrievalQuery: null }, {
+      discovery: {
+        inspectSources: vi.fn().mockResolvedValue({
+          degraded: true,
+          nextState: state,
+          inventories: [
+            {
+              sourceType: "foundry",
+              discovered: 0,
+              added: 0,
+              updated: 0,
+              removed: 0,
+              failed: 1,
+              status: "failed",
+              message: "foundry: failed.",
+              details: []
+            },
+            {
+              sourceType: "pdf",
+              discovered: 1,
+              added: 1,
+              updated: 0,
+              removed: 0,
+              failed: 0,
+              status: "scheduled",
+              message: "pdf: scheduled.",
+              details: []
+            }
+          ]
+        })
+      },
+      ingestion: {
+        ingest: vi.fn().mockResolvedValue({
+          nextState: state,
+          summary: {
+            corpusSourceCount: 1,
+            degraded: true,
+            sourceSummaries: [
+              {
+                sourceType: "foundry",
+                status: "skipped",
+                discovered: 0,
+                ingested: 0,
+                removed: 0,
+                failed: 0,
+                message: "foundry: ingestion skipped.",
+                details: []
+              },
+              {
+                sourceType: "pdf",
+                status: "succeeded",
+                discovered: 1,
+                ingested: 0,
+                removed: 0,
+                failed: 1,
+                message: "pdf: ingestion completed with source-scoped failures.",
+                details: ["new.pdf: parse failed"]
+              }
+            ]
+          }
+        })
+      },
+      reporter,
+      stateStore: createPlaceholderStateStore()
+    });
+
+    expect(summary.degraded).toBe(true);
+    expect(summary.degradedSources).toEqual(["foundry", "pdf"]);
+    expect(reporter.warnings.some((message) => message.includes("degradedSources=foundry, pdf"))).toBe(true);
+    expect(reporter.warnings.some((message) => message.includes("foundry: discovery failed."))).toBe(true);
+    expect(reporter.warnings.some((message) => message.includes("pdf: partial ingestion failure."))).toBe(true);
   });
 });
 

@@ -8,6 +8,8 @@ Eberron Query Assistant is a terminal-based lore and campaign assistant for an E
 
 On startup, the application refreshes its retrieval layer before opening chat. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine launches stay fast, and a full-refresh script is available when a full rebuild is needed.
 
+Startup output reports what was checked, skipped, refreshed, rebuilt, or degraded. If one source fails while another source remains usable, the app can enter chat in degraded mode and names the affected source type. If no retrieval corpus is available, startup fails before chat opens.
+
 By default, local runtime state and retrieval artifacts are stored under `.eberron-query-assistant/` in the repository.
 Runtime state is tied to the application major/minor version line; incompatible version-line changes invalidate stale local runtime artifacts, while patch revisions can migrate compatible state in place.
 

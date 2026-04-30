@@ -186,6 +186,99 @@ describe("Phase 3 ingestion", () => {
     expect(normalized.chunks[0]?.citation.label).toBe("Example Article");
   });
 
+  it("does not commit PDF inventory state when an added PDF fails to parse", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await mkdir(config.pdfDir, { recursive: true });
+    await writeFile(path.join(config.pdfDir, "broken.pdf"), "", "utf8");
+
+    const seedStore = createSqliteCorpusStore();
+    stores.push(seedStore);
+    await seedStore.initialize(config);
+    await seedStore.replaceSource(config, {
+      sourceId: "article:https://keith-baker.com/existing/",
+      sourceType: "article",
+      sourceKey: "https://keith-baker.com/existing/",
+      title: "Existing Article",
+      metadata: {},
+      status: "succeeded"
+    }, [
+      {
+        chunkId: "article:https://keith-baker.com/existing/:0",
+        sourceId: "article:https://keith-baker.com/existing/",
+        chunkIndex: 0,
+        text: "Existing article text.",
+        citation: {
+          sourceType: "article",
+          label: "Existing Article",
+          locator: null,
+          url: "https://keith-baker.com/existing/"
+        },
+        metadata: {}
+      }
+    ]);
+
+    const state = createDefaultRuntimeState();
+    state.pdf.knownFilenames = [];
+    const service = createService({
+      pdfParser: {
+        parse: () => Promise.reject(new Error("simulated parse failure"))
+      }
+    });
+    const discovery = scheduledDiscovery(state, ["pdf"]);
+    discovery.inventories = discovery.inventories.map((inventory) =>
+      inventory.sourceType === "pdf"
+        ? {
+            ...inventory,
+            removed: 0,
+            details: ["added:broken.pdf"]
+          }
+        : inventory
+    );
+    discovery.nextState.pdf.knownFilenames = ["broken.pdf"];
+    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, discovery);
+
+    expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "pdf")).toMatchObject({
+      failed: 1,
+      status: "failed"
+    });
+    expect(result.nextState.pdf.knownFilenames).toEqual([]);
+    expect(readRows(config, "SELECT source_type, source_key FROM sources")).toEqual([
+      {
+        source_type: "article",
+        source_key: "https://keith-baker.com/existing/"
+      }
+    ]);
+  });
+
+  it("does not advance the article scrape cadence when an article page fails", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const state = createDefaultRuntimeState();
+    state.article.lastSuccessfulIndexScrapeAt = "2026-04-17T12:00:00.000Z";
+    const fetcher = createMapArticleFetcher(
+      new Map([
+        [
+          "https://keith-baker.com/eberron-index/",
+          '<main><a href="/new-article/">New</a></main>'
+        ]
+      ])
+    );
+
+    const service = createService({ articleFetcher: fetcher });
+    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+
+    expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "article")).toMatchObject({
+      failed: 1,
+      status: "failed"
+    });
+    expect(result.nextState.article.lastSuccessfulIndexScrapeAt).toBe("2026-04-17T12:00:00.000Z");
+    expect(result.nextState.article.knownArticles).toMatchObject([
+      {
+        canonicalUrl: "https://keith-baker.com/new-article/",
+        scrapeStatus: "failed"
+      }
+    ]);
+  });
+
   it("splits oversized single paragraphs into bounded chunks", () => {
     const chunks = chunkText("word ".repeat(1_000), 1_600);
 
