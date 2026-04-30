@@ -168,7 +168,7 @@ const parseArticleRecords = (value: unknown): ArticleStateRecord[] => {
     }
 
     const scrapeStatus = record.scrapeStatus;
-    if (scrapeStatus !== "pending" && scrapeStatus !== "succeeded" && scrapeStatus !== "failed") {
+    if (scrapeStatus !== "pending" && scrapeStatus !== "succeeded" && scrapeStatus !== "failed" && scrapeStatus !== "inaccessible") {
       throw createInvalidRuntimeStateError(`article.knownArticles[${index}].scrapeStatus is invalid.`);
     }
 

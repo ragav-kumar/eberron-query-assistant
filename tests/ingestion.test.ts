@@ -279,6 +279,68 @@ describe("Phase 3 ingestion", () => {
     ]);
   });
 
+  it("marks 403 and 404 Keith Baker articles inaccessible and excludes them from future retries", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const state = createDefaultRuntimeState();
+    state.article.knownArticles = [
+      {
+        canonicalUrl: "https://keith-baker.com/forbidden/",
+        title: null,
+        firstSeenAt: "2026-04-20T10:00:00.000Z",
+        lastIngestedAt: null,
+        scrapeStatus: "pending"
+      },
+      {
+        canonicalUrl: "https://keith-baker.com/gone/",
+        title: null,
+        firstSeenAt: "2026-04-20T10:00:00.000Z",
+        lastIngestedAt: null,
+        scrapeStatus: "pending"
+      },
+      {
+        canonicalUrl: "https://keith-baker.com/already-inaccessible/",
+        title: null,
+        firstSeenAt: "2026-04-20T10:00:00.000Z",
+        lastIngestedAt: null,
+        scrapeStatus: "inaccessible"
+      }
+    ];
+    const fetcher = createMapArticleFetcher(
+      new Map([
+        [
+          "https://keith-baker.com/eberron-index/",
+          '<main><a href="/forbidden/">Forbidden</a><a href="/gone/">Gone</a><a href="/already-inaccessible/">Already Inaccessible</a></main>'
+        ]
+      ]),
+      new Map([
+        ["https://keith-baker.com/forbidden/", 403],
+        ["https://keith-baker.com/gone/", 404]
+      ])
+    );
+
+    const service = createService({ articleFetcher: fetcher });
+    const result = await service.ingest(config, { forceReingest: true, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+
+    expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "article")).toMatchObject({
+      failed: 0,
+      status: "succeeded"
+    });
+    expect(result.nextState.article.knownArticles).toMatchObject([
+      {
+        canonicalUrl: "https://keith-baker.com/already-inaccessible/",
+        scrapeStatus: "inaccessible"
+      },
+      {
+        canonicalUrl: "https://keith-baker.com/forbidden/",
+        scrapeStatus: "inaccessible"
+      },
+      {
+        canonicalUrl: "https://keith-baker.com/gone/",
+        scrapeStatus: "inaccessible"
+      }
+    ]);
+  });
+
   it("splits oversized single paragraphs into bounded chunks", () => {
     const chunks = chunkText("word ".repeat(1_000), 1_600);
 
@@ -369,9 +431,20 @@ const readRows = (config: ReturnType<typeof loadDefaultConfig>, sql: string): Ar
   }
 };
 
-const createMapArticleFetcher = (responses: Map<string, string>): ArticleFetcher => {
+const createMapArticleFetcher = (responses: Map<string, string>, statuses: Map<string, number> = new Map()): ArticleFetcher => {
   return {
     fetchText(url) {
+      const status = statuses.get(url);
+      if (status) {
+        throw {
+          kind: "http-fetch-failed",
+          message: `GET ${url} failed with ${status} fixture`,
+          name: "http-fetch-failed",
+          status,
+          statusText: "fixture",
+          url
+        };
+      }
       const response = responses.get(url);
       if (!response) {
         throw createTaggedError("missing-article-fixture", `Missing fixture for ${url}`);

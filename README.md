@@ -32,6 +32,7 @@ The project expects these source locations by default:
 - `pdf/`
 
 Keith Baker articles are discovered from the Eberron index and cached into the local retrieval layer after ingestion.
+Article pages that return HTTP 403 or 404 are recorded as permanently inaccessible and skipped on later runs.
 
 ## Usage
 Install dependencies and run the default CLI entrypoint:

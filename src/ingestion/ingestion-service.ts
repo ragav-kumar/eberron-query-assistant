@@ -3,7 +3,14 @@ import type { ProgressReporter } from "../progress/reporter.js";
 import type { SourceDiscoverySummary } from "../source-discovery/index.js";
 import type { ArticleStateRecord, RuntimeState } from "../state/index.js";
 import type { IngestionSummary, RuntimeConfig, RuntimeOptions, SourceIngestionSummary } from "../types.js";
-import { createFetchArticleFetcher, KEITH_BAKER_INDEX_URL, type ArticleFetcher, discoverArticleLinks, normalizeArticle } from "./article-ingestion.js";
+import {
+  createFetchArticleFetcher,
+  KEITH_BAKER_INDEX_URL,
+  type ArticleFetcher,
+  discoverArticleLinks,
+  isPermanentlyInaccessibleArticleFetch,
+  normalizeArticle
+} from "./article-ingestion.js";
 import type { CorpusStore } from "./corpus-store.js";
 import { parseFoundryRecords } from "./foundry-ingestion.js";
 import { createPdfDataExtractParser, type PdfParser, normalizePdf } from "./pdf-ingestion.js";
@@ -141,7 +148,9 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
       const discovered = discoverArticleLinks(indexHtml, state.article.knownArticles, nowIso);
       const articleMap = new Map(discovered.articles.map((article) => [article.canonicalUrl, article]));
       const ingestCandidates = discovered.articles.filter(
-        (article) => options.forceReingest || article.scrapeStatus !== "succeeded" || !article.lastIngestedAt
+        (article) =>
+          article.scrapeStatus !== "inaccessible" &&
+          (options.forceReingest || article.scrapeStatus !== "succeeded" || !article.lastIngestedAt)
       );
 
       let ingested = 0;
@@ -163,12 +172,18 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
           );
           ingested += 1;
         } catch (error) {
-          failed += 1;
-          dependencies.reporter.warn(`article: failed ${article.canonicalUrl}: ${formatThrownValue(error)}.`);
-          details.push(`${article.canonicalUrl}: ${formatThrownValue(error)}`);
+          const permanentlyInaccessible = isPermanentlyInaccessibleArticleFetch(error);
+          if (permanentlyInaccessible) {
+            dependencies.reporter.warn(`article: permanently inaccessible ${article.canonicalUrl}: ${formatThrownValue(error)}.`);
+            details.push(`${article.canonicalUrl}: permanently inaccessible (${error.status})`);
+          } else {
+            failed += 1;
+            dependencies.reporter.warn(`article: failed ${article.canonicalUrl}: ${formatThrownValue(error)}.`);
+            details.push(`${article.canonicalUrl}: ${formatThrownValue(error)}`);
+          }
           articleMap.set(article.canonicalUrl, {
             ...article,
-            scrapeStatus: "failed"
+            scrapeStatus: permanentlyInaccessible ? "inaccessible" : "failed"
           });
         }
       }
@@ -186,6 +201,8 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
         message:
           failed > 0
             ? "article: ingestion completed with source-scoped failures."
+            : details.length > 0
+              ? "article: discovered article changes with permanently inaccessible pages."
             : "article: discovered and ingested article changes.",
         details
       };

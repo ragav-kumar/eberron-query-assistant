@@ -156,6 +156,7 @@ Required behavior:
 - Skip the index scrape entirely if the last completed scrape was less than one week ago.
 - Allow the full re-ingest command to bypass the one-week skip.
 - Avoid re-scraping previously captured article pages unless a force refresh is requested.
+- Treat Keith Baker article page responses with HTTP 403 or 404 as permanently inaccessible, persist that status, and do not retry those article URLs on later incremental or full re-ingest runs. Other article page failures remain retryable.
 
 Persist for each article:
 - canonical URL

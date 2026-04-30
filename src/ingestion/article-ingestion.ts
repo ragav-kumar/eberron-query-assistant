@@ -13,6 +13,16 @@ export interface ArticleFetcher {
 }
 
 const FETCH_TIMEOUT_MS = 30_000;
+const PERMANENTLY_INACCESSIBLE_STATUSES = new Set([403, 404]);
+
+export interface HttpFetchFailedError {
+  kind: "http-fetch-failed";
+  message: string;
+  name: string;
+  status: number;
+  statusText: string;
+  url: string;
+}
 
 export const createFetchArticleFetcher = (): ArticleFetcher => {
   return {
@@ -31,12 +41,28 @@ export const createFetchArticleFetcher = (): ArticleFetcher => {
         throw {
           kind: "http-fetch-failed",
           message: `GET ${url} failed with ${response.status} ${response.statusText}`,
-          name: "http-fetch-failed"
-        };
+          name: "http-fetch-failed",
+          status: response.status,
+          statusText: response.statusText,
+          url
+        } satisfies HttpFetchFailedError;
       }
       return response.text();
     }
   };
+};
+
+export const isPermanentlyInaccessibleArticleFetch = (value: unknown): value is HttpFetchFailedError => {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Partial<HttpFetchFailedError>;
+  return (
+    candidate.kind === "http-fetch-failed" &&
+    typeof candidate.status === "number" &&
+    PERMANENTLY_INACCESSIBLE_STATUSES.has(candidate.status)
+  );
 };
 
 export interface ArticleDiscoveryResult {
