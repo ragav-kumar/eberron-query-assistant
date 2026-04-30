@@ -209,7 +209,19 @@ describe("Phase 4 retrieval", () => {
 
     await retrieval.refresh(config);
 
-    expect(adapter.inputs[0]?.[0]).toHaveLength(24_000);
+    expect(adapter.inputs[0]?.[0]).toHaveLength(6_000);
+  });
+
+  it("bounds oversized query text before requesting query embeddings", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await seedCorpus(config);
+    const adapter = captureEmbeddingInputAdapter();
+    const retrieval = createRetrieval(adapter.adapter);
+
+    await retrieval.refresh(config);
+    await retrieval.search({ query: "query-token ".repeat(2_000), limit: 1 });
+
+    expect(adapter.singleInputs[0]).toHaveLength(6_000);
   });
 
   it("deletes stale vector rows when chunks are removed", async () => {
@@ -373,22 +385,27 @@ const interruptingBatchAdapter = (failAfterSuccessfulBatches: number): { adapter
   };
 };
 
-const captureEmbeddingInputAdapter = (): { adapter: EmbeddingAdapter; inputs: string[][] } => {
+const captureEmbeddingInputAdapter = (): { adapter: EmbeddingAdapter; inputs: string[][]; singleInputs: string[] } => {
   const base = createDeterministicEmbeddingAdapter();
   const inputs: string[][] = [];
+  const singleInputs: string[] = [];
 
   return {
     adapter: {
       failedRetries: 0,
       modelId: "capture-model",
       schemaVersion: "capture-schema",
-      embed: (input) => base.embed(input),
+      embed(input) {
+        singleInputs.push(input);
+        return base.embed(input);
+      },
       embedBatch(batchInputs) {
         inputs.push(batchInputs);
         return base.embedBatch(batchInputs);
       }
     },
-    inputs
+    inputs,
+    singleInputs
   };
 };
 

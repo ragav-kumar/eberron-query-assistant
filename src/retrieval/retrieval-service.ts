@@ -18,7 +18,7 @@ import { getCorpusDatabasePath } from "../ingestion/index.js";
 const VECTOR_INDEX_FILENAME = "vector-index.json";
 const DEFAULT_LIMIT = 8;
 const EMBEDDING_BATCH_SIZE = 64;
-const MAX_EMBEDDING_INPUT_CHARACTERS = 24_000;
+const MAX_EMBEDDING_INPUT_CHARACTERS = 6_000;
 const VECTOR_STORE_SCHEMA_VERSION = "sqlite-json-v1";
 
 export interface RetrievalSyncSummary {
@@ -276,7 +276,7 @@ const searchVector = async (
   }
 
   const chunkById = new Map(chunks.map((chunk) => [chunk.chunkId, chunk]));
-  const queryEmbedding = await embeddingAdapter.embed(request.query);
+  const queryEmbedding = await embeddingAdapter.embed(toEmbeddingInput(request.query));
 
   return readCompatibleVectorRows(database, embeddingAdapter)
     .map((entry) => {

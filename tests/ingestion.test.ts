@@ -16,6 +16,7 @@ import {
   type CorpusStore,
   type PdfParser
 } from "../src/ingestion/index.js";
+import { chunkText } from "../src/ingestion/chunking.js";
 import type { SourceDiscoverySummary } from "../src/source-discovery/index.js";
 import { createDefaultRuntimeState, type RuntimeState } from "../src/state/state-store.js";
 
@@ -183,6 +184,14 @@ describe("Phase 3 ingestion", () => {
 
     expect(normalized.source.title).toBe("Example Article");
     expect(normalized.chunks[0]?.citation.label).toBe("Example Article");
+  });
+
+  it("splits oversized single paragraphs into bounded chunks", () => {
+    const chunks = chunkText("word ".repeat(1_000), 1_600);
+
+    expect(chunks.length).toBeGreaterThan(1);
+    expect(chunks.every((chunk) => chunk.text.length <= 1_600)).toBe(true);
+    expect(chunks.every((chunk) => chunk.startParagraph === 0 && chunk.endParagraph === 0)).toBe(true);
   });
 });
 
