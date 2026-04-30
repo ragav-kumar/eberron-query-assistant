@@ -383,7 +383,8 @@ const syncVectorStore = async (
     upsertVectorRows(database, entries, embeddingAdapter);
     regeneratedEmbeddings += entries.length;
 
-    reporter.info(
+    reportProgress(
+      reporter,
       `Retrieval embedding sync progress: processed=${reusedEmbeddings + regeneratedEmbeddings}/${chunks.length}, reused=${reusedEmbeddings}, regenerated=${regeneratedEmbeddings}, remaining=${chunks.length - reusedEmbeddings - regeneratedEmbeddings}, failedRetries=${embeddingAdapter.failedRetries ?? 0}, model=${embeddingAdapter.modelId}.`
     );
   }
@@ -393,6 +394,15 @@ const syncVectorStore = async (
     reusedEmbeddings,
     regeneratedEmbeddings
   };
+};
+
+const reportProgress = (reporter: ProgressReporter, message: string): void => {
+  if (reporter.progress) {
+    reporter.progress(message);
+    return;
+  }
+
+  reporter.info(message);
 };
 
 const deleteStaleVectorRows = (database: Database.Database): void => {

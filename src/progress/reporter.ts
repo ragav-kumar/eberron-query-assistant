@@ -1,6 +1,7 @@
 export interface ProgressReporter {
   info(message: string): void;
   warn(message: string): void;
+  progress?(message: string): void;
 }
 
 export interface MemoryProgressReporter extends ProgressReporter {
@@ -10,14 +11,40 @@ export interface MemoryProgressReporter extends ProgressReporter {
 
 export const createConsoleProgressReporter = (): ProgressReporter => {
   const colorsEnabled = shouldUseColor();
+  const rewriteProgress = shouldRewriteProgress();
+  let hasActiveProgress = false;
+
+  const finishProgressLine = (): void => {
+    if (!hasActiveProgress) {
+      return;
+    }
+
+    process.stdout.write("\n");
+    hasActiveProgress = false;
+  };
 
   return {
     info(message) {
+      finishProgressLine();
       console.log(formatInfoMessage(message, colorsEnabled));
     },
 
     warn(message) {
+      finishProgressLine();
       console.warn(formatWarningMessage(message, colorsEnabled));
+    },
+
+    progress(message) {
+      const formatted = formatInfoMessage(message, colorsEnabled);
+      if (!rewriteProgress) {
+        console.log(formatted);
+        return;
+      }
+
+      process.stdout.clearLine(0);
+      process.stdout.cursorTo(0);
+      process.stdout.write(formatted);
+      hasActiveProgress = true;
     }
   };
 };
@@ -32,6 +59,9 @@ export const createMemoryProgressReporter = (): MemoryProgressReporter => {
     info(message) {
       messages.push(message);
     },
+    progress(message) {
+      messages.push(message);
+    },
     warn(message) {
       warnings.push(message);
     }
@@ -40,6 +70,10 @@ export const createMemoryProgressReporter = (): MemoryProgressReporter => {
 
 const shouldUseColor = (): boolean => {
   return Boolean(process.stdout.isTTY) && process.env.NO_COLOR === undefined;
+};
+
+const shouldRewriteProgress = (): boolean => {
+  return Boolean(process.stdout.isTTY);
 };
 
 const formatInfoMessage = (message: string, colorsEnabled: boolean): string => {
