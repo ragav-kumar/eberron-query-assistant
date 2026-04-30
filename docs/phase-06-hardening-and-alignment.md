@@ -5,6 +5,7 @@ Finish the project by tightening startup safety, degraded-mode reporting, end-to
 
 ## Scope
 - Bump the application version to `0.6.0`.
+- Preserve usable Phase 5.5 runtime and retrieval state across the Phase 6 version bump.
 - Harden startup refresh so runtime state is committed only after ingestion and retrieval refresh complete successfully enough to trust.
 - Make degraded startup output explicit by naming failed source types and distinguishing discovery failures, ingestion failures, and partial source failures.
 - Preserve source-scoped behavior so one failed source does not block other source checks or successful source ingestion.
@@ -19,6 +20,7 @@ Finish the project by tightening startup safety, degraded-mode reporting, end-to
 
 ## Required Tests
 - Version test for Phase 6 `0.6.0`.
+- State-store tests proving version differences alone do not invalidate persisted runtime state.
 - Runtime tests proving state is not saved when retrieval refresh fails or when startup produces an empty corpus.
 - Runtime tests proving degraded startup output names degraded source types.
 - Ingestion tests proving per-source failures do not commit untrusted inventory state or erase unrelated successful corpus data.

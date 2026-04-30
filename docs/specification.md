@@ -99,7 +99,7 @@ The application must maintain a persisted local state record separate from the F
 
 This state is the basis for incremental startup decisions.
 
-Runtime state uses `appVersion` as its compatibility marker. Each implementation phase increments the minor application version to match the phase number, and patch revisions may be used for migration or hardening work within a phase. If the stored `appVersion` is missing, malformed, or belongs to a different major/minor version line than the actual app version, startup must invalidate the stored runtime state, clear app-owned runtime artifacts, and continue from default state for the current version. Patch-version changes within the same major/minor line are compatible and must not invalidate runtime state unless a later written specification explicitly requires it.
+Runtime state records the `appVersion` that last wrote the state for diagnostics and normalization, but version differences alone must not invalidate stored state. Startup must validate the persisted state by shape and normalize it to the current application version when it is saved again. Missing `appVersion` values fall back to default state, and malformed state fields must fail validation rather than being silently trusted. App-owned runtime artifacts should only be cleared for an explicit schema migration, explicit user-requested rebuild, or a later written specification that defines a concrete invalidation rule.
 
 ### Foundry Export Handling
 The application must inspect `foundry-export/` on every startup.

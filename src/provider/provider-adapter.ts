@@ -269,7 +269,6 @@ const fetchWithTimeout = async (
 ): Promise<Response> => {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.requestTimeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS);
-  timeout.unref?.();
 
   try {
     return await (options.fetchImpl ?? fetch)(url, {
@@ -295,7 +294,6 @@ const isRetryableFetchError = (error: unknown): boolean => {
 
 const delay = async (durationMs: number): Promise<void> => {
   await new Promise<void>((resolve) => {
-    const timeout = setTimeout(resolve, durationMs);
-    timeout.unref?.();
+    setTimeout(resolve, durationMs);
   });
 };

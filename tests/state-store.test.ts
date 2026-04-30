@@ -111,7 +111,7 @@ describe("FilesystemStateStore", () => {
     expect(result.state.foundry.lastSuccessfulExport).toBeNull();
   });
 
-  it("loads compatible patch-version state without invalidation", async () => {
+  it("loads state from any app version without invalidation when the shape is valid", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = createFilesystemStateStore();
 
@@ -119,7 +119,7 @@ describe("FilesystemStateStore", () => {
     await writeFile(
       getStatePath(config),
       `${JSON.stringify({
-        appVersion: "0.6.1",
+        appVersion: "0.2.0",
         foundry: { lastSuccessfulExport: null },
         pdf: { knownFilenames: ["a.pdf"] },
         article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }
@@ -134,29 +134,26 @@ describe("FilesystemStateStore", () => {
     expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
   });
 
-  it("invalidates different app version line state", async () => {
+  it("normalizes non-semver app version state when the shape is valid", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = createFilesystemStateStore();
 
     await mkdir(config.stateDir, { recursive: true });
-    await writeFile(getStatePath(config), `${JSON.stringify({ appVersion: "0.2.0" })}\n`, "utf8");
+    await writeFile(
+      getStatePath(config),
+      `${JSON.stringify({
+        appVersion: "not-semver",
+        foundry: { lastSuccessfulExport: null },
+        pdf: { knownFilenames: ["a.pdf"] },
+        article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }
+      })}\n`,
+      "utf8"
+    );
 
     const result = await store.load(config);
 
-    expect(result.invalidated).toBe(true);
-    expect(result.invalidationReason).toContain("0.2.0");
-  });
-
-  it("invalidates malformed app version state", async () => {
-    const config = loadDefaultConfig(TEST_ROOT);
-    const store = createFilesystemStateStore();
-
-    await mkdir(config.stateDir, { recursive: true });
-    await writeFile(getStatePath(config), `${JSON.stringify({ appVersion: "not-semver" })}\n`, "utf8");
-
-    const result = await store.load(config);
-
-    expect(result.invalidated).toBe(true);
-    expect(result.invalidationReason).toContain("not-semver");
+    expect(result.invalidated).toBe(false);
+    expect(result.state.appVersion).toBe(APP_VERSION);
+    expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
   });
 });

@@ -69,7 +69,7 @@ Phase documents stage delivery toward the final-state specification. They must n
 ## Implementation Guardrails
 Use the final-state specification as the product source of truth. If an implementation detail in a phase document conflicts with `docs/specification.md`, update the phase document or the specification so the conflict is resolved explicitly.
 
-Each implementation phase increments the application minor version to match the phase number. Phase 1 is `0.1.0`, Phase 2 is `0.2.0`, Phase 3 is `0.3.0`, and later phases continue that pattern. Patch revisions may be used for migration or hardening work inside a phase. Runtime state uses the application major/minor version line as its compatibility marker; if stored runtime state was written by an incompatible version line, startup must invalidate it and rebuild app-owned runtime artifacts. Patch-version changes within the same version line must not invalidate runtime state unless a later written specification explicitly requires it.
+Each implementation phase increments the application minor version to match the phase number. Phase 1 is `0.1.0`, Phase 2 is `0.2.0`, Phase 3 is `0.3.0`, and later phases continue that pattern. Patch revisions may be used for migration or hardening work inside a phase. Runtime state must not be invalidated solely because the stored `appVersion` differs from the current application version. Startup should validate and normalize persisted state by shape, preserving usable source and retrieval state across version bumps unless a later written specification defines an explicit schema migration or invalidation rule.
 
 Keep the system modular. Maintain clear separation between:
 - CLI/runtime flow

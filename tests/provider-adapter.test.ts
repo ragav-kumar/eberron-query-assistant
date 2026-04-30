@@ -106,6 +106,37 @@ describe("OpenAI-compatible provider adapters", () => {
     expect(adapter.failedRetries).toBe(1);
   });
 
+  it("keeps provider retry timers ref'd so top-level runtime awaits can settle", async () => {
+    const timeoutHandles: Array<{ unref?: ReturnType<typeof vi.fn> }> = [];
+    const originalSetTimeout = globalThis.setTimeout;
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout").mockImplementation((handler: () => void, timeout?: number) => {
+      const handle = originalSetTimeout(handler, timeout) as ReturnType<typeof originalSetTimeout> & {
+        unref?: ReturnType<typeof vi.fn>;
+      };
+      handle.unref = vi.fn();
+      timeoutHandles.push(handle);
+      return handle;
+    });
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ error: { message: "rate limit" } }, 429))
+      .mockResolvedValueOnce(jsonResponse({ data: [{ index: 0, embedding: [0.4] }] }));
+
+    try {
+      const adapter = createOpenAiEmbeddingAdapter(config, {
+        fetchImpl,
+        maxRetries: 1,
+        retryDelayMs: 1
+      });
+
+      await expect(adapter.embed("retry me")).resolves.toEqual([0.4]);
+      expect(timeoutHandles.length).toBeGreaterThan(0);
+      expect(timeoutHandles.every((handle) => handle.unref && handle.unref.mock.calls.length === 0)).toBe(true);
+    } finally {
+      setTimeoutSpy.mockRestore();
+    }
+  });
+
   it("does not retry non-retryable embedding failures", async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ error: { message: "bad key" } }, 401));
     const adapter = createOpenAiEmbeddingAdapter(config, {
