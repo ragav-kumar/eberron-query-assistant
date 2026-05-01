@@ -11,11 +11,31 @@ import { type RetrievalService } from "../src/retrieval/index.js";
 import {
   buildAssistantMessages,
   createAssistantPromptShell,
-  formatCitation
+  formatCitation,
+  loadAssistantPromptAssets,
+  type AssistantPromptAssets
 } from "../src/runtime/prompt.js";
+import type { AssistantConfig } from "../src/types.js";
 import type { RetrievalResult } from "../src/types.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "prompt");
+const PROMPT_ASSETS: AssistantPromptAssets = {
+  additionalContext: "",
+  sessionTitlePrompt: [
+    "For this first response only, return exactly this Markdown metadata wrapper before the answer:",
+    "<session-title>A concise filesystem-safe title of at most 8 words</session-title>",
+    "<answer>",
+    "Your normal answer.",
+    "</answer>"
+  ].join("\n"),
+  systemPrompt: [
+    "You are Eberron Query Assistant, a terminal-only assistant for Eberron lore and campaign notes.",
+    "Answer using the retrieved evidence when it is relevant.",
+    "Distinguish direct support from inference. Do not describe synthesized conclusions as quoted facts.",
+    "Include concise references when evidence is available.",
+    "Use PDF title plus page when present, article title plus URL, and foundry entity name plus type or identifier."
+  ].join("\n")
+};
 
 afterEach(async () => {
   await rm(TEST_ROOT, { force: true, recursive: true });
@@ -25,6 +45,7 @@ describe("assistant prompt assembly", () => {
   it("separates instructions, evidence, and user question", () => {
     const messages = buildAssistantMessages({
       evidence: [result("pdf", "eberron.pdf", "Eberron Rising", "page 4")],
+      promptAssets: PROMPT_ASSETS,
       question: "What does Aerenal do with deathless ancestors?"
     });
 
@@ -53,10 +74,66 @@ describe("assistant prompt assembly", () => {
   it("tells the model when no evidence was retrieved", () => {
     const messages = buildAssistantMessages({
       evidence: [],
+      promptAssets: PROMPT_ASSETS,
       question: "What is unknown?"
     });
 
     expect(messages.at(-1)?.content).toContain("No relevant retrieval results were found");
+  });
+
+  it("includes non-empty local assistant context in the system message", () => {
+    const messages = buildAssistantMessages({
+      evidence: [],
+      promptAssets: {
+        ...PROMPT_ASSETS,
+        additionalContext: "The campaign treats Vathirond as politically tense."
+      },
+      question: "What is happening in Vathirond?"
+    });
+
+    expect(messages[0]?.content).toContain("Additional assistant context:");
+    expect(messages[0]?.content).toContain("The campaign treats Vathirond as politically tense.");
+  });
+
+  it("omits the local assistant context section when it is empty", () => {
+    const messages = buildAssistantMessages({
+      evidence: [],
+      promptAssets: PROMPT_ASSETS,
+      question: "What is happening in Vathirond?"
+    });
+
+    expect(messages[0]?.content).not.toContain("Additional assistant context:");
+  });
+
+  it("uses the session title prompt only when requested", () => {
+    const normalMessages = buildAssistantMessages({
+      evidence: [],
+      promptAssets: PROMPT_ASSETS,
+      question: "Normal question"
+    });
+    const firstResponseMessages = buildAssistantMessages({
+      evidence: [],
+      promptAssets: PROMPT_ASSETS,
+      question: "First question",
+      requestSessionTitle: true
+    });
+
+    expect(normalMessages[0]?.content).not.toContain("<session-title>");
+    expect(firstResponseMessages[0]?.content).toContain("<session-title>");
+  });
+
+  it("loads prompt text from assistant files and creates missing local context", async () => {
+    const assistant = await writeAssistantFiles("load-assets", {
+      additionalContext: null,
+      systemPrompt: "System prompt from disk."
+    });
+
+    const loaded = await loadAssistantPromptAssets(assistant);
+
+    expect(loaded.systemPrompt).toBe("System prompt from disk.");
+    expect(loaded.sessionTitlePrompt).toContain("<session-title>");
+    expect(loaded.additionalContext).toBe("");
+    await expect(readFile(assistant.additionalContextPath, "utf8")).resolves.toBe("");
   });
 });
 
@@ -70,6 +147,7 @@ describe("assistant prompt shell", () => {
     const output = createWritableCapture();
 
     await createAssistantPromptShell({
+      assistant: await writeAssistantFiles("retrieves-evidence"),
       chat,
       input: Readable.from(["What about Aerenal?\nexit\n"]),
       output,
@@ -100,6 +178,7 @@ describe("assistant prompt shell", () => {
     const output = createWritableCapture();
 
     await createAssistantPromptShell({
+      assistant: await writeAssistantFiles("logs-title"),
       chat: { complete },
       input: Readable.from(["What about Aerenal?\nexit\n"]),
       logDir,
@@ -131,6 +210,7 @@ describe("assistant prompt shell", () => {
     const output = createWritableCapture();
 
     const prompt = createAssistantPromptShell({
+      assistant: await writeAssistantFiles("logs-append"),
       chat: { complete },
       input,
       logDir,
@@ -163,6 +243,7 @@ describe("assistant prompt shell", () => {
     const logDir = path.join(TEST_ROOT, "logs-fallback");
 
     await createAssistantPromptShell({
+      assistant: await writeAssistantFiles("logs-fallback"),
       chat: { complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("Plain answer.") },
       input: Readable.from(["What/about:Aerenal?\nexit\n"]),
       logDir,
@@ -180,6 +261,7 @@ describe("assistant prompt shell", () => {
     const logDir = path.join(TEST_ROOT, "logs-empty");
 
     await createAssistantPromptShell({
+      assistant: await writeAssistantFiles("logs-empty"),
       chat: mockChat().chat,
       input: Readable.from(["exit\n"]),
       logDir,
@@ -199,6 +281,7 @@ describe("assistant prompt shell", () => {
     await writeFile(path.join(logDir, "20260102030405 Old Session.md"), "Old logged question", "utf8");
 
     await createAssistantPromptShell({
+      assistant: await writeAssistantFiles("logs-history-first"),
       chat: firstChat.chat,
       input: Readable.from(["First question\nexit\n"]),
       logDir,
@@ -207,6 +290,7 @@ describe("assistant prompt shell", () => {
       retrieval: mockRetrieval([]).retrieval
     }).start();
     await createAssistantPromptShell({
+      assistant: await writeAssistantFiles("logs-history-second"),
       chat: secondChat.chat,
       input: Readable.from(["Second question\nexit\n"]),
       logDir,
@@ -300,4 +384,32 @@ const createWritableCapture = (): Writable & { text(): string } => {
   }) as Writable & { text(): string };
   writable.text = () => chunks.join("");
   return writable;
+};
+
+const writeAssistantFiles = async (
+  name: string,
+  options: {
+    additionalContext?: string | null;
+    sessionTitlePrompt?: string;
+    systemPrompt?: string;
+  } = {}
+): Promise<AssistantConfig> => {
+  const assistantDir = path.join(TEST_ROOT, "assistant", name);
+  const config: AssistantConfig = {
+    assistantDir,
+    additionalContextPath: path.join(assistantDir, "additional-context.md"),
+    sessionTitlePromptPath: path.join(assistantDir, "session-title-prompt.md"),
+    systemPromptPath: path.join(assistantDir, "system-prompt.md")
+  };
+  await mkdir(assistantDir, { recursive: true });
+  await writeFile(config.systemPromptPath, options.systemPrompt ?? PROMPT_ASSETS.systemPrompt, "utf8");
+  await writeFile(
+    config.sessionTitlePromptPath,
+    options.sessionTitlePrompt ?? PROMPT_ASSETS.sessionTitlePrompt,
+    "utf8"
+  );
+  if (options.additionalContext !== null) {
+    await writeFile(config.additionalContextPath, options.additionalContext ?? "", "utf8");
+  }
+  return config;
 };

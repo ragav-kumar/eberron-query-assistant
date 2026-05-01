@@ -44,6 +44,9 @@ Each document has a distinct audience and purpose.
 ### New Enhancement Documentation
 - Any further changes after Phase 6 are enhancements on top of the historical baseline.
 - New planning or specification work must live in new enhancement documentation instead of editing `docs/specification.md` or phase documents through Phase 6.
+- Minor enhancements must be recorded in `docs/phase-X-enhancements.md`, where `X` is the current minor-version phase number.
+- Each `docs/phase-X-enhancements.md` file must include a table of contents and list minor enhancements in chronological order.
+- Create standalone `docs/phase-X-*.md` files only for large changes that need their own implementation plan.
 - Enhancement documents must define their goal, scope, tests, end state, and human verification where applicable.
 
 ### `README.md`
@@ -74,6 +77,7 @@ New enhancement documentation must:
 - Include required automated tests.
 - Include concrete human verification steps.
 - Record assumptions or prerequisites that materially affect implementation.
+- For minor enhancements, place the entry in the current `docs/phase-X-enhancements.md` document, update its table of contents, and preserve chronological order.
 
 Enhancement documents describe changes on top of the historical baseline. They must not silently rewrite the Phase 6 baseline; they should identify intentional deviations as enhancements.
 

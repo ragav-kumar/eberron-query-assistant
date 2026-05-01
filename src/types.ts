@@ -5,6 +5,7 @@ export interface RuntimeOptions {
 
 export interface RuntimeConfig {
   repoRoot: string;
+  assistant: AssistantConfig;
   foundryExportDir: string;
   pdfDir: string;
   runtimeDir: string;
@@ -13,6 +14,13 @@ export interface RuntimeConfig {
   cacheDir: string;
   retrievalDir: string;
   provider: ProviderConfig;
+}
+
+export interface AssistantConfig {
+  assistantDir: string;
+  additionalContextPath: string;
+  sessionTitlePromptPath: string;
+  systemPromptPath: string;
 }
 
 export interface ProviderConfig {

@@ -1,12 +1,13 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createInterface } from "node:readline/promises";
 
 import type { Readable, Writable } from "node:stream";
 
-import { formatThrownValue, hasErrorName } from "../errors.js";
+import { createTaggedError, formatThrownValue, hasErrorCode, hasErrorName } from "../errors.js";
 import type { ChatAdapter, ChatMessage } from "../provider/index.js";
 import type { ProgressReporter } from "../progress/reporter.js";
 import type { RetrievalService } from "../retrieval/index.js";
-import type { RetrievalResult } from "../types.js";
+import type { AssistantConfig, RetrievalResult } from "../types.js";
 import { createSessionLog, type SessionLog } from "./session-log.js";
 
 export interface PromptShell {
@@ -14,6 +15,7 @@ export interface PromptShell {
 }
 
 export interface PromptShellOptions {
+  assistant: AssistantConfig;
   chat: ChatAdapter;
   input?: Readable;
   logDir?: string;
@@ -34,6 +36,7 @@ export const createAssistantPromptShell = (options: PromptShellOptions): PromptS
 
   return {
     async start() {
+      const promptAssets = await loadAssistantPromptAssets(options.assistant);
       const rl = createInterface({
         input,
         output,
@@ -62,6 +65,7 @@ export const createAssistantPromptShell = (options: PromptShellOptions): PromptS
               const messages = buildAssistantMessages({
                 evidence,
                 history,
+                promptAssets,
                 question,
                 requestSessionTitle: shouldRequestSessionTitle
               });
@@ -107,33 +111,32 @@ const formatAssistantResponse = (response: string): string => {
 export interface AssistantMessageBuildRequest {
   evidence: RetrievalResult[];
   history?: ChatMessage[];
+  promptAssets: AssistantPromptAssets;
   question: string;
   requestSessionTitle?: boolean;
+}
+
+export interface AssistantPromptAssets {
+  additionalContext: string;
+  sessionTitlePrompt: string;
+  systemPrompt: string;
 }
 
 export const buildAssistantMessages = (request: AssistantMessageBuildRequest): ChatMessage[] => {
   const evidence = formatEvidence(request.evidence);
   const recentHistory = request.history ?? [];
+  const systemPromptParts = [
+    request.promptAssets.systemPrompt,
+    request.promptAssets.additionalContext.length > 0
+      ? ["Additional assistant context:", request.promptAssets.additionalContext].join("\n")
+      : "",
+    request.requestSessionTitle === true ? request.promptAssets.sessionTitlePrompt : ""
+  ].filter((part) => part.length > 0);
 
   return [
     {
       role: "system",
-      content: [
-        "You are Eberron Query Assistant, a terminal-only assistant for Eberron lore and campaign notes.",
-        "Answer using the retrieved evidence when it is relevant.",
-        "Distinguish direct support from inference. Do not describe synthesized conclusions as quoted facts.",
-        "Include concise references when evidence is available.",
-        "Use PDF title plus page when present, article title plus URL, and foundry entity name plus type or identifier.",
-        request.requestSessionTitle === true
-          ? [
-              "For this first response only, return exactly this Markdown metadata wrapper before the answer:",
-              "<session-title>A concise filesystem-safe title of at most 8 words</session-title>",
-              "<answer>",
-              "Your normal answer.",
-              "</answer>"
-            ].join("\n")
-          : ""
-      ].join("\n")
+      content: systemPromptParts.join("\n\n")
     },
     ...recentHistory,
     {
@@ -146,6 +149,47 @@ export const buildAssistantMessages = (request: AssistantMessageBuildRequest): C
       ].join("\n")
     }
   ];
+};
+
+export const loadAssistantPromptAssets = async (config: AssistantConfig): Promise<AssistantPromptAssets> => {
+  await ensureAdditionalContextFile(config);
+
+  const [systemPrompt, sessionTitlePrompt, additionalContext] = await Promise.all([
+    readRequiredPromptFile(config.systemPromptPath, "system prompt"),
+    readRequiredPromptFile(config.sessionTitlePromptPath, "session title prompt"),
+    readFile(config.additionalContextPath, "utf8")
+  ]);
+
+  return {
+    additionalContext: additionalContext.trim(),
+    sessionTitlePrompt: sessionTitlePrompt.trim(),
+    systemPrompt: systemPrompt.trim()
+  };
+};
+
+const ensureAdditionalContextFile = async (config: AssistantConfig): Promise<void> => {
+  await mkdir(config.assistantDir, { recursive: true });
+
+  try {
+    await readFile(config.additionalContextPath, "utf8");
+  } catch (error) {
+    if (hasErrorCode(error, "ENOENT")) {
+      await writeFile(config.additionalContextPath, "", "utf8");
+      return;
+    }
+    throw error;
+  }
+};
+
+const readRequiredPromptFile = async (filePath: string, label: string): Promise<string> => {
+  try {
+    return await readFile(filePath, "utf8");
+  } catch (error) {
+    if (hasErrorCode(error, "ENOENT")) {
+      throw createTaggedError("assistant-prompt-missing", `Missing ${label} file: ${filePath}`);
+    }
+    throw error;
+  }
 };
 
 interface FirstAssistantResponse {

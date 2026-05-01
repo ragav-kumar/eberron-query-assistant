@@ -6,3 +6,4 @@ logs/
 foundry-export/
 pdf/
 .env
+assistant/additional-context.md

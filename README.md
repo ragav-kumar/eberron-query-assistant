@@ -6,6 +6,8 @@ Eberron Query Assistant is a terminal-based lore and campaign assistant for an E
 - local PDFs from `pdf/`
 - Keith Baker articles discovered from the Eberron index
 
+Assistant instructions are stored in tracked Markdown files under `assistant/`. Local campaign notes or other assistant-only guidance that does not belong in the source corpus can be written to `assistant/additional-context.md`. That file is gitignored, is created as an empty file on startup when missing, and is included in every assistant prompt only when it contains text.
+
 On startup, the application refreshes its retrieval layer before opening chat. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine launches stay fast, and a full-refresh script is available when a full rebuild is needed.
 
 Startup output reports what was checked, skipped, refreshed, rebuilt, or degraded. If one source fails while another source remains usable, the app can enter chat in degraded mode and names the affected source type. If no retrieval corpus is available, startup fails before chat opens.
@@ -14,7 +16,7 @@ By default, local runtime state and retrieval artifacts are stored under `.eberr
 Runtime state records the application version for diagnostics only. Routine startup preserves existing local state and retrieval artifacts across version changes; the app only intentionally clears or force-rebuilds its corpus when you run `npm run reingest` or pass `--force-reingest`.
 Interactive sessions with at least one successful assistant response are archived as local Markdown transcripts under `logs/`, which is gitignored. These transcripts are for review only and are not loaded as future assistant memory.
 
-Detailed engineering and phased-delivery documentation lives in `docs/specification.md` and the `docs/phase-*.md` files. This README remains focused on the intended finished user experience.
+Detailed engineering and phased-delivery documentation lives in `docs/specification.md`, historical phase documents, and active `docs/phase-*-enhancements.md` files. This README remains focused on the intended finished user experience.
 
 After startup completes, the app opens an interactive terminal session. You can ask direct lore questions, cross-reference campaign data, or ask inference-heavy questions that require combining material across sources. Answers are designed to include a direct response and supporting references when available, such as PDF page citations, article links, or specific foundry entities.
 
@@ -30,6 +32,7 @@ The project expects these source locations by default:
 - `foundry-export/manifest.json`
 - `foundry-export/records.ndjson`
 - `pdf/`
+- optional local assistant context in `assistant/additional-context.md`
 
 Keith Baker articles are discovered from the Eberron index and cached into the local retrieval layer after ingestion.
 Article pages that return HTTP 403 or 404 are recorded as permanently inaccessible and skipped on later runs.

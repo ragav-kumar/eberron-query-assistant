@@ -32,6 +32,12 @@ describe("loadDefaultConfig", () => {
 
     expect(loadDefaultConfig(repoRoot)).toEqual({
       repoRoot,
+      assistant: {
+        assistantDir: path.join(repoRoot, "assistant"),
+        additionalContextPath: path.join(repoRoot, "assistant", "additional-context.md"),
+        sessionTitlePromptPath: path.join(repoRoot, "assistant", "session-title-prompt.md"),
+        systemPromptPath: path.join(repoRoot, "assistant", "system-prompt.md")
+      },
       foundryExportDir: path.join(repoRoot, "foundry-export"),
       pdfDir: path.join(repoRoot, "pdf"),
       runtimeDir: path.join(repoRoot, ".eberron-query-assistant"),

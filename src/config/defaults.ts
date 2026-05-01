@@ -5,10 +5,17 @@ import type { RuntimeConfig } from "../types.js";
 
 export const loadDefaultConfig = (repoRoot = process.cwd()): RuntimeConfig => {
   const runtimeDir = path.join(repoRoot, ".eberron-query-assistant");
+  const assistantDir = path.join(repoRoot, "assistant");
   const envFile = parseEnvFile(path.join(repoRoot, ".env"));
 
   return {
     repoRoot,
+    assistant: {
+      assistantDir,
+      additionalContextPath: path.join(assistantDir, "additional-context.md"),
+      sessionTitlePromptPath: path.join(assistantDir, "session-title-prompt.md"),
+      systemPromptPath: path.join(assistantDir, "system-prompt.md")
+    },
     foundryExportDir: path.join(repoRoot, "foundry-export"),
     pdfDir: path.join(repoRoot, "pdf"),
     runtimeDir,
