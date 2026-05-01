@@ -4,9 +4,7 @@ export const createPlaceholderStateStore = (): StateStore => {
   return {
     load(): Promise<RuntimeStateLoadResult> {
       return Promise.resolve({
-        state: createDefaultRuntimeState(),
-        invalidated: false,
-        invalidationReason: null
+        state: createDefaultRuntimeState()
       });
     },
 

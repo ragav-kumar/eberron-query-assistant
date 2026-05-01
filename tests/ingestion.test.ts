@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
 import { createTaggedError } from "../src/errors.js";
@@ -348,6 +348,32 @@ describe("Phase 3 ingestion", () => {
     expect(chunks.every((chunk) => chunk.text.length <= 1_600)).toBe(true);
     expect(chunks.every((chunk) => chunk.startParagraph === 0 && chunk.endParagraph === 0)).toBe(true);
   });
+
+  it("clears the corpus store only for force re-ingest", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const state = createDefaultRuntimeState();
+    const corpusStoreFixture = createMockCorpusStore();
+    const service = createFilesystemIngestionService({
+      articleFetcher: createMapArticleFetcher(new Map()),
+      corpusStore: corpusStoreFixture.corpusStore,
+      now: () => NOW,
+      pdfParser: {
+        parse: () => Promise.resolve({ pageCount: 0, fingerprint: null, title: null, pages: [] })
+      },
+      reporter: {
+        info: () => undefined,
+        warn: () => undefined
+      }
+    });
+
+    await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, []));
+    await service.ingest(config, { forceReingest: true, retrievalQuery: null }, state, scheduledDiscovery(state, []));
+
+    expect(corpusStoreFixture.initialize).toHaveBeenNthCalledWith(1, config, { allowIncompatibleReset: false });
+    expect(corpusStoreFixture.initialize).toHaveBeenNthCalledWith(2, config, { allowIncompatibleReset: true });
+    expect(corpusStoreFixture.clear).toHaveBeenCalledTimes(1);
+    expect(corpusStoreFixture.clear).toHaveBeenCalledWith(config);
+  });
 });
 
 const createService = (options: { articleFetcher?: ArticleFetcher; pdfParser?: PdfParser } = {}) => {
@@ -451,5 +477,30 @@ const createMapArticleFetcher = (responses: Map<string, string>, statuses: Map<s
       }
       return Promise.resolve(response);
     }
+  };
+};
+
+const createMockCorpusStore = (): {
+  clear: ReturnType<typeof vi.fn<CorpusStore["clear"]>>;
+  corpusStore: CorpusStore;
+  initialize: ReturnType<typeof vi.fn<CorpusStore["initialize"]>>;
+} => {
+  const initialize = vi.fn<CorpusStore["initialize"]>().mockResolvedValue(undefined);
+  const clear = vi.fn<CorpusStore["clear"]>().mockResolvedValue(undefined);
+
+  return {
+    clear,
+    corpusStore: {
+      initialize,
+      clear,
+      replaceSource: vi.fn<CorpusStore["replaceSource"]>().mockResolvedValue(undefined),
+      replaceSourcesByType: vi.fn<CorpusStore["replaceSourcesByType"]>().mockResolvedValue(undefined),
+      removeSource: vi.fn<CorpusStore["removeSource"]>().mockResolvedValue(undefined),
+      removeSourcesByType: vi.fn<CorpusStore["removeSourcesByType"]>().mockResolvedValue(undefined),
+      countSources: vi.fn<CorpusStore["countSources"]>().mockResolvedValue(1),
+      rebuildSearchIndex: vi.fn<CorpusStore["rebuildSearchIndex"]>().mockResolvedValue(undefined),
+      close: vi.fn<CorpusStore["close"]>()
+    },
+    initialize
   };
 };

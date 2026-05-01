@@ -11,7 +11,7 @@ On startup, the application refreshes its retrieval layer before opening chat. I
 Startup output reports what was checked, skipped, refreshed, rebuilt, or degraded. If one source fails while another source remains usable, the app can enter chat in degraded mode and names the affected source type. If no retrieval corpus is available, startup fails before chat opens.
 
 By default, local runtime state and retrieval artifacts are stored under `.eberron-query-assistant/` in the repository.
-Runtime state records the application version for diagnostics, but routine version bumps do not discard usable local state or retrieval artifacts.
+Runtime state records the application version for diagnostics only. Routine startup preserves existing local state and retrieval artifacts across version changes; the app only intentionally clears or force-rebuilds its corpus when you run `npm run reingest` or pass `--force-reingest`.
 Interactive sessions with at least one successful assistant response are archived as local Markdown transcripts under `logs/`, which is gitignored. These transcripts are for review only and are not loaded as future assistant memory.
 
 Detailed engineering and phased-delivery documentation lives in `docs/specification.md` and the `docs/phase-*.md` files. This README remains focused on the intended finished user experience.
@@ -42,7 +42,7 @@ npm install
 npm run start
 ```
 
-Run a full rebuild when you want to ignore incremental skip logic:
+Run an explicit full rebuild when you want to discard and regenerate app-owned corpus and retrieval artifacts:
 
 ```bash
 npm run reingest
@@ -54,7 +54,7 @@ Inspect retrieval results for a query without entering chat:
 npm run debug:retrieval -- "aerenal deathless"
 ```
 
-The intended workflow is to run the project from this repository: start the application, let it refresh the corpus, then interact with the assistant in the terminal. Use `npm run reingest` when you need a full rebuild.
+The intended workflow is to run the project from this repository: start the application, let it refresh the corpus incrementally, then interact with the assistant in the terminal. Use `npm run reingest` when you need an explicit full rebuild.
 
 ## Example Questions
 - What are the names of the clans of the Znir?

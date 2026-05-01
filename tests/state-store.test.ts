@@ -24,8 +24,6 @@ describe("FilesystemStateStore", () => {
     const store = createFilesystemStateStore();
 
     await expect(store.load(loadDefaultConfig(TEST_ROOT))).resolves.toEqual({
-      invalidated: false,
-      invalidationReason: null,
       state: {
         appVersion: APP_VERSION,
         foundry: {
@@ -80,8 +78,6 @@ describe("FilesystemStateStore", () => {
     await store.save(config, state);
 
     await expect(store.load(config)).resolves.toEqual({
-      invalidated: false,
-      invalidationReason: null,
       state: {
         ...state,
         pdf: {
@@ -97,18 +93,36 @@ describe("FilesystemStateStore", () => {
     await expect(mkdir(path.dirname(getStatePath(config)))).rejects.toMatchObject({ code: "EEXIST" });
   });
 
-  it("invalidates missing app version state", async () => {
+  it("preserves valid state when app version is missing", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = createFilesystemStateStore();
 
     await mkdir(config.stateDir, { recursive: true });
-    await writeFile(getStatePath(config), `${JSON.stringify({ version: 2 })}\n`, "utf8");
+    await writeFile(
+      getStatePath(config),
+      `${JSON.stringify({
+        foundry: {
+          lastSuccessfulExport: {
+            generatedAt: "2026-04-24T10:00:00.000Z",
+            recordCount: 2,
+            runId: "run-1"
+          }
+        },
+        pdf: { knownFilenames: ["a.pdf"] },
+        article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }
+      })}\n`,
+      "utf8"
+    );
 
     const result = await store.load(config);
 
-    expect(result.invalidated).toBe(true);
     expect(result.state.appVersion).toBe(APP_VERSION);
-    expect(result.state.foundry.lastSuccessfulExport).toBeNull();
+    expect(result.state.foundry.lastSuccessfulExport).toEqual({
+      generatedAt: "2026-04-24T10:00:00.000Z",
+      recordCount: 2,
+      runId: "run-1"
+    });
+    expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
   });
 
   it("loads state from any app version without invalidation when the shape is valid", async () => {
@@ -129,7 +143,6 @@ describe("FilesystemStateStore", () => {
 
     const result = await store.load(config);
 
-    expect(result.invalidated).toBe(false);
     expect(result.state.appVersion).toBe(APP_VERSION);
     expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
   });
@@ -152,7 +165,6 @@ describe("FilesystemStateStore", () => {
 
     const result = await store.load(config);
 
-    expect(result.invalidated).toBe(false);
     expect(result.state.appVersion).toBe(APP_VERSION);
     expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
   });

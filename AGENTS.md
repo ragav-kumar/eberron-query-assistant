@@ -80,7 +80,7 @@ Enhancement documents describe changes on top of the historical baseline. They m
 ## Implementation Guardrails
 Use the historical baseline documents as context for the Phase 6 product state. For enhancement work, document new intended behavior in new enhancement documentation rather than editing the frozen specification or frozen phase documents.
 
-Each implementation phase increments the application minor version to match the phase number. Phase 1 is `0.1.0`, Phase 2 is `0.2.0`, Phase 3 is `0.3.0`, and later phases continue that pattern. Patch revisions may be used for migration or hardening work inside a phase. Runtime state must not be invalidated solely because the stored `appVersion` differs from the current application version. Startup should validate and normalize persisted state by shape, preserving usable source and retrieval state across version bumps unless later active enhancement documentation defines an explicit schema migration or invalidation rule.
+Each implementation phase increments the application minor version to match the phase number. Phase 1 is `0.1.0`, Phase 2 is `0.2.0`, Phase 3 is `0.3.0`, and later phases continue that pattern. Patch revisions may be used for migration or hardening work inside a phase. The stored `appVersion` is diagnostic metadata only and must not drive compatibility decisions. Startup should validate and normalize persisted state by shape, preserving usable source and retrieval state across version bumps. The only application behavior that may intentionally discard, clear, or force-rebuild app-owned corpus or retrieval artifacts is explicit force re-ingest through `--force-reingest` or `npm run reingest`.
 
 Keep the system modular. Maintain clear separation between:
 - CLI/runtime flow
@@ -93,7 +93,7 @@ Keep the system modular. Maintain clear separation between:
 
 Prefer small, testable units and explicit interfaces over hidden coupling or cross-cutting implicit behavior.
 
-Keep persistent-state changes versioned and migration-safe. Do not make silent breaking changes to stored state or retrieval artifacts without documenting the new version and the expected upgrade path.
+Keep persistent-state changes versioned and migration-safe. Do not make silent breaking changes to stored state or retrieval artifacts without documenting the new version and the expected upgrade path. Incompatible persisted artifacts should fail clearly and instruct the user to run `npm run reingest`; they should not be silently deleted or rebuilt during routine startup.
 
 Handle partial failures in a source-scoped way. Do not mark incomplete ingest or index work as current, and do not let one failed source silently invalidate successful work from another source.
 

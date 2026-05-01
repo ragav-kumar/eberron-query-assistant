@@ -31,8 +31,6 @@ export interface RuntimeState {
 
 export interface RuntimeStateLoadResult {
   state: RuntimeState;
-  invalidated: boolean;
-  invalidationReason: string | null;
 }
 
 export interface StateStore {

@@ -178,7 +178,7 @@ describe("startup refresh skeleton", () => {
           search: vi.fn().mockResolvedValue([])
         },
         stateStore: {
-          load: vi.fn().mockResolvedValue({ state, invalidated: false, invalidationReason: null }),
+          load: vi.fn().mockResolvedValue({ state }),
           save
         }
       })
@@ -217,7 +217,7 @@ describe("startup refresh skeleton", () => {
         reporter: createMemoryProgressReporter(),
         retrieval,
         stateStore: {
-          load: vi.fn().mockResolvedValue({ state, invalidated: false, invalidationReason: null }),
+          load: vi.fn().mockResolvedValue({ state }),
           save
         }
       })
@@ -302,6 +302,50 @@ describe("startup refresh skeleton", () => {
     expect(reporter.warnings.some((message) => message.includes("degradedSources=foundry, pdf"))).toBe(true);
     expect(reporter.warnings.some((message) => message.includes("foundry: discovery failed."))).toBe(true);
     expect(reporter.warnings.some((message) => message.includes("pdf: partial ingestion failure."))).toBe(true);
+  });
+
+  it("forces retrieval rebuild only for force re-ingest", async () => {
+    const state = createDefaultRuntimeState();
+    const nextState = createDefaultRuntimeState();
+    const retrieval = {
+      refresh: vi.fn().mockResolvedValue({ chunkCount: 1, reusedEmbeddings: 0, regeneratedEmbeddings: 1 }),
+      search: vi.fn().mockResolvedValue([])
+    };
+    const dependencies = {
+      discovery: {
+        inspectSources: vi.fn().mockResolvedValue({
+          degraded: false,
+          nextState,
+          inventories: []
+        })
+      },
+      ingestion: {
+        ingest: vi.fn().mockResolvedValue({
+          nextState,
+          summary: {
+            corpusSourceCount: 1,
+            degraded: false,
+            sourceSummaries: []
+          }
+        })
+      },
+      reporter: createMemoryProgressReporter(),
+      retrieval,
+      stateStore: {
+        load: vi.fn().mockResolvedValue({ state }),
+        save: vi.fn().mockResolvedValue(undefined)
+      }
+    };
+
+    await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false, retrievalQuery: null }, dependencies);
+    await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: true, retrievalQuery: null }, dependencies);
+
+    expect(retrieval.refresh).toHaveBeenNthCalledWith(1, loadDefaultConfig(PLACEHOLDER_ROOT), {
+      forceRebuild: false
+    });
+    expect(retrieval.refresh).toHaveBeenNthCalledWith(2, loadDefaultConfig(PLACEHOLDER_ROOT), {
+      forceRebuild: true
+    });
   });
 });
 

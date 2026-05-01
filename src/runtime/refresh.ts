@@ -30,10 +30,6 @@ export const runStartupRefresh = async (
   const stateLoad = await dependencies.stateStore.load(config);
   const state = stateLoad.state;
 
-  if (stateLoad.invalidated) {
-    dependencies.reporter.warn(`Runtime state invalidated: ${stateLoad.invalidationReason}.`);
-  }
-
   if (options.forceReingest) {
     dependencies.reporter.info("Force re-ingest requested; source inventory will schedule all available sources.");
   }
@@ -50,7 +46,7 @@ export const runStartupRefresh = async (
     }
   }
 
-  const ingestion = await dependencies.ingestion.ingest(config, options, state, discovery, stateLoad.invalidated);
+  const ingestion = await dependencies.ingestion.ingest(config, options, state, discovery);
 
   for (const summary of ingestion.summary.sourceSummaries) {
     const report = `${summary.message} discovered=${summary.discovered}, ingested=${summary.ingested}, removed=${summary.removed}, failed=${summary.failed}, status=${summary.status}.`;
@@ -69,7 +65,7 @@ export const runStartupRefresh = async (
   }
 
   const retrieval = dependencies.retrieval
-    ? await refreshRetrievalIndexes(config, options, stateLoad.invalidated, dependencies)
+    ? await refreshRetrievalIndexes(config, options, dependencies)
     : undefined;
 
   await dependencies.stateStore.save(config, ingestion.nextState);
@@ -95,7 +91,6 @@ export const runStartupRefresh = async (
 const refreshRetrievalIndexes = async (
   config: RuntimeConfig,
   options: RuntimeOptions,
-  invalidated: boolean,
   dependencies: StartupRefreshDependencies
 ): Promise<RetrievalSyncSummary | undefined> => {
   if (!dependencies.retrieval) {
@@ -104,7 +99,7 @@ const refreshRetrievalIndexes = async (
 
   dependencies.reporter.info("Refreshing retrieval indexes.");
   const retrieval = await dependencies.retrieval.refresh(config, {
-    forceRebuild: options.forceReingest || invalidated
+    forceRebuild: options.forceReingest
   });
   dependencies.reporter.info("Retrieval indexes ready.");
   return retrieval;

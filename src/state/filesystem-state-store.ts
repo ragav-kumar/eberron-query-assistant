@@ -31,9 +31,7 @@ export const createFilesystemStateStore = (): StateStore => {
       } catch (error) {
         if (hasErrorCode(error, "ENOENT")) {
           return {
-            state: createDefaultRuntimeState(),
-            invalidated: false,
-            invalidationReason: null
+            state: createDefaultRuntimeState()
           };
         }
 
@@ -65,14 +63,6 @@ const parseRuntimeState = (value: unknown): RuntimeStateLoadResult => {
     throw createInvalidRuntimeStateError("Runtime state file must contain an object.");
   }
 
-  if (typeof value.appVersion !== "string" || value.appVersion.length === 0) {
-    return {
-      state: createDefaultRuntimeState(),
-      invalidated: true,
-      invalidationReason: "runtime state appVersion is missing"
-    };
-  }
-
   if (!isRecord(value.foundry)) {
     throw createInvalidRuntimeStateError("Runtime state field foundry must be an object.");
   }
@@ -101,9 +91,7 @@ const parseRuntimeState = (value: unknown): RuntimeStateLoadResult => {
         ),
         knownArticles: parseArticleRecords(value.article.knownArticles)
       }
-    }),
-    invalidated: false,
-    invalidationReason: null
+    })
   };
 };
 

@@ -28,8 +28,7 @@ export interface IngestionService {
     config: RuntimeConfig,
     options: RuntimeOptions,
     state: RuntimeState,
-    discovery: SourceDiscoverySummary,
-    invalidated?: boolean
+    discovery: SourceDiscoverySummary
   ): Promise<{
     summary: IngestionSummary;
     nextState: RuntimeState;
@@ -216,11 +215,10 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     config: RuntimeConfig,
     options: RuntimeOptions,
     state: RuntimeState,
-    discovery: SourceDiscoverySummary,
-    invalidated = false
+    discovery: SourceDiscoverySummary
     ) {
-      await corpusStore.initialize(config);
-      if (options.forceReingest || invalidated) {
+      await corpusStore.initialize(config, { allowIncompatibleReset: options.forceReingest });
+      if (options.forceReingest) {
         await corpusStore.clear(config);
       }
 

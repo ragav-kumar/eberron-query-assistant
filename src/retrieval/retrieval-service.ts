@@ -77,7 +77,9 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
   ): Promise<RetrievalSyncSummary> => {
     config = nextConfig;
     await mkdir(nextConfig.retrievalDir, { recursive: true });
-    await deleteLegacyVectorIndex(nextConfig, dependencies.reporter);
+    if (options.forceRebuild) {
+      await deleteLegacyVectorIndex(nextConfig, dependencies.reporter);
+    }
 
     const database = new Database(getCorpusDatabasePath(nextConfig));
     try {

@@ -3,12 +3,13 @@ import path from "node:path";
 
 import Database from "better-sqlite3";
 
+import { createTaggedError } from "../errors.js";
 import type { CorpusChunk, CorpusSource, RuntimeConfig, SourceType } from "../types.js";
 
 const DATABASE_FILENAME = "corpus.sqlite";
 
 export interface CorpusStore {
-  initialize(config: RuntimeConfig): Promise<void>;
+  initialize(config: RuntimeConfig, options?: { allowIncompatibleReset?: boolean }): Promise<void>;
   clear(config: RuntimeConfig): Promise<void>;
   replaceSource(config: RuntimeConfig, source: CorpusSource, chunks: CorpusChunk[]): Promise<void>;
   replaceSourcesByType(
@@ -48,9 +49,15 @@ export const createSqliteCorpusStore = (): CorpusStore => {
   };
 
   return {
-    async initialize(config) {
+    async initialize(config, options = {}) {
       let openedDatabase = await open(config);
       if (!isCompatibleSchema(openedDatabase)) {
+        if (options.allowIncompatibleReset !== true) {
+          throw createTaggedError(
+            "incompatible-corpus-schema",
+            "Existing corpus.sqlite is not compatible with the current corpus schema. Run npm run reingest to rebuild retrieval artifacts explicitly."
+          );
+        }
         close();
         await rm(nextDatabasePath(config), { force: true });
         openedDatabase = await open(config);

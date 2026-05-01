@@ -5,6 +5,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
+import { isRecord } from "../src/errors.js";
 import { createSqliteCorpusStore, getCorpusDatabasePath, type CorpusStore } from "../src/ingestion/index.js";
 import { createDeterministicEmbeddingAdapter, type EmbeddingAdapter } from "../src/provider/index.js";
 import { createMemoryProgressReporter, type ProgressReporter } from "../src/progress/reporter.js";
@@ -105,7 +106,7 @@ describe("Phase 4 retrieval", () => {
     });
   });
 
-  it("recreates incompatible SQLite artifacts before corpus use", async () => {
+  it("rejects incompatible SQLite artifacts without explicit reset", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await mkdir(config.retrievalDir, { recursive: true });
     const database = new Database(getCorpusDatabasePath(config));
@@ -113,7 +114,26 @@ describe("Phase 4 retrieval", () => {
     database.close();
 
     const store = createStore();
-    await store.initialize(config);
+    await store.initialize(config).then(
+      () => {
+        throw new Error("Expected incompatible corpus schema to fail.");
+      },
+      (error: unknown) => {
+        expect(error).toMatchObject({ kind: "incompatible-corpus-schema" });
+        expect(isRecord(error) && typeof error.message === "string" ? error.message : "").toContain("npm run reingest");
+      }
+    );
+  });
+
+  it("recreates incompatible SQLite artifacts only when explicit reset is allowed", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await mkdir(config.retrievalDir, { recursive: true });
+    const database = new Database(getCorpusDatabasePath(config));
+    database.exec("CREATE TABLE sources (legacy_id TEXT PRIMARY KEY)");
+    database.close();
+
+    const store = createStore();
+    await store.initialize(config, { allowIncompatibleReset: true });
     await store.replaceSource(config, source("pdf", "eberron.pdf", "Eberron Rising"), [
       chunk("pdf:eberron.pdf:0", "pdf:eberron.pdf", 0, "Aerenal keeps deathless counselors.", {
         sourceType: "pdf",
@@ -158,7 +178,7 @@ describe("Phase 4 retrieval", () => {
     expect(resumed.embedBatch).toHaveBeenCalledTimes(1);
   });
 
-  it("deletes legacy vector files during normal refresh and regenerates SQLite rows", async () => {
+  it("preserves legacy vector files during routine refresh and deletes them during force rebuild", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config);
     await mkdir(config.retrievalDir, { recursive: true });
@@ -173,10 +193,13 @@ describe("Phase 4 retrieval", () => {
     const retrieval = createRetrieval(counted.adapter);
     const summary = await retrieval.refresh(config);
 
-    await expect(readFile(getVectorIndexPath(config), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(readFile(getVectorIndexPath(config), "utf8")).resolves.toBe(legacy);
     expect(summary).toMatchObject({ chunkCount: 3, reusedEmbeddings: 0, regeneratedEmbeddings: 3 });
     expect(counted.embedBatch).toHaveBeenCalledTimes(1);
     expect(readVectorRows(config)).toHaveLength(3);
+
+    await retrieval.refresh(config, { forceRebuild: true });
+    await expect(readFile(getVectorIndexPath(config), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("reports embedding sync start, progress, and final summary", async () => {
