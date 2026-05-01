@@ -1,5 +1,7 @@
 # Phase 02: Source Discovery And State
 
+> Historical baseline: this phase document records completed Phase 2 planning. Further changes are enhancements on top of the Phase 6 baseline and must be documented elsewhere. Do not modify this document again.
+
 ## Goal
 Implement deterministic source inventory checks and persisted runtime state so the application can decide what work to skip or schedule on startup.
 

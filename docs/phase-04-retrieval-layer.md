@@ -1,5 +1,7 @@
 # Phase 04: Retrieval Layer
 
+> Historical baseline: this phase document records completed Phase 4 planning. Further changes are enhancements on top of the Phase 6 baseline and must be documented elsewhere. Do not modify this document again.
+
 ## Goal
 Implement the finalized retrieval layer so normalized sources become queryable with citation-friendly results and reliable stale-entry cleanup.
 

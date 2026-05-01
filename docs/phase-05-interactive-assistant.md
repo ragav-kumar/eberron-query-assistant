@@ -1,5 +1,7 @@
 # Phase 05: Interactive Assistant
 
+> Historical baseline: this phase document records completed Phase 5 planning. Further changes are enhancements on top of the Phase 6 baseline and must be documented elsewhere. Do not modify this document again.
+
 ## Goal
 Connect retrieval to a provider-backed interactive terminal assistant that answers questions with grounded citations and clear distinction between direct support and inference.
 

@@ -1,5 +1,7 @@
 # Phase 03: Ingestion Pipelines
 
+> Historical baseline: this phase document records completed Phase 3 planning. Further changes are enhancements on top of the Phase 6 baseline and must be documented elsewhere. Do not modify this document again.
+
 ## Goal
 Convert each supported source type into normalized source and chunk records with durable metadata and source-scoped failure handling.
 

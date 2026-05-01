@@ -3,17 +3,25 @@
 ## Purpose
 This file defines durable repository rules for `eberron-query-assistant`.
 
-Follow these rules unless a later instruction in the repo or task explicitly overrides them.
+Follow these rules unless a later instruction in the repo or task explicitly overrides them. The frozen historical-document rule is not overrideable.
 
 ## Branch Policy
-Work against the current branch unless later instructions or a written specification explicitly say otherwise.
+Work against the current branch unless later instructions or active enhancement documentation explicitly say otherwise.
 
 ## Documentation Set And Output Order
 Create and maintain the governing documentation set in this order:
 
 1. `AGENTS.md`
-2. `docs/specification.md`
-3. `docs/phase-*.md`
+2. historical baseline documents, when reading for context only:
+   - `docs/specification.md`
+   - `docs/phase-01-project-scaffold.md`
+   - `docs/phase-02-source-discovery-and-state.md`
+   - `docs/phase-03-ingestion-pipelines.md`
+   - `docs/phase-04-retrieval-layer.md`
+   - `docs/phase-05-interactive-assistant.md`
+   - `docs/phase-05.5-vector-storage-migration.md`
+   - `docs/phase-06-hardening-and-alignment.md`
+3. new enhancement documentation
 4. `README.md`
 
 If one document changes the durable rules for another, update the upstream governing document as part of the same work.
@@ -27,35 +35,38 @@ Each document has a distinct audience and purpose.
 - Implementation guardrails.
 - Coding best practices that should remain true across phases.
 
-### `docs/specification.md`
-- The authoritative final-state engineering specification.
-- The exhaustive definition of the intended finished system.
-- The source of truth for architecture, workflows, interfaces, storage, failure handling, and validation expectations.
+### Historical Baseline Documents
+- `docs/specification.md` and phase documents through Phase 6 are historical baseline documents.
+- They describe the completed baseline through Phase 6 and are no longer active planning or specification targets.
+- They are frozen after their historical status notice has been added.
+- Do not modify them again.
 
-### `docs/phase-*.md`
-- The phased implementation plan.
-- Decision-complete descriptions of incremental delivery steps toward the final-state spec.
-- The place where each phase defines its goal, scope, tests, end state, and human verification.
+### New Enhancement Documentation
+- Any further changes after Phase 6 are enhancements on top of the historical baseline.
+- New planning or specification work must live in new enhancement documentation instead of editing `docs/specification.md` or phase documents through Phase 6.
+- Enhancement documents must define their goal, scope, tests, end state, and human verification where applicable.
 
 ### `README.md`
 - Human-facing project overview and usage guide.
 - A description of the intended finished system.
 - A user document, not a planning or contributor workflow document.
 
-## Specification Rules
-`docs/specification.md` must remain the authoritative final-state spec file.
+## Historical Baseline Rules
+`docs/specification.md` is the authoritative historical baseline spec through Phase 6.
 
-Phase planning must live in `docs/phase-*.md`, not inside `docs/specification.md`, except for brief references that help readers navigate the documentation set.
+The following documents are frozen historical records:
+- `docs/specification.md`
+- `docs/phase-01-project-scaffold.md`
+- `docs/phase-02-source-discovery-and-state.md`
+- `docs/phase-03-ingestion-pipelines.md`
+- `docs/phase-04-retrieval-layer.md`
+- `docs/phase-05-interactive-assistant.md`
+- `docs/phase-05.5-vector-storage-migration.md`
+- `docs/phase-06-hardening-and-alignment.md`
 
-The specification must be exhaustive and decision-complete. If a previously open technical decision is resolved during planning or implementation, update the specification, this file, and the README as needed so the documentation set remains internally consistent.
+Do not modify these frozen historical documents again.
 
-The final-state spec must:
-- Define exact finished behavior for startup refresh, ingestion, retrieval, assistant runtime, failure handling, and verification.
-- Define the intended architecture, module boundaries, storage model, configuration model, and technology choices.
-- Record assumptions and unresolved decisions instead of leaving them implicit.
-- Be written as implementation guidance for the finished system, not as a brainstorm or progress log.
-
-Each phase document must:
+New enhancement documentation must:
 - Define the phase goal.
 - Define the scope of work for the phase.
 - Identify out-of-scope work where needed to prevent ambiguity.
@@ -64,12 +75,12 @@ Each phase document must:
 - Include concrete human verification steps.
 - Record assumptions or prerequisites that materially affect implementation.
 
-Phase documents stage delivery toward the final-state specification. They must not redefine finished product behavior independently of `docs/specification.md`.
+Enhancement documents describe changes on top of the historical baseline. They must not silently rewrite the Phase 6 baseline; they should identify intentional deviations as enhancements.
 
 ## Implementation Guardrails
-Use the final-state specification as the product source of truth. If an implementation detail in a phase document conflicts with `docs/specification.md`, update the phase document or the specification so the conflict is resolved explicitly.
+Use the historical baseline documents as context for the Phase 6 product state. For enhancement work, document new intended behavior in new enhancement documentation rather than editing the frozen specification or frozen phase documents.
 
-Each implementation phase increments the application minor version to match the phase number. Phase 1 is `0.1.0`, Phase 2 is `0.2.0`, Phase 3 is `0.3.0`, and later phases continue that pattern. Patch revisions may be used for migration or hardening work inside a phase. Runtime state must not be invalidated solely because the stored `appVersion` differs from the current application version. Startup should validate and normalize persisted state by shape, preserving usable source and retrieval state across version bumps unless a later written specification defines an explicit schema migration or invalidation rule.
+Each implementation phase increments the application minor version to match the phase number. Phase 1 is `0.1.0`, Phase 2 is `0.2.0`, Phase 3 is `0.3.0`, and later phases continue that pattern. Patch revisions may be used for migration or hardening work inside a phase. Runtime state must not be invalidated solely because the stored `appVersion` differs from the current application version. Startup should validate and normalize persisted state by shape, preserving usable source and retrieval state across version bumps unless later active enhancement documentation defines an explicit schema migration or invalidation rule.
 
 Keep the system modular. Maintain clear separation between:
 - CLI/runtime flow
@@ -92,14 +103,14 @@ For startup, source-discovery, state, CLI, and user-visible runtime behavior cha
 
 Document assumptions, invariants, and unresolved decisions explicitly in the governing docs rather than leaving them implied in code structure or commit history.
 
-Update `README.md` whenever the final intended user-visible behavior changes.
+Update `README.md` whenever intended user-visible behavior changes.
 
 Do not attempt sandboxed runs of commands known to require network access or external write permissions, including `npm install`, `git push`, and similar package-management or remote-publishing commands. Request escalation directly for those commands when they are needed.
 
 ## Coding Best Practices
 Implement the project as TypeScript-first code with explicit types at important boundaries, especially around configuration, state persistence, normalized records, retrieval results, and provider adapters.
 
-Prefer functional TypeScript. Model boundaries with interfaces and create concrete implementations with factory functions that return those interfaces. Do not add project-authored classes or constructors unless a later written specification explicitly requires them; third-party and platform constructors may still be used where their APIs require it.
+Prefer functional TypeScript. Model boundaries with interfaces and create concrete implementations with factory functions that return those interfaces. Do not add project-authored classes or constructors unless later active enhancement documentation explicitly requires them; third-party and platform constructors may still be used where their APIs require it.
 
 Prefer arrow functions over classic `function` declarations. Use classic functions only when a platform API, TypeScript limitation, or a concrete readability/safety need makes an arrow function unsuitable.
 
@@ -126,11 +137,11 @@ The README must:
 - Explain project purpose and expected inputs.
 - Explain how to run the application and what user-facing behavior to expect.
 - Avoid planning notes, contributor instructions, implementation status, and future-work commentary.
-- Stay consistent with the latest approved specification.
+- Stay consistent with the latest active enhancement documentation and the frozen historical baseline.
 
-Instructions about how the README should be written belong here or in the specification, not in the README itself.
+Instructions about how the README should be written belong here or in active enhancement documentation, not in the README itself.
 
 ## Maintenance Rules
 If planning or implementation reveals a durable process rule, documentation constraint, or coding convention that should govern future work, update `AGENTS.md`.
 
-If the final-state specification changes intended user-visible behavior, update `README.md` so it reflects the final intended result rather than the current state of the repository.
+If active enhancement documentation changes intended user-visible behavior, update `README.md` so it reflects the intended result rather than the current state of the repository.

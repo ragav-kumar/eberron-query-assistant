@@ -1,5 +1,7 @@
 # Phase 06: Hardening And Alignment
 
+> Historical baseline: this phase document records completed Phase 6 planning. Further changes are enhancements on top of the Phase 6 baseline and must be documented elsewhere. Do not modify this document again.
+
 ## Goal
 Finish the project by tightening startup safety, degraded-mode reporting, end-to-end scenario coverage, and documentation consistency.
 

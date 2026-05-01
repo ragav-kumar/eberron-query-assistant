@@ -1,5 +1,7 @@
 # Phase 05.5: Vector Storage Migration
 
+> Historical baseline: this phase document records completed Phase 5.5 planning. Further changes are enhancements on top of the Phase 6 baseline and must be documented elsewhere. Do not modify this document again.
+
 ## Goal
 Replace the giant JSON vector index with durable SQLite-backed vector storage so provider-generated embeddings are checkpointed incrementally without large whole-file rewrites, memory pressure, or lost progress after aborts. Existing JSON vector artifacts are discarded and regenerated into SQLite.
 

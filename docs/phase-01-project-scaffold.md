@@ -1,5 +1,7 @@
 # Phase 01: Project Scaffold
 
+> Historical baseline: this phase document records completed Phase 1 planning. Further changes are enhancements on top of the Phase 6 baseline and must be documented elsewhere. Do not modify this document again.
+
 ## Goal
 Establish the TypeScript, Node.js, Vitest, and ESLint foundation for the CLI application, along with the initial module boundaries required by later phases.
 

@@ -1,5 +1,7 @@
 # Eberron Query Assistant Specification
 
+> Historical baseline: this document records the completed specification through Phase 6. Further changes are enhancements on top of this baseline and must be documented elsewhere. Do not modify this document again.
+
 ## Summary
 `eberron-query-assistant` is part 2 of a two-part workflow. Part 1 exports Foundry VTT world data into a manifest plus NDJSON corpus. Part 2 consumes that foundry export, a local library of PDFs, and scraped Keith Baker articles to build and maintain a retrieval layer for an interactive assistant.
 
