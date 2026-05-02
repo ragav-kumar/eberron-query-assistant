@@ -5,13 +5,24 @@ import type { OutputTab } from "./ui-types.js";
 
 interface OutputTabsProps {
   consoleOutput: ApiConsole;
+  isBusy: boolean;
   log: ApiLog;
+  onNewSession: () => void;
+  onSelectLog: (filePath: string) => void;
   onTabChange: (tab: OutputTab) => void;
   tab: OutputTab;
 }
 
 /** Renders the right-side output tabs for transient console output and persisted logs. */
-export const OutputTabs = ({ consoleOutput, log, onTabChange, tab }: OutputTabsProps) => (
+export const OutputTabs = ({
+  consoleOutput,
+  isBusy,
+  log,
+  onNewSession,
+  onSelectLog,
+  onTabChange,
+  tab
+}: OutputTabsProps) => (
   <aside className="output-view" aria-label="Application output">
     <div className="output-header">
       <div className="tab-list" role="tablist" aria-label="Output tabs">
@@ -36,7 +47,16 @@ export const OutputTabs = ({ consoleOutput, log, onTabChange, tab }: OutputTabsP
           Log
         </button>
       </div>
-      {tab === "log" ? <span>{log.filePath ?? "No log yet"}</span> : <span>Local only; not saved to logs</span>}
+      {tab === "log" ? (
+        <LogToolbar
+          isBusy={isBusy}
+          log={log}
+          onNewSession={onNewSession}
+          onSelectLog={onSelectLog}
+        />
+      ) : (
+        <span>Local only; not saved to logs</span>
+      )}
     </div>
     {tab === "console" ? (
       <ConsoleFeed entries={consoleOutput.entries} />
@@ -45,3 +65,64 @@ export const OutputTabs = ({ consoleOutput, log, onTabChange, tab }: OutputTabsP
     )}
   </aside>
 );
+
+interface LogToolbarProps {
+  isBusy: boolean;
+  log: ApiLog;
+  onNewSession: () => void;
+  onSelectLog: (filePath: string) => void;
+}
+
+const LogToolbar = ({ isBusy, log, onNewSession, onSelectLog }: LogToolbarProps) => {
+  const historicalFiles = log.files.filter((file) => !file.active);
+  const currentFile = log.files.find((file) => file.active);
+  const selectedFilePath = log.filePath ?? "";
+  const status = log.filePath
+    ? log.readOnly
+      ? "Read only"
+      : "Current session"
+    : "No log selected";
+
+  return (
+    <div className="log-toolbar">
+      <div className="log-select-row">
+        <label className="sr-only" htmlFor="log-file-select">
+          Log file
+        </label>
+        <select
+          id="log-file-select"
+          value={selectedFilePath}
+          onChange={(event) => onSelectLog(event.currentTarget.value)}
+          disabled={log.files.length === 0}
+          title="Browse saved Markdown transcript logs."
+        >
+          {log.files.length === 0 ? (
+            <option value="">No saved logs</option>
+          ) : (
+            <option value="" disabled>
+              Select a log
+            </option>
+          )}
+          {currentFile ? <option value={currentFile.filePath}>Current session - {currentFile.label}</option> : null}
+          {historicalFiles.map((file) => (
+            <option key={file.filePath} value={file.filePath}>
+              {file.label}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          onClick={onNewSession}
+          disabled={isBusy}
+          title="Start a fresh assistant transcript. The file is created after the next answer."
+        >
+          New session
+        </button>
+      </div>
+      <span>
+        {status}
+        {log.filePath ? `: ${log.filePath}` : ""}
+      </span>
+    </div>
+  );
+};

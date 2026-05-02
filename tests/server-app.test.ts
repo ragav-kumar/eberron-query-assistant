@@ -25,7 +25,7 @@ describe("web app API model", () => {
     });
 
     await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
-    await expect(app.getLog()).resolves.toEqual({ filePath: null, markdown: "" });
+    await expect(app.getLog()).resolves.toEqual(emptyLogResponse());
   });
 
   it("reads and writes additional context", async () => {
@@ -72,7 +72,7 @@ describe("web app API model", () => {
 
     const response = await app.debugRetrieval("aerenal deathless");
 
-    expect(response.log).toEqual({ filePath: null, markdown: "" });
+    expect(response.log).toEqual(emptyLogResponse());
     expect(response.console.entries.map((entry) => entry.message).join("\n")).toContain(
       "Debug retrieval query: aerenal deathless"
     );
@@ -123,9 +123,104 @@ describe("web app API model", () => {
     expect(inspectSources.mock.calls[1]?.[1]).toMatchObject({ forceReingest: true });
     expect(refresh.mock.calls[0]?.[1]).toEqual({ forceRebuild: false });
     expect(refresh.mock.calls[1]?.[1]).toEqual({ forceRebuild: true });
-    expect(firstResponse.log).toEqual({ filePath: null, markdown: "" });
+    expect(firstResponse.log).toEqual(emptyLogResponse());
     expect(secondResponse.console.entries.map((entry) => entry.message).join("\n")).toContain("Refresh complete.");
     await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("lists Markdown logs newest first and reads selected historical logs", async () => {
+    const config = await writeConfig("log-browser");
+    await mkdir(config.logDir, { recursive: true });
+    await writeFile(path.join(config.logDir, "20260101000000 Old.md"), "# Old", "utf8");
+    await writeFile(path.join(config.logDir, "20260201000000 New.md"), "# New", "utf8");
+    await writeFile(path.join(config.logDir, "notes.txt"), "not a transcript", "utf8");
+    await mkdir(path.join(config.logDir, "nested"), { recursive: true });
+    await writeFile(path.join(config.logDir, "nested", "20260301000000 Nested.md"), "# Nested", "utf8");
+    const app = createWebApp({
+      config,
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+
+    const response = await app.getLog(path.join(config.logDir, "20260101000000 Old.md"));
+
+    expect(response.markdown).toBe("# Old");
+    expect(response.readOnly).toBe(true);
+    expect(response.files.map((file) => file.label)).toEqual(["20260201000000 New.md", "20260101000000 Old.md"]);
+  });
+
+  it("rejects unsafe or missing log selections", async () => {
+    const config = await writeConfig("unsafe-log-selection");
+    await mkdir(config.logDir, { recursive: true });
+    await writeFile(path.join(config.logDir, "20260101000000 Old.md"), "# Old", "utf8");
+    const app = createWebApp({
+      config,
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+
+    await expect(app.getLog(path.join(config.logDir, "nested", "Bad.md"))).rejects.toThrow(
+      "Selected log file must be a Markdown file directly inside the log directory."
+    );
+    await expect(app.getLog(path.join(config.logDir, "..", "Bad.md"))).rejects.toThrow(
+      "Selected log file must be a Markdown file directly inside the log directory."
+    );
+    await expect(app.getLog(path.join(config.logDir, "missing.md"))).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("keeps historical log browsing read-only while assistant prompts write to the active session", async () => {
+    const config = await writeConfig("historical-readonly");
+    await mkdir(config.logDir, { recursive: true });
+    const oldPath = path.join(config.logDir, "20260101000000 Old.md");
+    await writeFile(oldPath, "# Old\n\nOriginal", "utf8");
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: {
+        complete: vi.fn().mockResolvedValue("<session-title>Current</session-title>\n<answer>\nCurrent answer.\n</answer>")
+      }
+    });
+
+    const historical = await app.getLog(oldPath);
+    expect(historical.readOnly).toBe(true);
+
+    const response = await app.askAssistant("New question");
+
+    expect(await readFile(oldPath, "utf8")).toBe("# Old\n\nOriginal");
+    expect(response.log.filePath).not.toBe(oldPath);
+    expect(response.log.activeFilePath).toBe(response.log.filePath);
+    expect(response.log.readOnly).toBe(false);
+    expect(response.log.markdown).toContain("New question");
+    expect(response.log.markdown).toContain("Current answer.");
+  });
+
+  it("starts a lazy new session without creating an empty transcript", async () => {
+    const config = await writeConfig("new-session");
+    const chat = vi
+      .fn()
+      .mockResolvedValueOnce("<session-title>First</session-title>\n<answer>\nFirst answer.\n</answer>")
+      .mockResolvedValueOnce("<session-title>Second</session-title>\n<answer>\nSecond answer.\n</answer>");
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: chat }
+    });
+    const first = await app.askAssistant("First question");
+    const firstFiles = await readdir(config.logDir);
+
+    const reset = await app.startNewSession();
+    const filesAfterReset = await readdir(config.logDir);
+    const second = await app.askAssistant("Second question");
+
+    expect(reset.filePath).toBeNull();
+    expect(reset.activeFilePath).toBeNull();
+    expect(filesAfterReset).toEqual(firstFiles);
+    expect(second.log.filePath).not.toBe(first.log.filePath);
+    expect(second.log.markdown).toContain("Second question");
+    const secondMessages = chat.mock.calls[1]?.[0] as Array<{ content: string }> | undefined;
+    expect(secondMessages?.[0]?.content).toContain("<session-title>");
   });
 
   it("writes assistant failures to console instead of transcript logs", async () => {
@@ -238,4 +333,12 @@ const result = (): RetrievalResult => ({
   },
   score: 0.9,
   matchKind: "hybrid"
+});
+
+const emptyLogResponse = () => ({
+  activeFilePath: null,
+  files: [],
+  filePath: null,
+  markdown: "",
+  readOnly: false
 });

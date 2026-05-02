@@ -14,7 +14,7 @@ The local Console output reports what was checked, skipped, refreshed, rebuilt, 
 
 By default, local runtime state and retrieval artifacts are stored under `.eberron-query-assistant/` in the repository.
 Runtime state records the application version for diagnostics only. Routine refresh preserves existing local state and retrieval artifacts across version changes; the app only intentionally clears or force-rebuilds its corpus when you use the force-reingest control.
-Each app session writes assistant exchanges to an active local Markdown transcript under `logs/`, which is gitignored. The right column of the app separates transient Console output from the persisted Markdown Log tab, and both output panes auto-scroll as new content arrives. These transcripts are not loaded as future assistant memory.
+Each app session writes assistant exchanges to an active local Markdown transcript under `logs/`, which is gitignored. The right column of the app separates transient Console output from the persisted Markdown Log tab, and both output panes auto-scroll as new content arrives. The Log tab starts empty, can browse saved transcripts with a dropdown, and treats older transcripts as read-only. Standard assistant prompts always write to the current session, creating one lazily when needed. Use `New session` to clear the current conversation and start a fresh transcript on the next assistant answer. These transcripts are not loaded as future assistant memory.
 
 Detailed engineering and historical phased-delivery documentation lives in `docs/specification.md`, historical phase documents, and `docs/enhancements.md`. This README remains focused on the intended finished user experience.
 
@@ -45,7 +45,7 @@ npm install
 npm run start
 ```
 
-Open the Vite URL printed by the command. Use the in-app refresh control for optional routine source checks, the force-reingest control when you need an explicit full rebuild, the Input tab for Standard assistant prompts or Debug Query retrieval inspection, and the Additional Context tab for local assistant-only notes. Press Enter to submit the active input; use Shift+Enter for new lines in the assistant prompt. Use the Console tab for unsaved local operational output and the Log tab for saved assistant transcript output.
+Open the Vite URL printed by the command. Use the in-app refresh control for optional routine source checks, the force-reingest control when you need an explicit full rebuild, the Input tab for Standard assistant prompts or Debug Query retrieval inspection, and the Additional Context tab for local assistant-only notes. Press Enter to submit the active input; use Shift+Enter for new lines in the assistant prompt. Use the Console tab for unsaved local operational output and the Log tab to browse saved assistant transcripts, identify whether the displayed transcript is current or read-only, and start a new lazy session.
 
 ## Example Questions
 - What are the names of the clans of the Znir?

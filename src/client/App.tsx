@@ -8,6 +8,7 @@ import {
   getLog,
   getStatus,
   refresh,
+  startNewLogSession,
   writeContext,
   type ApiConsole,
   type ApiLog,
@@ -22,6 +23,13 @@ import "./styles.css";
 
 const SAVE_DELAY_MS = 500;
 const OUTPUT_POLL_MS = 1_500;
+const EMPTY_LOG: ApiLog = {
+  activeFilePath: null,
+  files: [],
+  filePath: null,
+  markdown: "",
+  readOnly: false
+};
 
 /** Coordinates API state and composes the local assistant browser UI. */
 export const App = () => {
@@ -31,7 +39,7 @@ export const App = () => {
   const [lastSavedContext, setLastSavedContext] = useState("");
   const [contextLoaded, setContextLoaded] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState<ApiConsole>({ entries: [] });
-  const [log, setLog] = useState<ApiLog>({ filePath: null, markdown: "" });
+  const [log, setLog] = useState<ApiLog>(EMPTY_LOG);
   const [status, setStatus] = useState<ApiStatus>({ busy: false, operation: null });
   const [error, setError] = useState<string | null>(null);
   const [leftTab, setLeftTab] = useState<LeftTab>("input");
@@ -164,6 +172,31 @@ export const App = () => {
     [isBusy, runOperation]
   );
 
+  const selectLog = useCallback((filePath: string) => {
+    setError(null);
+    void getLog(filePath)
+      .then(setLog)
+      .catch((requestError: unknown) => {
+        setError(formatError(requestError));
+      });
+  }, []);
+
+  const startNewSession = useCallback(() => {
+    if (isBusy) {
+      return;
+    }
+    setError(null);
+    setStatus({ busy: true, operation: "new-session" });
+    void startNewLogSession()
+      .then(setLog)
+      .catch((requestError: unknown) => {
+        setError(formatError(requestError));
+      })
+      .finally(() => {
+        void refreshStatus();
+      });
+  }, [isBusy, refreshStatus]);
+
   return (
     <main className="app-shell">
       <section className="workspace" aria-label="Assistant controls">
@@ -188,7 +221,15 @@ export const App = () => {
         />
       </section>
 
-      <OutputTabs consoleOutput={consoleOutput} log={log} onTabChange={setOutputTab} tab={outputTab} />
+      <OutputTabs
+        consoleOutput={consoleOutput}
+        isBusy={isBusy}
+        log={log}
+        onNewSession={startNewSession}
+        onSelectLog={selectLog}
+        onTabChange={setOutputTab}
+        tab={outputTab}
+      />
     </main>
   );
 };

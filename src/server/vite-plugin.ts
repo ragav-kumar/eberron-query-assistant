@@ -47,7 +47,12 @@ const handleApiRequest = async (
   }
 
   if (request.method === "GET" && url.pathname === "/api/log") {
-    writeJson(response, 200, await app.getLog());
+    writeJson(response, 200, await app.getLog(url.searchParams.get("filePath") ?? undefined));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/log/session") {
+    writeJson(response, 200, await app.startNewSession());
     return;
   }
 

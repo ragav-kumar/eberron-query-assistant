@@ -34,12 +34,22 @@ vi.mock("../src/client/api.js", () => ({
   getLog: vi.fn(),
   getStatus: vi.fn(),
   refresh: vi.fn(),
+  startNewLogSession: vi.fn(),
   writeContext: vi.fn()
 }));
 
 const initialLog = {
+  activeFilePath: "logs/session.md" as string | null,
+  files: [
+    {
+      active: true,
+      filePath: "logs/session.md",
+      label: "session.md"
+    }
+  ],
   filePath: "logs/session.md" as string | null,
-  markdown: "# GUI Session\n\nReady."
+  markdown: "# GUI Session\n\nReady.",
+  readOnly: false
 };
 
 const initialConsole = {
@@ -93,6 +103,7 @@ beforeEach(() => {
     },
     log: initialLog
   });
+  vi.mocked(api.startNewLogSession).mockResolvedValue(emptyLog());
   vi.mocked(api.writeContext).mockResolvedValue(undefined);
 });
 
@@ -230,12 +241,102 @@ describe("App", () => {
   });
 
   it("renders an empty log state before a log exists", async () => {
-    vi.mocked(api.getLog).mockResolvedValue({ filePath: null, markdown: "" });
+    vi.mocked(api.getLog).mockResolvedValue(emptyLog());
 
     render(<App />);
 
-    expect(await screen.findByText("No log yet")).toBeTruthy();
+    expect(await screen.findByText("No log selected")).toBeTruthy();
     expect(await screen.findByText("Submit an assistant prompt to start the log.")).toBeTruthy();
+  });
+
+  it("browses historical logs as read-only selections", async () => {
+    const historicalLog = {
+      ...initialLog,
+      filePath: "logs/old.md",
+      markdown: "# Old Session\n\nPast answer.",
+      readOnly: true
+    };
+    vi.mocked(api.getLog).mockResolvedValueOnce({
+      ...initialLog,
+      files: [
+        ...(initialLog.files ?? []),
+        {
+          active: false,
+          filePath: "logs/old.md",
+          label: "old.md"
+        }
+      ]
+    });
+    vi.mocked(api.getLog).mockResolvedValueOnce(historicalLog);
+
+    render(<App />);
+
+    const select = await screen.findByLabelText("Log file");
+    fireEvent.change(select, { target: { value: "logs/old.md" } });
+
+    await waitFor(() => {
+      expect(api.getLog).toHaveBeenCalledWith("logs/old.md");
+    });
+    expect(await screen.findByText("Read only: logs/old.md")).toBeTruthy();
+    expect(await screen.findByText("Old Session")).toBeTruthy();
+    expect(await screen.findByText("Past answer.")).toBeTruthy();
+  });
+
+  it("starts a new lazy log session", async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "New session" }));
+
+    await waitFor(() => {
+      expect(api.startNewLogSession).toHaveBeenCalled();
+    });
+    expect(await screen.findByText("No log selected")).toBeTruthy();
+    expect(await screen.findByText("Submit an assistant prompt to start the log.")).toBeTruthy();
+  });
+
+  it("switches back to the active log after submitting while browsing history", async () => {
+    vi.mocked(api.getLog).mockResolvedValueOnce({
+      ...initialLog,
+      files: [
+        ...(initialLog.files ?? []),
+        {
+          active: false,
+          filePath: "logs/old.md",
+          label: "old.md"
+        }
+      ]
+    });
+    vi.mocked(api.getLog).mockResolvedValueOnce({
+      ...initialLog,
+      filePath: "logs/old.md",
+      markdown: "# Old Session",
+      readOnly: true
+    });
+    vi.mocked(api.askAssistant).mockResolvedValue({
+      ok: true,
+      console: initialConsole,
+      log: {
+        ...initialLog,
+        markdown: "# GUI Session\n\n## Assistant\n\nNew answer."
+      }
+    });
+
+    render(<App />);
+
+    const select = await screen.findByLabelText("Log file");
+    fireEvent.change(select, { target: { value: "logs/old.md" } });
+    expect(await screen.findByText("Old Session")).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText(/Ask about Eberron/i), {
+      target: { value: "Write to active session" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+
+    await waitFor(() => {
+      expect(api.askAssistant).toHaveBeenCalledWith("Write to active session");
+    });
+    expect(await screen.findByText("Current session: logs/session.md")).toBeTruthy();
+    expect(await screen.findByText("New answer.")).toBeTruthy();
   });
 
   it("renders refresh output as console feed text", async () => {
@@ -296,4 +397,12 @@ describe("App", () => {
       expect(api.refresh).not.toHaveBeenCalled();
     });
   });
+});
+
+const emptyLog = (): api.ApiLog => ({
+  activeFilePath: null,
+  files: [],
+  filePath: null,
+  markdown: "",
+  readOnly: false
 });

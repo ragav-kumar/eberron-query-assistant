@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export interface SessionLog {
@@ -18,18 +18,20 @@ export interface SessionLogCreateRequest {
   title: string;
 }
 
+export interface SessionLogFile {
+  active: boolean;
+  filePath: string;
+  label: string;
+}
+
 const FALLBACK_TITLE = "Untitled Session";
 
 export const createSessionLog = async (request: SessionLogCreateRequest): Promise<SessionLog> => {
   const startedAt = request.now ?? new Date();
   const title = sanitizeSessionTitle(request.title);
-  const filePath = path.join(request.logDir, `${formatTimestamp(startedAt)} ${title}.md`);
 
   await mkdir(request.logDir, { recursive: true });
-  await writeFile(filePath, [`# ${title}`, "", `Started: ${startedAt.toISOString()}`, ""].join("\n"), {
-    flag: "wx",
-    encoding: "utf8"
-  });
+  const filePath = await createUniqueSessionLogFile(request.logDir, startedAt, title);
 
   return {
     filePath,
@@ -48,6 +50,29 @@ export const createSessionLog = async (request: SessionLogCreateRequest): Promis
   };
 };
 
+const createUniqueSessionLogFile = async (logDir: string, startedAt: Date, title: string): Promise<string> => {
+  const timestamp = formatTimestamp(startedAt);
+  const content = [`# ${title}`, "", `Started: ${startedAt.toISOString()}`, ""].join("\n");
+
+  for (let attempt = 1; attempt <= 100; attempt += 1) {
+    const suffix = attempt === 1 ? "" : ` ${attempt}`;
+    const filePath = path.join(logDir, `${timestamp} ${title}${suffix}.md`);
+    try {
+      await writeFile(filePath, content, {
+        flag: "wx",
+        encoding: "utf8"
+      });
+      return filePath;
+    } catch (error) {
+      if (!hasNodeErrorCode(error, "EEXIST")) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error("Unable to create a unique session log filename.");
+};
+
 export const sanitizeSessionTitle = (title: string): string => {
   const sanitized = title
     .split("")
@@ -60,8 +85,57 @@ export const sanitizeSessionTitle = (title: string): string => {
   return sanitized.length > 0 ? sanitized : FALLBACK_TITLE;
 };
 
+export const listSessionLogFiles = async (
+  logDir: string,
+  activeFilePath: string | null = null
+): Promise<SessionLogFile[]> => {
+  let entries;
+  try {
+    entries = await readdir(logDir, { withFileTypes: true });
+  } catch (error) {
+    if (hasNodeErrorCode(error, "ENOENT")) {
+      return [];
+    }
+    throw error;
+  }
+
+  const activeResolved = activeFilePath ? path.resolve(activeFilePath) : null;
+  return entries
+    .filter((entry) => entry.isFile() && path.extname(entry.name).toLowerCase() === ".md")
+    .map((entry) => {
+      const filePath = path.join(logDir, entry.name);
+      return {
+        active: activeResolved !== null && path.resolve(filePath) === activeResolved,
+        filePath,
+        label: entry.name
+      };
+    })
+    .sort((left, right) => right.label.localeCompare(left.label));
+};
+
+export const readSessionLogFile = async (logDir: string, filePath: string): Promise<string> => {
+  const root = path.resolve(logDir);
+  const candidate = path.resolve(root, filePath);
+
+  if (path.dirname(candidate) !== root || path.extname(candidate).toLowerCase() !== ".md") {
+    throw new Error("Selected log file must be a Markdown file directly inside the log directory.");
+  }
+
+  return readFile(candidate, "utf8");
+};
+
 const isUnsafeFilenameCharacter = (character: string): boolean => {
   return '\\/:*?"<>|'.includes(character) || character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127;
+};
+
+const hasNodeErrorCode = (error: unknown, code: string): boolean => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string" &&
+    error.code === code
+  );
 };
 
 const formatTimestamp = (date: Date): string => {

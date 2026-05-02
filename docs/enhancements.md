@@ -35,3 +35,11 @@ The right column has a transient plain-text `Console` feed for local progress, r
 Assistant and debug-query input do not require the user to run refresh manually first. If the current browser-server session has not completed a refresh yet, the app runs a routine refresh automatically before continuing with the requested input. Input panels use unframed layouts rather than cards, and Enter submits the active input mode while Shift+Enter preserves multiline assistant prompts.
 
 Verification added or preserved for this change covers structured console API behavior, transcript separation, tab and radio rendering, autosaved additional context, output auto-scroll, tooltips, and componentized React UI behavior.
+
+## GUI Log Browser And Sessions
+
+The Log tab can browse saved Markdown transcripts from `logs/` with a dropdown. Historical transcripts are read-only display targets; Standard assistant input always writes to the current writable browser-server session, creating one lazily if no current session exists.
+
+The app initially shows an empty Log pane instead of loading an existing transcript automatically. A `New session` button clears the current writable assistant session and conversation history without creating an empty file; the next successful Standard assistant exchange creates the new transcript. Debug Query, Refresh, and Force reingest still do not create transcript files.
+
+Verification added for this change covers safe log-file listing and selection, read-only historical browsing, active-session writes while viewing history, lazy new-session behavior, and React controls for selecting logs and starting sessions.

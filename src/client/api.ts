@@ -1,6 +1,15 @@
 export interface ApiLog {
+  activeFilePath: string | null;
+  files: ApiLogFile[];
   filePath: string | null;
   markdown: string;
+  readOnly: boolean;
+}
+
+export interface ApiLogFile {
+  active: boolean;
+  filePath: string;
+  label: string;
 }
 
 export type ApiConsoleLevel = "debug" | "error" | "info" | "warn";
@@ -31,8 +40,9 @@ export const getStatus = async (): Promise<ApiStatus> => {
   return requestJson<ApiStatus>("/api/status");
 };
 
-export const getLog = async (): Promise<ApiLog> => {
-  return requestJson<ApiLog>("/api/log");
+export const getLog = async (filePath?: string): Promise<ApiLog> => {
+  const query = filePath === undefined ? "" : `?filePath=${encodeURIComponent(filePath)}`;
+  return requestJson<ApiLog>(`/api/log${query}`);
 };
 
 export const getConsole = async (): Promise<ApiConsole> => {
@@ -69,6 +79,12 @@ export const refresh = async (forceReingest: boolean): Promise<ApiOperationResul
   return requestJson<ApiOperationResult>("/api/refresh", {
     method: "POST",
     body: JSON.stringify({ forceReingest })
+  });
+};
+
+export const startNewLogSession = async (): Promise<ApiLog> => {
+  return requestJson<ApiLog>("/api/log/session", {
+    method: "POST"
   });
 };
 

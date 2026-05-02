@@ -9,7 +9,13 @@ import type { ProgressReporter } from "../progress/reporter.js";
 import { createSqliteRetrievalService, type RetrievalService } from "../retrieval/index.js";
 import { createAssistantSession, type AssistantSession } from "../runtime/assistant-session.js";
 import { runStartupRefresh } from "../runtime/refresh.js";
-import { createSessionLog, type SessionLog } from "../runtime/session-log.js";
+import {
+  createSessionLog,
+  listSessionLogFiles,
+  readSessionLogFile,
+  type SessionLog,
+  type SessionLogFile
+} from "../runtime/session-log.js";
 import { createFilesystemSourceDiscoveryService, type SourceDiscoveryService } from "../source-discovery/index.js";
 import { createFilesystemStateStore, type StateStore } from "../state/index.js";
 import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
@@ -19,9 +25,10 @@ export interface WebApp {
   debugRetrieval(query: string): Promise<WebOperationResult>;
   getConsole(): WebConsoleResponse;
   getContext(): Promise<string>;
-  getLog(): Promise<WebLogResponse>;
+  getLog(filePath?: string): Promise<WebLogResponse>;
   getStatus(): WebStatus;
   refresh(forceReingest: boolean): Promise<WebOperationResult>;
+  startNewSession(): Promise<WebLogResponse>;
   writeContext(markdown: string): Promise<void>;
 }
 
@@ -37,8 +44,11 @@ export interface WebAppDependencies {
 }
 
 export interface WebLogResponse {
+  activeFilePath: string | null;
+  files: SessionLogFile[];
   filePath: string | null;
   markdown: string;
+  readOnly: boolean;
 }
 
 export type WebConsoleLevel = "debug" | "error" | "info" | "warn";
@@ -71,6 +81,7 @@ const DEBUG_RETRIEVAL_LIMIT = 8;
 export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   const config = dependencies.config ?? loadDefaultConfig();
   let log: SessionLog | null = dependencies.log ?? null;
+  let displayedLogFilePath: string | null = log?.filePath ?? null;
   let assistant: AssistantSession | null = dependencies.assistant ?? null;
   let hasRoutineRefresh = false;
   const consoleFeed = createMemoryConsoleFeed();
@@ -80,6 +91,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       logDir: config.logDir,
       title: "GUI Session"
     });
+    displayedLogFilePath = log.filePath;
     return log;
   };
   let activeOperation: string | null = null;
@@ -100,10 +112,33 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     return assistant;
   };
 
-  const readLog = async (): Promise<WebLogResponse> => ({
-    filePath: log?.filePath ?? null,
-    markdown: log ? await readFile(log.filePath, "utf8") : ""
-  });
+  const readLog = async (selectedFilePath?: string): Promise<WebLogResponse> => {
+    if (selectedFilePath !== undefined) {
+      displayedLogFilePath = selectedFilePath.trim().length > 0 ? selectedFilePath : null;
+    }
+
+    const activeFilePath = log?.filePath ?? null;
+    const filePath = displayedLogFilePath;
+    const files = await listSessionLogFiles(config.logDir, activeFilePath);
+
+    if (!filePath) {
+      return {
+        activeFilePath,
+        files,
+        filePath: null,
+        markdown: "",
+        readOnly: false
+      };
+    }
+
+    return {
+      activeFilePath,
+      files,
+      filePath,
+      markdown: await readSessionLogFile(config.logDir, filePath),
+      readOnly: activeFilePath === null || path.resolve(filePath) !== path.resolve(activeFilePath)
+    };
+  };
 
   const runExclusive = async <T>(operation: string, task: () => Promise<T>): Promise<T> => {
     if (activeOperation !== null) {
@@ -210,6 +245,14 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           summary,
           log: await readLog()
         };
+      });
+    },
+    async startNewSession() {
+      return runExclusive("new-session", async () => {
+        log = null;
+        assistant = null;
+        displayedLogFilePath = null;
+        return readLog();
       });
     },
     async writeContext(markdown) {
