@@ -1,0 +1,85 @@
+export interface ApiLog {
+  filePath: string | null;
+  markdown: string;
+}
+
+export interface ApiStatus {
+  busy: boolean;
+  operation: string | null;
+}
+
+export interface ApiOperationResult {
+  log: ApiLog;
+  ok: true;
+}
+
+export const getStatus = async (): Promise<ApiStatus> => {
+  return requestJson<ApiStatus>("/api/status");
+};
+
+export const getLog = async (): Promise<ApiLog> => {
+  return requestJson<ApiLog>("/api/log");
+};
+
+export const getContext = async (): Promise<string> => {
+  const response = await requestJson<{ markdown: string }>("/api/context");
+  return response.markdown;
+};
+
+export const writeContext = async (markdown: string): Promise<void> => {
+  await requestJson<{ ok: true }>("/api/context", {
+    method: "PUT",
+    body: JSON.stringify({ markdown })
+  });
+};
+
+export const askAssistant = async (prompt: string): Promise<ApiOperationResult> => {
+  return requestJson<ApiOperationResult>("/api/assistant", {
+    method: "POST",
+    body: JSON.stringify({ prompt })
+  });
+};
+
+export const debugRetrieval = async (query: string): Promise<ApiOperationResult> => {
+  return requestJson<ApiOperationResult>("/api/debug-retrieval", {
+    method: "POST",
+    body: JSON.stringify({ query })
+  });
+};
+
+export const refresh = async (forceReingest: boolean): Promise<ApiOperationResult> => {
+  return requestJson<ApiOperationResult>("/api/refresh", {
+    method: "POST",
+    body: JSON.stringify({ forceReingest })
+  });
+};
+
+const requestJson = async <T>(url: string, init: RequestInit = {}): Promise<T> => {
+  const response = await fetch(url, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...init.headers
+    }
+  });
+  const body = (await response.json()) as unknown;
+
+  if (!response.ok) {
+    throw new Error(readErrorMessage(body));
+  }
+
+  return body as T;
+};
+
+const readErrorMessage = (body: unknown): string => {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "error" in body &&
+    typeof body.error === "string"
+  ) {
+    return body.error;
+  }
+
+  return "Request failed.";
+};

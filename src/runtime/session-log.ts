@@ -3,6 +3,7 @@ import path from "node:path";
 
 export interface SessionLog {
   append(exchange: SessionLogExchange): Promise<void>;
+  appendMarkdown(markdown: string): Promise<void>;
   readonly filePath: string;
 }
 
@@ -34,6 +35,12 @@ export const createSessionLog = async (request: SessionLogCreateRequest): Promis
     filePath,
     async append(exchange) {
       await writeFile(filePath, formatExchange(exchange), {
+        flag: "a",
+        encoding: "utf8"
+      });
+    },
+    async appendMarkdown(markdown) {
+      await writeFile(filePath, normalizeMarkdownAppend(markdown), {
         flag: "a",
         encoding: "utf8"
       });
@@ -81,4 +88,9 @@ const formatExchange = (exchange: SessionLogExchange): string => {
     exchange.assistantResponse.trimEnd(),
     ""
   ].join("\n");
+};
+
+const normalizeMarkdownAppend = (markdown: string): string => {
+  const trimmed = markdown.trimEnd();
+  return trimmed.length > 0 ? `${trimmed}\n\n` : "";
 };
