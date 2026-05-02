@@ -23,5 +23,11 @@ export default tseslint.config(
       "@typescript-eslint/only-throw-error": "off",
       "func-style": ["error", "expression", { "allowArrowFunctions": true }]
     }
+  },
+  {
+    files: ["src/client/**/*.{ts,tsx}", "tests/**/*.tsx"],
+    languageOptions: {
+      globals: globals.browser
+    }
   }
 );

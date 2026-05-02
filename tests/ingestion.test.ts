@@ -379,8 +379,7 @@ describe("Phase 3 ingestion", () => {
 const createService = (options: { articleFetcher?: ArticleFetcher; pdfParser?: PdfParser } = {}) => {
   const corpusStore = createSqliteCorpusStore();
   stores.push(corpusStore);
-  return createFilesystemIngestionService({
-    articleFetcher: options.articleFetcher,
+  const dependencies = {
     corpusStore,
     now: () => NOW,
     pdfParser: options.pdfParser ?? {
@@ -395,7 +394,11 @@ const createService = (options: { articleFetcher?: ArticleFetcher; pdfParser?: P
     reporter: {
       info: () => undefined,
       warn: () => undefined
-    }
+    },
+    ...(options.articleFetcher ? { articleFetcher: options.articleFetcher } : {})
+  };
+  return createFilesystemIngestionService({
+    ...dependencies
   });
 };
 
@@ -421,7 +424,8 @@ const scheduledDiscovery = (state: RuntimeState, scheduled: Array<"foundry" | "p
         removed: 0,
         failed: 0,
         status: scheduled.includes("foundry") ? "scheduled" : "skipped",
-        message: "foundry"
+        message: "foundry",
+        details: []
       },
       {
         sourceType: "pdf",
@@ -442,7 +446,8 @@ const scheduledDiscovery = (state: RuntimeState, scheduled: Array<"foundry" | "p
         removed: 0,
         failed: 0,
         status: scheduled.includes("article") ? "scheduled" : "skipped",
-        message: "article"
+        message: "article",
+        details: []
       }
     ]
   };

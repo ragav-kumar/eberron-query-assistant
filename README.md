@@ -1,24 +1,24 @@
 # Eberron Query Assistant
 
-Eberron Query Assistant is a terminal-based lore and campaign assistant for an Eberron game corpus. It combines three source types into one queryable knowledge base:
+Eberron Query Assistant is a local browser-based lore and campaign assistant for an Eberron game corpus. It combines three source types into one queryable knowledge base:
 
 - Foundry VTT export data from `foundry-export/`
 - local PDFs from `pdf/`
 - Keith Baker articles discovered from the Eberron index
 
-Assistant instructions are stored in tracked Markdown files under `assistant/`. Local campaign notes or other assistant-only guidance that does not belong in the source corpus can be written to `assistant/additional-context.md`. That file is gitignored, is created as an empty file on startup when missing, and is included in every assistant prompt only when it contains text.
+Assistant instructions are stored in tracked Markdown files under `assistant/`. Local campaign notes or other assistant-only guidance that does not belong in the source corpus can be edited in the app through a WYSIWYG Markdown editor backed by `assistant/additional-context.md`. That file is gitignored, is created as an empty file when missing, and is included in every assistant prompt only when it contains text.
 
-On startup, the application refreshes its retrieval layer before opening chat. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine launches stay fast, and a full-refresh script is available when a full rebuild is needed.
+The application provides controls to refresh its retrieval layer before or during use. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine refreshes stay fast, and a force-reingest control is available when a full rebuild is needed.
 
-Startup output reports what was checked, skipped, refreshed, rebuilt, or degraded. If one source fails while another source remains usable, the app can enter chat in degraded mode and names the affected source type. If no retrieval corpus is available, startup fails before chat opens.
+The active session log reports what was checked, skipped, refreshed, rebuilt, or degraded. If one source fails while another source remains usable, the app can continue in degraded mode and names the affected source type. If no retrieval corpus is available, refresh fails clearly.
 
 By default, local runtime state and retrieval artifacts are stored under `.eberron-query-assistant/` in the repository.
-Runtime state records the application version for diagnostics only. Routine startup preserves existing local state and retrieval artifacts across version changes; the app only intentionally clears or force-rebuilds its corpus when you run `npm run reingest` or pass `--force-reingest`.
-Interactive sessions with at least one successful assistant response are archived as local Markdown transcripts under `logs/`, which is gitignored. These transcripts are for review only and are not loaded as future assistant memory.
+Runtime state records the application version for diagnostics only. Routine refresh preserves existing local state and retrieval artifacts across version changes; the app only intentionally clears or force-rebuilds its corpus when you use the force-reingest control.
+Each app session writes to an active local Markdown transcript under `logs/`, which is gitignored. The right column of the app renders that active log as the current output surface. These transcripts are not loaded as future assistant memory.
 
 Detailed engineering and phased-delivery documentation lives in `docs/specification.md`, historical phase documents, and active `docs/phase-*-enhancements.md` files. This README remains focused on the intended finished user experience.
 
-After startup completes, the app opens an interactive terminal session. You can ask direct lore questions, cross-reference campaign data, or ask inference-heavy questions that require combining material across sources. Answers are designed to include a direct response and supporting references when available, such as PDF page citations, article links, or specific foundry entities.
+The app opens a local browser UI. You can ask direct lore questions, cross-reference campaign data, run debug retrieval queries, refresh the corpus, or ask inference-heavy questions that require combining material across sources. Answers are designed to include a direct response and supporting references when available, such as PDF page citations, article links, or specific foundry entities.
 
 ## What It Is For
 - answering Eberron setting and lore questions from your local corpus
@@ -38,26 +38,14 @@ Keith Baker articles are discovered from the Eberron index and cached into the l
 Article pages that return HTTP 403 or 404 are recorded as permanently inaccessible and skipped on later runs.
 
 ## Usage
-Install dependencies and run the default CLI entrypoint:
+Install dependencies and run the local GUI:
 
 ```bash
 npm install
 npm run start
 ```
 
-Run an explicit full rebuild when you want to discard and regenerate app-owned corpus and retrieval artifacts:
-
-```bash
-npm run reingest
-```
-
-Inspect retrieval results for a query without entering chat:
-
-```bash
-npm run debug:retrieval -- "aerenal deathless"
-```
-
-The intended workflow is to run the project from this repository: start the application, let it refresh the corpus incrementally, then interact with the assistant in the terminal. Use `npm run reingest` when you need an explicit full rebuild.
+Open the Vite URL printed by the command. Use the in-app refresh control for routine source checks, the force-reingest control when you need an explicit full rebuild, the assistant textarea for normal prompts, and the debug retrieval input to inspect retrieved chunks for a query.
 
 ## Example Questions
 - What are the names of the clans of the Znir?
