@@ -17,6 +17,7 @@ import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../ty
 export interface WebApp {
   askAssistant(prompt: string): Promise<WebOperationResult>;
   debugRetrieval(query: string): Promise<WebOperationResult>;
+  getConsole(): WebConsoleResponse;
   getContext(): Promise<string>;
   getLog(): Promise<WebLogResponse>;
   getStatus(): WebStatus;
@@ -40,7 +41,21 @@ export interface WebLogResponse {
   markdown: string;
 }
 
+export type WebConsoleLevel = "debug" | "error" | "info" | "warn";
+
+export interface WebConsoleEntry {
+  id: string;
+  level: WebConsoleLevel;
+  message: string;
+  timestamp: string;
+}
+
+export interface WebConsoleResponse {
+  entries: WebConsoleEntry[];
+}
+
 export interface WebOperationResult {
+  console: WebConsoleResponse;
   log: WebLogResponse;
   ok: true;
   summary?: StartupRefreshSummary;
@@ -57,6 +72,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   const config = dependencies.config ?? loadDefaultConfig();
   let log: SessionLog | null = dependencies.log ?? null;
   let assistant: AssistantSession | null = dependencies.assistant ?? null;
+  const consoleFeed = createMemoryConsoleFeed();
 
   const ensureLog = async (): Promise<SessionLog> => {
     log ??= await createSessionLog({
@@ -66,7 +82,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     return log;
   };
   let activeOperation: string | null = null;
-  const defaultReporter = createQueuedLogProgressReporter(ensureLog);
+  const defaultReporter = createQueuedConsoleProgressReporter(consoleFeed);
   const retrieval =
     dependencies.retrieval ??
     createSqliteRetrievalService({
@@ -107,11 +123,12 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
         try {
           await (await ensureAssistant()).ask(prompt);
         } catch (error) {
-          await (await ensureLog()).appendMarkdown(`## Error\n\nAssistant response failed: ${formatThrownValue(error)}`);
+          consoleFeed.error(`Assistant response failed: ${formatThrownValue(error)}`);
           throw error;
         }
         return {
           ok: true,
+          console: consoleFeed.read(),
           log: await readLog()
         };
       });
@@ -127,12 +144,16 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           query: normalizedQuery,
           limit: DEBUG_RETRIEVAL_LIMIT
         });
-        await (await ensureLog()).appendMarkdown(formatDebugRetrievalMarkdown(normalizedQuery, results));
+        appendDebugRetrievalConsoleEntries(consoleFeed, normalizedQuery, results);
         return {
           ok: true,
+          console: consoleFeed.read(),
           log: await readLog()
         };
       });
+    },
+    getConsole() {
+      return consoleFeed.read();
     },
     async getContext() {
       await ensureAdditionalContextFile(config);
@@ -147,7 +168,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     },
     async refresh(forceReingest) {
       return runExclusive(forceReingest ? "force-reingest" : "refresh", async () => {
-        const reporter = createQueuedLogProgressReporter(ensureLog);
+        const reporter = createQueuedConsoleProgressReporter(consoleFeed);
         const options: RuntimeOptions = {
           forceReingest,
           retrievalQuery: null
@@ -165,9 +186,10 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           stateStore: dependencies.stateStore ?? createFilesystemStateStore()
         });
         await reporter.flush();
-        await (await ensureLog()).appendMarkdown(formatRefreshSummaryMarkdown(summary));
+        consoleFeed.info(formatRefreshSummaryMessage(summary));
         return {
           ok: true,
+          console: consoleFeed.read(),
           summary,
           log: await readLog()
         };
@@ -216,15 +238,58 @@ const ensureAdditionalContextFile = async (config: RuntimeConfig): Promise<void>
   }
 };
 
-interface QueuedLogProgressReporter extends ProgressReporter {
+interface QueuedConsoleProgressReporter extends ProgressReporter {
   flush(): Promise<void>;
 }
 
-const createQueuedLogProgressReporter = (ensureLog: () => Promise<SessionLog>): QueuedLogProgressReporter => {
+interface MemoryConsoleFeed {
+  debug(message: string): void;
+  error(message: string): void;
+  info(message: string): void;
+  read(): WebConsoleResponse;
+  warn(message: string): void;
+}
+
+const createMemoryConsoleFeed = (): MemoryConsoleFeed => {
+  const entries: WebConsoleEntry[] = [];
+  let nextId = 1;
+
+  const append = (level: WebConsoleLevel, message: string): void => {
+    entries.push({
+      id: String(nextId),
+      level,
+      message,
+      timestamp: new Date().toISOString()
+    });
+    nextId += 1;
+  };
+
+  return {
+    debug(message) {
+      append("debug", message);
+    },
+    error(message) {
+      append("error", message);
+    },
+    info(message) {
+      append("info", message);
+    },
+    read() {
+      return {
+        entries: entries.map((entry) => ({ ...entry }))
+      };
+    },
+    warn(message) {
+      append("warn", message);
+    }
+  };
+};
+
+const createQueuedConsoleProgressReporter = (consoleFeed: MemoryConsoleFeed): QueuedConsoleProgressReporter => {
   let queue = Promise.resolve();
-  const append = (label: string, message: string): void => {
-    queue = queue.then(async () => {
-      await (await ensureLog()).appendMarkdown(`## ${label}\n\n${message}`);
+  const append = (level: WebConsoleLevel, message: string): void => {
+    queue = queue.then(() => {
+      consoleFeed[level](message);
     });
   };
 
@@ -233,43 +298,40 @@ const createQueuedLogProgressReporter = (ensureLog: () => Promise<SessionLog>): 
       await queue;
     },
     info(message) {
-      append("Progress", message);
+      append("info", message);
     },
     progress(message) {
-      append("Progress", message);
+      append("info", message);
     },
     warn(message) {
-      append("Warning", message);
+      append("warn", message);
     }
   };
 };
 
-const formatDebugRetrievalMarkdown = (
+const appendDebugRetrievalConsoleEntries = (
+  consoleFeed: MemoryConsoleFeed,
   query: string,
   results: Awaited<ReturnType<RetrievalService["search"]>>
-): string => {
-  const lines = [`## Debug Retrieval`, "", `Query: ${query}`, "", `Results: ${results.length}`];
+): void => {
+  consoleFeed.debug(`Debug retrieval query: ${query}`);
+  consoleFeed.debug(`Debug retrieval results: ${results.length}`);
 
   for (const [index, result] of results.entries()) {
     const locator = result.citation.locator ? ` ${result.citation.locator}` : "";
     const url = result.citation.url ? ` ${result.citation.url}` : "";
-    lines.push(
-      "",
-      `${index + 1}. [${result.matchKind} ${result.score.toFixed(3)}] ${result.sourceType}:${result.sourceTitle}${locator}${url} chunk=${result.chunkId}`,
-      "",
-      result.content
+    consoleFeed.debug(
+      `${index + 1}. [${result.matchKind} ${result.score.toFixed(3)}] ${result.sourceType}:${result.sourceTitle}${locator}${url} chunk=${result.chunkId}\n${result.content}`
     );
   }
-
-  return lines.join("\n");
 };
 
-const formatRefreshSummaryMarkdown = (summary: StartupRefreshSummary): string => {
+const formatRefreshSummaryMessage = (summary: StartupRefreshSummary): string => {
   const retrieval = summary.retrieval
     ? ` Retrieval chunks=${summary.retrieval.chunkCount}, reused=${summary.retrieval.reusedEmbeddings}, regenerated=${summary.retrieval.regeneratedEmbeddings}.`
     : "";
   const degraded = summary.degraded ? ` Degraded sources: ${summary.degradedSources.join(", ")}.` : "";
-  return `## Refresh Complete\n\nForce reingest: ${String(summary.forceReingest)}.${retrieval}${degraded}`;
+  return `Refresh complete. Force reingest: ${String(summary.forceReingest)}.${retrieval}${degraded}`;
 };
 
 export const toPublicPath = (filePath: string): string => {

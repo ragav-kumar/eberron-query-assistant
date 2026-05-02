@@ -8,7 +8,7 @@ describe("app version", () => {
     expect(getAppVersion()).toBe(packageJson.version);
   });
 
-  it("matches the Phase 9 application version", () => {
-    expect(getAppVersion()).toBe("0.9.0");
+  it("matches the Phase 10 application version", () => {
+    expect(getAppVersion()).toBe("0.10.0");
   });
 });

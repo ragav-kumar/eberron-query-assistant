@@ -3,12 +3,26 @@ export interface ApiLog {
   markdown: string;
 }
 
+export type ApiConsoleLevel = "debug" | "error" | "info" | "warn";
+
+export interface ApiConsoleEntry {
+  id: string;
+  level: ApiConsoleLevel;
+  message: string;
+  timestamp: string;
+}
+
+export interface ApiConsole {
+  entries: ApiConsoleEntry[];
+}
+
 export interface ApiStatus {
   busy: boolean;
   operation: string | null;
 }
 
 export interface ApiOperationResult {
+  console: ApiConsole;
   log: ApiLog;
   ok: true;
 }
@@ -19,6 +33,10 @@ export const getStatus = async (): Promise<ApiStatus> => {
 
 export const getLog = async (): Promise<ApiLog> => {
   return requestJson<ApiLog>("/api/log");
+};
+
+export const getConsole = async (): Promise<ApiConsole> => {
+  return requestJson<ApiConsole>("/api/console");
 };
 
 export const getContext = async (): Promise<string> => {

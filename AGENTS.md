@@ -21,7 +21,7 @@ Create and maintain the governing documentation set in this order:
    - `docs/phase-05-interactive-assistant.md`
    - `docs/phase-05.5-vector-storage-migration.md`
    - `docs/phase-06-hardening-and-alignment.md`
-3. new enhancement documentation
+3. `docs/enhancements.md`
 4. `README.md`
 
 If one document changes the durable rules for another, update the upstream governing document as part of the same work.
@@ -43,11 +43,10 @@ Each document has a distinct audience and purpose.
 
 ### New Enhancement Documentation
 - Any further changes after Phase 6 are enhancements on top of the historical baseline.
-- New planning or specification work must live in new enhancement documentation instead of editing `docs/specification.md` or phase documents through Phase 6.
-- Minor enhancements must be recorded in `docs/phase-X-enhancements.md`, where `X` is the current minor-version phase number.
-- Each `docs/phase-X-enhancements.md` file must include a table of contents and list minor enhancements in chronological order.
-- Create standalone `docs/phase-X-*.md` files only for large changes that need their own implementation plan.
-- Enhancement documents must define their goal, scope, tests, end state, and human verification where applicable.
+- Record post-Phase 6 intended behavior only in `docs/enhancements.md` instead of editing `docs/specification.md` or phase documents through Phase 6.
+- Do not create additional enhancement, planning, or specification documents unless the user explicitly asks for them.
+- `docs/enhancements.md` is a high-level change log for intentional deviations from the historical baseline, so future sessions can tell that those changes are deliberate.
+- Keep entries concise. Record the behavior change, the reason it exists when useful, and any verification note needed to understand that the divergence is intentional.
 
 ### `README.md`
 - Human-facing project overview and usage guide.
@@ -70,19 +69,15 @@ The following documents are frozen historical records:
 Do not modify these frozen historical documents again.
 
 New enhancement documentation must:
-- Define the phase goal.
-- Define the scope of work for the phase.
-- Identify out-of-scope work where needed to prevent ambiguity.
-- State the expected project state at the end of the phase.
-- Include required automated tests.
-- Include concrete human verification steps.
-- Record assumptions or prerequisites that materially affect implementation.
-- For minor enhancements, place the entry in the current `docs/phase-X-enhancements.md` document, update its table of contents, and preserve chronological order.
+- Live only in `docs/enhancements.md`.
+- Stay high-level and chronological.
+- Identify intentional behavior changes on top of the Phase 6 historical baseline.
+- Include verification notes only when they materially help a future session understand that the change was deliberate.
 
-Enhancement documents describe changes on top of the historical baseline. They must not silently rewrite the Phase 6 baseline; they should identify intentional deviations as enhancements.
+`docs/enhancements.md` describes changes on top of the historical baseline. It must not silently rewrite the Phase 6 baseline; it should identify intentional deviations as enhancements. Do not create phase-specific enhancement documents.
 
 ## Implementation Guardrails
-Use the historical baseline documents as context for the Phase 6 product state. For enhancement work, document new intended behavior in new enhancement documentation rather than editing the frozen specification or frozen phase documents.
+Use the historical baseline documents as context for the Phase 6 product state. For enhancement work, document new intended behavior in `docs/enhancements.md` rather than editing the frozen specification or frozen phase documents.
 
 Each implementation phase increments the application minor version to match the phase number. Phase 1 is `0.1.0`, Phase 2 is `0.2.0`, Phase 3 is `0.3.0`, and later phases continue that pattern. Patch revisions may be used for migration or hardening work inside a phase. The stored `appVersion` is diagnostic metadata only and must not drive compatibility decisions. Startup should validate and normalize persisted state by shape, preserving usable source and retrieval state across version bumps. The only application behavior that may intentionally discard, clear, or force-rebuild app-owned corpus or retrieval artifacts is explicit force re-ingest through `--force-reingest` or `npm run reingest`.
 

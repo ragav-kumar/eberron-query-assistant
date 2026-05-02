@@ -10,15 +10,15 @@ Assistant instructions are stored in tracked Markdown files under `assistant/`. 
 
 The application provides controls to refresh its retrieval layer before or during use. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine refreshes stay fast, and a force-reingest control is available when a full rebuild is needed.
 
-The active session log reports what was checked, skipped, refreshed, rebuilt, or degraded. If one source fails while another source remains usable, the app can continue in degraded mode and names the affected source type. If no retrieval corpus is available, refresh fails clearly.
+The local Console output reports what was checked, skipped, refreshed, rebuilt, or degraded. If one source fails while another source remains usable, the app can continue in degraded mode and names the affected source type. If no retrieval corpus is available, refresh fails clearly. Console output is a transient local feed and is not saved to transcript logs.
 
 By default, local runtime state and retrieval artifacts are stored under `.eberron-query-assistant/` in the repository.
 Runtime state records the application version for diagnostics only. Routine refresh preserves existing local state and retrieval artifacts across version changes; the app only intentionally clears or force-rebuilds its corpus when you use the force-reingest control.
-Each app session writes to an active local Markdown transcript under `logs/`, which is gitignored. The right column of the app renders that active log as the current output surface. These transcripts are not loaded as future assistant memory.
+Each app session writes assistant exchanges to an active local Markdown transcript under `logs/`, which is gitignored. The right column of the app separates transient Console output from the persisted Markdown Log tab, and both output panes auto-scroll as new content arrives. These transcripts are not loaded as future assistant memory.
 
-Detailed engineering and phased-delivery documentation lives in `docs/specification.md`, historical phase documents, and active `docs/phase-*-enhancements.md` files. This README remains focused on the intended finished user experience.
+Detailed engineering and historical phased-delivery documentation lives in `docs/specification.md`, historical phase documents, and `docs/enhancements.md`. This README remains focused on the intended finished user experience.
 
-The app opens a local browser UI. You can ask direct lore questions, cross-reference campaign data, run debug retrieval queries, refresh the corpus, or ask inference-heavy questions that require combining material across sources. Answers are designed to include a direct response and supporting references when available, such as PDF page citations, article links, or specific foundry entities.
+The app opens a local browser UI. The left column contains input tabs for assistant/query workflows and editable additional context. In the Input tab, choose Standard assistant mode, Debug Query mode, or the stubbed Name Generator mode. You can ask direct lore questions, cross-reference campaign data, run debug retrieval queries, refresh the corpus, or ask inference-heavy questions that require combining material across sources. Answers are designed to include a direct response and supporting references when available, such as PDF page citations, article links, or specific foundry entities.
 
 ## What It Is For
 - answering Eberron setting and lore questions from your local corpus
@@ -45,7 +45,7 @@ npm install
 npm run start
 ```
 
-Open the Vite URL printed by the command. Use the in-app refresh control for routine source checks, the force-reingest control when you need an explicit full rebuild, the assistant textarea for normal prompts, and the debug retrieval input to inspect retrieved chunks for a query.
+Open the Vite URL printed by the command. Use the in-app refresh control for routine source checks, the force-reingest control when you need an explicit full rebuild, the Input tab for Standard assistant prompts or Debug Query retrieval inspection, and the Additional Context tab for local assistant-only notes. Use the Console tab for unsaved local operational output and the Log tab for saved assistant transcript output.
 
 ## Example Questions
 - What are the names of the clans of the Znir?

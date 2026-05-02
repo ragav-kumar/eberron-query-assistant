@@ -51,6 +51,11 @@ const handleApiRequest = async (
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/console") {
+    writeJson(response, 200, app.getConsole());
+    return;
+  }
+
   if (request.method === "GET" && url.pathname === "/api/context") {
     writeJson(response, 200, { markdown: await app.getContext() });
     return;

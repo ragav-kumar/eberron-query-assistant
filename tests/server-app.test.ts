@@ -59,21 +59,28 @@ describe("web app API model", () => {
     expect(response.log.markdown).not.toContain("<session-title>");
   });
 
-  it("logs debug retrieval results", async () => {
+  it("writes debug retrieval results to console without creating a transcript", async () => {
+    const config = await writeConfig("debug");
     const app = createWebApp({
-      config: await writeConfig("debug"),
+      config,
       retrieval: mockRetrieval([result()]).retrieval,
       chat: { complete: vi.fn().mockResolvedValue("answer") }
     });
 
     const response = await app.debugRetrieval("aerenal deathless");
 
-    expect(response.log.markdown).toContain("## Debug Retrieval");
-    expect(response.log.markdown).toContain("Query: aerenal deathless");
-    expect(response.log.markdown).toContain("[hybrid 0.900] pdf:Eberron Rising page 4");
+    expect(response.log).toEqual({ filePath: null, markdown: "" });
+    expect(response.console.entries.map((entry) => entry.message).join("\n")).toContain(
+      "Debug retrieval query: aerenal deathless"
+    );
+    expect(response.console.entries.map((entry) => entry.message).join("\n")).toContain(
+      "[hybrid 0.900] pdf:Eberron Rising page 4"
+    );
+    await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
-  it("runs refresh and force reingest with the requested runtime option", async () => {
+  it("runs refresh and force reingest with the requested runtime option and console output", async () => {
+    const config = await writeConfig("refresh");
     const state = createDefaultRuntimeState();
     const nextState = createDefaultRuntimeState();
     const inspectSources = vi.fn().mockResolvedValue({
@@ -91,7 +98,7 @@ describe("web app API model", () => {
     });
     const refresh = vi.fn().mockResolvedValue({ chunkCount: 1, reusedEmbeddings: 0, regeneratedEmbeddings: 1 });
     const app = createWebApp({
-      config: await writeConfig("refresh"),
+      config,
       discovery: { inspectSources },
       ingestion: { ingest },
       retrieval: {
@@ -105,13 +112,35 @@ describe("web app API model", () => {
       chat: { complete: vi.fn().mockResolvedValue("answer") }
     });
 
-    await app.refresh(false);
-    await app.refresh(true);
+    const firstResponse = await app.refresh(false);
+    const secondResponse = await app.refresh(true);
 
     expect(inspectSources.mock.calls[0]?.[1]).toMatchObject({ forceReingest: false });
     expect(inspectSources.mock.calls[1]?.[1]).toMatchObject({ forceReingest: true });
     expect(refresh.mock.calls[0]?.[1]).toEqual({ forceRebuild: false });
     expect(refresh.mock.calls[1]?.[1]).toEqual({ forceRebuild: true });
+    expect(firstResponse.log).toEqual({ filePath: null, markdown: "" });
+    expect(secondResponse.console.entries.map((entry) => entry.message).join("\n")).toContain("Refresh complete.");
+    await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("writes assistant failures to console instead of transcript logs", async () => {
+    const config = await writeConfig("assistant-error");
+    const app = createWebApp({
+      config,
+      assistant: {
+        ask: vi.fn().mockRejectedValue(new Error("provider failed"))
+      },
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+
+    await expect(app.askAssistant("Will this fail?")).rejects.toThrow("provider failed");
+
+    expect(app.getConsole().entries.map((entry) => `${entry.level}:${entry.message}`).join("\n")).toContain(
+      "error:Assistant response failed: provider failed"
+    );
+    await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("rejects overlapping operations with a busy error", async () => {
