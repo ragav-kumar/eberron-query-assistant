@@ -46,6 +46,7 @@ describe("web app API model", () => {
   it("logs assistant exchanges through the active log", async () => {
     const app = createWebApp({
       config: await writeConfig("assistant"),
+      ...mockRefreshDependencies(),
       retrieval: mockRetrieval([result()]).retrieval,
       chat: {
         complete: vi.fn().mockResolvedValue("<session-title>Aerenal</session-title>\n<answer>\nAerenal answer.\n</answer>")
@@ -61,9 +62,11 @@ describe("web app API model", () => {
 
   it("writes debug retrieval results to console without creating a transcript", async () => {
     const config = await writeConfig("debug");
+    const retrievalFixture = mockRetrieval([result()]);
     const app = createWebApp({
       config,
-      retrieval: mockRetrieval([result()]).retrieval,
+      ...mockRefreshDependencies(),
+      retrieval: retrievalFixture.retrieval,
       chat: { complete: vi.fn().mockResolvedValue("answer") }
     });
 
@@ -76,6 +79,7 @@ describe("web app API model", () => {
     expect(response.console.entries.map((entry) => entry.message).join("\n")).toContain(
       "[hybrid 0.900] pdf:Eberron Rising page 4"
     );
+    expect(retrievalFixture.retrieval.refresh).toHaveBeenCalledWith(config, { forceRebuild: false });
     await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
@@ -128,6 +132,7 @@ describe("web app API model", () => {
     const config = await writeConfig("assistant-error");
     const app = createWebApp({
       config,
+      ...mockRefreshDependencies(),
       assistant: {
         ask: vi.fn().mockRejectedValue(new Error("provider failed"))
       },
@@ -147,6 +152,7 @@ describe("web app API model", () => {
     let resolveAsk: (() => void) | undefined;
     const app = createWebApp({
       config: await writeConfig("busy"),
+      ...mockRefreshDependencies(),
       assistant: {
         ask: vi.fn(
           () =>
@@ -161,6 +167,9 @@ describe("web app API model", () => {
 
     const pending = app.askAssistant("Slow question");
     await expect(app.debugRetrieval("blocked")).rejects.toSatisfy(isBusyError);
+    await vi.waitFor(() => {
+      expect(resolveAsk).toBeDefined();
+    });
     if (!resolveAsk) {
       throw new Error("Assistant promise was not started.");
     }
@@ -168,6 +177,34 @@ describe("web app API model", () => {
     await pending;
   });
 });
+
+const mockRefreshDependencies = () => {
+  const state = createDefaultRuntimeState();
+  const nextState = createDefaultRuntimeState();
+  return {
+    discovery: {
+      inspectSources: vi.fn().mockResolvedValue({
+        degraded: false,
+        inventories: [],
+        nextState
+      })
+    },
+    ingestion: {
+      ingest: vi.fn().mockResolvedValue({
+        nextState,
+        summary: {
+          corpusSourceCount: 1,
+          degraded: false,
+          sourceSummaries: []
+        }
+      })
+    },
+    stateStore: {
+      load: vi.fn().mockResolvedValue({ state }),
+      save: vi.fn().mockResolvedValue(undefined)
+    }
+  };
+};
 
 const writeConfig = async (name: string): Promise<RuntimeConfig> => {
   const config = loadDefaultConfig(path.join(TEST_ROOT, name));

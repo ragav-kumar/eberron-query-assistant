@@ -1,3 +1,5 @@
+import type { FormEvent, KeyboardEvent } from "react";
+
 interface AssistantPromptPanelProps {
   disabled: boolean;
   onPromptChange: (prompt: string) => void;
@@ -6,23 +8,33 @@ interface AssistantPromptPanelProps {
 }
 
 /** Renders the standard assistant prompt form. */
-export const AssistantPromptPanel = ({ disabled, onPromptChange, onSubmit, prompt }: AssistantPromptPanelProps) => (
-  <section className="panel" aria-labelledby="assistant-heading">
-    <h2 id="assistant-heading">Assistant</h2>
-    <textarea
-      value={prompt}
-      onChange={(event) => onPromptChange(event.currentTarget.value)}
-      placeholder="Ask about Eberron lore, campaign notes, PDFs, or articles."
-      disabled={disabled}
-      title="Ask a grounded assistant question using the configured corpus and additional context."
-    />
-    <button
-      type="button"
-      onClick={onSubmit}
-      disabled={disabled || prompt.trim().length === 0}
-      title="Submit this prompt to the assistant."
-    >
-      Ask
-    </button>
-  </section>
-);
+export const AssistantPromptPanel = ({ disabled, onPromptChange, onSubmit, prompt }: AssistantPromptPanelProps) => {
+  const submitPrompt = (event: FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    onSubmit();
+  };
+
+  const submitOnEnter = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      onSubmit();
+    }
+  };
+
+  return (
+    <form className="panel" aria-labelledby="assistant-heading" onSubmit={submitPrompt}>
+      <h2 id="assistant-heading">Assistant</h2>
+      <textarea
+        value={prompt}
+        onChange={(event) => onPromptChange(event.currentTarget.value)}
+        onKeyDown={submitOnEnter}
+        placeholder="Ask about Eberron lore, campaign notes, PDFs, or articles."
+        disabled={disabled}
+        title="Ask a grounded assistant question using the configured corpus and additional context."
+      />
+      <button type="submit" disabled={disabled || prompt.trim().length === 0} title="Submit this prompt to the assistant.">
+        Ask
+      </button>
+    </form>
+  );
+};

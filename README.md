@@ -8,7 +8,7 @@ Eberron Query Assistant is a local browser-based lore and campaign assistant for
 
 Assistant instructions are stored in tracked Markdown files under `assistant/`. Local campaign notes or other assistant-only guidance that does not belong in the source corpus can be edited in the app through a WYSIWYG Markdown editor backed by `assistant/additional-context.md`. That file is gitignored, is created as an empty file when missing, and is included in every assistant prompt only when it contains text.
 
-The application provides controls to refresh its retrieval layer before or during use. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine refreshes stay fast, and a force-reingest control is available when a full rebuild is needed.
+The application refreshes its retrieval layer automatically before the first assistant or debug query in a browser-server session when needed. It also provides controls to refresh during use. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine refreshes stay fast, and a force-reingest control is available when a full rebuild is needed.
 
 The local Console output reports what was checked, skipped, refreshed, rebuilt, or degraded. If one source fails while another source remains usable, the app can continue in degraded mode and names the affected source type. If no retrieval corpus is available, refresh fails clearly. Console output is a transient local feed and is not saved to transcript logs.
 
@@ -45,7 +45,7 @@ npm install
 npm run start
 ```
 
-Open the Vite URL printed by the command. Use the in-app refresh control for routine source checks, the force-reingest control when you need an explicit full rebuild, the Input tab for Standard assistant prompts or Debug Query retrieval inspection, and the Additional Context tab for local assistant-only notes. Use the Console tab for unsaved local operational output and the Log tab for saved assistant transcript output.
+Open the Vite URL printed by the command. Use the in-app refresh control for optional routine source checks, the force-reingest control when you need an explicit full rebuild, the Input tab for Standard assistant prompts or Debug Query retrieval inspection, and the Additional Context tab for local assistant-only notes. Press Enter to submit the active input; use Shift+Enter for new lines in the assistant prompt. Use the Console tab for unsaved local operational output and the Log tab for saved assistant transcript output.
 
 ## Example Questions
 - What are the names of the clans of the Znir?

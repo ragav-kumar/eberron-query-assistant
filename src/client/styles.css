@@ -173,14 +173,12 @@ p {
 }
 
 .mode-selector {
-  background: #ffffff;
-  border: 1px solid #d8dee4;
-  border-radius: 8px;
+  border: 0;
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
   margin: 0;
-  padding: 0.8rem 1rem 1rem;
+  padding: 0.25rem 0 0.5rem;
 }
 
 .mode-selector legend {
@@ -201,13 +199,13 @@ p {
 }
 
 .panel {
-  background: #ffffff;
-  border: 1px solid #d8dee4;
-  border-radius: 8px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
-  padding: 1rem;
+  padding: 0;
 }
 
 .panel h2,
@@ -232,17 +230,20 @@ p {
 }
 
 .mdxeditor {
+  background: #ffffff;
   border: 1px solid #d8dee4;
   border-radius: 6px;
   min-height: 17rem;
 }
 
 .context-editor {
+  background: #ffffff;
   min-height: 13rem;
 }
 
 .context-loading {
   align-items: center;
+  background: #ffffff;
   border: 1px solid #d8dee4;
   border-radius: 6px;
   color: #52616f;

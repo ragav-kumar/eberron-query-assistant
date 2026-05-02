@@ -143,6 +143,20 @@ describe("App", () => {
     expect(await screen.findByText("Answer")).toBeTruthy();
   });
 
+  it("submits assistant prompts with Enter", async () => {
+    render(<App />);
+
+    const prompt = screen.getByPlaceholderText(/Ask about Eberron/i);
+    fireEvent.change(prompt, {
+      target: { value: "What about Sharn?" }
+    });
+    fireEvent.keyDown(prompt, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Sharn?");
+    });
+  });
+
   it("submits debug retrieval queries", async () => {
     render(<App />);
 
@@ -157,6 +171,21 @@ describe("App", () => {
     });
     expect(await screen.findByText("Debug retrieval query: deathless")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Console" }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("submits debug retrieval queries with Enter", async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("radio", { name: "Debug Query" }));
+    const query = screen.getByPlaceholderText("aerenal deathless");
+    fireEvent.change(query, {
+      target: { value: "sharn" }
+    });
+    fireEvent.keyDown(query, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(api.debugRetrieval).toHaveBeenCalledWith("sharn");
+    });
   });
 
   it("persists additional context edits", async () => {

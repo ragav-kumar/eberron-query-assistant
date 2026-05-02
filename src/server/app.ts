@@ -72,6 +72,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   const config = dependencies.config ?? loadDefaultConfig();
   let log: SessionLog | null = dependencies.log ?? null;
   let assistant: AssistantSession | null = dependencies.assistant ?? null;
+  let hasRoutineRefresh = false;
   const consoleFeed = createMemoryConsoleFeed();
 
   const ensureLog = async (): Promise<SessionLog> => {
@@ -117,10 +118,43 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     }
   };
 
+  const runRefreshTask = async (forceReingest: boolean): Promise<StartupRefreshSummary> => {
+    const reporter = createQueuedConsoleProgressReporter(consoleFeed);
+    const options: RuntimeOptions = {
+      forceReingest,
+      retrievalQuery: null
+    };
+    const summary = await runStartupRefresh(config, options, {
+      discovery: dependencies.discovery ?? createFilesystemSourceDiscoveryService(),
+      ingestion:
+        dependencies.ingestion ??
+        createFilesystemIngestionService({
+          corpusStore: createSqliteCorpusStore(),
+          reporter
+        }),
+      reporter,
+      retrieval,
+      stateStore: dependencies.stateStore ?? createFilesystemStateStore()
+    });
+    await reporter.flush();
+    hasRoutineRefresh = true;
+    consoleFeed.info(formatRefreshSummaryMessage(summary));
+    return summary;
+  };
+
+  const ensureRoutineRefresh = async (): Promise<void> => {
+    if (hasRoutineRefresh) {
+      return;
+    }
+    consoleFeed.info("No completed refresh found for this server session; running routine refresh before continuing.");
+    await runRefreshTask(false);
+  };
+
   return {
     async askAssistant(prompt) {
       return runExclusive("assistant", async () => {
         try {
+          await ensureRoutineRefresh();
           await (await ensureAssistant()).ask(prompt);
         } catch (error) {
           consoleFeed.error(`Assistant response failed: ${formatThrownValue(error)}`);
@@ -140,6 +174,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           throw new Error("Debug retrieval query cannot be empty.");
         }
 
+        await ensureRoutineRefresh();
         const results = await retrieval.search({
           query: normalizedQuery,
           limit: DEBUG_RETRIEVAL_LIMIT
@@ -168,25 +203,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     },
     async refresh(forceReingest) {
       return runExclusive(forceReingest ? "force-reingest" : "refresh", async () => {
-        const reporter = createQueuedConsoleProgressReporter(consoleFeed);
-        const options: RuntimeOptions = {
-          forceReingest,
-          retrievalQuery: null
-        };
-        const summary = await runStartupRefresh(config, options, {
-          discovery: dependencies.discovery ?? createFilesystemSourceDiscoveryService(),
-          ingestion:
-            dependencies.ingestion ??
-            createFilesystemIngestionService({
-              corpusStore: createSqliteCorpusStore(),
-              reporter
-            }),
-          reporter,
-          retrieval,
-          stateStore: dependencies.stateStore ?? createFilesystemStateStore()
-        });
-        await reporter.flush();
-        consoleFeed.info(formatRefreshSummaryMessage(summary));
+        const summary = await runRefreshTask(forceReingest);
         return {
           ok: true,
           console: consoleFeed.read(),

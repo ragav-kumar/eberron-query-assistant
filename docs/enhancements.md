@@ -32,4 +32,6 @@ The browser UI separates left-side inputs from right-side outputs. The left colu
 
 The right column has a transient plain-text `Console` feed for local progress, refresh, debug, warning, and error output, plus a persisted Markdown `Log` tab for assistant transcript output. Console output is process-local, is not written to `logs/`, and both Console and Log auto-scroll as new output arrives.
 
+Assistant and debug-query input do not require the user to run refresh manually first. If the current browser-server session has not completed a refresh yet, the app runs a routine refresh automatically before continuing with the requested input. Input panels use unframed layouts rather than cards, and Enter submits the active input mode while Shift+Enter preserves multiline assistant prompts.
+
 Verification added or preserved for this change covers structured console API behavior, transcript separation, tab and radio rendering, autosaved additional context, output auto-scroll, tooltips, and componentized React UI behavior.
