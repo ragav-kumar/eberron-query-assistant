@@ -142,6 +142,7 @@ const readStoredNpcRecord = (value: unknown): StoredGeneratedNpc => {
   const npc = {
     id,
     name: value.name.trim(),
+    ...readOptionalStoredNpcDetails(value),
     description: value.description.trim(),
     bio: value.bio.trim(),
     createdAt: value.createdAt.trim(),
@@ -158,6 +159,32 @@ const readStoredNpcRecord = (value: unknown): StoredGeneratedNpc => {
   }
 
   return npc;
+};
+
+const OPTIONAL_STORED_NPC_DETAIL_KEYS = ["species", "ethnicity", "gender", "role", "age"] as const;
+type OptionalStoredNpcDetailKey = (typeof OPTIONAL_STORED_NPC_DETAIL_KEYS)[number];
+
+const readOptionalStoredNpcDetails = (
+  value: Partial<Record<OptionalStoredNpcDetailKey, unknown>>
+): Partial<StoredGeneratedNpc> => {
+  const details: Partial<StoredGeneratedNpc> = {};
+
+  for (const key of OPTIONAL_STORED_NPC_DETAIL_KEYS) {
+    const detail = value[key];
+    if (detail === undefined) {
+      continue;
+    }
+    if (typeof detail !== "string") {
+      throw new Error("Generated NPC state file contains an invalid NPC record.");
+    }
+
+    const normalized = detail.trim();
+    if (normalized.length > 0) {
+      details[key] = normalized;
+    }
+  }
+
+  return details;
 };
 
 const assertUniqueNpcIds = (npcs: StoredGeneratedNpc[]): void => {

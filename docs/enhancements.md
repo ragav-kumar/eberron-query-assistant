@@ -103,3 +103,9 @@ Session Notes are treated as authoritative for events that happened in play. Que
 This change depends on richer Foundry metadata preservation during ingestion, including source UUIDs, provenance paths, classification tags, timestamps, and citation anchors. Existing corpus rows created before this enhancement do not contain enough metadata; the user must run force reingest after implementation.
 
 Verification added for this change covers environment config, Foundry metadata ingestion, party-context assembly, degraded missing-source notes, and Standard prompt injection.
+
+## Rich NPC Card Details
+
+Name Generator NPC cards now support structured species, ethnicity, gender, role, and age details in addition to name, physical description, and bio. The assistant is instructed to provide those details when they apply and are knowable in-setting, while omitting details that do not apply or cannot reasonably be known.
+
+Existing generated NPC state remains valid without migration. Verification added for this change covers legacy saved cards, optional detail normalization and validation, persistence, id-based revisions, and React card metadata rendering.

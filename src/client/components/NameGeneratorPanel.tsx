@@ -23,7 +23,7 @@ export const NameGeneratorPanel = ({ disabled, onPromptChange, onSubmit, prompt 
 
   return (
     <form className="panel" aria-labelledby="name-generator-heading" onSubmit={submitPrompt}>
-      <h2 id="name-generator-heading">Name Generator</h2>
+      <h2 id="name-generator-heading">NPC Generator</h2>
       <textarea
         value={prompt}
         onChange={(event) => onPromptChange(event.currentTarget.value)}

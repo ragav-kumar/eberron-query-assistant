@@ -439,6 +439,33 @@ p {
   font-size: 1rem;
 }
 
+.npc-card-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.npc-card-metadata-item {
+  background: #f4f7fa;
+  border: 1px solid #d8dee4;
+  border-radius: 6px;
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem 0.45rem;
+}
+
+.npc-card-metadata dt {
+  color: #52616f;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.npc-card-metadata dd {
+  font-size: 0.75rem;
+  margin: 0;
+}
+
 .npc-card p {
   line-height: 1.45;
 }

@@ -5,10 +5,15 @@ import { readGeneratedNpcState, updateGeneratedNpcState } from "./npc-store.js";
 import { formatCitation, loadAssistantPromptAssets, type AssistantPromptAssets } from "./prompt.js";
 
 export interface GeneratedNpc {
+  age?: string;
   bio: string;
   description: string;
+  ethnicity?: string;
+  gender?: string;
   id: number;
   name: string;
+  role?: string;
+  species?: string;
 }
 
 export interface NpcGenerationSession {
@@ -103,7 +108,10 @@ export const buildNpcGenerationMessages = (request: NpcMessageBuildRequest): Cha
       "You are in NPC name generator mode.",
       "Generate Eberron-appropriate NPC records based on the user prompt and retrieved evidence.",
       "Infer how many NPCs the user wants from the prompt.",
-      "Return only strict JSON with this exact shape: {\"npcs\":[{\"id\":number,\"name\":\"...\",\"description\":\"...\",\"bio\":\"...\"}]}",
+      "Return only strict JSON with this exact shape: {\"npcs\":[{\"id\":number,\"name\":\"...\",\"species\":\"...\",\"ethnicity\":\"...\",\"gender\":\"...\",\"role\":\"...\",\"age\":\"...\",\"description\":\"...\",\"bio\":\"...\"}]}",
+      "Specify species, ethnicity, gender, role, and age whenever each field applies and is knowable in-setting.",
+      "Omit any of species, ethnicity, gender, role, or age only when that field does not apply or cannot reasonably be known in-setting, such as a precise age for an immortal.",
+      "Age, gender, and role are flexible text fields; age may be approximate.",
       "Each description must be a concise physical description.",
       "Each bio must be very short.",
       "Use existing NPC ids only when revising an NPC already present in saved NPC state.",
@@ -169,6 +177,7 @@ const readGeneratedNpc = (value: unknown): GeneratedNpc => {
   const npc = {
     id,
     name: value.name.trim(),
+    ...readOptionalNpcDetails(value),
     description: value.description.trim(),
     bio: value.bio.trim()
   };
@@ -197,11 +206,36 @@ const formatEvidenceForNpcPrompt = (results: RetrievalResult[]): string => {
 
 const readNpcList = (npcs: GeneratedNpc[]): GeneratedNpc[] =>
   npcs.map((npc) => ({
+    ...readOptionalNpcDetails(npc),
     bio: npc.bio,
     description: npc.description,
     id: npc.id,
     name: npc.name
   }));
+
+const OPTIONAL_NPC_DETAIL_KEYS = ["species", "ethnicity", "gender", "role", "age"] as const;
+type OptionalNpcDetailKey = (typeof OPTIONAL_NPC_DETAIL_KEYS)[number];
+
+const readOptionalNpcDetails = (value: Partial<Record<OptionalNpcDetailKey, unknown>>): Partial<GeneratedNpc> => {
+  const details: Partial<GeneratedNpc> = {};
+
+  for (const key of OPTIONAL_NPC_DETAIL_KEYS) {
+    const detail = value[key];
+    if (detail === undefined) {
+      continue;
+    }
+    if (typeof detail !== "string") {
+      throw new Error("NPC generation response included an invalid NPC record.");
+    }
+
+    const normalized = detail.trim();
+    if (normalized.length > 0) {
+      details[key] = normalized;
+    }
+  }
+
+  return details;
+};
 
 const readMaxNpcId = (npcs: GeneratedNpc[]): number => npcs.reduce((maxId, npc) => Math.max(maxId, npc.id), 0);
 

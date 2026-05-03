@@ -13,11 +13,16 @@ export interface ApiLogFile {
 }
 
 export interface ApiNpc {
+  age?: string;
   bio: string;
   createdAt?: string;
   description: string;
+  ethnicity?: string;
+  gender?: string;
   id: number;
   name: string;
+  role?: string;
+  species?: string;
   updatedAt?: string;
 }
 

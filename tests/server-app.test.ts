@@ -288,6 +288,11 @@ describe("web app API model", () => {
         {
           id: 2,
           name: "Newer",
+          species: "Human",
+          ethnicity: "Aundairian",
+          gender: "woman",
+          role: "envoy",
+          age: "middle-aged",
           description: "A newer NPC.",
           bio: "They were saved second.",
           createdAt: "2026-05-02T12:00:00.000Z",
@@ -302,13 +307,48 @@ describe("web app API model", () => {
       chat: { complete: vi.fn().mockResolvedValue("answer") }
     });
 
-    expect((await app.getNpcs()).npcs.map((npc) => npc.name)).toEqual(["Newer", "Older"]);
+    expect((await app.getNpcs()).npcs).toEqual([
+      {
+        id: 2,
+        name: "Newer",
+        species: "Human",
+        ethnicity: "Aundairian",
+        gender: "woman",
+        role: "envoy",
+        age: "middle-aged",
+        description: "A newer NPC.",
+        bio: "They were saved second."
+      },
+      {
+        id: 1,
+        name: "Older",
+        description: "An older NPC.",
+        bio: "They were saved first."
+      }
+    ]);
   });
 
-  it("rejects malformed or duplicate generated NPC state", async () => {
+  it("rejects malformed, invalid optional detail, or duplicate generated NPC state", async () => {
     const malformed = await writeConfig("npc-state-malformed");
     await mkdir(malformed.stateDir, { recursive: true });
     await writeFile(path.join(malformed.stateDir, "generated-npcs.json"), "{}", "utf8");
+    const invalidDetail = await writeConfig("npc-state-invalid-detail");
+    await mkdir(invalidDetail.stateDir, { recursive: true });
+    await writeFile(
+      path.join(invalidDetail.stateDir, "generated-npcs.json"),
+      JSON.stringify([
+        {
+          id: 1,
+          name: "Invalid",
+          species: ["human"],
+          description: "Invalid NPC.",
+          bio: "Invalid bio.",
+          createdAt: "2026-05-01T12:00:00.000Z",
+          updatedAt: "2026-05-01T12:00:00.000Z"
+        }
+      ]),
+      "utf8"
+    );
     const duplicate = await writeConfig("npc-state-duplicate");
     await mkdir(duplicate.stateDir, { recursive: true });
     await writeFile(
@@ -340,6 +380,13 @@ describe("web app API model", () => {
       chat: { complete: vi.fn().mockResolvedValue("answer") }
     }).getNpcs()).rejects.toThrow(
       "Generated NPC state file must contain a JSON array."
+    );
+    await expect(createWebApp({
+      config: invalidDetail,
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    }).getNpcs()).rejects.toThrow(
+      "Generated NPC state file contains an invalid NPC record."
     );
     await expect(createWebApp({
       config: duplicate,
@@ -475,6 +522,11 @@ describe("web app API model", () => {
               {
                 id: 1,
                 name: "Jala ir'Wynarn",
+                species: "Human",
+                ethnicity: "Aundairian",
+                gender: "woman",
+                role: "envoy",
+                age: "about 40",
                 description: "A sharp-eyed Aundairian envoy in travel-stained blue.",
                 bio: "She trades favors along the border."
               }
@@ -490,6 +542,11 @@ describe("web app API model", () => {
       {
         id: 1,
         name: "Jala ir'Wynarn",
+        species: "Human",
+        ethnicity: "Aundairian",
+        gender: "woman",
+        role: "envoy",
+        age: "about 40",
         description: "A sharp-eyed Aundairian envoy in travel-stained blue.",
         bio: "She trades favors along the border."
       }
@@ -497,9 +554,69 @@ describe("web app API model", () => {
     expect(retrievalFixture.retrieval.refresh).toHaveBeenCalledWith(config, { forceRebuild: false });
     const stateText = await readFile(path.join(config.stateDir, "generated-npcs.json"), "utf8");
     expect(stateText).toContain("\"name\": \"Jala ir'Wynarn\"");
+    expect(stateText).toContain("\"species\": \"Human\"");
     expect(stateText).toContain("\"createdAt\"");
     expect(response.log.files.map((file) => file.label)).not.toContain("generated_npcs.md");
     expect(response.log).toEqual(emptyLogResponse());
+  });
+
+  it("normalizes empty optional NPC details and rejects invalid generated detail values", async () => {
+    const config = await writeConfig("npc-details-normalization");
+    const chat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          npcs: [
+            {
+              id: 1,
+              name: "  Jala ir'Wynarn  ",
+              species: " Human ",
+              ethnicity: "",
+              gender: "   ",
+              role: " Envoy ",
+              age: " about 40 ",
+              description: " A sharp-eyed Aundairian envoy. ",
+              bio: " She trades favors. "
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          npcs: [
+            {
+              id: 2,
+              name: "Invalid",
+              species: 42,
+              description: "Invalid NPC.",
+              bio: "Invalid bio."
+            }
+          ]
+        })
+      );
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: chat }
+    });
+
+    const response = await app.generateNpcs("Generate one Aundairian envoy");
+
+    expect(response.npcs.npcs).toEqual([
+      {
+        id: 1,
+        name: "Jala ir'Wynarn",
+        species: "Human",
+        role: "Envoy",
+        age: "about 40",
+        description: "A sharp-eyed Aundairian envoy.",
+        bio: "She trades favors."
+      }
+    ]);
+    await expect(app.generateNpcs("Generate invalid NPC")).rejects.toMatchObject({
+      message: "NPC generation response included an invalid NPC record."
+    });
   });
 
   it("patches saved NPC cards by id without duplicating revisions", async () => {

@@ -109,6 +109,11 @@ beforeEach(() => {
         {
           id: 1,
           name: "Jala ir'Wynarn",
+          species: "Human",
+          ethnicity: "Aundairian",
+          gender: "woman",
+          role: "envoy",
+          age: "about 40",
           description: "A sharp-eyed Aundairian envoy in travel-stained blue.",
           bio: "She trades favors along the border."
         }
@@ -279,6 +284,16 @@ describe("App", () => {
       expect(api.generateNpcs).toHaveBeenCalledWith("Generate one Aundairian envoy", expect.any(String));
     });
     expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
+    expect(screen.getByText("Species")).toBeTruthy();
+    expect(screen.getByText("Human")).toBeTruthy();
+    expect(screen.getByText("Ethnicity")).toBeTruthy();
+    expect(screen.getByText("Aundairian")).toBeTruthy();
+    expect(screen.getByText("Gender")).toBeTruthy();
+    expect(screen.getByText("woman")).toBeTruthy();
+    expect(screen.getByText("Role")).toBeTruthy();
+    expect(screen.getByText("envoy")).toBeTruthy();
+    expect(screen.getByText("Age")).toBeTruthy();
+    expect(screen.getByText("about 40")).toBeTruthy();
     expect(screen.getByText("#1")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "NPCs" }).getAttribute("aria-selected")).toBe("true");
   });
@@ -310,6 +325,8 @@ describe("App", () => {
     expect(await screen.findByText("Newer NPC")).toBeTruthy();
     expect(await screen.findByText("Older NPC")).toBeTruthy();
     expect(screen.getByText("2 NPCs saved")).toBeTruthy();
+    expect(screen.queryByText("Species")).toBeNull();
+    expect(screen.queryByText("Unknown")).toBeNull();
   });
 
   it("submits name generator prompts with Enter", async () => {
