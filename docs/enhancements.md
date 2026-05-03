@@ -79,3 +79,13 @@ Verification added for this change covers streamed console subscriptions, prompt
 The right-column tab bar now shows a discreet loading spinner while an operation is running. NPC cards in the `NPCs` tab wrap into multiple columns when space allows, with each card capped around 500 pixels wide so wide output panes can show tiled cards instead of one long column.
 
 Verification added for this change covers the right-column loading indicator during busy operations.
+
+## Automatic Party Context
+
+Standard assistant prompts now include an automatically assembled party context block from the Foundry corpus. Local `.env` settings identify the party actor UUIDs, the Session Notes journal, the Quests journal, and the campaign journal folder convention. This moves routine party identity and current-status lookup out of `assistant/additional-context.md` and into deterministic runtime context.
+
+Session Notes are treated as authoritative for events that happened in play. Quests are treated as authoritative for active or expected quest threads. Actor-sheet mechanics describe the sheet, while actor backstory describes what the character believes happened and may reflect player error, incomplete knowledge, or unreliable narration.
+
+This change depends on richer Foundry metadata preservation during ingestion, including source UUIDs, provenance paths, classification tags, timestamps, and citation anchors. Existing corpus rows created before this enhancement do not contain enough metadata; the user must run force reingest after implementation.
+
+Verification added for this change covers environment config, Foundry metadata ingestion, party-context assembly, degraded missing-source notes, and Standard prompt injection.

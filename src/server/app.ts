@@ -13,6 +13,7 @@ import {
   type GeneratedNpc,
   type NpcGenerationSession
 } from "../runtime/npc-session.js";
+import { createSqlitePartyContextService, type PartyContextService } from "../runtime/party-context.js";
 import { runStartupRefresh } from "../runtime/refresh.js";
 import {
   createSessionLog,
@@ -45,6 +46,7 @@ export interface WebAppDependencies {
   ingestion?: IngestionService;
   log?: SessionLog;
   npcSession?: NpcGenerationSession;
+  partyContext?: PartyContextService;
   retrieval?: RetrievalService;
   stateStore?: StateStore;
 }
@@ -150,6 +152,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   };
   let activeOperation: string | null = null;
   const defaultReporter = createQueuedConsoleProgressReporter(consoleFeed);
+  const partyContext = dependencies.partyContext ?? createSqlitePartyContextService();
   const retrieval =
     dependencies.retrieval ??
     createSqliteRetrievalService({
@@ -173,6 +176,8 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
         await appendStandardSessionExchange(session, exchange);
       },
       chat: dependencies.chat ?? createOpenAiChatAdapter(config.provider),
+      config,
+      partyContext,
       retrieval
     });
     return session.assistant;

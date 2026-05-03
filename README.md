@@ -8,6 +8,8 @@ Eberron Query Assistant is a local browser-based lore and campaign assistant for
 
 Assistant instructions are stored in tracked Markdown files under `assistant/`. Local campaign notes or other assistant-only guidance that does not belong in the source corpus can be edited in the app through a WYSIWYG Markdown editor backed by `assistant/additional-context.md`. That file is gitignored, is created as an empty file when missing, and is included in every assistant prompt only when it contains text.
 
+Standard assistant prompts also receive automatic party context assembled from the local Foundry corpus. Configure the party actor UUIDs and campaign journal names in `.env`; `.env.example` documents the supported keys. Session Notes are used for what happened in play, Quests are used for active or expected quest threads, actor-sheet mechanics are treated as character-sheet facts, and actor backstory is treated as what the character believes rather than guaranteed objective truth.
+
 The application refreshes its retrieval layer automatically before the first assistant or debug query in a browser-server session when needed. It also provides controls to refresh during use. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine refreshes stay fast, and a force-reingest control is available when a full rebuild is needed.
 
 The local Console output streams what is being checked, skipped, refreshed, rebuilt, or degraded while operations run. If one source fails while another source remains usable, the app can continue in degraded mode and names the affected source type. If no retrieval corpus is available, refresh fails clearly. Console output is a transient local feed and is not saved to transcript logs.
@@ -33,6 +35,7 @@ The project expects these source locations by default:
 - `foundry-export/records.ndjson`
 - `pdf/`
 - optional local assistant context in `assistant/additional-context.md`
+- optional automatic party context settings in `.env`
 
 Keith Baker articles are discovered from the Eberron index and cached into the local retrieval layer after ingestion.
 Article pages that return HTTP 403 or 404 are recorded as permanently inaccessible and skipped on later runs.
@@ -45,7 +48,7 @@ npm install
 npm run start
 ```
 
-Open the Vite URL printed by the command. Use the in-app refresh control for optional routine source checks, the force-reingest control when you need an explicit full rebuild, the Input tab for Standard assistant prompts, Debug Query retrieval inspection, or Name Generator prompts, and the Additional Context tab for local assistant-only notes. Press Enter to submit the active input; use Shift+Enter for new lines in text areas. Use the Console tab for unsaved local operational output, the Log tab to browse saved assistant transcripts, and the NPCs tab to browse saved generated cards.
+Open the Vite URL printed by the command. Use the in-app refresh control for optional routine source checks, the force-reingest control when you need an explicit full rebuild, the Input tab for Standard assistant prompts, Debug Query retrieval inspection, or Name Generator prompts, and the Additional Context tab for local assistant-only notes. Standard assistant prompts automatically include configured party context after refresh. Press Enter to submit the active input; use Shift+Enter for new lines in text areas. Use the Console tab for unsaved local operational output, the Log tab to browse saved assistant transcripts, and the NPCs tab to browse saved generated cards.
 
 ## Example Questions
 - What are the names of the clans of the Znir?

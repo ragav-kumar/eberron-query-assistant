@@ -42,13 +42,18 @@ const normalizeFoundryLine = (
     throw createTaggedError("invalid-foundry-ndjson", `Invalid foundry NDJSON on line ${index + 1}: record must be an object.`);
   }
 
-  const recordId = firstString(parsed, ["id", "_id", "uuid", "key"]) ?? hashText(line);
-  const entityKind = firstString(parsed, ["type", "kind", "entityType", "documentType"]) ?? "record";
+  const recordId = firstString(parsed, ["recordId", "id", "_id", "uuid", "key"]) ?? hashText(line);
+  const entityKind =
+    firstString(parsed, ["sourceType", "type", "kind", "entityType", "documentType"]) ??
+    readNestedString(parsed, ["metadata", "classification", "documentType"]) ??
+    "record";
   const title = firstString(parsed, ["name", "title", "label"]) ?? `${entityKind} ${recordId}`;
   const sourceKey = recordId;
   const sourceId = createSourceId("foundry", sourceKey);
-  const extractedText = extractText(parsed);
+  const body = typeof parsed.body === "string" ? parsed.body.trim() : "";
+  const extractedText = body.length > 0 ? body : extractText(parsed);
   const text = extractedText.length > 0 ? extractedText : JSON.stringify(parsed, null, 2);
+  const citationAnchor = readNestedString(parsed, ["metadata", "citation", "anchor"]);
 
   const source: CorpusSource = {
     sourceId,
@@ -61,6 +66,17 @@ const normalizeFoundryLine = (
       entityKind,
       title,
       recordId,
+      sourceScope: firstString(parsed, ["sourceScope"]),
+      sourceId: firstString(parsed, ["sourceId"]),
+      sourceUuid: firstString(parsed, ["sourceUuid"]),
+      parentId: firstString(parsed, ["parentId"]),
+      parentUuid: firstString(parsed, ["parentUuid"]),
+      packId: firstString(parsed, ["packId"]),
+      provenancePath: readNestedStringArray(parsed, ["metadata", "provenance", "path"]),
+      classificationTags: readNestedStringArray(parsed, ["metadata", "classification", "tags"]),
+      citationAnchor,
+      createdTime: readNestedPrimitive(parsed, ["timestamps", "createdTime"]),
+      modifiedTime: readNestedPrimitive(parsed, ["timestamps", "modifiedTime"]),
       exportRunId: exportMarker.runId,
       exportGeneratedAt: exportMarker.generatedAt
     }
@@ -74,13 +90,16 @@ const normalizeFoundryLine = (
     citation: {
       sourceType: "foundry",
       label: title,
-      locator: entityKind,
+      locator: citationAnchor ?? entityKind,
       url: null
     },
     metadata: {
       sourceType: "foundry",
       entityKind,
       recordId,
+      sourceUuid: firstString(parsed, ["sourceUuid"]),
+      provenancePath: readNestedStringArray(parsed, ["metadata", "provenance", "path"]),
+      classificationTags: readNestedStringArray(parsed, ["metadata", "classification", "tags"]),
       exportRunId: exportMarker.runId,
       startParagraph: chunk.startParagraph,
       endParagraph: chunk.endParagraph
@@ -137,6 +156,36 @@ const firstString = (record: Record<string, unknown>, keys: string[]): string | 
     }
   }
   return null;
+};
+
+const readNestedString = (record: Record<string, unknown>, pathSegments: string[]): string | null => {
+  const value = readNestedValue(record, pathSegments);
+  return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
+};
+
+const readNestedStringArray = (record: Record<string, unknown>, pathSegments: string[]): string[] => {
+  const value = readNestedValue(record, pathSegments);
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === "string" && item.trim().length > 0);
+};
+
+const readNestedPrimitive = (record: Record<string, unknown>, pathSegments: string[]): string | number | null => {
+  const value = readNestedValue(record, pathSegments);
+  return typeof value === "string" || typeof value === "number" ? value : null;
+};
+
+const readNestedValue = (record: Record<string, unknown>, pathSegments: string[]): unknown => {
+  let value: unknown = record;
+  for (const segment of pathSegments) {
+    if (!isRecord(value)) {
+      return null;
+    }
+    value = value[segment];
+  }
+  return value;
 };
 
 const createSourceId = (sourceType: string, sourceKey: string): string => {

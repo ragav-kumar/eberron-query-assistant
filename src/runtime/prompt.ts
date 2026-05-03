@@ -7,7 +7,8 @@ import { createTaggedError, formatThrownValue, hasErrorCode, hasErrorName } from
 import type { ChatAdapter, ChatMessage } from "../provider/index.js";
 import type { ProgressReporter } from "../progress/reporter.js";
 import type { RetrievalService } from "../retrieval/index.js";
-import type { AssistantConfig, RetrievalResult } from "../types.js";
+import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "../types.js";
+import { createSqlitePartyContextService, type PartyContextService } from "./party-context.js";
 import { createSessionLog, type SessionLog } from "./session-log.js";
 
 export interface PromptShell {
@@ -17,9 +18,11 @@ export interface PromptShell {
 export interface PromptShellOptions {
   assistant: AssistantConfig;
   chat: ChatAdapter;
+  config: RuntimeConfig;
   input?: Readable;
   logDir?: string;
   output?: Writable;
+  partyContext?: PartyContextService;
   reporter: ProgressReporter;
   retrieval: RetrievalService;
 }
@@ -30,6 +33,7 @@ const MAX_HISTORY_MESSAGES = 8;
 export const createAssistantPromptShell = (options: PromptShellOptions): PromptShell => {
   const input = options.input ?? process.stdin;
   const output = options.output ?? process.stdout;
+  const partyContext = options.partyContext ?? createSqlitePartyContextService();
   const reporter = options.reporter;
   const history: ChatMessage[] = [];
   let sessionLog: SessionLog | null = null;
@@ -65,6 +69,7 @@ export const createAssistantPromptShell = (options: PromptShellOptions): PromptS
               const messages = buildAssistantMessages({
                 evidence,
                 history,
+                partyContext: await partyContext.build(options.config),
                 promptAssets,
                 question,
                 requestSessionTitle: shouldRequestSessionTitle
@@ -111,6 +116,7 @@ const formatAssistantResponse = (response: string): string => {
 export interface AssistantMessageBuildRequest {
   evidence: RetrievalResult[];
   history?: ChatMessage[];
+  partyContext?: string;
   promptAssets: AssistantPromptAssets;
   question: string;
   requestSessionTitle?: boolean;
@@ -125,6 +131,15 @@ export interface AssistantPromptAssets {
 export const buildAssistantMessages = (request: AssistantMessageBuildRequest): ChatMessage[] => {
   const evidence = formatEvidence(request.evidence);
   const recentHistory = request.history ?? [];
+  const partyContext = request.partyContext?.trim() ?? "";
+  const userContentParts = [
+    partyContext,
+    partyContext.length > 0 ? "" : "",
+    "Retrieved evidence:",
+    evidence,
+    "",
+    `Question: ${request.question}`
+  ].filter((part, index) => part.length > 0 || (partyContext.length > 0 && index === 1));
   const systemPromptParts = [
     request.promptAssets.systemPrompt,
     request.promptAssets.additionalContext.length > 0
@@ -141,12 +156,7 @@ export const buildAssistantMessages = (request: AssistantMessageBuildRequest): C
     ...recentHistory,
     {
       role: "user",
-      content: [
-        "Retrieved evidence:",
-        evidence,
-        "",
-        `Question: ${request.question}`
-      ].join("\n")
+      content: userContentParts.join("\n")
     }
   ];
 };

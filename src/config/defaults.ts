@@ -16,6 +16,12 @@ export const loadDefaultConfig = (repoRoot = process.cwd()): RuntimeConfig => {
       sessionTitlePromptPath: path.join(assistantDir, "session-title-prompt.md"),
       systemPromptPath: path.join(assistantDir, "system-prompt.md")
     },
+    campaign: {
+      campaignJournalFolder: getConfigValue("EQA_CAMPAIGN_JOURNAL_FOLDER", envFile) ?? "Legacy",
+      partyActorUuids: parseCommaSeparatedList(getConfigValue("EQA_PARTY_ACTOR_UUIDS", envFile)),
+      questsJournal: getConfigValue("EQA_QUESTS_JOURNAL", envFile) ?? "Quests",
+      sessionNotesJournal: getConfigValue("EQA_SESSION_NOTES_JOURNAL", envFile) ?? "Session Notes"
+    },
     foundryExportDir: path.join(repoRoot, "foundry-export"),
     pdfDir: path.join(repoRoot, "pdf"),
     runtimeDir,
@@ -74,6 +80,17 @@ const unwrapEnvValue = (value: string): string => {
   }
 
   return value;
+};
+
+const parseCommaSeparatedList = (value: string | undefined): string[] => {
+  if (!value) {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
 };
 
 const normalizeBaseUrl = (value: string): string => {

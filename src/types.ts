@@ -6,6 +6,7 @@ export interface RuntimeOptions {
 export interface RuntimeConfig {
   repoRoot: string;
   assistant: AssistantConfig;
+  campaign: CampaignConfig;
   foundryExportDir: string;
   pdfDir: string;
   runtimeDir: string;
@@ -21,6 +22,13 @@ export interface AssistantConfig {
   additionalContextPath: string;
   sessionTitlePromptPath: string;
   systemPromptPath: string;
+}
+
+export interface CampaignConfig {
+  campaignJournalFolder: string | null;
+  partyActorUuids: string[];
+  questsJournal: string;
+  sessionNotesJournal: string;
 }
 
 export interface ProviderConfig {

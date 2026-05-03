@@ -74,6 +74,64 @@ describe("Phase 3 ingestion", () => {
     });
   });
 
+  it("preserves Foundry export metadata needed for party context", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await mkdir(config.foundryExportDir, { recursive: true });
+    await writeFile(
+      path.join(config.foundryExportDir, "records.ndjson"),
+      `${JSON.stringify({
+        recordId: "world.journalentrypage.session.note",
+        sourceType: "JournalEntryPage",
+        sourceScope: "world",
+        sourceId: "note",
+        sourceUuid: "JournalEntry.session.JournalEntryPage.note",
+        parentId: "session",
+        parentUuid: "JournalEntry.session",
+        packId: null,
+        title: "2026-04-25",
+        body: "The party reached Vathirond.",
+        metadata: {
+          provenance: {
+            collection: "journal",
+            path: ["Session Notes", "2026-04-25"]
+          },
+          classification: {
+            documentType: "JournalEntryPage",
+            tags: ["page-type:text"]
+          },
+          citation: {
+            anchor: "Session Notes > 2026-04-25"
+          }
+        },
+        timestamps: {
+          createdTime: 1770000000000,
+          modifiedTime: 1771000000000
+        }
+      })}\n`,
+      "utf8"
+    );
+
+    const service = createService();
+    const state = createDefaultRuntimeState();
+    await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["foundry"]));
+
+    const rows = readRows(config, "SELECT source_key, title, metadata_json FROM sources");
+    expect(rows[0]).toMatchObject({
+      source_key: "world.journalentrypage.session.note",
+      title: "2026-04-25"
+    });
+    expect(JSON.parse(String(rows[0]?.metadata_json))).toMatchObject({
+      entityKind: "JournalEntryPage",
+      sourceScope: "world",
+      sourceUuid: "JournalEntry.session.JournalEntryPage.note",
+      parentUuid: "JournalEntry.session",
+      provenancePath: ["Session Notes", "2026-04-25"],
+      classificationTags: ["page-type:text"],
+      citationAnchor: "Session Notes > 2026-04-25",
+      modifiedTime: 1771000000000
+    });
+  });
+
   it("does not commit foundry state when NDJSON parsing fails", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await mkdir(config.foundryExportDir, { recursive: true });

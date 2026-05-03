@@ -7,6 +7,10 @@ import { loadDefaultConfig } from "../src/config/index.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "config");
 const ENV_KEYS = [
+  "EQA_CAMPAIGN_JOURNAL_FOLDER",
+  "EQA_PARTY_ACTOR_UUIDS",
+  "EQA_QUESTS_JOURNAL",
+  "EQA_SESSION_NOTES_JOURNAL",
   "OPENAI_API_KEY",
   "OPENAI_BASE_URL",
   "OPENAI_CHAT_MODEL",
@@ -38,6 +42,12 @@ describe("loadDefaultConfig", () => {
         sessionTitlePromptPath: path.join(repoRoot, "assistant", "session-title-prompt.md"),
         systemPromptPath: path.join(repoRoot, "assistant", "system-prompt.md")
       },
+      campaign: {
+        campaignJournalFolder: process.env.EQA_CAMPAIGN_JOURNAL_FOLDER ?? "Legacy",
+        partyActorUuids: process.env.EQA_PARTY_ACTOR_UUIDS?.split(",").map((item) => item.trim()).filter((item) => item.length > 0) ?? [],
+        questsJournal: process.env.EQA_QUESTS_JOURNAL ?? "Quests",
+        sessionNotesJournal: process.env.EQA_SESSION_NOTES_JOURNAL ?? "Session Notes"
+      },
       foundryExportDir: path.join(repoRoot, "foundry-export"),
       pdfDir: path.join(repoRoot, "pdf"),
       runtimeDir: path.join(repoRoot, ".eberron-query-assistant"),
@@ -66,7 +76,11 @@ describe("loadDefaultConfig", () => {
         "OPENAI_API_KEY=sk-test-value",
         "OPENAI_BASE_URL=https://provider.example/v1/",
         "OPENAI_CHAT_MODEL=gpt-test-chat",
-        "OPENAI_EMBEDDING_MODEL=gpt-test-embedding"
+        "OPENAI_EMBEDDING_MODEL=gpt-test-embedding",
+        "EQA_PARTY_ACTOR_UUIDS=Actor.a, Actor.b,, Actor.c",
+        "EQA_SESSION_NOTES_JOURNAL=Minutes",
+        "EQA_QUESTS_JOURNAL=Leads",
+        "EQA_CAMPAIGN_JOURNAL_FOLDER=Campaign"
       ].join("\n"),
       "utf8"
     );
@@ -76,6 +90,12 @@ describe("loadDefaultConfig", () => {
       baseUrl: "https://provider.example/v1",
       chatModel: "gpt-test-chat",
       embeddingModel: "gpt-test-embedding"
+    });
+    expect(loadDefaultConfig(TEST_ROOT).campaign).toEqual({
+      campaignJournalFolder: "Campaign",
+      partyActorUuids: ["Actor.a", "Actor.b", "Actor.c"],
+      questsJournal: "Leads",
+      sessionNotesJournal: "Minutes"
     });
   });
 
@@ -93,6 +113,7 @@ describe("loadDefaultConfig", () => {
     );
     process.env.OPENAI_API_KEY = "sk-process";
     process.env.OPENAI_CHAT_MODEL = "process-chat";
+    process.env.EQA_PARTY_ACTOR_UUIDS = "Actor.process";
 
     expect(loadDefaultConfig(TEST_ROOT).provider).toMatchObject({
       apiKey: "sk-process",
@@ -100,6 +121,7 @@ describe("loadDefaultConfig", () => {
       chatModel: "process-chat",
       embeddingModel: "env-file-embedding"
     });
+    expect(loadDefaultConfig(TEST_ROOT).campaign.partyActorUuids).toEqual(["Actor.process"]);
   });
 
   it("uses model defaults when optional .env values are missing", () => {
@@ -112,6 +134,12 @@ describe("loadDefaultConfig", () => {
       baseUrl: "https://api.openai.com/v1",
       chatModel: "gpt-5.2",
       embeddingModel: "text-embedding-3-small"
+    });
+    expect(loadDefaultConfig(TEST_ROOT).campaign).toEqual({
+      campaignJournalFolder: "Legacy",
+      partyActorUuids: [],
+      questsJournal: "Quests",
+      sessionNotesJournal: "Session Notes"
     });
   });
 });

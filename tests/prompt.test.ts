@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ChatAdapter } from "../src/provider/index.js";
 import { createMemoryProgressReporter } from "../src/progress/reporter.js";
 import { type RetrievalService } from "../src/retrieval/index.js";
+import { loadDefaultConfig } from "../src/config/index.js";
 import {
   buildAssistantMessages,
   createAssistantPromptShell,
@@ -15,7 +16,7 @@ import {
   loadAssistantPromptAssets,
   type AssistantPromptAssets
 } from "../src/runtime/prompt.js";
-import type { AssistantConfig } from "../src/types.js";
+import type { AssistantConfig, RuntimeConfig } from "../src/types.js";
 import type { RetrievalResult } from "../src/types.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "prompt");
@@ -95,6 +96,20 @@ describe("assistant prompt assembly", () => {
     expect(messages[0]?.content).toContain("The campaign treats Vathirond as politically tense.");
   });
 
+  it("includes current party context before retrieved evidence", () => {
+    const messages = buildAssistantMessages({
+      evidence: [result("foundry", "world.actor.peanunt", "Peanunt", "Actor")],
+      partyContext: "Current party context:\n- Party actors: Peanunt.",
+      promptAssets: PROMPT_ASSETS,
+      question: "Who is the party?"
+    });
+
+    expect(messages.at(-1)?.content).toContain("Current party context:");
+    expect(messages.at(-1)?.content.indexOf("Current party context:")).toBeLessThan(
+      messages.at(-1)?.content.indexOf("Retrieved evidence:") ?? 0
+    );
+  });
+
   it("omits the local assistant context section when it is empty", () => {
     const messages = buildAssistantMessages({
       evidence: [],
@@ -147,7 +162,7 @@ describe("assistant prompt shell", () => {
     const output = createWritableCapture();
 
     await createAssistantPromptShell({
-      assistant: await writeAssistantFiles("retrieves-evidence"),
+      ...promptShellConfig(await writeAssistantFiles("retrieves-evidence")),
       chat,
       input: Readable.from(["What about Aerenal?\nexit\n"]),
       output,
@@ -178,7 +193,7 @@ describe("assistant prompt shell", () => {
     const output = createWritableCapture();
 
     await createAssistantPromptShell({
-      assistant: await writeAssistantFiles("logs-title"),
+      ...promptShellConfig(await writeAssistantFiles("logs-title")),
       chat: { complete },
       input: Readable.from(["What about Aerenal?\nexit\n"]),
       logDir,
@@ -210,7 +225,7 @@ describe("assistant prompt shell", () => {
     const output = createWritableCapture();
 
     const prompt = createAssistantPromptShell({
-      assistant: await writeAssistantFiles("logs-append"),
+      ...promptShellConfig(await writeAssistantFiles("logs-append")),
       chat: { complete },
       input,
       logDir,
@@ -243,7 +258,7 @@ describe("assistant prompt shell", () => {
     const logDir = path.join(TEST_ROOT, "logs-fallback");
 
     await createAssistantPromptShell({
-      assistant: await writeAssistantFiles("logs-fallback"),
+      ...promptShellConfig(await writeAssistantFiles("logs-fallback")),
       chat: { complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("Plain answer.") },
       input: Readable.from(["What/about:Aerenal?\nexit\n"]),
       logDir,
@@ -261,7 +276,7 @@ describe("assistant prompt shell", () => {
     const logDir = path.join(TEST_ROOT, "logs-empty");
 
     await createAssistantPromptShell({
-      assistant: await writeAssistantFiles("logs-empty"),
+      ...promptShellConfig(await writeAssistantFiles("logs-empty")),
       chat: mockChat().chat,
       input: Readable.from(["exit\n"]),
       logDir,
@@ -281,7 +296,7 @@ describe("assistant prompt shell", () => {
     await writeFile(path.join(logDir, "20260102030405 Old Session.md"), "Old logged question", "utf8");
 
     await createAssistantPromptShell({
-      assistant: await writeAssistantFiles("logs-history-first"),
+      ...promptShellConfig(await writeAssistantFiles("logs-history-first")),
       chat: firstChat.chat,
       input: Readable.from(["First question\nexit\n"]),
       logDir,
@@ -290,7 +305,7 @@ describe("assistant prompt shell", () => {
       retrieval: mockRetrieval([]).retrieval
     }).start();
     await createAssistantPromptShell({
-      assistant: await writeAssistantFiles("logs-history-second"),
+      ...promptShellConfig(await writeAssistantFiles("logs-history-second")),
       chat: secondChat.chat,
       input: Readable.from(["Second question\nexit\n"]),
       logDir,
@@ -412,4 +427,15 @@ const writeAssistantFiles = async (
     await writeFile(config.additionalContextPath, options.additionalContext ?? "", "utf8");
   }
   return config;
+};
+
+const promptShellConfig = (assistant: AssistantConfig): { assistant: AssistantConfig; config: RuntimeConfig } => {
+  const config = loadDefaultConfig(path.join(TEST_ROOT, "runtime", path.basename(assistant.assistantDir)));
+  return {
+    assistant,
+    config: {
+      ...config,
+      assistant
+    }
+  };
 };

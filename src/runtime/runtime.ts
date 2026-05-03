@@ -84,6 +84,7 @@ export const runRuntime = async (
     createAssistantPromptShell({
       assistant: config.assistant,
       chat: dependencies.chat ?? createOpenAiChatAdapter(config.provider),
+      config,
       logDir: config.logDir,
       reporter,
       retrieval
