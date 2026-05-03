@@ -1,13 +1,15 @@
-import type { ApiConsole, ApiLog } from "../api.js";
+import type { ApiConsole, ApiLog, ApiNpcResponse, ApiSessionMode } from "../api.js";
 import { ConsoleFeed } from "./ConsoleFeed.js";
 import { MarkdownOutputPane } from "./MarkdownOutputPane.js";
+import { NpcCardsPane } from "./NpcCardsPane.js";
 import type { OutputTab } from "./ui-types.js";
 
 interface OutputTabsProps {
   consoleOutput: ApiConsole;
   isBusy: boolean;
   log: ApiLog;
-  onNewSession: () => void;
+  npcs: ApiNpcResponse;
+  onNewSession: (mode: ApiSessionMode) => void;
   onSelectLog: (filePath: string) => void;
   onTabChange: (tab: OutputTab) => void;
   tab: OutputTab;
@@ -18,6 +20,7 @@ export const OutputTabs = ({
   consoleOutput,
   isBusy,
   log,
+  npcs,
   onNewSession,
   onSelectLog,
   onTabChange,
@@ -46,6 +49,16 @@ export const OutputTabs = ({
         >
           Log
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "npcs"}
+          className={tab === "npcs" ? "tab active" : "tab"}
+          onClick={() => onTabChange("npcs")}
+          title="Show generated NPC cards for this session."
+        >
+          NPCs
+        </button>
       </div>
       {tab === "log" ? (
         <LogToolbar
@@ -54,12 +67,16 @@ export const OutputTabs = ({
           onNewSession={onNewSession}
           onSelectLog={onSelectLog}
         />
+      ) : tab === "npcs" ? (
+        <NpcToolbar isBusy={isBusy} npcs={npcs} onNewSession={onNewSession} />
       ) : (
         <span>Local only; not saved to logs</span>
       )}
     </div>
     {tab === "console" ? (
       <ConsoleFeed entries={consoleOutput.entries} />
+    ) : tab === "npcs" ? (
+      <NpcCardsPane npcs={npcs.npcs} />
     ) : (
       <MarkdownOutputPane markdown={log.markdown} emptyMessage="Submit an assistant prompt to start the log." />
     )}
@@ -69,7 +86,7 @@ export const OutputTabs = ({
 interface LogToolbarProps {
   isBusy: boolean;
   log: ApiLog;
-  onNewSession: () => void;
+  onNewSession: (mode: ApiSessionMode) => void;
   onSelectLog: (filePath: string) => void;
 }
 
@@ -112,7 +129,7 @@ const LogToolbar = ({ isBusy, log, onNewSession, onSelectLog }: LogToolbarProps)
         </select>
         <button
           type="button"
-          onClick={onNewSession}
+          onClick={() => onNewSession("standard")}
           disabled={isBusy}
           title="Start a fresh assistant transcript. The file is created after the next answer."
         >
@@ -126,3 +143,25 @@ const LogToolbar = ({ isBusy, log, onNewSession, onSelectLog }: LogToolbarProps)
     </div>
   );
 };
+
+interface NpcToolbarProps {
+  isBusy: boolean;
+  npcs: ApiNpcResponse;
+  onNewSession: (mode: ApiSessionMode) => void;
+}
+
+const NpcToolbar = ({ isBusy, npcs, onNewSession }: NpcToolbarProps) => (
+  <div className="log-toolbar">
+    <div className="log-select-row">
+      <button
+        type="button"
+        onClick={() => onNewSession("npcs")}
+        disabled={isBusy}
+        title="Clear generated NPC cards for this session without deleting generated_npcs.md."
+      >
+        New session
+      </button>
+    </div>
+    <span>{npcs.npcs.length === 1 ? "1 NPC in current session" : `${npcs.npcs.length} NPCs in current session`}</span>
+  </div>
+);

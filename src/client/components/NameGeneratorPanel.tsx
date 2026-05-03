@@ -1,14 +1,14 @@
 import type { KeyboardEvent, SubmitEvent } from "react";
 
-interface AssistantPromptPanelProps {
+interface NameGeneratorPanelProps {
   disabled: boolean;
   onPromptChange: (prompt: string) => void;
   onSubmit: () => void;
   prompt: string;
 }
 
-/** Renders the standard assistant prompt form. */
-export const AssistantPromptPanel = ({ disabled, onPromptChange, onSubmit, prompt }: AssistantPromptPanelProps) => {
+/** Renders the NPC name generator prompt form. */
+export const NameGeneratorPanel = ({ disabled, onPromptChange, onSubmit, prompt }: NameGeneratorPanelProps) => {
   const submitPrompt = (event: SubmitEvent<HTMLFormElement>): void => {
     event.preventDefault();
     onSubmit();
@@ -22,18 +22,22 @@ export const AssistantPromptPanel = ({ disabled, onPromptChange, onSubmit, promp
   };
 
   return (
-    <form className="panel" aria-labelledby="assistant-heading" onSubmit={submitPrompt}>
-      <h2 id="assistant-heading">Assistant</h2>
+    <form className="panel" aria-labelledby="name-generator-heading" onSubmit={submitPrompt}>
+      <h2 id="name-generator-heading">Name Generator</h2>
       <textarea
         value={prompt}
         onChange={(event) => onPromptChange(event.currentTarget.value)}
         onKeyDown={submitOnEnter}
-        placeholder="Ask about Eberron lore, campaign notes, PDFs, or articles."
+        placeholder="Generate three Aundairian goblin NPCs for a border town."
         disabled={disabled}
-        title="Ask a grounded assistant question using the configured corpus and additional context."
+        title="Generate Eberron-appropriate NPC names, descriptions, and short bios."
       />
-      <button type="submit" disabled={disabled || prompt.trim().length === 0} title="Submit this prompt to the assistant.">
-        Ask
+      <button
+        type="submit"
+        disabled={disabled || prompt.trim().length === 0}
+        title="Generate NPC cards from this prompt."
+      >
+        Generate
       </button>
     </form>
   );

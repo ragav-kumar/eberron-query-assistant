@@ -8,6 +8,11 @@ import { createOpenAiChatAdapter, createOpenAiEmbeddingAdapter, type ChatAdapter
 import type { ProgressReporter } from "../progress/reporter.js";
 import { createSqliteRetrievalService, type RetrievalService } from "../retrieval/index.js";
 import { createAssistantSession, type AssistantSession } from "../runtime/assistant-session.js";
+import {
+  createNpcGenerationSession,
+  type GeneratedNpc,
+  type NpcGenerationSession
+} from "../runtime/npc-session.js";
 import { runStartupRefresh } from "../runtime/refresh.js";
 import {
   createSessionLog,
@@ -23,12 +28,15 @@ import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../ty
 export interface WebApp {
   askAssistant(prompt: string): Promise<WebOperationResult>;
   debugRetrieval(query: string): Promise<WebOperationResult>;
+  generateNpcs(prompt: string): Promise<WebOperationResult>;
   getConsole(): WebConsoleResponse;
   getContext(): Promise<string>;
   getLog(filePath?: string): Promise<WebLogResponse>;
+  getNpcs(): WebNpcResponse;
   getStatus(): WebStatus;
   refresh(forceReingest: boolean): Promise<WebOperationResult>;
-  startNewSession(): Promise<WebLogResponse>;
+  startNewSession(mode: WebSessionMode): Promise<WebOperationResult>;
+  switchSessionMode(mode: WebSessionMode): Promise<WebOperationResult>;
   writeContext(markdown: string): Promise<void>;
 }
 
@@ -39,6 +47,7 @@ export interface WebAppDependencies {
   discovery?: SourceDiscoveryService;
   ingestion?: IngestionService;
   log?: SessionLog;
+  npcSession?: NpcGenerationSession;
   retrieval?: RetrievalService;
   stateStore?: StateStore;
 }
@@ -67,9 +76,16 @@ export interface WebConsoleResponse {
 export interface WebOperationResult {
   console: WebConsoleResponse;
   log: WebLogResponse;
+  npcs: WebNpcResponse;
   ok: true;
   summary?: StartupRefreshSummary;
 }
+
+export interface WebNpcResponse {
+  npcs: GeneratedNpc[];
+}
+
+export type WebSessionMode = "npcs" | "standard";
 
 export interface WebStatus {
   busy: boolean;
@@ -83,6 +99,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   let log: SessionLog | null = dependencies.log ?? null;
   let displayedLogFilePath: string | null = log?.filePath ?? null;
   let assistant: AssistantSession | null = dependencies.assistant ?? null;
+  let npcSession: NpcGenerationSession | null = dependencies.npcSession ?? null;
   let hasRoutineRefresh = false;
   const consoleFeed = createMemoryConsoleFeed();
 
@@ -111,6 +128,19 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     });
     return assistant;
   };
+  const ensureNpcSession = (): NpcGenerationSession => {
+    npcSession ??= createNpcGenerationSession({
+      assistant: config.assistant,
+      chat: dependencies.chat ?? createOpenAiChatAdapter(config.provider),
+      logDir: config.logDir,
+      retrieval
+    });
+    return npcSession;
+  };
+
+  const readNpcs = (): WebNpcResponse => ({
+    npcs: npcSession?.read() ?? []
+  });
 
   const readLog = async (selectedFilePath?: string): Promise<WebLogResponse> => {
     if (selectedFilePath !== undefined) {
@@ -189,6 +219,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     async askAssistant(prompt) {
       return runExclusive("assistant", async () => {
         try {
+          npcSession = null;
           await ensureRoutineRefresh();
           await (await ensureAssistant()).ask(prompt);
         } catch (error) {
@@ -198,7 +229,8 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
         return {
           ok: true,
           console: consoleFeed.read(),
-          log: await readLog()
+          log: await readLog(),
+          npcs: readNpcs()
         };
       });
     },
@@ -218,7 +250,28 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
         return {
           ok: true,
           console: consoleFeed.read(),
-          log: await readLog()
+          log: await readLog(),
+          npcs: readNpcs()
+        };
+      });
+    },
+    async generateNpcs(prompt) {
+      return runExclusive("npcs", async () => {
+        try {
+          log = null;
+          assistant = null;
+          displayedLogFilePath = null;
+          await ensureRoutineRefresh();
+          await ensureNpcSession().generate(prompt);
+        } catch (error) {
+          consoleFeed.error(`NPC generation failed: ${formatThrownValue(error)}`);
+          throw error;
+        }
+        return {
+          ok: true,
+          console: consoleFeed.read(),
+          log: await readLog(),
+          npcs: readNpcs()
         };
       });
     },
@@ -230,6 +283,9 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       return readFile(config.assistant.additionalContextPath, "utf8");
     },
     getLog: readLog,
+    getNpcs() {
+      return readNpcs();
+    },
     getStatus() {
       return {
         busy: activeOperation !== null,
@@ -243,16 +299,43 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           ok: true,
           console: consoleFeed.read(),
           summary,
-          log: await readLog()
+          log: await readLog(),
+          npcs: readNpcs()
         };
       });
     },
-    async startNewSession() {
+    async startNewSession(mode) {
       return runExclusive("new-session", async () => {
-        log = null;
-        assistant = null;
-        displayedLogFilePath = null;
-        return readLog();
+        if (mode === "npcs") {
+          ensureNpcSession().reset();
+        } else {
+          log = null;
+          assistant = null;
+          displayedLogFilePath = null;
+        }
+        return {
+          ok: true,
+          console: consoleFeed.read(),
+          log: await readLog(),
+          npcs: readNpcs()
+        };
+      });
+    },
+    async switchSessionMode(mode) {
+      return runExclusive("switch-session-mode", async () => {
+        if (mode === "npcs") {
+          log = null;
+          assistant = null;
+          displayedLogFilePath = null;
+        } else {
+          npcSession = null;
+        }
+        return {
+          ok: true,
+          console: consoleFeed.read(),
+          log: await readLog(),
+          npcs: readNpcs()
+        };
       });
     },
     async writeContext(markdown) {

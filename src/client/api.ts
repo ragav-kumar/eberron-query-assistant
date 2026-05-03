@@ -12,6 +12,17 @@ export interface ApiLogFile {
   label: string;
 }
 
+export interface ApiNpc {
+  bio: string;
+  description: string;
+  id: number;
+  name: string;
+}
+
+export interface ApiNpcResponse {
+  npcs: ApiNpc[];
+}
+
 export type ApiConsoleLevel = "debug" | "error" | "info" | "warn";
 
 export interface ApiConsoleEntry {
@@ -33,8 +44,11 @@ export interface ApiStatus {
 export interface ApiOperationResult {
   console: ApiConsole;
   log: ApiLog;
+  npcs: ApiNpcResponse;
   ok: true;
 }
+
+export type ApiSessionMode = "npcs" | "standard";
 
 export const getStatus = async (): Promise<ApiStatus> => {
   return requestJson<ApiStatus>("/api/status");
@@ -47,6 +61,10 @@ export const getLog = async (filePath?: string): Promise<ApiLog> => {
 
 export const getConsole = async (): Promise<ApiConsole> => {
   return requestJson<ApiConsole>("/api/console");
+};
+
+export const getNpcs = async (): Promise<ApiNpcResponse> => {
+  return requestJson<ApiNpcResponse>("/api/npcs");
 };
 
 export const getContext = async (): Promise<string> => {
@@ -68,6 +86,13 @@ export const askAssistant = async (prompt: string): Promise<ApiOperationResult> 
   });
 };
 
+export const generateNpcs = async (prompt: string): Promise<ApiOperationResult> => {
+  return requestJson<ApiOperationResult>("/api/npcs", {
+    method: "POST",
+    body: JSON.stringify({ prompt })
+  });
+};
+
 export const debugRetrieval = async (query: string): Promise<ApiOperationResult> => {
   return requestJson<ApiOperationResult>("/api/debug-retrieval", {
     method: "POST",
@@ -82,9 +107,17 @@ export const refresh = async (forceReingest: boolean): Promise<ApiOperationResul
   });
 };
 
-export const startNewLogSession = async (): Promise<ApiLog> => {
-  return requestJson<ApiLog>("/api/log/session", {
-    method: "POST"
+export const startNewSession = async (mode: ApiSessionMode): Promise<ApiOperationResult> => {
+  return requestJson<ApiOperationResult>("/api/log/session", {
+    method: "POST",
+    body: JSON.stringify({ mode })
+  });
+};
+
+export const switchSessionMode = async (mode: ApiSessionMode): Promise<ApiOperationResult> => {
+  return requestJson<ApiOperationResult>("/api/session", {
+    method: "POST",
+    body: JSON.stringify({ mode })
   });
 };
 

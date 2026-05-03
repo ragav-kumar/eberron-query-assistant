@@ -52,12 +52,24 @@ const handleApiRequest = async (
   }
 
   if (request.method === "POST" && url.pathname === "/api/log/session") {
-    writeJson(response, 200, await app.startNewSession());
+    const body = await readJsonBody(request);
+    writeJson(response, 200, await app.startNewSession(readSessionModeField(body)));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/session") {
+    const body = await readJsonBody(request);
+    writeJson(response, 200, await app.switchSessionMode(readSessionModeField(body)));
     return;
   }
 
   if (request.method === "GET" && url.pathname === "/api/console") {
     writeJson(response, 200, app.getConsole());
+    return;
+  }
+
+  if (request.method === "GET" && url.pathname === "/api/npcs") {
+    writeJson(response, 200, app.getNpcs());
     return;
   }
 
@@ -76,6 +88,12 @@ const handleApiRequest = async (
   if (request.method === "POST" && url.pathname === "/api/assistant") {
     const body = await readJsonBody(request);
     writeJson(response, 200, await app.askAssistant(readStringField(body, "prompt")));
+    return;
+  }
+
+  if (request.method === "POST" && url.pathname === "/api/npcs") {
+    const body = await readJsonBody(request);
+    writeJson(response, 200, await app.generateNpcs(readStringField(body, "prompt")));
     return;
   }
 
@@ -121,6 +139,17 @@ const readBooleanField = (body: unknown, field: string): boolean => {
   }
 
   return body[field];
+};
+
+const readSessionModeField = (body: unknown): "npcs" | "standard" => {
+  if (!isRecord(body) || body.mode === undefined) {
+    return "standard";
+  }
+  if (body.mode === "npcs" || body.mode === "standard") {
+    return body.mode;
+  }
+
+  throw new Error("Expected JSON session mode field to be standard or npcs.");
 };
 
 const writeJson = (response: ServerResponse, statusCode: number, body: unknown): void => {

@@ -25,6 +25,7 @@ export interface SessionLogFile {
 }
 
 const FALLBACK_TITLE = "Untitled Session";
+const NON_TRANSCRIPT_LOG_FILES = new Set(["generated_npcs.md"]);
 
 export const createSessionLog = async (request: SessionLogCreateRequest): Promise<SessionLog> => {
   const startedAt = request.now ?? new Date();
@@ -101,7 +102,12 @@ export const listSessionLogFiles = async (
 
   const activeResolved = activeFilePath ? path.resolve(activeFilePath) : null;
   return entries
-    .filter((entry) => entry.isFile() && path.extname(entry.name).toLowerCase() === ".md")
+    .filter(
+      (entry) =>
+        entry.isFile() &&
+        path.extname(entry.name).toLowerCase() === ".md" &&
+        !NON_TRANSCRIPT_LOG_FILES.has(entry.name.toLowerCase())
+    )
     .map((entry) => {
       const filePath = path.join(logDir, entry.name);
       return {

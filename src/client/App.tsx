@@ -3,15 +3,21 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   askAssistant,
   debugRetrieval,
+  generateNpcs,
   getConsole,
   getContext,
   getLog,
+  getNpcs,
   getStatus,
   refresh,
-  startNewLogSession,
+  startNewSession,
+  switchSessionMode,
   writeContext,
   type ApiConsole,
   type ApiLog,
+  type ApiNpcResponse,
+  type ApiOperationResult,
+  type ApiSessionMode,
   type ApiStatus
 } from "./api.js";
 import { AppHeader } from "./components/AppHeader.js";
@@ -30,16 +36,21 @@ const EMPTY_LOG: ApiLog = {
   markdown: "",
   readOnly: false
 };
+const EMPTY_NPCS: ApiNpcResponse = {
+  npcs: []
+};
 
 /** Coordinates API state and composes the local assistant browser UI. */
 export const App = () => {
   const [assistantPrompt, setAssistantPrompt] = useState("");
   const [debugQuery, setDebugQuery] = useState("");
+  const [nameGeneratorPrompt, setNameGeneratorPrompt] = useState("");
   const [contextMarkdown, setContextMarkdown] = useState("");
   const [lastSavedContext, setLastSavedContext] = useState("");
   const [contextLoaded, setContextLoaded] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState<ApiConsole>({ entries: [] });
   const [log, setLog] = useState<ApiLog>(EMPTY_LOG);
+  const [npcs, setNpcs] = useState<ApiNpcResponse>(EMPTY_NPCS);
   const [status, setStatus] = useState<ApiStatus>({ busy: false, operation: null });
   const [error, setError] = useState<string | null>(null);
   const [leftTab, setLeftTab] = useState<LeftTab>("input");
@@ -52,10 +63,11 @@ export const App = () => {
   }, []);
 
   const refreshStatusAndOutputs = useCallback(async () => {
-    const [nextStatus, nextLog, nextConsole] = await Promise.all([getStatus(), getLog(), getConsole()]);
+    const [nextStatus, nextLog, nextConsole, nextNpcs] = await Promise.all([getStatus(), getLog(), getConsole(), getNpcs()]);
     setStatus(nextStatus);
     setLog(nextLog);
     setConsoleOutput(nextConsole);
+    setNpcs(nextNpcs);
   }, []);
 
   useEffect(() => {
@@ -120,13 +132,14 @@ export const App = () => {
   );
 
   const runOperation = useCallback(
-    async (operation: () => Promise<{ console: ApiConsole; log: ApiLog }>) => {
+    async (operation: () => Promise<ApiOperationResult>) => {
       setError(null);
       setStatus({ busy: true, operation: "request" });
       try {
         const result = await operation();
         setLog(result.log);
         setConsoleOutput(result.console);
+        setNpcs(result.npcs);
       } catch (requestError) {
         setError(formatError(requestError));
         await refreshStatusAndOutputs();
@@ -144,7 +157,18 @@ export const App = () => {
     }
     setAssistantPrompt("");
     void runOperation(() => askAssistant(prompt));
+    setOutputTab("log");
   }, [assistantPrompt, isBusy, runOperation]);
+
+  const submitNameGeneratorPrompt = useCallback(() => {
+    const prompt = nameGeneratorPrompt.trim();
+    if (prompt.length === 0 || isBusy) {
+      return;
+    }
+    setNameGeneratorPrompt("");
+    void runOperation(() => generateNpcs(prompt));
+    setOutputTab("npcs");
+  }, [isBusy, nameGeneratorPrompt, runOperation]);
 
   const submitDebugQuery = useCallback(() => {
     const query = debugQuery.trim();
@@ -181,14 +205,46 @@ export const App = () => {
       });
   }, []);
 
-  const startNewSession = useCallback(() => {
+  const changeInputMode = useCallback(
+    (mode: InputMode) => {
+      if (mode === inputMode) {
+        return;
+      }
+      setInputMode(mode);
+      if (isBusy || (mode !== "standard" && mode !== "name-generator")) {
+        return;
+      }
+      const sessionMode: ApiSessionMode = mode === "name-generator" ? "npcs" : "standard";
+      setError(null);
+      setStatus({ busy: true, operation: "switch-session-mode" });
+      void switchSessionMode(sessionMode)
+        .then((result) => {
+          setLog(result.log);
+          setConsoleOutput(result.console);
+          setNpcs(result.npcs);
+        })
+        .catch((requestError: unknown) => {
+          setError(formatError(requestError));
+        })
+        .finally(() => {
+          void refreshStatus();
+        });
+    },
+    [inputMode, isBusy, refreshStatus]
+  );
+
+  const startSession = useCallback((mode: ApiSessionMode) => {
     if (isBusy) {
       return;
     }
     setError(null);
     setStatus({ busy: true, operation: "new-session" });
-    void startNewLogSession()
-      .then(setLog)
+    void startNewSession(mode)
+      .then((result) => {
+        setLog(result.log);
+        setConsoleOutput(result.console);
+        setNpcs(result.npcs);
+      })
       .catch((requestError: unknown) => {
         setError(formatError(requestError));
       })
@@ -211,13 +267,16 @@ export const App = () => {
           inputMode={inputMode}
           isBusy={isBusy}
           leftTab={leftTab}
+          nameGeneratorPrompt={nameGeneratorPrompt}
           onAssistantPromptChange={setAssistantPrompt}
           onContextChange={setContextMarkdown}
           onDebugQueryChange={setDebugQuery}
-          onInputModeChange={setInputMode}
+          onInputModeChange={changeInputMode}
           onLeftTabChange={setLeftTab}
+          onNameGeneratorPromptChange={setNameGeneratorPrompt}
           onSubmitAssistant={submitAssistantPrompt}
           onSubmitDebugQuery={submitDebugQuery}
+          onSubmitNameGenerator={submitNameGeneratorPrompt}
         />
       </section>
 
@@ -225,7 +284,8 @@ export const App = () => {
         consoleOutput={consoleOutput}
         isBusy={isBusy}
         log={log}
-        onNewSession={startNewSession}
+        npcs={npcs}
+        onNewSession={startSession}
         onSelectLog={selectLog}
         onTabChange={setOutputTab}
         tab={outputTab}

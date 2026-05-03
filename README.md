@@ -14,11 +14,11 @@ The local Console output reports what was checked, skipped, refreshed, rebuilt, 
 
 By default, local runtime state and retrieval artifacts are stored under `.eberron-query-assistant/` in the repository.
 Runtime state records the application version for diagnostics only. Routine refresh preserves existing local state and retrieval artifacts across version changes; the app only intentionally clears or force-rebuilds its corpus when you use the force-reingest control.
-Each app session writes assistant exchanges to an active local Markdown transcript under `logs/`, which is gitignored. The right column of the app separates transient Console output from the persisted Markdown Log tab, and both output panes auto-scroll as new content arrives. The Log tab starts empty, can browse saved transcripts with a dropdown, and treats older transcripts as read-only. Standard assistant prompts always write to the current session, creating one lazily when needed. Use `New session` to clear the current conversation and start a fresh transcript on the next assistant answer. These transcripts are not loaded as future assistant memory.
+Each app session writes assistant exchanges to an active local Markdown transcript under `logs/`, which is gitignored. Generated NPC cards are appended separately to `logs/generated_npcs.md`, which is also local-only and append-only. The right column of the app separates transient Console output, the persisted Markdown Log tab, and the current-session NPC cards. The Log tab starts empty, can browse saved transcripts with a dropdown, and treats older transcripts as read-only. Standard assistant prompts always write to the current session, creating one lazily when needed. Name Generator prompts write only to the NPC card session and `generated_npcs.md`. Use `New session` from the active output workflow to clear the Standard conversation or the current NPC cards without deleting existing files. These transcripts and generated NPC logs are not loaded as future assistant memory.
 
 Detailed engineering and historical phased-delivery documentation lives in `docs/specification.md`, historical phase documents, and `docs/enhancements.md`. This README remains focused on the intended finished user experience.
 
-The app opens a local browser UI. The left column contains input tabs for assistant/query workflows and editable additional context. In the Input tab, choose Standard assistant mode, Debug Query mode, or the stubbed Name Generator mode. You can ask direct lore questions, cross-reference campaign data, run debug retrieval queries, refresh the corpus, or ask inference-heavy questions that require combining material across sources. Answers are designed to include a direct response and supporting references when available, such as PDF page citations, article links, or specific foundry entities.
+The app opens a local browser UI. The left column contains input tabs for assistant/query workflows and editable additional context. In the Input tab, choose Standard assistant mode, Debug Query mode, or Name Generator mode. You can ask direct lore questions, cross-reference campaign data, run debug retrieval queries, refresh the corpus, generate lore-aware NPC names and cards, or ask inference-heavy questions that require combining material across sources. Standard answers are designed to include a direct response and supporting references when available, such as PDF page citations, article links, or specific foundry entities. Name Generator answers return structured NPC cards with an id, name, physical description, and very short bio.
 
 ## What It Is For
 - answering Eberron setting and lore questions from your local corpus
@@ -45,7 +45,7 @@ npm install
 npm run start
 ```
 
-Open the Vite URL printed by the command. Use the in-app refresh control for optional routine source checks, the force-reingest control when you need an explicit full rebuild, the Input tab for Standard assistant prompts or Debug Query retrieval inspection, and the Additional Context tab for local assistant-only notes. Press Enter to submit the active input; use Shift+Enter for new lines in the assistant prompt. Use the Console tab for unsaved local operational output and the Log tab to browse saved assistant transcripts, identify whether the displayed transcript is current or read-only, and start a new lazy session.
+Open the Vite URL printed by the command. Use the in-app refresh control for optional routine source checks, the force-reingest control when you need an explicit full rebuild, the Input tab for Standard assistant prompts, Debug Query retrieval inspection, or Name Generator prompts, and the Additional Context tab for local assistant-only notes. Press Enter to submit the active input; use Shift+Enter for new lines in text areas. Use the Console tab for unsaved local operational output, the Log tab to browse saved assistant transcripts, and the NPCs tab to view generated cards for the current session.
 
 ## Example Questions
 - What are the names of the clans of the Znir?
@@ -55,6 +55,7 @@ Open the Vite URL printed by the command. Use the in-app refresh control for opt
 - What are some common magic items or professions that Keith Baker has talked about?
 - Do any of the players have connections to Thrane?
 - Do any of the NPCs in Vathirond have connections to Aundair?
+- Generate three goblin NPCs native to Aundair.
 
 ## Expected Answer Style
 Answers should provide:

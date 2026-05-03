@@ -2,7 +2,7 @@ import { AdditionalContextPanel } from "./AdditionalContextPanel.js";
 import { AssistantPromptPanel } from "./AssistantPromptPanel.js";
 import { DebugQueryPanel } from "./DebugQueryPanel.js";
 import { InputModeSelector } from "./InputModeSelector.js";
-import { NameGeneratorStub } from "./NameGeneratorStub.js";
+import { NameGeneratorPanel } from "./NameGeneratorPanel.js";
 import type { InputMode, LeftTab } from "./ui-types.js";
 
 interface LeftInputColumnProps {
@@ -14,13 +14,16 @@ interface LeftInputColumnProps {
   inputMode: InputMode;
   isBusy: boolean;
   leftTab: LeftTab;
+  nameGeneratorPrompt: string;
   onAssistantPromptChange: (prompt: string) => void;
   onContextChange: (markdown: string) => void;
   onDebugQueryChange: (query: string) => void;
   onInputModeChange: (mode: InputMode) => void;
   onLeftTabChange: (tab: LeftTab) => void;
+  onNameGeneratorPromptChange: (prompt: string) => void;
   onSubmitAssistant: () => void;
   onSubmitDebugQuery: () => void;
+  onSubmitNameGenerator: () => void;
 }
 
 /** Owns the left-side input tabs and renders the active input or context editor surface. */
@@ -33,13 +36,16 @@ export const LeftInputColumn = ({
   inputMode,
   isBusy,
   leftTab,
+  nameGeneratorPrompt,
   onAssistantPromptChange,
   onContextChange,
   onDebugQueryChange,
   onInputModeChange,
   onLeftTabChange,
+  onNameGeneratorPromptChange,
   onSubmitAssistant,
-  onSubmitDebugQuery
+  onSubmitDebugQuery,
+  onSubmitNameGenerator
 }: LeftInputColumnProps) => (
   <>
     <div className="tab-list" role="tablist" aria-label="Left column tabs">
@@ -84,7 +90,14 @@ export const LeftInputColumn = ({
             query={debugQuery}
           />
         ) : null}
-        {inputMode === "name-generator" ? <NameGeneratorStub /> : null}
+        {inputMode === "name-generator" ? (
+          <NameGeneratorPanel
+            disabled={isBusy}
+            onPromptChange={onNameGeneratorPromptChange}
+            onSubmit={onSubmitNameGenerator}
+            prompt={nameGeneratorPrompt}
+          />
+        ) : null}
       </div>
     ) : (
       <div className="tab-panel" role="tabpanel">

@@ -210,17 +210,200 @@ describe("web app API model", () => {
     const first = await app.askAssistant("First question");
     const firstFiles = await readdir(config.logDir);
 
-    const reset = await app.startNewSession();
+    const reset = await app.startNewSession("standard");
     const filesAfterReset = await readdir(config.logDir);
     const second = await app.askAssistant("Second question");
 
-    expect(reset.filePath).toBeNull();
-    expect(reset.activeFilePath).toBeNull();
+    expect(reset.log.filePath).toBeNull();
+    expect(reset.log.activeFilePath).toBeNull();
     expect(filesAfterReset).toEqual(firstFiles);
     expect(second.log.filePath).not.toBe(first.log.filePath);
     expect(second.log.markdown).toContain("Second question");
     const secondMessages = chat.mock.calls[1]?.[0] as Array<{ content: string }> | undefined;
     expect(secondMessages?.[0]?.content).toContain("<session-title>");
+  });
+
+  it("generates NPC cards, appends generated_npcs.md, and keeps transcript logs separate", async () => {
+    const config = await writeConfig("npcs");
+    const retrievalFixture = mockRetrieval([result()]);
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      retrieval: retrievalFixture.retrieval,
+      chat: {
+        complete: vi.fn().mockResolvedValue(
+          JSON.stringify({
+            npcs: [
+              {
+                id: 1,
+                name: "Jala ir'Wynarn",
+                description: "A sharp-eyed Aundairian envoy in travel-stained blue.",
+                bio: "She trades favors along the border."
+              }
+            ]
+          })
+        )
+      }
+    });
+
+    const response = await app.generateNpcs("Generate one Aundairian envoy");
+
+    expect(response.npcs.npcs).toEqual([
+      {
+        id: 1,
+        name: "Jala ir'Wynarn",
+        description: "A sharp-eyed Aundairian envoy in travel-stained blue.",
+        bio: "She trades favors along the border."
+      }
+    ]);
+    expect(retrievalFixture.retrieval.refresh).toHaveBeenCalledWith(config, { forceRebuild: false });
+    expect(await readFile(path.join(config.logDir, "generated_npcs.md"), "utf8")).toContain("### 1. Jala ir'Wynarn");
+    expect(response.log.files.map((file) => file.label)).not.toContain("generated_npcs.md");
+    expect(response.log).toEqual(emptyLogResponse());
+  });
+
+  it("patches same-session NPC cards by id and appends revisions", async () => {
+    const config = await writeConfig("npc-patch");
+    const chat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          npcs: [
+            {
+              id: 1,
+              name: "Graak",
+              description: "A goblin courier with soot-dark leathers.",
+              bio: "He knows the fastest alleys."
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          npcs: [
+            {
+              id: 1,
+              name: "Gara ir'Lantar",
+              description: "A polished Aundairian goblin with a duelist's posture.",
+              bio: "She carries messages for a minor arcane house."
+            },
+            {
+              id: 2,
+              name: "Tavin d'Orien",
+              description: "A broad-shouldered courier with a marked palm.",
+              bio: "He keeps her routes discreet."
+            }
+          ]
+        })
+      );
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: chat }
+    });
+
+    await app.generateNpcs("Generate a goblin NPC");
+    const response = await app.generateNpcs("Make that goblin native to Aundair and add a contact");
+
+    expect(response.npcs.npcs.map((npc) => `${npc.id}:${npc.name}`)).toEqual(["1:Gara ir'Lantar", "2:Tavin d'Orien"]);
+    const logText = await readFile(path.join(config.logDir, "generated_npcs.md"), "utf8");
+    expect(logText).toContain("### 1. Graak");
+    expect(logText).toContain("### 1. Gara ir'Lantar");
+    expect(logText).toContain("### 2. Tavin d'Orien");
+  });
+
+  it("clears NPC session state with new session without deleting generated_npcs.md", async () => {
+    const config = await writeConfig("npc-new-session");
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: {
+        complete: vi.fn().mockResolvedValue(
+          JSON.stringify({
+            npcs: [
+              {
+                id: 1,
+                name: "Jala ir'Wynarn",
+                description: "A sharp-eyed Aundairian envoy.",
+                bio: "She trades favors."
+              }
+            ]
+          })
+        )
+      }
+    });
+
+    await app.generateNpcs("Generate one Aundairian envoy");
+    const reset = await app.startNewSession("npcs");
+
+    expect(reset.npcs.npcs).toEqual([]);
+    expect(await readFile(path.join(config.logDir, "generated_npcs.md"), "utf8")).toContain("Jala ir'Wynarn");
+  });
+
+  it("switches between standard and NPC sessions without keeping parallel session state", async () => {
+    const config = await writeConfig("session-switch");
+    const chat = vi
+      .fn()
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          npcs: [
+            {
+              id: 1,
+              name: "Jala ir'Wynarn",
+              description: "A sharp-eyed Aundairian envoy.",
+              bio: "She trades favors."
+            }
+          ]
+        })
+      )
+      .mockResolvedValueOnce("<session-title>Standard</session-title>\n<answer>\nStandard answer.\n</answer>");
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: chat }
+    });
+
+    const npcResponse = await app.generateNpcs("Generate one envoy");
+    const standardMode = await app.switchSessionMode("standard");
+    const assistantResponse = await app.askAssistant("What about Aerenal?");
+
+    expect(npcResponse.npcs.npcs).toHaveLength(1);
+    expect(standardMode.npcs.npcs).toEqual([]);
+    expect(assistantResponse.npcs.npcs).toEqual([]);
+    expect(assistantResponse.log.markdown).toContain("Standard answer.");
+  });
+
+  it("rejects empty NPC prompts", async () => {
+    const app = createWebApp({
+      config: await writeConfig("empty-npc"),
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("{}") }
+    });
+
+    await expect(app.generateNpcs("   ")).rejects.toThrow("NPC generation prompt cannot be empty.");
+  });
+
+  it("writes NPC failures to console instead of generated_npcs.md", async () => {
+    const config = await writeConfig("npc-error");
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("not json") }
+    });
+
+    await expect(app.generateNpcs("Generate one NPC")).rejects.toThrow();
+
+    expect(app.getConsole().entries.map((entry) => `${entry.level}:${entry.message}`).join("\n")).toContain(
+      "error:NPC generation failed:"
+    );
+    await expect(readFile(path.join(config.logDir, "generated_npcs.md"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT"
+    });
   });
 
   it("writes assistant failures to console instead of transcript logs", async () => {

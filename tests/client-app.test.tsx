@@ -29,12 +29,15 @@ vi.mock("@mdxeditor/editor", () => ({
 vi.mock("../src/client/api.js", () => ({
   askAssistant: vi.fn(),
   debugRetrieval: vi.fn(),
+  generateNpcs: vi.fn(),
   getConsole: vi.fn(),
   getContext: vi.fn(),
   getLog: vi.fn(),
+  getNpcs: vi.fn(),
   getStatus: vi.fn(),
   refresh: vi.fn(),
-  startNewLogSession: vi.fn(),
+  startNewSession: vi.fn(),
+  switchSessionMode: vi.fn(),
   writeContext: vi.fn()
 }));
 
@@ -63,20 +66,28 @@ const initialConsole = {
   ]
 };
 
+const emptyNpcs = (): api.ApiNpcResponse => ({
+  npcs: []
+});
+
+const operationResult = (overrides: Partial<api.ApiOperationResult> = {}): api.ApiOperationResult => ({
+  ok: true,
+  console: initialConsole,
+  log: initialLog,
+  npcs: emptyNpcs(),
+  ...overrides
+});
+
 beforeEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
   vi.mocked(api.getContext).mockResolvedValue("");
   vi.mocked(api.getConsole).mockResolvedValue(initialConsole);
   vi.mocked(api.getLog).mockResolvedValue(initialLog);
+  vi.mocked(api.getNpcs).mockResolvedValue(emptyNpcs());
   vi.mocked(api.getStatus).mockResolvedValue({ busy: false, operation: null });
-  vi.mocked(api.askAssistant).mockResolvedValue({
-    ok: true,
-    console: initialConsole,
-    log: { ...initialLog, markdown: "## Assistant\n\nAnswer" }
-  });
-  vi.mocked(api.debugRetrieval).mockResolvedValue({
-    ok: true,
+  vi.mocked(api.askAssistant).mockResolvedValue(operationResult({ log: { ...initialLog, markdown: "## Assistant\n\nAnswer" } }));
+  vi.mocked(api.debugRetrieval).mockResolvedValue(operationResult({
     console: {
       entries: [
         {
@@ -86,11 +97,21 @@ beforeEach(() => {
           timestamp: "2026-05-02T12:00:01.000Z"
         }
       ]
-    },
-    log: initialLog
-  });
-  vi.mocked(api.refresh).mockResolvedValue({
-    ok: true,
+    }
+  }));
+  vi.mocked(api.generateNpcs).mockResolvedValue(operationResult({
+    npcs: {
+      npcs: [
+        {
+          id: 1,
+          name: "Jala ir'Wynarn",
+          description: "A sharp-eyed Aundairian envoy in travel-stained blue.",
+          bio: "She trades favors along the border."
+        }
+      ]
+    }
+  }));
+  vi.mocked(api.refresh).mockResolvedValue(operationResult({
     console: {
       entries: [
         {
@@ -100,10 +121,10 @@ beforeEach(() => {
           timestamp: "2026-05-02T12:00:02.000Z"
         }
       ]
-    },
-    log: initialLog
-  });
-  vi.mocked(api.startNewLogSession).mockResolvedValue(emptyLog());
+    }
+  }));
+  vi.mocked(api.startNewSession).mockResolvedValue(operationResult({ log: emptyLog() }));
+  vi.mocked(api.switchSessionMode).mockResolvedValue(operationResult());
   vi.mocked(api.writeContext).mockResolvedValue(undefined);
 });
 
@@ -120,6 +141,7 @@ describe("App", () => {
     expect(screen.getByRole("tab", { name: "Additional Context" }).getAttribute("aria-selected")).toBe("false");
     expect(screen.getByRole("tab", { name: "Console" }).getAttribute("aria-selected")).toBe("false");
     expect(screen.getByRole("tab", { name: "Log" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByRole("tab", { name: "NPCs" }).getAttribute("aria-selected")).toBe("false");
   });
 
   it("switches input modes with the radio group", async () => {
@@ -133,7 +155,7 @@ describe("App", () => {
     expect(screen.queryByPlaceholderText(/Ask about Eberron/i)).toBeNull();
 
     fireEvent.click(screen.getByRole("radio", { name: "Name Generator" }));
-    expect(screen.getByText("Name generator mode is not implemented yet.")).toBeTruthy();
+    expect(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i)).toBeTruthy();
     expect(screen.queryByPlaceholderText("aerenal deathless")).toBeNull();
   });
 
@@ -197,6 +219,69 @@ describe("App", () => {
     await waitFor(() => {
       expect(api.debugRetrieval).toHaveBeenCalledWith("sharn");
     });
+  });
+
+  it("submits name generator prompts and renders NPC cards", async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
+    await waitFor(() => {
+      expect(api.switchSessionMode).toHaveBeenCalledWith("npcs");
+    });
+    fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
+      target: { value: "Generate one Aundairian envoy" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    await waitFor(() => {
+      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one Aundairian envoy");
+    });
+    expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
+    expect(screen.getByText("#1")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "NPCs" }).getAttribute("aria-selected")).toBe("true");
+  });
+
+  it("submits name generator prompts with Enter", async () => {
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
+    await waitFor(() => {
+      expect(api.switchSessionMode).toHaveBeenCalledWith("npcs");
+    });
+    const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
+    fireEvent.change(prompt, {
+      target: { value: "Generate one goblin" }
+    });
+    fireEvent.keyDown(prompt, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one goblin");
+    });
+  });
+
+  it("starts a new NPC session from the NPCs tab", async () => {
+    vi.mocked(api.getNpcs).mockResolvedValue({
+      npcs: [
+        {
+          id: 1,
+          name: "Jala ir'Wynarn",
+          description: "A sharp-eyed Aundairian envoy.",
+          bio: "She trades favors."
+        }
+      ]
+    });
+    vi.mocked(api.startNewSession).mockResolvedValue(operationResult({ npcs: emptyNpcs() }));
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("tab", { name: "NPCs" }));
+    expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "New session" }));
+
+    await waitFor(() => {
+      expect(api.startNewSession).toHaveBeenCalledWith("npcs");
+    });
+    expect(await screen.findByText("Generate NPCs to show cards for this session.")).toBeTruthy();
   });
 
   it("persists additional context edits", async () => {
@@ -288,7 +373,7 @@ describe("App", () => {
     fireEvent.click(await screen.findByRole("button", { name: "New session" }));
 
     await waitFor(() => {
-      expect(api.startNewLogSession).toHaveBeenCalled();
+      expect(api.startNewSession).toHaveBeenCalledWith("standard");
     });
     expect(await screen.findByText("No log selected")).toBeTruthy();
     expect(await screen.findByText("Submit an assistant prompt to start the log.")).toBeTruthy();
@@ -312,14 +397,12 @@ describe("App", () => {
       markdown: "# Old Session",
       readOnly: true
     });
-    vi.mocked(api.askAssistant).mockResolvedValue({
-      ok: true,
-      console: initialConsole,
+    vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
       log: {
         ...initialLog,
         markdown: "# GUI Session\n\n## Assistant\n\nNew answer."
       }
-    });
+    }));
 
     render(<App />);
 

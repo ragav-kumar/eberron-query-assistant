@@ -28,11 +28,11 @@ Verification added or preserved for this change covers package metadata and scri
 
 ## GUI Input And Output Tabs
 
-The browser UI separates left-side inputs from right-side outputs. The left column has `Input` and `Additional Context` tabs; the `Input` tab uses radio buttons for Standard assistant prompts, Debug Query retrieval inspection, and a stubbed Name Generator mode.
+The browser UI separates left-side inputs from right-side outputs. The left column has `Input` and `Additional Context` tabs; the `Input` tab uses radio buttons for Standard assistant prompts, Debug Query retrieval inspection, and Name Generator mode.
 
-The right column has a transient plain-text `Console` feed for local progress, refresh, debug, warning, and error output, plus a persisted Markdown `Log` tab for assistant transcript output. Console output is process-local, is not written to `logs/`, and both Console and Log auto-scroll as new output arrives.
+The right column has a transient plain-text `Console` feed for local progress, refresh, debug, warning, and error output, a persisted Markdown `Log` tab for assistant transcript output, and an `NPCs` tab for current-session generated NPC cards. Console output is process-local, is not written to `logs/`, and output panes auto-scroll as new output arrives.
 
-Assistant and debug-query input do not require the user to run refresh manually first. If the current browser-server session has not completed a refresh yet, the app runs a routine refresh automatically before continuing with the requested input. Input panels use unframed layouts rather than cards, and Enter submits the active input mode while Shift+Enter preserves multiline assistant prompts.
+Assistant, name-generator, and debug-query input do not require the user to run refresh manually first. If the current browser-server session has not completed a refresh yet, the app runs a routine refresh automatically before continuing with the requested input. Input panels use unframed layouts rather than cards, and Enter submits the active input mode while Shift+Enter preserves multiline text-area prompts.
 
 Verification added or preserved for this change covers structured console API behavior, transcript separation, tab and radio rendering, autosaved additional context, output auto-scroll, tooltips, and componentized React UI behavior.
 
@@ -43,3 +43,11 @@ The Log tab can browse saved Markdown transcripts from `logs/` with a dropdown. 
 The app initially shows an empty Log pane instead of loading an existing transcript automatically. A `New session` button clears the current writable assistant session and conversation history without creating an empty file; the next successful Standard assistant exchange creates the new transcript. Debug Query, Refresh, and Force reingest still do not create transcript files.
 
 Verification added for this change covers safe log-file listing and selection, read-only historical browsing, active-session writes while viewing history, lazy new-session behavior, and React controls for selecting logs and starting sessions.
+
+## Name Generator NPC Cards
+
+Name Generator mode now asks the assistant for structured NPC records with numeric ids, names, physical descriptions, and very short bios. The model infers the requested count from the prompt, uses retrieval evidence and local assistant context for Eberron accuracy, and can revise current-session NPCs by returning an existing id while assigning new NPCs ids above the current maximum.
+
+Generated NPCs render as cards in the right-column `NPCs` tab and are appended to `logs/generated_npcs.md`. This file is write-only from the UI, is excluded from the transcript browser, and is not loaded as future assistant memory. Switching between Standard and Name Generator closes the other in-memory session; `New session` clears the active Standard transcript session or current NPC cards without deleting append-only log files.
+
+Verification added for this change covers structured NPC parsing, id-based card patching, append-only NPC logging, failure behavior, session switching, `New session` behavior, and React rendering for the Name Generator workflow.

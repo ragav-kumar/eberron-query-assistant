@@ -1,4 +1,4 @@
-import type { FormEvent, KeyboardEvent } from "react";
+import type { KeyboardEvent, SubmitEvent } from "react";
 
 interface DebugQueryPanelProps {
   disabled: boolean;
@@ -9,7 +9,7 @@ interface DebugQueryPanelProps {
 
 /** Renders the retrieval debug input that sends results to the local Console tab. */
 export const DebugQueryPanel = ({ disabled, onQueryChange, onSubmit, query }: DebugQueryPanelProps) => {
-  const submitQuery = (event: FormEvent<HTMLFormElement>): void => {
+  const submitQuery = (event: SubmitEvent<HTMLFormElement>): void => {
     event.preventDefault();
     onSubmit();
   };
