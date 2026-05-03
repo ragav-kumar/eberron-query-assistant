@@ -61,6 +61,11 @@ const handleApiRequest = async (
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/npcs") {
+    writeJson(response, 200, await app.getNpcs());
+    return;
+  }
+
   if (request.method === "PUT" && url.pathname === "/api/context") {
     const body = await readJsonBody(request);
     await app.writeContext(readStringField(body, "markdown"));

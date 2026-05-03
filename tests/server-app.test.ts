@@ -170,6 +170,132 @@ describe("web app API model", () => {
     await expect(app.getLog(path.join(config.logDir, "missing.md"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("reads missing generated NPC state as an empty list", async () => {
+    const app = createWebApp({
+      config: await writeConfig("npc-state-missing"),
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+
+    expect(await app.getNpcs()).toEqual({ npcs: [] });
+  });
+
+  it("reads saved generated NPC state newest first", async () => {
+    const config = await writeConfig("npc-state-read");
+    await mkdir(config.stateDir, { recursive: true });
+    await writeFile(
+      path.join(config.stateDir, "generated-npcs.json"),
+      JSON.stringify([
+        {
+          id: 1,
+          name: "Older",
+          description: "An older NPC.",
+          bio: "They were saved first.",
+          createdAt: "2026-05-01T12:00:00.000Z",
+          updatedAt: "2026-05-01T12:00:00.000Z"
+        },
+        {
+          id: 2,
+          name: "Newer",
+          description: "A newer NPC.",
+          bio: "They were saved second.",
+          createdAt: "2026-05-02T12:00:00.000Z",
+          updatedAt: "2026-05-02T12:00:00.000Z"
+        }
+      ]),
+      "utf8"
+    );
+    const app = createWebApp({
+      config,
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+
+    expect((await app.getNpcs()).npcs.map((npc) => npc.name)).toEqual(["Newer", "Older"]);
+  });
+
+  it("rejects malformed or duplicate generated NPC state", async () => {
+    const malformed = await writeConfig("npc-state-malformed");
+    await mkdir(malformed.stateDir, { recursive: true });
+    await writeFile(path.join(malformed.stateDir, "generated-npcs.json"), "{}", "utf8");
+    const duplicate = await writeConfig("npc-state-duplicate");
+    await mkdir(duplicate.stateDir, { recursive: true });
+    await writeFile(
+      path.join(duplicate.stateDir, "generated-npcs.json"),
+      JSON.stringify([
+        {
+          id: 1,
+          name: "First",
+          description: "First NPC.",
+          bio: "First bio.",
+          createdAt: "2026-05-01T12:00:00.000Z",
+          updatedAt: "2026-05-01T12:00:00.000Z"
+        },
+        {
+          id: 1,
+          name: "Second",
+          description: "Second NPC.",
+          bio: "Second bio.",
+          createdAt: "2026-05-02T12:00:00.000Z",
+          updatedAt: "2026-05-02T12:00:00.000Z"
+        }
+      ]),
+      "utf8"
+    );
+
+    await expect(createWebApp({
+      config: malformed,
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    }).getNpcs()).rejects.toThrow(
+      "Generated NPC state file must contain a JSON array."
+    );
+    await expect(createWebApp({
+      config: duplicate,
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    }).getNpcs()).rejects.toThrow(
+      "Generated NPC state file contains duplicate NPC ids."
+    );
+  });
+
+  it("migrates legacy generated NPC Markdown into runtime state", async () => {
+    const config = await writeConfig("npc-state-migration");
+    await mkdir(config.logDir, { recursive: true });
+    await writeFile(
+      path.join(config.logDir, "generated_npcs.md"),
+      [
+        "## NPC Generation",
+        "",
+        "Prompt: Generate one NPC",
+        "",
+        "### 1. Father Halven ir'Bradd",
+        "",
+        "Description: Lean, middle-aged human priest.",
+        "",
+        "Bio: He keeps Vathirond organized.",
+        ""
+      ].join("\n"),
+      "utf8"
+    );
+    const app = createWebApp({
+      config,
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+
+    expect((await app.getNpcs()).npcs).toEqual([
+      {
+        id: 1,
+        name: "Father Halven ir'Bradd",
+        description: "Lean, middle-aged human priest.",
+        bio: "He keeps Vathirond organized."
+      }
+    ]);
+    expect(await readFile(path.join(config.stateDir, "generated-npcs.json"), "utf8")).toContain("Father Halven ir'Bradd");
+    expect(await readFile(path.join(config.logDir, "generated_npcs.md"), "utf8")).toContain("## NPC Generation");
+  });
+
   it("keeps historical log browsing read-only while assistant prompts write to the active session", async () => {
     const config = await writeConfig("historical-readonly");
     await mkdir(config.logDir, { recursive: true });
@@ -244,7 +370,7 @@ describe("web app API model", () => {
     expect(response.log.markdown).toContain("Plain answer.");
   });
 
-  it("generates NPC cards, appends generated_npcs.md, and keeps transcript logs separate", async () => {
+  it("generates NPC cards, writes generated NPC state, and keeps transcript logs separate", async () => {
     const config = await writeConfig("npcs");
     const retrievalFixture = mockRetrieval([result()]);
     const app = createWebApp({
@@ -278,12 +404,14 @@ describe("web app API model", () => {
       }
     ]);
     expect(retrievalFixture.retrieval.refresh).toHaveBeenCalledWith(config, { forceRebuild: false });
-    expect(await readFile(path.join(config.logDir, "generated_npcs.md"), "utf8")).toContain("### 1. Jala ir'Wynarn");
+    const stateText = await readFile(path.join(config.stateDir, "generated-npcs.json"), "utf8");
+    expect(stateText).toContain("\"name\": \"Jala ir'Wynarn\"");
+    expect(stateText).toContain("\"createdAt\"");
     expect(response.log.files.map((file) => file.label)).not.toContain("generated_npcs.md");
     expect(response.log).toEqual(emptyLogResponse());
   });
 
-  it("patches same-session NPC cards by id and appends revisions", async () => {
+  it("patches saved NPC cards by id without duplicating revisions", async () => {
     const config = await writeConfig("npc-patch");
     const chat = vi
       .fn()
@@ -327,14 +455,13 @@ describe("web app API model", () => {
     await app.generateNpcs("Generate a goblin NPC");
     const response = await app.generateNpcs("Make that goblin native to Aundair and add a contact");
 
-    expect(response.npcs.npcs.map((npc) => `${npc.id}:${npc.name}`)).toEqual(["1:Gara ir'Lantar", "2:Tavin d'Orien"]);
-    const logText = await readFile(path.join(config.logDir, "generated_npcs.md"), "utf8");
-    expect(logText).toContain("### 1. Graak");
-    expect(logText).toContain("### 1. Gara ir'Lantar");
-    expect(logText).toContain("### 2. Tavin d'Orien");
+    expect(response.npcs.npcs.map((npc) => `${npc.id}:${npc.name}`)).toEqual(["2:Tavin d'Orien", "1:Gara ir'Lantar"]);
+    const state = JSON.parse(await readFile(path.join(config.stateDir, "generated-npcs.json"), "utf8")) as Array<{ id: number; name: string }>;
+    expect(state.map((npc) => `${npc.id}:${npc.name}`)).toEqual(["1:Gara ir'Lantar", "2:Tavin d'Orien"]);
+    expect(state.some((npc) => npc.name === "Graak")).toBe(false);
   });
 
-  it("clears NPC session state with new session without deleting generated_npcs.md", async () => {
+  it("starts fresh NPC generation context without deleting generated NPC state", async () => {
     const config = await writeConfig("npc-new-session");
     const app = createWebApp({
       config,
@@ -361,7 +488,7 @@ describe("web app API model", () => {
 
     expect(reset.npcs.npcs).toHaveLength(1);
     expect(reset.npcs.npcs[0]?.id).toBe(1);
-    expect(await readFile(path.join(config.logDir, "generated_npcs.md"), "utf8")).toContain("Jala ir'Wynarn");
+    expect(await readFile(path.join(config.stateDir, "generated-npcs.json"), "utf8")).toContain("Jala ir'Wynarn");
   });
 
   it("switches between standard and NPC sessions without keeping parallel session state", async () => {
@@ -392,7 +519,8 @@ describe("web app API model", () => {
     const assistantResponse = await app.askAssistant("What about Aerenal?");
 
     expect(npcResponse.npcs.npcs).toHaveLength(1);
-    expect(assistantResponse.npcs.npcs).toEqual([]);
+    expect(assistantResponse.npcs.npcs).toHaveLength(1);
+    expect(assistantResponse.npcs.npcs[0]?.name).toBe("Jala ir'Wynarn");
     expect(assistantResponse.log.markdown).toContain("Standard answer.");
   });
 
@@ -407,7 +535,7 @@ describe("web app API model", () => {
     await expect(app.generateNpcs("   ")).rejects.toThrow("NPC generation prompt cannot be empty.");
   });
 
-  it("writes NPC failures to operation errors instead of generated_npcs.md", async () => {
+  it("writes NPC failures to operation errors instead of generated NPC state", async () => {
     const config = await writeConfig("npc-error");
     const app = createWebApp({
       config,
@@ -427,7 +555,7 @@ describe("web app API model", () => {
       expect(error.console.entries.some((entry) => entry.message.includes("NPC generation failed:"))).toBe(true);
       expect(error.message.length).toBeGreaterThan(0);
     }
-    await expect(readFile(path.join(config.logDir, "generated_npcs.md"), "utf8")).rejects.toMatchObject({
+    await expect(readFile(path.join(config.stateDir, "generated-npcs.json"), "utf8")).rejects.toMatchObject({
       code: "ENOENT"
     });
   });

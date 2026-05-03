@@ -57,7 +57,7 @@ export const OutputTabs = ({
           aria-selected={tab === "npcs"}
           className={tab === "npcs" ? "tab active" : "tab"}
           onClick={() => onTabChange("npcs")}
-          title="Show generated NPC cards for this session."
+          title="Show saved generated NPC cards."
         >
           NPCs
         </button>
@@ -160,11 +160,11 @@ const NpcToolbar = ({ isBusy, npcs, onNewSession }: NpcToolbarProps) => (
         type="button"
         onClick={() => onNewSession("npcs")}
         disabled={isBusy}
-        title="Clear generated NPC cards for this session without deleting generated_npcs.md."
+        title="Start fresh NPC generation context without deleting saved NPC cards."
       >
         New session
       </button>
     </div>
-    <span>{npcs.npcs.length === 1 ? "1 NPC in current session" : `${npcs.npcs.length} NPCs in current session`}</span>
+    <span>{npcs.npcs.length === 1 ? "1 NPC saved" : `${npcs.npcs.length} NPCs saved`}</span>
   </div>
 );

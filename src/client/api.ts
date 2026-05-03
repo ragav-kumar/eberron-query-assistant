@@ -14,9 +14,11 @@ export interface ApiLogFile {
 
 export interface ApiNpc {
   bio: string;
+  createdAt?: string;
   description: string;
   id: number;
   name: string;
+  updatedAt?: string;
 }
 
 export interface ApiNpcResponse {
@@ -55,6 +57,10 @@ export const getLog = async (options: { filePath?: string; sessionId: string }):
 export const getContext = async (): Promise<string> => {
   const response = await requestJson<{ markdown: string }>("/api/context");
   return response.markdown;
+};
+
+export const getNpcs = async (): Promise<ApiNpcResponse> => {
+  return requestJson<ApiNpcResponse>("/api/npcs");
 };
 
 export const writeContext = async (markdown: string): Promise<void> => {

@@ -31,6 +31,7 @@ export interface WebApp {
   generateNpcs(prompt: string, sessionId?: string): Promise<WebOperationResult>;
   getContext(): Promise<string>;
   getLog(options?: string | { filePath?: string; sessionId?: string }): Promise<WebLogResponse>;
+  getNpcs(): Promise<WebNpcResponse>;
   refresh(forceReingest: boolean): Promise<WebOperationResult>;
   subscribeConsole(listener: WebConsoleListener): () => void;
   writeContext(markdown: string): Promise<void>;
@@ -180,14 +181,14 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     session.npcSession ??= createNpcGenerationSession({
       assistant: config.assistant,
       chat: dependencies.chat ?? createOpenAiChatAdapter(config.provider),
-      logDir: config.logDir,
+      config,
       retrieval
     });
     return session.npcSession;
   };
 
-  const readNpcs = (sessionId: string): WebNpcResponse => ({
-    npcs: readNpcSession(sessionId).npcSession?.read() ?? []
+  const readNpcs = async (sessionId = DEFAULT_SESSION_ID): Promise<WebNpcResponse> => ({
+    npcs: await (readNpcSession(sessionId).npcSession ?? ensureNpcSession(readNpcSession(sessionId))).read()
   });
 
   const readLog = async (options: string | { filePath?: string; sessionId?: string } = {}): Promise<WebLogResponse> => {
@@ -281,7 +282,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           ok: true,
           console: consoleFeed.read(),
           log: await readLog({ sessionId }),
-          npcs: { npcs: [] }
+          npcs: await readNpcs()
         };
       });
     },
@@ -302,7 +303,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           ok: true,
           console: consoleFeed.read(),
           log: emptyLogResponse(await listSessionLogFiles(config.logDir, null)),
-          npcs: { npcs: [] }
+          npcs: await readNpcs()
         };
       });
     },
@@ -321,7 +322,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           ok: true,
           console: consoleFeed.read(),
           log: emptyLogResponse(await listSessionLogFiles(config.logDir, null)),
-          npcs: readNpcs(sessionId)
+          npcs: await readNpcs(sessionId)
         };
       });
     },
@@ -330,6 +331,9 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       return readFile(config.assistant.additionalContextPath, "utf8");
     },
     getLog: readLog,
+    getNpcs() {
+      return readNpcs();
+    },
     async refresh(forceReingest) {
       return runExclusive(forceReingest ? "force-reingest" : "refresh", async () => {
         const summary = await runRefreshTask(forceReingest);
@@ -338,7 +342,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           console: consoleFeed.read(),
           summary,
           log: emptyLogResponse(await listSessionLogFiles(config.logDir, null)),
-          npcs: { npcs: [] }
+          npcs: await readNpcs()
         };
       });
     },

@@ -1,9 +1,7 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
-
 import type { ChatAdapter, ChatMessage } from "../provider/index.js";
 import type { RetrievalService } from "../retrieval/index.js";
-import type { AssistantConfig, RetrievalResult } from "../types.js";
+import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "../types.js";
+import { readGeneratedNpcState, updateGeneratedNpcState } from "./npc-store.js";
 import { formatCitation, loadAssistantPromptAssets, type AssistantPromptAssets } from "./prompt.js";
 
 export interface GeneratedNpc {
@@ -15,7 +13,7 @@ export interface GeneratedNpc {
 
 export interface NpcGenerationSession {
   generate(prompt: string): Promise<NpcGenerationAnswer>;
-  read(): GeneratedNpc[];
+  read(): Promise<GeneratedNpc[]>;
   reset(): void;
 }
 
@@ -27,17 +25,15 @@ export interface NpcGenerationAnswer {
 export interface NpcGenerationSessionOptions {
   assistant: AssistantConfig;
   chat: ChatAdapter;
-  logDir: string;
+  config: RuntimeConfig;
   retrieval: RetrievalService;
 }
 
-const GENERATED_NPCS_LOG_FILE = "generated_npcs.md";
 const MAX_EVIDENCE_RESULTS = 8;
 const MAX_HISTORY_MESSAGES = 8;
 
 export const createNpcGenerationSession = (options: NpcGenerationSessionOptions): NpcGenerationSession => {
   const history: ChatMessage[] = [];
-  let npcs: GeneratedNpc[] = [];
   let promptAssets: AssistantPromptAssets | null = null;
 
   const loadPromptAssets = async (): Promise<AssistantPromptAssets> => {
@@ -56,23 +52,19 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
         query: normalizedPrompt,
         limit: MAX_EVIDENCE_RESULTS
       });
-      const maxExistingId = readMaxNpcId(npcs);
+      const existingNpcs = await readGeneratedNpcState(options.config);
+      const maxExistingId = readMaxNpcId(existingNpcs);
       const messages = buildNpcGenerationMessages({
         evidence,
         history,
         maxExistingId,
-        npcs,
+        npcs: existingNpcs,
         prompt: normalizedPrompt,
         promptAssets: await loadPromptAssets()
       });
       const response = await options.chat.complete(messages);
-      const returnedNpcs = parseNpcGenerationResponse(response, npcs);
-      npcs = mergeNpcsById(npcs, returnedNpcs);
-      await appendGeneratedNpcsLog({
-        logDir: options.logDir,
-        npcs: returnedNpcs,
-        prompt: normalizedPrompt
-      });
+      const returnedNpcs = parseNpcGenerationResponse(response, existingNpcs);
+      const savedNpcs = await updateGeneratedNpcState(options.config, returnedNpcs);
 
       const structuredResponse = JSON.stringify({ npcs: returnedNpcs });
       history.push({ role: "user", content: normalizedPrompt }, { role: "assistant", content: structuredResponse });
@@ -80,15 +72,14 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
 
       return {
         evidence,
-        npcs: readNpcList(npcs)
+        npcs: readNpcList(savedNpcs)
       };
     },
-    read() {
-      return readNpcList(npcs);
+    async read() {
+      return readNpcList(await readGeneratedNpcState(options.config));
     },
     reset() {
       history.splice(0, history.length);
-      npcs = [];
     }
   };
 };
@@ -115,7 +106,7 @@ export const buildNpcGenerationMessages = (request: NpcMessageBuildRequest): Cha
       "Return only strict JSON with this exact shape: {\"npcs\":[{\"id\":number,\"name\":\"...\",\"description\":\"...\",\"bio\":\"...\"}]}",
       "Each description must be a concise physical description.",
       "Each bio must be very short.",
-      "Use existing NPC ids only when revising an NPC already present in the current session.",
+      "Use existing NPC ids only when revising an NPC already present in saved NPC state.",
       `For new NPCs, ids must be greater than ${request.maxExistingId}.`,
       "Do not include markdown, commentary, citations, or regular assistant prose in the response."
     ].join("\n")
@@ -133,7 +124,7 @@ export const buildNpcGenerationMessages = (request: NpcMessageBuildRequest): Cha
         "Retrieved evidence:",
         formatEvidenceForNpcPrompt(request.evidence),
         "",
-        "Current NPCs in this session:",
+        "Saved NPCs:",
         request.npcs.length > 0 ? JSON.stringify({ npcs: request.npcs }) : "[]",
         "",
         `Prompt: ${request.prompt}`
@@ -188,41 +179,6 @@ const readGeneratedNpc = (value: unknown): GeneratedNpc => {
   return npc;
 };
 
-const mergeNpcsById = (current: GeneratedNpc[], updates: GeneratedNpc[]): GeneratedNpc[] => {
-  const merged = new Map(current.map((npc) => [npc.id, npc]));
-  for (const update of updates) {
-    merged.set(update.id, update);
-  }
-  return [...merged.values()].sort((left, right) => left.id - right.id);
-};
-
-const appendGeneratedNpcsLog = async (request: {
-  logDir: string;
-  npcs: GeneratedNpc[];
-  prompt: string;
-}): Promise<void> => {
-  await mkdir(request.logDir, { recursive: true });
-  const filePath = path.join(request.logDir, GENERATED_NPCS_LOG_FILE);
-  const markdown = [
-    "## NPC Generation",
-    "",
-    `Prompt: ${request.prompt}`,
-    "",
-    ...request.npcs.flatMap((npc) => [
-      `### ${npc.id}. ${npc.name}`,
-      "",
-      `Description: ${npc.description}`,
-      "",
-      `Bio: ${npc.bio}`,
-      ""
-    ])
-  ].join("\n");
-  await writeFile(filePath, `${markdown.trimEnd()}\n\n`, {
-    flag: "a",
-    encoding: "utf8"
-  });
-};
-
 const formatEvidenceForNpcPrompt = (results: RetrievalResult[]): string => {
   if (results.length === 0) {
     return "No relevant retrieval results were found. Use general Eberron lore only when it is reasonable.";
@@ -239,7 +195,13 @@ const formatEvidenceForNpcPrompt = (results: RetrievalResult[]): string => {
     .join("\n\n");
 };
 
-const readNpcList = (npcs: GeneratedNpc[]): GeneratedNpc[] => npcs.map((npc) => ({ ...npc }));
+const readNpcList = (npcs: GeneratedNpc[]): GeneratedNpc[] =>
+  npcs.map((npc) => ({
+    bio: npc.bio,
+    description: npc.description,
+    id: npc.id,
+    name: npc.name
+  }));
 
 const readMaxNpcId = (npcs: GeneratedNpc[]): number => npcs.reduce((maxId, npc) => Math.max(maxId, npc.id), 0);
 

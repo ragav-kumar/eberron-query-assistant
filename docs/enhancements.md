@@ -30,7 +30,7 @@ Verification added or preserved for this change covers package metadata and scri
 
 The browser UI separates left-side inputs from right-side outputs. The left column has `Input` and `Additional Context` tabs; the `Input` tab uses radio buttons for Standard assistant prompts, Debug Query retrieval inspection, and Name Generator mode.
 
-The right column has a transient plain-text `Console` feed for local progress, refresh, debug, warning, and error output, a persisted Markdown `Log` tab for assistant transcript output, and an `NPCs` tab for current-session generated NPC cards. Console output is process-local, is not written to `logs/`, and output panes auto-scroll as new output arrives.
+The right column has a transient plain-text `Console` feed for local progress, refresh, debug, warning, and error output, a persisted Markdown `Log` tab for assistant transcript output, and an `NPCs` tab for saved generated NPC cards. Console output is process-local, is not written to `logs/`, and output panes auto-scroll as new output arrives.
 
 Assistant, name-generator, and debug-query input do not require the user to run refresh manually first. If the current browser-server session has not completed a refresh yet, the app runs a routine refresh automatically before continuing with the requested input. Input panels use unframed layouts rather than cards, and Enter submits the active input mode while Shift+Enter preserves multiline text-area prompts.
 
@@ -46,15 +46,23 @@ Verification added for this change covers safe log-file listing and selection, r
 
 ## Name Generator NPC Cards
 
-Name Generator mode now asks the assistant for structured NPC records with numeric ids, names, physical descriptions, and very short bios. The model infers the requested count from the prompt, uses retrieval evidence and local assistant context for Eberron accuracy, and can revise current-session NPCs by returning an existing id while assigning new NPCs ids above the current maximum.
+Name Generator mode now asks the assistant for structured NPC records with numeric ids, names, physical descriptions, and very short bios. The model infers the requested count from the prompt, uses retrieval evidence and local assistant context for Eberron accuracy, and can revise saved NPCs by returning an existing id while assigning new NPCs ids above the current maximum.
 
-Generated NPCs render as cards in the right-column `NPCs` tab and are appended to `logs/generated_npcs.md`. This file is write-only from the UI, is excluded from the transcript browser, and is not loaded as future assistant memory. Switching between Standard and Name Generator closes the other in-memory session; `New session` clears the active Standard transcript session or current NPC cards without deleting append-only log files.
+Generated NPCs render as cards in the right-column `NPCs` tab and are saved as local runtime state in `.eberron-query-assistant/state/generated-npcs.json`. This state is excluded from transcript browsing and is not loaded as future assistant memory. Switching between Standard and Name Generator closes the other in-memory session; `New session` clears the active Standard transcript session or resets NPC generation context without deleting saved NPC cards.
 
-Verification added for this change covers structured NPC parsing, id-based card patching, append-only NPC logging, failure behavior, session switching, `New session` behavior, and React rendering for the Name Generator workflow.
+Verification added for this change covers structured NPC parsing, id-based card patching, NPC persistence failure behavior, session switching, `New session` behavior, and React rendering for the Name Generator workflow.
+
+## Persistent NPC Browsing
+
+The `NPCs` tab now always renders saved generated NPC cards from runtime state, sorted newest to oldest. NPC state is stored as a JSON array at `.eberron-query-assistant/state/generated-npcs.json`; each record includes its numeric id, card text, creation timestamp, and update timestamp.
+
+Name Generator responses that return an existing id update that saved NPC card instead of appending a duplicate revision. Responses that return new ids must still assign ids above the saved maximum. Legacy local `logs/generated_npcs.md` files are migrated into JSON state only when the JSON state file does not already exist, and malformed or duplicate legacy/state records fail clearly.
+
+Verification added for this change covers missing state, JSON loading and validation, newest-first rendering, generation inserts and revisions, legacy Markdown migration, and preserving saved cards across Standard prompts, mode switches, and NPC generation-context resets.
 
 ## Thin Local Runtime Bridge
 
-The React GUI now owns browser-session state such as selected mode, current prompts, busy display, selected output tab, current NPC cards, and fresh-session identity. The Vite middleware remains only as a local Node bridge for filesystem, retrieval, refresh, provider, and log-reading capabilities that cannot reasonably run in the browser.
+The React GUI now owns browser-session state such as selected mode, current prompts, busy display, selected output tab, rendered NPC cards, and fresh-session identity. The Vite middleware remains only as a local Node bridge for filesystem, retrieval, refresh, provider, and log-reading capabilities that cannot reasonably run in the browser.
 
 This intentionally reduces fake REST-style state polling while preserving the local browser-plus-Node runtime model. Standard and NPC sessions are identified by browser-owned session ids when an operation needs Node runtime work.
 

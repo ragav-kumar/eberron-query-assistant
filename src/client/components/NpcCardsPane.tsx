@@ -6,7 +6,7 @@ interface NpcCardsPaneProps {
   npcs: ApiNpc[];
 }
 
-/** Renders the current-session generated NPC cards. */
+/** Renders saved generated NPC cards. */
 export const NpcCardsPane = ({ npcs }: NpcCardsPaneProps) => {
   const scrollRef = useRef<HTMLElement>(null);
 
@@ -33,7 +33,7 @@ export const NpcCardsPane = ({ npcs }: NpcCardsPaneProps) => {
           ))}
         </div>
       ) : (
-        <p className="empty-output">Generate NPCs to show cards for this session.</p>
+        <p className="empty-output">Generate NPCs to save cards here.</p>
       )}
     </article>
   );

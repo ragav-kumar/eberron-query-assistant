@@ -32,6 +32,7 @@ vi.mock("../src/client/api.js", () => ({
   generateNpcs: vi.fn(),
   getContext: vi.fn(),
   getLog: vi.fn(),
+  getNpcs: vi.fn(),
   refresh: vi.fn(),
   isApiRequestError: vi.fn((error: unknown) => error instanceof Error && "console" in error),
   subscribeConsole: vi.fn(),
@@ -80,6 +81,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.getContext).mockResolvedValue("");
   vi.mocked(api.getLog).mockResolvedValue(initialLog);
+  vi.mocked(api.getNpcs).mockResolvedValue(emptyNpcs());
   vi.mocked(api.subscribeConsole).mockReturnValue(() => undefined);
   vi.mocked(api.askAssistant).mockResolvedValue(operationResult({ log: { ...initialLog, markdown: "## Assistant\n\nAnswer" } }));
   vi.mocked(api.debugRetrieval).mockResolvedValue(operationResult({
@@ -169,6 +171,47 @@ describe("App", () => {
     expect(await screen.findByText("Answer")).toBeTruthy();
   });
 
+  it("keeps saved NPC cards after standard assistant prompts and mode switches", async () => {
+    vi.mocked(api.getNpcs).mockResolvedValue({
+      npcs: [
+        {
+          id: 1,
+          name: "Saved NPC",
+          description: "A saved generated NPC.",
+          bio: "They persist outside the prompt mode."
+        }
+      ]
+    });
+    vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
+      log: { ...initialLog, markdown: "## Assistant\n\nAnswer" },
+      npcs: {
+        npcs: [
+          {
+            id: 1,
+            name: "Saved NPC",
+            description: "A saved generated NPC.",
+            bio: "They persist outside the prompt mode."
+          }
+        ]
+      }
+    }));
+
+    render(<App />);
+
+    fireEvent.change(await screen.findByPlaceholderText(/Ask about Eberron/i), {
+      target: { value: "What about Aerenal?" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    await waitFor(() => {
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String));
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "Name Generator" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Standard" }));
+    fireEvent.click(screen.getByRole("tab", { name: "NPCs" }));
+
+    expect(await screen.findByText("Saved NPC")).toBeTruthy();
+  });
+
   it("submits assistant prompts with Enter", async () => {
     render(<App />);
 
@@ -231,6 +274,33 @@ describe("App", () => {
     expect(screen.getByRole("tab", { name: "NPCs" }).getAttribute("aria-selected")).toBe("true");
   });
 
+  it("loads saved NPC cards on startup", async () => {
+    vi.mocked(api.getNpcs).mockResolvedValue({
+      npcs: [
+        {
+          id: 2,
+          name: "Newer NPC",
+          description: "A recently updated NPC.",
+          bio: "They should render first."
+        },
+        {
+          id: 1,
+          name: "Older NPC",
+          description: "An older saved NPC.",
+          bio: "They should render second."
+        }
+      ]
+    });
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("tab", { name: "NPCs" }));
+
+    expect(await screen.findByText("Newer NPC")).toBeTruthy();
+    expect(await screen.findByText("Older NPC")).toBeTruthy();
+    expect(screen.getByText("2 NPCs saved")).toBeTruthy();
+  });
+
   it("submits name generator prompts with Enter", async () => {
     render(<App />);
 
@@ -246,7 +316,7 @@ describe("App", () => {
     });
   });
 
-  it("starts a new NPC session from the NPCs tab", async () => {
+  it("starts a new NPC generation context from the NPCs tab without clearing saved cards", async () => {
     vi.mocked(api.generateNpcs).mockResolvedValue(operationResult({
       npcs: {
         npcs: [
@@ -271,7 +341,8 @@ describe("App", () => {
     expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "New session" }));
 
-    expect(await screen.findByText("Generate NPCs to show cards for this session.")).toBeTruthy();
+    expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
+    expect(screen.getByText("1 NPC saved")).toBeTruthy();
   });
 
   it("persists additional context edits", async () => {

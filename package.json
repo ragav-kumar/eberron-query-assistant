@@ -6,7 +6,7 @@
   "scripts": {
     "lint": "eslint .",
     "prestart": "tsc --noEmit",
-    "start": "vite --host 127.0.0.1",
+    "start": "vite",
     "test": "vitest run"
   },
   "engines": {

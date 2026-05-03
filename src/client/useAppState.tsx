@@ -6,6 +6,7 @@ import {
   generateNpcs,
   getContext,
   getLog,
+  getNpcs,
   isApiRequestError,
   refresh,
   subscribeConsole,
@@ -120,9 +121,10 @@ const useCreateAppState = (): AppState => {
 
     const loadInitialState = async () => {
       try {
-        const [initialContext, initialLog] = await Promise.all([
+        const [initialContext, initialLog, initialNpcs] = await Promise.all([
           getContext(),
-          getLog({ sessionId: initialStandardSessionId.current })
+          getLog({ sessionId: initialStandardSessionId.current }),
+          getNpcs()
         ]);
         if (!active) {
           return;
@@ -131,6 +133,7 @@ const useCreateAppState = (): AppState => {
         setLastSavedContext(initialContext);
         setContextLoaded(true);
         setLog(initialLog);
+        setNpcs(initialNpcs);
       } catch (requestError) {
         if (active) {
           setError(formatError(requestError));
@@ -189,6 +192,7 @@ const useCreateAppState = (): AppState => {
       try {
         const result = await operation();
         setConsoleOutput(result.console);
+        setNpcs(result.npcs);
         applyResult(result);
       } catch (requestError) {
         if (isApiRequestError(requestError) && requestError.console) {
@@ -214,7 +218,6 @@ const useCreateAppState = (): AppState => {
       (result) => {
         setAssistantPrompt("");
         setLog(result.log);
-        setNpcs(EMPTY_NPCS);
       }
     );
   }, [assistantPrompt, runOperation, standardSessionId, status.busy]);
@@ -280,7 +283,6 @@ const useCreateAppState = (): AppState => {
         return;
       }
 
-      const leavingNpcMode = inputMode === "name-generator" && mode !== "name-generator";
       const enteringNpcMode = mode === "name-generator";
       setInputMode(mode);
 
@@ -288,9 +290,8 @@ const useCreateAppState = (): AppState => {
         setStandardSessionId(nextSessionId("standard"));
         clearLogSelection();
       }
-      if (leavingNpcMode) {
+      if (inputMode === "name-generator" && mode !== "name-generator") {
         setNpcSessionId(nextSessionId("npcs"));
-        setNpcs(EMPTY_NPCS);
       }
     },
     [clearLogSelection, inputMode, nextSessionId]
@@ -304,7 +305,6 @@ const useCreateAppState = (): AppState => {
       setError(null);
       if (mode === "npcs") {
         setNpcSessionId(nextSessionId("npcs"));
-        setNpcs(EMPTY_NPCS);
         return;
       }
 
