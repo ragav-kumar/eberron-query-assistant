@@ -66,6 +66,13 @@ const handleApiRequest = async (
     return;
   }
 
+  if (request.method === "GET" && url.pathname === "/api/status") {
+    writeJson(response, 200, await app.getStatus({
+      sessionId: url.searchParams.get("sessionId") ?? ""
+    }));
+    return;
+  }
+
   if (request.method === "PUT" && url.pathname === "/api/context") {
     const body = await readJsonBody(request);
     await app.writeContext(readStringField(body, "markdown"));

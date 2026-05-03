@@ -33,6 +33,7 @@ vi.mock("../src/client/api.js", () => ({
   getContext: vi.fn(),
   getLog: vi.fn(),
   getNpcs: vi.fn(),
+  getStatus: vi.fn(),
   refresh: vi.fn(),
   isApiRequestError: vi.fn((error: unknown) => error instanceof Error && "console" in error),
   subscribeConsole: vi.fn(),
@@ -82,6 +83,12 @@ beforeEach(() => {
   vi.mocked(api.getContext).mockResolvedValue("");
   vi.mocked(api.getLog).mockResolvedValue(initialLog);
   vi.mocked(api.getNpcs).mockResolvedValue(emptyNpcs());
+  vi.mocked(api.getStatus).mockResolvedValue({
+    activeOperation: null,
+    console: { entries: [] },
+    log: initialLog,
+    npcs: emptyNpcs()
+  });
   vi.mocked(api.subscribeConsole).mockReturnValue(() => undefined);
   vi.mocked(api.askAssistant).mockResolvedValue(operationResult({ log: { ...initialLog, markdown: "## Assistant\n\nAnswer" } }));
   vi.mocked(api.debugRetrieval).mockResolvedValue(operationResult({
@@ -172,16 +179,18 @@ describe("App", () => {
   });
 
   it("keeps saved NPC cards after standard assistant prompts and mode switches", async () => {
-    vi.mocked(api.getNpcs).mockResolvedValue({
-      npcs: [
-        {
-          id: 1,
-          name: "Saved NPC",
-          description: "A saved generated NPC.",
-          bio: "They persist outside the prompt mode."
-        }
-      ]
-    });
+    vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
+      npcs: {
+        npcs: [
+          {
+            id: 1,
+            name: "Saved NPC",
+            description: "A saved generated NPC.",
+            bio: "They persist outside the prompt mode."
+          }
+        ]
+      }
+    }));
     vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
       log: { ...initialLog, markdown: "## Assistant\n\nAnswer" },
       npcs: {
@@ -275,22 +284,24 @@ describe("App", () => {
   });
 
   it("loads saved NPC cards on startup", async () => {
-    vi.mocked(api.getNpcs).mockResolvedValue({
-      npcs: [
-        {
-          id: 2,
-          name: "Newer NPC",
-          description: "A recently updated NPC.",
-          bio: "They should render first."
-        },
-        {
-          id: 1,
-          name: "Older NPC",
-          description: "An older saved NPC.",
-          bio: "They should render second."
-        }
-      ]
-    });
+    vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
+      npcs: {
+        npcs: [
+          {
+            id: 2,
+            name: "Newer NPC",
+            description: "A recently updated NPC.",
+            bio: "They should render first."
+          },
+          {
+            id: 1,
+            name: "Older NPC",
+            description: "An older saved NPC.",
+            bio: "They should render second."
+          }
+        ]
+      }
+    }));
 
     render(<App />);
 
@@ -510,6 +521,72 @@ describe("App", () => {
     expect(await screen.findByText(/No completed refresh found/)).toBeTruthy();
   });
 
+  it("restores active operation state and console output on startup", async () => {
+    vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
+      activeOperation: "force-reingest",
+      console: {
+        entries: [
+          {
+            id: "replay-1",
+            level: "info",
+            message: "Force re-ingest requested; source inventory will schedule all available sources.",
+            timestamp: "2026-05-02T12:00:04.000Z"
+          }
+        ]
+      }
+    }));
+
+    render(<App />);
+
+    expect(await screen.findByText("Running force-reingest")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "Console" }).getAttribute("aria-selected")).toBe("true");
+    expect(await screen.findByText(/Force re-ingest requested/)).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
+  });
+
+  it("polls recovered operations until final output is available", async () => {
+    vi.mocked(api.getStatus)
+      .mockResolvedValueOnce(statusResponse({
+        activeOperation: "force-reingest",
+        console: {
+          entries: [
+            {
+              id: "replay-1",
+              level: "info",
+              message: "Force re-ingest requested.",
+              timestamp: "2026-05-02T12:00:04.000Z"
+            }
+          ]
+        }
+      }))
+      .mockResolvedValue(statusResponse({
+        activeOperation: null,
+        console: {
+          entries: [
+            {
+              id: "replay-1",
+              level: "info",
+              message: "Force re-ingest requested.",
+              timestamp: "2026-05-02T12:00:04.000Z"
+            },
+            {
+              id: "replay-2",
+              level: "info",
+              message: "Refresh complete. Force reingest: true.",
+              timestamp: "2026-05-02T12:00:05.000Z"
+            }
+          ]
+        }
+      }));
+
+    render(<App />);
+
+    expect(await screen.findByText("Running force-reingest")).toBeTruthy();
+    expect(await screen.findByText("Refresh complete. Force reingest: true.")).toBeTruthy();
+    expect(await screen.findByText("Ready")).toBeTruthy();
+    expect(api.getStatus).toHaveBeenCalledTimes(2);
+  });
+
   it("renders the active log Markdown", async () => {
     render(<App />);
 
@@ -518,7 +595,7 @@ describe("App", () => {
   });
 
   it("renders an empty log state before a log exists", async () => {
-    vi.mocked(api.getLog).mockResolvedValue(emptyLog());
+    vi.mocked(api.getStatus).mockResolvedValue(statusResponse({ log: emptyLog() }));
 
     render(<App />);
 
@@ -533,7 +610,7 @@ describe("App", () => {
       markdown: "# Old Session\n\nPast answer.",
       readOnly: true
     };
-    vi.mocked(api.getLog).mockResolvedValueOnce({
+    vi.mocked(api.getStatus).mockResolvedValue(statusResponse({ log: {
       ...initialLog,
       files: [
         ...(initialLog.files ?? []),
@@ -543,7 +620,7 @@ describe("App", () => {
           label: "old.md"
         }
       ]
-    });
+    } }));
     vi.mocked(api.getLog).mockResolvedValueOnce(historicalLog);
 
     render(<App />);
@@ -573,7 +650,7 @@ describe("App", () => {
   });
 
   it("switches back to the active log after submitting while browsing history", async () => {
-    vi.mocked(api.getLog).mockResolvedValueOnce({
+    vi.mocked(api.getStatus).mockResolvedValue(statusResponse({ log: {
       ...initialLog,
       files: [
         ...(initialLog.files ?? []),
@@ -583,7 +660,7 @@ describe("App", () => {
           label: "old.md"
         }
       ]
-    });
+    } }));
     vi.mocked(api.getLog).mockResolvedValueOnce({
       ...initialLog,
       filePath: "logs/old.md",
@@ -681,4 +758,12 @@ const emptyLog = (): api.ApiLog => ({
   filePath: null,
   markdown: "",
   readOnly: false
+});
+
+const statusResponse = (overrides: Partial<api.ApiStatus> = {}): api.ApiStatus => ({
+  activeOperation: null,
+  console: { entries: [] },
+  log: initialLog,
+  npcs: emptyNpcs(),
+  ...overrides
 });

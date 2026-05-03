@@ -2,6 +2,12 @@
 
 This file records intentional high-level changes on top of the frozen Phase 6 historical baseline. Its purpose is to prevent future sessions from mistaking deliberate changes for unintended divergence.
 
+## Operation Reconnect Recovery
+
+The browser UI now restores current in-process operation status after a reload or reconnect to the same local Vite server. Runtime artifact directories are excluded from Vite file watching so force reingest writes do not trigger dev-server reloads, and the transient Console feed replays existing in-memory entries before streaming new ones.
+
+Console output remains process-local and is not written to transcript logs. If the local server process is stopped or restarted, active-operation and Console recovery state is intentionally lost.
+
 ## Force-Reingest-Only Invalidation
 
 Routine startup preserves valid runtime state, corpus rows, and retrieval artifacts across application version changes. `appVersion` is diagnostic metadata only. The app only clears corpus storage or forces retrieval rebuild when the user explicitly runs force reingest through the supported UI or script.

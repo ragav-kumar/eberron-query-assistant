@@ -12,7 +12,7 @@ describe("package scripts", () => {
     };
 
     expect(metadata.bin).toBeUndefined();
-    expect(metadata.scripts.start).toBe("vite --host 127.0.0.1");
+    expect(metadata.scripts.start).toBe("vite");
     expect(metadata.scripts.prestart).toBe("tsc --noEmit");
     expect(metadata.scripts.build).toBeUndefined();
     expect(metadata.scripts.reingest).toBeUndefined();
@@ -21,5 +21,14 @@ describe("package scripts", () => {
 
   it("keeps local session transcripts gitignored", () => {
     expect(readFileSync(".gitignore", "utf8").split(/\r?\n/)).toContain("logs/");
+  });
+
+  it("keeps runtime artifact directories out of Vite file watching", () => {
+    const viteConfig = readFileSync("vite.config.ts", "utf8");
+
+    expect(viteConfig).toContain("**/.eberron-query-assistant/**");
+    expect(viteConfig).toContain("**/logs/**");
+    expect(viteConfig).toContain("**/foundry-export/**");
+    expect(viteConfig).toContain("**/pdf/**");
   });
 });

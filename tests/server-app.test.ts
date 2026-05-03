@@ -130,6 +130,97 @@ describe("web app API model", () => {
     await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("reports idle status snapshots with console, log, and NPC state", async () => {
+    const app = createWebApp({
+      config: await writeConfig("idle-status"),
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+
+    const status = await app.getStatus();
+
+    expect(status.activeOperation).toBeNull();
+    expect(status.console.entries).toEqual([]);
+    expect(status.log).toEqual(emptyLogResponse());
+    expect(status.npcs).toEqual({ npcs: [] });
+  });
+
+  it("reports active operation status while refresh is running", async () => {
+    const config = await writeConfig("active-status");
+    const state = createDefaultRuntimeState();
+    const nextState = createDefaultRuntimeState();
+    let resolveIngest: ((value: {
+      nextState: typeof nextState;
+      summary: {
+        corpusSourceCount: number;
+        degraded: boolean;
+        sourceSummaries: [];
+      };
+    }) => void) | undefined;
+    const ingest = vi.fn().mockReturnValue(new Promise((resolve) => {
+      resolveIngest = resolve;
+    }));
+    const app = createWebApp({
+      config,
+      discovery: {
+        inspectSources: vi.fn().mockResolvedValue({
+          degraded: false,
+          nextState,
+          inventories: []
+        })
+      },
+      ingestion: { ingest },
+      retrieval: mockRetrieval([]).retrieval,
+      stateStore: {
+        load: vi.fn().mockResolvedValue({ state }),
+        save: vi.fn().mockResolvedValue(undefined)
+      },
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+
+    const pending = app.refresh(true);
+    await vi.waitFor(() => {
+      expect(ingest).toHaveBeenCalled();
+    });
+
+    const status = await app.getStatus();
+
+    expect(status.activeOperation).toBe("force-reingest");
+    expect(status.console.entries.map((entry) => entry.message).join("\n")).toContain("Force re-ingest requested");
+
+    resolveIngest?.({
+      nextState,
+      summary: {
+        corpusSourceCount: 1,
+        degraded: false,
+        sourceSummaries: []
+      }
+    });
+    await pending;
+    expect((await app.getStatus()).activeOperation).toBeNull();
+  });
+
+  it("replays existing console entries to new subscribers before streaming new ones", async () => {
+    const config = await writeConfig("console-replay");
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+    await app.refresh(false);
+    const streamedMessages: string[] = [];
+
+    const unsubscribe = app.subscribeConsole((entry) => {
+      streamedMessages.push(entry.message);
+    });
+    await app.debugRetrieval("aerenal");
+
+    expect(streamedMessages.some((message) => message.includes("Refresh complete"))).toBe(true);
+    expect(streamedMessages.some((message) => message.includes("Debug retrieval query: aerenal"))).toBe(true);
+    unsubscribe();
+  });
+
   it("lists Markdown logs newest first and reads selected historical logs", async () => {
     const config = await writeConfig("log-browser");
     await mkdir(config.logDir, { recursive: true });

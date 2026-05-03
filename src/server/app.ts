@@ -33,6 +33,7 @@ export interface WebApp {
   getContext(): Promise<string>;
   getLog(options?: string | { filePath?: string; sessionId?: string }): Promise<WebLogResponse>;
   getNpcs(): Promise<WebNpcResponse>;
+  getStatus(options?: { sessionId?: string }): Promise<WebStatusResponse>;
   refresh(forceReingest: boolean): Promise<WebOperationResult>;
   subscribeConsole(listener: WebConsoleListener): () => void;
   writeContext(markdown: string): Promise<void>;
@@ -84,6 +85,13 @@ export interface WebOperationResult {
 
 export interface WebNpcResponse {
   npcs: GeneratedNpc[];
+}
+
+export interface WebStatusResponse {
+  activeOperation: string | null;
+  console: WebConsoleResponse;
+  log: WebLogResponse;
+  npcs: WebNpcResponse;
 }
 
 const DEBUG_RETRIEVAL_LIMIT = 8;
@@ -339,6 +347,14 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     getNpcs() {
       return readNpcs();
     },
+    async getStatus(options = {}) {
+      return {
+        activeOperation,
+        console: consoleFeed.read(),
+        log: await readLog({ sessionId: options.sessionId ?? DEFAULT_SESSION_ID }),
+        npcs: await readNpcs()
+      };
+    },
     async refresh(forceReingest) {
       return runExclusive(forceReingest ? "force-reingest" : "refresh", async () => {
         const summary = await runRefreshTask(forceReingest);
@@ -482,6 +498,9 @@ const createMemoryConsoleFeed = (): MemoryConsoleFeed => {
     },
     subscribe(listener) {
       listeners.add(listener);
+      for (const entry of entries) {
+        listener({ ...entry });
+      }
       return () => {
         listeners.delete(listener);
       };

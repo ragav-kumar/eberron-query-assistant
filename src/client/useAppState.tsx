@@ -1,4 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type ReactNode,
+  type SetStateAction
+} from "react";
 
 import {
   askAssistant,
@@ -6,7 +17,7 @@ import {
   generateNpcs,
   getContext,
   getLog,
-  getNpcs,
+  getStatus,
   isApiRequestError,
   refresh,
   subscribeConsole,
@@ -15,11 +26,13 @@ import {
   type ApiConsole,
   type ApiLog,
   type ApiNpcResponse,
-  type ApiOperationResult
+  type ApiOperationResult,
+  type ApiStatus
 } from "./api.js";
 import type { InputMode, LeftTab, OutputTab } from "./components/ui-types.js";
 
 const SAVE_DELAY_MS = 500;
+const RECOVERY_POLL_MS = 1_000;
 const EMPTY_LOG: ApiLog = {
   activeFilePath: null,
   files: [],
@@ -99,6 +112,7 @@ const useCreateAppState = (): AppState => {
   const [log, setLog] = useState<ApiLog>(EMPTY_LOG);
   const [npcs, setNpcs] = useState<ApiNpcResponse>(EMPTY_NPCS);
   const [status, setStatus] = useState<BusyState>({ busy: false, operation: null });
+  const [isRecoveringOperation, setIsRecoveringOperation] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leftTab, setLeftTab] = useState<LeftTab>("input");
   const [inputMode, setInputMode] = useState<InputMode>("standard");
@@ -121,10 +135,9 @@ const useCreateAppState = (): AppState => {
 
     const loadInitialState = async () => {
       try {
-        const [initialContext, initialLog, initialNpcs] = await Promise.all([
+        const [initialContext, initialStatus] = await Promise.all([
           getContext(),
-          getLog({ sessionId: initialStandardSessionId.current }),
-          getNpcs()
+          getStatus({ sessionId: initialStandardSessionId.current })
         ]);
         if (!active) {
           return;
@@ -132,8 +145,15 @@ const useCreateAppState = (): AppState => {
         setContextMarkdown(initialContext);
         setLastSavedContext(initialContext);
         setContextLoaded(true);
-        setLog(initialLog);
-        setNpcs(initialNpcs);
+        applyStatusSnapshot(initialStatus, {
+          recoverActiveOperation: true,
+          setConsoleOutput,
+          setIsRecoveringOperation,
+          setLog,
+          setNpcs,
+          setOutputTab,
+          setStatus
+        });
       } catch (requestError) {
         if (active) {
           setError(formatError(requestError));
@@ -146,6 +166,45 @@ const useCreateAppState = (): AppState => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isRecoveringOperation || !status.busy) {
+      return;
+    }
+
+    let active = true;
+    const poll = async () => {
+      try {
+        const snapshot = await getStatus({ sessionId: standardSessionId });
+        if (!active) {
+          return;
+        }
+        applyStatusSnapshot(snapshot, {
+          recoverActiveOperation: true,
+          setConsoleOutput,
+          setIsRecoveringOperation,
+          setLog,
+          setNpcs,
+          setOutputTab,
+          setStatus
+        });
+      } catch (requestError) {
+        if (active) {
+          setError(formatError(requestError));
+        }
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      void poll();
+    }, RECOVERY_POLL_MS);
+    void poll();
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [isRecoveringOperation, standardSessionId, status.busy]);
 
   useEffect(() => {
     return subscribeConsole((entry) => {
@@ -188,6 +247,7 @@ const useCreateAppState = (): AppState => {
         return;
       }
       setError(null);
+      setIsRecoveringOperation(false);
       setStatus({ busy: true, operation: operationName });
       try {
         const result = await operation();
@@ -260,7 +320,7 @@ const useCreateAppState = (): AppState => {
         return;
       }
       setOutputTab("console");
-      void runOperation("refresh", () => refresh(forceReingest), () => undefined);
+      void runOperation(forceReingest ? "force-reingest" : "refresh", () => refresh(forceReingest), () => undefined);
     },
     [runOperation, status.busy]
   );
@@ -358,4 +418,32 @@ const appendConsoleEntry = (consoleOutput: ApiConsole, entry: ApiConsoleEntry): 
   return {
     entries: [...consoleOutput.entries, entry]
   };
+};
+
+interface StatusSnapshotSetters {
+  setConsoleOutput: Dispatch<SetStateAction<ApiConsole>>;
+  setIsRecoveringOperation: Dispatch<SetStateAction<boolean>>;
+  setLog: Dispatch<SetStateAction<ApiLog>>;
+  setNpcs: Dispatch<SetStateAction<ApiNpcResponse>>;
+  setOutputTab: Dispatch<SetStateAction<OutputTab>>;
+  setStatus: Dispatch<SetStateAction<BusyState>>;
+}
+
+const applyStatusSnapshot = (
+  snapshot: ApiStatus,
+  options: StatusSnapshotSetters & { recoverActiveOperation: boolean }
+): void => {
+  options.setConsoleOutput(snapshot.console);
+  options.setLog(snapshot.log);
+  options.setNpcs(snapshot.npcs);
+
+  if (snapshot.activeOperation) {
+    options.setStatus({ busy: true, operation: snapshot.activeOperation });
+    options.setIsRecoveringOperation(options.recoverActiveOperation);
+    options.setOutputTab("console");
+    return;
+  }
+
+  options.setStatus({ busy: false, operation: null });
+  options.setIsRecoveringOperation(false);
 };

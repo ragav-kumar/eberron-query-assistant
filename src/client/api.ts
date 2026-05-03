@@ -45,6 +45,13 @@ export interface ApiOperationResult {
   ok: true;
 }
 
+export interface ApiStatus {
+  activeOperation: string | null;
+  console: ApiConsole;
+  log: ApiLog;
+  npcs: ApiNpcResponse;
+}
+
 export const getLog = async (options: { filePath?: string; sessionId: string }): Promise<ApiLog> => {
   const params = new URLSearchParams({ sessionId: options.sessionId });
   if (options.filePath !== undefined) {
@@ -61,6 +68,11 @@ export const getContext = async (): Promise<string> => {
 
 export const getNpcs = async (): Promise<ApiNpcResponse> => {
   return requestJson<ApiNpcResponse>("/api/npcs");
+};
+
+export const getStatus = async (options: { sessionId: string }): Promise<ApiStatus> => {
+  const params = new URLSearchParams({ sessionId: options.sessionId });
+  return requestJson<ApiStatus>(`/api/status?${params.toString()}`);
 };
 
 export const writeContext = async (markdown: string): Promise<void> => {

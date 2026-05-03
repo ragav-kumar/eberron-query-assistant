@@ -6,6 +6,14 @@ import { eberronApiPlugin } from "./src/server/vite-plugin.js";
 export default defineConfig({
   plugins: [eberronApiPlugin(), react()],
   server: {
+    watch: {
+      ignored: [
+        "**/.eberron-query-assistant/**",
+        "**/logs/**",
+        "**/foundry-export/**",
+        "**/pdf/**"
+      ]
+    },
     port: 3000,
     strictPort: true
   }
