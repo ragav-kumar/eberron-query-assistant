@@ -92,6 +92,22 @@ export const refresh = async (forceReingest: boolean): Promise<ApiOperationResul
   });
 };
 
+export const subscribeConsole = (onEntry: (entry: ApiConsoleEntry) => void): (() => void) => {
+  if (typeof EventSource === "undefined") {
+    return () => undefined;
+  }
+
+  const events = new EventSource("/api/console/events");
+  events.onmessage = (event) => {
+    if (typeof event.data === "string") {
+      onEntry(JSON.parse(event.data) as ApiConsoleEntry);
+    }
+  };
+  return () => {
+    events.close();
+  };
+};
+
 const requestJson = async <T>(url: string, init: RequestInit = {}): Promise<T> => {
   const response = await fetch(url, {
     ...init,

@@ -34,6 +34,7 @@ vi.mock("../src/client/api.js", () => ({
   getLog: vi.fn(),
   refresh: vi.fn(),
   isApiRequestError: vi.fn((error: unknown) => error instanceof Error && "console" in error),
+  subscribeConsole: vi.fn(),
   writeContext: vi.fn()
 }));
 
@@ -79,6 +80,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(api.getContext).mockResolvedValue("");
   vi.mocked(api.getLog).mockResolvedValue(initialLog);
+  vi.mocked(api.subscribeConsole).mockReturnValue(() => undefined);
   vi.mocked(api.askAssistant).mockResolvedValue(operationResult({ log: { ...initialLog, markdown: "## Assistant\n\nAnswer" } }));
   vi.mocked(api.debugRetrieval).mockResolvedValue(operationResult({
     console: {
@@ -316,6 +318,124 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
 
     resolveAsk?.(operationResult());
+  });
+
+  it("keeps the submitted assistant prompt visible until the request succeeds", async () => {
+    let resolveAsk: ((value: api.ApiOperationResult) => void) | undefined;
+    vi.mocked(api.askAssistant).mockReturnValue(
+      new Promise((resolve) => {
+        resolveAsk = resolve;
+      })
+    );
+
+    render(<App />);
+
+    const prompt = await screen.findByPlaceholderText(/Ask about Eberron/i);
+    fireEvent.change(prompt, {
+      target: { value: "What about Sharn?" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+
+    expect(prompt).toHaveProperty("value", "What about Sharn?");
+
+    resolveAsk?.(operationResult());
+
+    await waitFor(() => {
+      expect(prompt).toHaveProperty("value", "");
+    });
+  });
+
+  it("keeps the submitted assistant prompt visible when the request fails", async () => {
+    vi.mocked(api.askAssistant).mockRejectedValue(new Error("provider failed"));
+
+    render(<App />);
+
+    const prompt = await screen.findByPlaceholderText(/Ask about Eberron/i);
+    fireEvent.change(prompt, {
+      target: { value: "What about Sharn?" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+
+    expect(await screen.findByText("provider failed")).toBeTruthy();
+    expect(prompt).toHaveProperty("value", "What about Sharn?");
+  });
+
+  it("clears name generator prompts only after success", async () => {
+    let resolveGenerate: ((value: api.ApiOperationResult) => void) | undefined;
+    vi.mocked(api.generateNpcs).mockReturnValue(
+      new Promise((resolve) => {
+        resolveGenerate = resolve;
+      })
+    );
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
+    const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
+    fireEvent.change(prompt, {
+      target: { value: "Generate one envoy" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    expect(prompt).toHaveProperty("value", "Generate one envoy");
+
+    resolveGenerate?.(operationResult({
+      npcs: {
+        npcs: [
+          {
+            id: 1,
+            name: "Jala ir'Wynarn",
+            description: "A sharp-eyed Aundairian envoy.",
+            bio: "She trades favors."
+          }
+        ]
+      }
+    }));
+
+    await waitFor(() => {
+      expect(prompt).toHaveProperty("value", "");
+    });
+  });
+
+  it("keeps name generator prompts visible when the request fails", async () => {
+    vi.mocked(api.generateNpcs).mockRejectedValue(new Error("generation failed"));
+
+    render(<App />);
+
+    fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
+    const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
+    fireEvent.change(prompt, {
+      target: { value: "Generate one envoy" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    expect(await screen.findByText("generation failed")).toBeTruthy();
+    expect(prompt).toHaveProperty("value", "Generate one envoy");
+  });
+
+  it("renders streamed console entries before an operation result returns", async () => {
+    let onConsoleEntry: ((entry: api.ApiConsoleEntry) => void) | undefined;
+    vi.mocked(api.subscribeConsole).mockImplementation((listener) => {
+      onConsoleEntry = listener;
+      return () => undefined;
+    });
+    vi.mocked(api.askAssistant).mockReturnValue(new Promise(() => undefined));
+
+    render(<App />);
+
+    fireEvent.change(await screen.findByPlaceholderText(/Ask about Eberron/i), {
+      target: { value: "What about Sharn?" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    onConsoleEntry?.({
+      id: "stream-1",
+      level: "info",
+      message: "No completed refresh found for this server session; running routine refresh before continuing.",
+      timestamp: "2026-05-02T12:00:03.000Z"
+    });
+    fireEvent.click(screen.getByRole("tab", { name: "Console" }));
+
+    expect(await screen.findByText(/No completed refresh found/)).toBeTruthy();
   });
 
   it("renders the active log Markdown", async () => {

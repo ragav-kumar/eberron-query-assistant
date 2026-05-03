@@ -7,7 +7,7 @@ import { createFilesystemIngestionService, createSqliteCorpusStore, type Ingesti
 import { createOpenAiChatAdapter, createOpenAiEmbeddingAdapter, type ChatAdapter } from "../provider/index.js";
 import type { ProgressReporter } from "../progress/reporter.js";
 import { createSqliteRetrievalService, type RetrievalService } from "../retrieval/index.js";
-import { createAssistantSession, type AssistantSession } from "../runtime/assistant-session.js";
+import { createAssistantSession, type AssistantSession, type AssistantSessionLogExchange } from "../runtime/assistant-session.js";
 import {
   createNpcGenerationSession,
   type GeneratedNpc,
@@ -32,6 +32,7 @@ export interface WebApp {
   getContext(): Promise<string>;
   getLog(options?: string | { filePath?: string; sessionId?: string }): Promise<WebLogResponse>;
   refresh(forceReingest: boolean): Promise<WebOperationResult>;
+  subscribeConsole(listener: WebConsoleListener): () => void;
   writeContext(markdown: string): Promise<void>;
 }
 
@@ -67,6 +68,8 @@ export interface WebConsoleEntry {
 export interface WebConsoleResponse {
   entries: WebConsoleEntry[];
 }
+
+export type WebConsoleListener = (entry: WebConsoleEntry) => void;
 
 export interface WebOperationResult {
   console: WebConsoleResponse;
@@ -137,10 +140,10 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     return session;
   };
 
-  const ensureLog = async (session: StandardSessionState): Promise<SessionLog> => {
+  const ensureLog = async (session: StandardSessionState, title: string): Promise<SessionLog> => {
     session.log ??= await createSessionLog({
       logDir: config.logDir,
-      title: "GUI Session"
+      title
     });
     return session.log;
   };
@@ -152,11 +155,23 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       embeddingAdapter: createOpenAiEmbeddingAdapter(config.provider),
       reporter: defaultReporter
     });
-  const ensureAssistant = async (session: StandardSessionState): Promise<AssistantSession> => {
+  const appendStandardSessionExchange = async (
+    session: StandardSessionState,
+    exchange: AssistantSessionLogExchange
+  ): Promise<void> => {
+    const log = await ensureLog(session, exchange.sessionTitle);
+    await log.append({
+      assistantResponse: exchange.assistantResponse,
+      userQuestion: exchange.userQuestion
+    });
+  };
+  const ensureAssistant = (session: StandardSessionState): AssistantSession => {
     session.assistant ??= createAssistantSession({
       assistant: config.assistant,
+      appendExchange: async (exchange) => {
+        await appendStandardSessionExchange(session, exchange);
+      },
       chat: dependencies.chat ?? createOpenAiChatAdapter(config.provider),
-      log: await ensureLog(session),
       retrieval
     });
     return session.assistant;
@@ -256,7 +271,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
         const standardSession = readStandardSession(sessionId);
         try {
           await ensureRoutineRefresh();
-          await (await ensureAssistant(standardSession)).ask(prompt);
+          await ensureAssistant(standardSession).ask(prompt);
         } catch (error) {
           const message = formatThrownValue(error);
           consoleFeed.error(`Assistant response failed: ${message}`);
@@ -326,6 +341,9 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           npcs: { npcs: [] }
         };
       });
+    },
+    subscribeConsole(listener) {
+      return consoleFeed.subscribe(listener);
     },
     async writeContext(markdown) {
       await ensureAdditionalContextFile(config);
@@ -415,21 +433,27 @@ interface MemoryConsoleFeed {
   error(message: string): void;
   info(message: string): void;
   read(): WebConsoleResponse;
+  subscribe(listener: WebConsoleListener): () => void;
   warn(message: string): void;
 }
 
 const createMemoryConsoleFeed = (): MemoryConsoleFeed => {
   const entries: WebConsoleEntry[] = [];
+  const listeners = new Set<WebConsoleListener>();
   let nextId = 1;
 
   const append = (level: WebConsoleLevel, message: string): void => {
-    entries.push({
+    const entry = {
       id: String(nextId),
       level,
       message,
       timestamp: new Date().toISOString()
-    });
+    };
+    entries.push(entry);
     nextId += 1;
+    for (const listener of listeners) {
+      listener({ ...entry });
+    }
   };
 
   return {
@@ -445,6 +469,12 @@ const createMemoryConsoleFeed = (): MemoryConsoleFeed => {
     read() {
       return {
         entries: entries.map((entry) => ({ ...entry }))
+      };
+    },
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
       };
     },
     warn(message) {

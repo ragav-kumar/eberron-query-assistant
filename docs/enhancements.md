@@ -59,3 +59,9 @@ The React GUI now owns browser-session state such as selected mode, current prom
 This intentionally reduces fake REST-style state polling while preserving the local browser-plus-Node runtime model. Standard and NPC sessions are identified by browser-owned session ids when an operation needs Node runtime work.
 
 Verification added or preserved for this change covers client-owned mode and new-session behavior, the slimmer bridge route surface, operation result output updates, safe log reads, refresh behavior, and server-side operation locking.
+
+## GUI Operation Responsiveness Fixes
+
+The browser UI streams local Console entries while operations are still running, keeps submitted Standard and Name Generator text visible until a request succeeds, and creates Standard transcript filenames from the assistant-provided session title when available. New Standard transcripts must not use `GUI Session` as a fallback filename; if the assistant title is unavailable, the submitted question is used instead.
+
+Verification added for this change covers streamed console subscriptions, prompt clearing success and failure behavior, assistant-title transcript filenames, and fallback transcript filename behavior.

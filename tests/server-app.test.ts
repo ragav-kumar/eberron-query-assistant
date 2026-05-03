@@ -55,6 +55,8 @@ describe("web app API model", () => {
 
     const response = await app.askAssistant("What about Aerenal?");
 
+    expect(path.basename(response.log.filePath ?? "")).toContain("Aerenal");
+    expect(path.basename(response.log.filePath ?? "")).not.toContain("GUI Session");
     expect(response.log.markdown).toContain("## User\n\nWhat about Aerenal?");
     expect(response.log.markdown).toContain("## Assistant\n\nAerenal answer.");
     expect(response.log.markdown).not.toContain("<session-title>");
@@ -218,9 +220,28 @@ describe("web app API model", () => {
     expect(reset.activeFilePath).toBeNull();
     expect(filesAfterReset).toEqual(firstFiles);
     expect(second.log.filePath).not.toBe(first.log.filePath);
+    expect(path.basename(first.log.filePath ?? "")).toContain("First");
+    expect(path.basename(second.log.filePath ?? "")).toContain("Second");
     expect(second.log.markdown).toContain("Second question");
     const secondMessages = chat.mock.calls[1]?.[0] as Array<{ content: string }> | undefined;
     expect(secondMessages?.[0]?.content).toContain("<session-title>");
+  });
+
+  it("falls back to the submitted question when the first response has no session title", async () => {
+    const app = createWebApp({
+      config: await writeConfig("fallback-title"),
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: {
+        complete: vi.fn().mockResolvedValue("Plain answer.")
+      }
+    });
+
+    const response = await app.askAssistant("What about the Mournland?");
+
+    expect(path.basename(response.log.filePath ?? "")).toContain("What about the Mournland");
+    expect(path.basename(response.log.filePath ?? "")).not.toContain("GUI Session");
+    expect(response.log.markdown).toContain("Plain answer.");
   });
 
   it("generates NPC cards, appends generated_npcs.md, and keeps transcript logs separate", async () => {
@@ -465,6 +486,39 @@ describe("web app API model", () => {
     }
     resolveAsk();
     await pending;
+  });
+
+  it("streams console entries before a long-running operation resolves", async () => {
+    let resolveAsk: (() => void) | undefined;
+    const app = createWebApp({
+      config: await writeConfig("console-subscribe"),
+      ...mockRefreshDependencies(),
+      assistant: {
+        ask: vi.fn(
+          () =>
+            new Promise<AssistantSessionAnswer>((resolve) => {
+              resolveAsk = () => resolve({ answer: "answer", evidence: [] });
+            })
+        )
+      },
+      retrieval: mockRetrieval([]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+    const streamedMessages: string[] = [];
+    const unsubscribe = app.subscribeConsole((entry) => {
+      streamedMessages.push(entry.message);
+    });
+
+    const pending = app.askAssistant("Slow question");
+
+    await vi.waitFor(() => {
+      expect(streamedMessages.some((message) => message.includes("No completed refresh found"))).toBe(true);
+      expect(resolveAsk).toBeDefined();
+    });
+    expect(streamedMessages.some((message) => message.includes("No completed refresh found"))).toBe(true);
+    resolveAsk?.();
+    await pending;
+    unsubscribe();
   });
 });
 

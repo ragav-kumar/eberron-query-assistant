@@ -6,7 +6,7 @@ import {
   loadAssistantPromptAssets,
   type AssistantPromptAssets
 } from "./prompt.js";
-import type { SessionLog } from "./session-log.js";
+import type { SessionLogExchange } from "./session-log.js";
 
 export interface AssistantSession {
   ask(question: string): Promise<AssistantSessionAnswer>;
@@ -17,10 +17,14 @@ export interface AssistantSessionAnswer {
   evidence: RetrievalResult[];
 }
 
+export interface AssistantSessionLogExchange extends SessionLogExchange {
+  sessionTitle: string;
+}
+
 export interface AssistantSessionOptions {
   assistant: AssistantConfig;
   chat: ChatAdapter;
-  log: SessionLog;
+  appendExchange(exchange: AssistantSessionLogExchange): Promise<void>;
   retrieval: RetrievalService;
 }
 
@@ -61,8 +65,9 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
       const answer = parsedResponse?.answer ?? response.trim();
       shouldRequestSessionTitle = false;
 
-      await options.log.append({
+      await options.appendExchange({
         assistantResponse: answer,
+        sessionTitle: parsedResponse?.title ?? normalizedQuestion,
         userQuestion: normalizedQuestion
       });
       history.push({ role: "user", content: normalizedQuestion }, { role: "assistant", content: answer });

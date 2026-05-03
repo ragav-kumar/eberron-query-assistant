@@ -10,7 +10,7 @@ Assistant instructions are stored in tracked Markdown files under `assistant/`. 
 
 The application refreshes its retrieval layer automatically before the first assistant or debug query in a browser-server session when needed. It also provides controls to refresh during use. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine refreshes stay fast, and a force-reingest control is available when a full rebuild is needed.
 
-The local Console output reports what was checked, skipped, refreshed, rebuilt, or degraded. If one source fails while another source remains usable, the app can continue in degraded mode and names the affected source type. If no retrieval corpus is available, refresh fails clearly. Console output is a transient local feed and is not saved to transcript logs.
+The local Console output streams what is being checked, skipped, refreshed, rebuilt, or degraded while operations run. If one source fails while another source remains usable, the app can continue in degraded mode and names the affected source type. If no retrieval corpus is available, refresh fails clearly. Console output is a transient local feed and is not saved to transcript logs.
 
 By default, local runtime state and retrieval artifacts are stored under `.eberron-query-assistant/` in the repository.
 Runtime state records the application version for diagnostics only. Routine refresh preserves existing local state and retrieval artifacts across version changes; the app only intentionally clears or force-rebuilds its corpus when you use the force-reingest control.

@@ -8,7 +8,9 @@ import {
   getLog,
   isApiRequestError,
   refresh,
+  subscribeConsole,
   writeContext,
+  type ApiConsoleEntry,
   type ApiConsole,
   type ApiLog,
   type ApiNpcResponse,
@@ -143,6 +145,12 @@ const useCreateAppState = (): AppState => {
   }, []);
 
   useEffect(() => {
+    return subscribeConsole((entry) => {
+      setConsoleOutput((current) => appendConsoleEntry(current, entry));
+    });
+  }, []);
+
+  useEffect(() => {
     if (!contextLoaded || contextMarkdown === lastSavedContext) {
       return;
     }
@@ -199,12 +207,12 @@ const useCreateAppState = (): AppState => {
     if (prompt.length === 0 || status.busy) {
       return;
     }
-    setAssistantPrompt("");
     setOutputTab("log");
     void runOperation(
       "assistant",
       () => askAssistant(prompt, standardSessionId),
       (result) => {
+        setAssistantPrompt("");
         setLog(result.log);
         setNpcs(EMPTY_NPCS);
       }
@@ -216,12 +224,12 @@ const useCreateAppState = (): AppState => {
     if (prompt.length === 0 || status.busy) {
       return;
     }
-    setNameGeneratorPrompt("");
     setOutputTab("npcs");
     void runOperation(
       "npcs",
       () => generateNpcs(prompt, npcSessionId),
       (result) => {
+        setNameGeneratorPrompt("");
         clearLogSelection();
         setNpcs(result.npcs);
       }
@@ -340,4 +348,14 @@ const useCreateAppState = (): AppState => {
 
 const formatError = (error: unknown): string => {
   return error instanceof Error ? error.message : String(error);
+};
+
+const appendConsoleEntry = (consoleOutput: ApiConsole, entry: ApiConsoleEntry): ApiConsole => {
+  if (consoleOutput.entries.some((current) => current.id === entry.id)) {
+    return consoleOutput;
+  }
+
+  return {
+    entries: [...consoleOutput.entries, entry]
+  };
 };

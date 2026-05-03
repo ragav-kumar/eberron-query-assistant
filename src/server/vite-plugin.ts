@@ -42,6 +42,11 @@ const handleApiRequest = async (
 ): Promise<void> => {
   const url = new URL(request.url ?? "/", "http://localhost");
 
+  if (request.method === "GET" && url.pathname === "/api/console/events") {
+    writeConsoleEvents(app, request, response);
+    return;
+  }
+
   if (request.method === "GET" && url.pathname === "/api/log") {
     const filePath = url.searchParams.get("filePath");
     writeJson(response, 200, await app.getLog({
@@ -134,6 +139,24 @@ const writeJson = (response: ServerResponse, statusCode: number, body: unknown):
   response.statusCode = statusCode;
   response.setHeader("Content-Type", "application/json; charset=utf-8");
   response.end(JSON.stringify(body));
+};
+
+const writeConsoleEvents = (app: WebApp, request: IncomingMessage, response: ServerResponse): void => {
+  response.statusCode = 200;
+  response.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+  response.setHeader("Cache-Control", "no-cache, no-transform");
+  response.setHeader("Connection", "keep-alive");
+  response.flushHeaders?.();
+  response.write(": connected\n\n");
+
+  const unsubscribe = app.subscribeConsole((entry) => {
+    response.write(`data: ${JSON.stringify(entry)}\n\n`);
+  });
+
+  request.on("close", () => {
+    unsubscribe();
+    response.end();
+  });
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
