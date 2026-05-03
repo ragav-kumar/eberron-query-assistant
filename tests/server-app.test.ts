@@ -221,7 +221,10 @@ describe("web app API model", () => {
 
     expect(response.exchanges).toEqual([{ user: "Old?", title: "Old", assistant: "Old." }]);
     expect(response.readOnly).toBe(true);
-    expect(response.files.map((file) => file.label)).toEqual(["20260201000000 New.json", "20260101000000 Old.json"]);
+    expect(response.files.map((file) => file.label)).toEqual([
+      "Feb 1, 2026 12:00 AM - New",
+      "Jan 1, 2026 12:00 AM - Old"
+    ]);
   });
 
   it("rejects unsafe or missing log selections", async () => {

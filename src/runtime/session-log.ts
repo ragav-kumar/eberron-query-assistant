@@ -25,6 +25,8 @@ export interface SessionLogFile {
 }
 
 const FALLBACK_TITLE = "Untitled Session";
+const TIMESTAMPED_LOG_FILENAME_PATTERN = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s+(.+)$/;
+const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export const createSessionLog = async (request: SessionLogCreateRequest): Promise<SessionLog> => {
   const startedAt = request.now ?? new Date();
@@ -104,10 +106,10 @@ export const listSessionLogFiles = async (
       return {
         active: activeResolved !== null && path.resolve(filePath) === activeResolved,
         filePath,
-        label: entry.name
+        label: formatSessionLogFileLabel(entry.name)
       };
     })
-    .sort((left, right) => right.label.localeCompare(left.label));
+    .sort((left, right) => path.basename(right.filePath).localeCompare(path.basename(left.filePath)));
 };
 
 export const readSessionLogFile = async (logDir: string, filePath: string): Promise<SessionLogExchange[]> => {
@@ -160,6 +162,23 @@ const formatTimestamp = (date: Date): string => {
     pad(date.getMinutes()),
     pad(date.getSeconds())
   ].join("");
+};
+
+const formatSessionLogFileLabel = (filename: string): string => {
+  const basename = path.basename(filename, path.extname(filename));
+  const match = TIMESTAMPED_LOG_FILENAME_PATTERN.exec(basename);
+  if (!match) {
+    return basename;
+  }
+
+  const [, year, month, day, hour, minute, , title] = match;
+  const monthIndex = Number(month) - 1;
+  const hour24 = Number(hour);
+  const hour12 = hour24 % 12 || 12;
+  const period = hour24 >= 12 ? "PM" : "AM";
+  const monthLabel = MONTH_LABELS[monthIndex] ?? month;
+
+  return `${monthLabel} ${Number(day)}, ${year} ${hour12}:${minute} ${period} - ${title}`;
 };
 
 const normalizeExchange = (exchange: SessionLogExchange): SessionLogExchange => {

@@ -52,7 +52,7 @@ const initialLog = {
     {
       active: true,
       filePath: "logs/session.json",
-      label: "session.json"
+      label: "session"
     }
   ],
   filePath: "logs/session.json" as string | null,
@@ -602,7 +602,7 @@ describe("App", () => {
         {
           active: false,
           filePath: "logs/old.json",
-          label: "old.json"
+          label: "old"
         }
       ]
     } }));
@@ -611,6 +611,7 @@ describe("App", () => {
     render(<App />);
 
     const select = await screen.findByLabelText("Log file");
+    expect(screen.getByRole("option", { name: "old" })).toBeTruthy();
     fireEvent.change(select, { target: { value: "logs/old.json" } });
 
     await waitFor(() => {
@@ -643,7 +644,7 @@ describe("App", () => {
         {
           active: false,
           filePath: "logs/old.json",
-          label: "old.json"
+          label: "old"
         }
       ]
     } }));

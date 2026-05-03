@@ -127,3 +127,5 @@ Existing generated NPC state remains valid without migration. Verification added
 Standard assistant transcript logs are now JSON files under `logs/` named from the timestamp and assistant-provided session title. Each file stores an array of `{ user, assistant, title }` exchanges. The exchange title is a concise table-of-contents heading for the user prompt; the assistant field remains Markdown answer text.
 
 The Log tab renders a linked table of contents from exchange titles and displays each Q&A pair as a separated section. Existing local Markdown transcript files were converted once into JSON logs, with generic `GUI Session` filenames replaced by better inferred session titles. Legacy `logs/generated_npcs.md` is obsolete because generated NPCs live in JSON state; it is not recreated or browsed as a Standard transcript.
+
+The Log tab dropdown displays saved transcript names without the `.json` extension. Timestamped transcript filenames are shown with a readable date and time followed by the session title, while selection still uses the original file path internally.
