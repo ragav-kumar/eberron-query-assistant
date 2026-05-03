@@ -121,6 +121,8 @@ There is no `npm run build` script. Use `npm run prestart` for the TypeScript no
 
 When starting the dev server from PowerShell for verification, invoke the Windows npm shim explicitly, for example `Start-Process -FilePath 'npm.cmd' -ArgumentList @('run','start','--','--host','127.0.0.1') ...`. `Start-Process -FilePath 'npm'` is known to fail on this setup with `%1 is not a valid Win32 application`.
 
+Place manual smoke-test and dev-server verification stdout/stderr files under `.test-tmp/`, not under `.eberron-query-assistant/`. The `.eberron-query-assistant/` directory is reserved for app-owned runtime state, cache, retrieval artifacts, and user data.
+
 ## Coding Best Practices
 Implement the project as TypeScript-first code with explicit types at important boundaries, especially around configuration, state persistence, normalized records, retrieval results, and provider adapters.
 
