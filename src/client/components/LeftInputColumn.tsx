@@ -9,12 +9,14 @@ interface LeftInputColumnProps {
   contextLoaded: boolean;
   contextMarkdown: string;
   contextSaveState: string;
+  includePartyContext: boolean;
   inputMode: InputMode;
   isBusy: boolean;
   leftTab: LeftTab;
   nameGeneratorPrompt: string;
   onAssistantPromptChange: (prompt: string) => void;
   onContextChange: (markdown: string) => void;
+  onIncludePartyContextChange: (includePartyContext: boolean) => void;
   onInputModeChange: (mode: InputMode) => void;
   onLeftTabChange: (tab: LeftTab) => void;
   onNameGeneratorPromptChange: (prompt: string) => void;
@@ -28,12 +30,14 @@ export const LeftInputColumn = ({
   contextLoaded,
   contextMarkdown,
   contextSaveState,
+  includePartyContext,
   inputMode,
   isBusy,
   leftTab,
   nameGeneratorPrompt,
   onAssistantPromptChange,
   onContextChange,
+  onIncludePartyContextChange,
   onInputModeChange,
   onLeftTabChange,
   onNameGeneratorPromptChange,
@@ -66,6 +70,15 @@ export const LeftInputColumn = ({
 
     {leftTab === "input" ? (
       <div className="tab-panel" role="tabpanel">
+        <label className="checkbox-row">
+          <input
+            type="checkbox"
+            checked={includePartyContext}
+            disabled={isBusy}
+            onChange={(event) => onIncludePartyContextChange(event.currentTarget.checked)}
+          />
+          Include party info
+        </label>
         <InputModeSelector mode={inputMode} onModeChange={onInputModeChange} />
         {inputMode === "standard" ? (
           <AssistantPromptPanel

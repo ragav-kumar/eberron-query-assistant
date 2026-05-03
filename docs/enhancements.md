@@ -129,3 +129,9 @@ Standard assistant transcript logs are now JSON files under `logs/` named from t
 The Log tab renders a linked table of contents from exchange titles and displays each Q&A pair as a separated section. Existing local Markdown transcript files were converted once into JSON logs, with generic `GUI Session` filenames replaced by better inferred session titles. Legacy `logs/generated_npcs.md` is obsolete because generated NPCs live in JSON state; it is not recreated or browsed as a Standard transcript.
 
 The Log tab dropdown displays saved transcript names without the `.json` extension. Timestamped transcript filenames are shown with a readable date and time followed by the session title, while selection still uses the original file path internally.
+
+## Shared Party Context Toggle
+
+The Input tab now has one shared `Include party info` checkbox above the Standard and NPC Generator mode selector. It is enabled by default and applies to whichever mode is submitted. When unchecked, automatic party context is omitted and the assistant is instructed to treat the request as world querying or world building rather than current-party status.
+
+NPC Generator prompts can now receive the same automatic party context as Standard prompts when the shared checkbox is enabled. Verification added for this change covers prompt assembly, server request options, and React checkbox submission behavior.

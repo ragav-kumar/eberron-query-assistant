@@ -2,7 +2,12 @@ import type { ChatAdapter, ChatMessage } from "../provider/index.js";
 import type { RetrievalService } from "../retrieval/index.js";
 import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "../types.js";
 import { readGeneratedNpcState, updateGeneratedNpcState } from "./npc-store.js";
-import { formatCitation, loadAssistantPromptAssets, type AssistantPromptAssets } from "./prompt.js";
+import {
+  formatCitation,
+  loadAssistantPromptAssets,
+  type AssistantPromptAssets
+} from "./prompt.js";
+import { createSqlitePartyContextService, type PartyContextService } from "./party-context.js";
 
 export interface GeneratedNpc {
   age?: string;
@@ -17,9 +22,13 @@ export interface GeneratedNpc {
 }
 
 export interface NpcGenerationSession {
-  generate(prompt: string): Promise<NpcGenerationAnswer>;
+  generate(prompt: string, options?: NpcGenerationOptions): Promise<NpcGenerationAnswer>;
   read(): Promise<GeneratedNpc[]>;
   reset(): void;
+}
+
+export interface NpcGenerationOptions {
+  includePartyContext?: boolean;
 }
 
 export interface NpcGenerationAnswer {
@@ -31,6 +40,7 @@ export interface NpcGenerationSessionOptions {
   assistant: AssistantConfig;
   chat: ChatAdapter;
   config: RuntimeConfig;
+  partyContext?: PartyContextService;
   retrieval: RetrievalService;
 }
 
@@ -39,6 +49,7 @@ const MAX_HISTORY_MESSAGES = 8;
 
 export const createNpcGenerationSession = (options: NpcGenerationSessionOptions): NpcGenerationSession => {
   const history: ChatMessage[] = [];
+  const partyContext = options.partyContext ?? createSqlitePartyContextService();
   let promptAssets: AssistantPromptAssets | null = null;
 
   const loadPromptAssets = async (): Promise<AssistantPromptAssets> => {
@@ -47,12 +58,13 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
   };
 
   return {
-    async generate(prompt) {
+    async generate(prompt, generationOptions = {}) {
       const normalizedPrompt = prompt.trim();
       if (normalizedPrompt.length === 0) {
         throw new Error("NPC generation prompt cannot be empty.");
       }
 
+      const includePartyContext = generationOptions.includePartyContext ?? true;
       const evidence = await options.retrieval.search({
         query: normalizedPrompt,
         limit: MAX_EVIDENCE_RESULTS
@@ -62,8 +74,10 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
       const messages = buildNpcGenerationMessages({
         evidence,
         history,
+        includePartyContext,
         maxExistingId,
         npcs: existingNpcs,
+        partyContext: includePartyContext ? await partyContext.build(options.config) : "",
         prompt: normalizedPrompt,
         promptAssets: await loadPromptAssets()
       });
@@ -92,18 +106,23 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
 interface NpcMessageBuildRequest {
   evidence: RetrievalResult[];
   history: ChatMessage[];
+  includePartyContext?: boolean;
   maxExistingId: number;
   npcs: GeneratedNpc[];
+  partyContext?: string;
   prompt: string;
   promptAssets: AssistantPromptAssets;
 }
 
 export const buildNpcGenerationMessages = (request: NpcMessageBuildRequest): ChatMessage[] => {
+  const includePartyContext = request.includePartyContext ?? true;
+  const partyContext = includePartyContext ? (request.partyContext?.trim() ?? "") : "";
   const systemPromptParts = [
     request.promptAssets.systemPrompt,
     request.promptAssets.additionalContext.length > 0
       ? ["Additional assistant context:", request.promptAssets.additionalContext].join("\n")
       : "",
+    includePartyContext ? "" : request.promptAssets.worldQueryingModePrompt,
     request.promptAssets.npcGeneratorPrompt.replaceAll("{{maxExistingId}}", String(request.maxExistingId))
   ].filter((part) => part.length > 0);
 
@@ -116,6 +135,8 @@ export const buildNpcGenerationMessages = (request: NpcMessageBuildRequest): Cha
     {
       role: "user",
       content: [
+        partyContext,
+        partyContext.length > 0 ? "" : "",
         "Retrieved evidence:",
         formatEvidenceForNpcPrompt(request.evidence),
         "",
@@ -123,7 +144,7 @@ export const buildNpcGenerationMessages = (request: NpcMessageBuildRequest): Cha
         request.npcs.length > 0 ? JSON.stringify({ npcs: request.npcs }) : "[]",
         "",
         `Prompt: ${request.prompt}`
-      ].join("\n")
+      ].filter((part, index) => part.length > 0 || (partyContext.length > 0 && index === 1)).join("\n")
     }
   ];
 };

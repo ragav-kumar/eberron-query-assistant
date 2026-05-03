@@ -25,12 +25,14 @@ const AppContent = () => {
           contextLoaded={state.contextLoaded}
           contextMarkdown={state.contextMarkdown}
           contextSaveState={state.contextSaveState}
+          includePartyContext={state.includePartyContext}
           inputMode={state.inputMode}
           isBusy={state.isBusy}
           leftTab={state.leftTab}
           nameGeneratorPrompt={state.nameGeneratorPrompt}
           onAssistantPromptChange={state.setAssistantPrompt}
           onContextChange={state.setContextMarkdown}
+          onIncludePartyContextChange={state.setIncludePartyContext}
           onInputModeChange={state.changeInputMode}
           onLeftTabChange={state.setLeftTab}
           onNameGeneratorPromptChange={state.setNameGeneratorPrompt}

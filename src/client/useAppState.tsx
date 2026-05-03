@@ -59,6 +59,7 @@ export interface AppState {
   contextSaveState: string;
   error: string | null;
   inputMode: InputMode;
+  includePartyContext: boolean;
   isBusy: boolean;
   leftTab: LeftTab;
   log: ApiLog;
@@ -69,6 +70,7 @@ export interface AppState {
   selectLog: (filePath: string) => void;
   setAssistantPrompt: (prompt: string) => void;
   setContextMarkdown: (markdown: string) => void;
+  setIncludePartyContext: (includePartyContext: boolean) => void;
   setLeftTab: (tab: LeftTab) => void;
   setNameGeneratorPrompt: (prompt: string) => void;
   setOutputTab: (tab: OutputTab) => void;
@@ -111,6 +113,7 @@ const useCreateAppState = (): AppState => {
   const [error, setError] = useState<string | null>(null);
   const [leftTab, setLeftTab] = useState<LeftTab>("input");
   const [inputMode, setInputMode] = useState<InputMode>("standard");
+  const [includePartyContext, setIncludePartyContext] = useState(true);
   const [outputTab, setOutputTab] = useState<OutputTab>("log");
 
   const nextSessionId = useCallback((mode: SessionMode): string => {
@@ -269,13 +272,13 @@ const useCreateAppState = (): AppState => {
     setOutputTab("log");
     void runOperation(
       "assistant",
-      () => askAssistant(prompt, standardSessionId),
+      () => askAssistant(prompt, standardSessionId, includePartyContext),
       (result) => {
         setAssistantPrompt("");
         setLog(result.log);
       }
     );
-  }, [assistantPrompt, runOperation, standardSessionId, status.busy]);
+  }, [assistantPrompt, includePartyContext, runOperation, standardSessionId, status.busy]);
 
   const submitNameGeneratorPrompt = useCallback(() => {
     const prompt = nameGeneratorPrompt.trim();
@@ -285,14 +288,14 @@ const useCreateAppState = (): AppState => {
     setOutputTab("npcs");
     void runOperation(
       "npcs",
-      () => generateNpcs(prompt, npcSessionId),
+      () => generateNpcs(prompt, npcSessionId, includePartyContext),
       (result) => {
         setNameGeneratorPrompt("");
         clearLogSelection();
         setNpcs(result.npcs);
       }
     );
-  }, [clearLogSelection, nameGeneratorPrompt, npcSessionId, runOperation, status.busy]);
+  }, [clearLogSelection, includePartyContext, nameGeneratorPrompt, npcSessionId, runOperation, status.busy]);
 
   const runRefresh = useCallback(
     (forceReingest: boolean) => {
@@ -369,6 +372,7 @@ const useCreateAppState = (): AppState => {
     contextSaveState,
     error,
     inputMode,
+    includePartyContext,
     isBusy: status.busy,
     leftTab,
     log,
@@ -379,6 +383,7 @@ const useCreateAppState = (): AppState => {
     selectLog,
     setAssistantPrompt,
     setContextMarkdown,
+    setIncludePartyContext,
     setLeftTab,
     setNameGeneratorPrompt,
     setOutputTab,

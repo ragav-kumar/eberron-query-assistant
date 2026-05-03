@@ -93,17 +93,25 @@ export const writeContext = async (markdown: string): Promise<void> => {
   });
 };
 
-export const askAssistant = async (prompt: string, sessionId: string): Promise<ApiOperationResult> => {
+export const askAssistant = async (
+  prompt: string,
+  sessionId: string,
+  includePartyContext: boolean
+): Promise<ApiOperationResult> => {
   return requestJson<ApiOperationResult>("/api/assistant", {
     method: "POST",
-    body: JSON.stringify({ prompt, sessionId })
+    body: JSON.stringify({ prompt, sessionId, includePartyContext })
   });
 };
 
-export const generateNpcs = async (prompt: string, sessionId: string): Promise<ApiOperationResult> => {
+export const generateNpcs = async (
+  prompt: string,
+  sessionId: string,
+  includePartyContext: boolean
+): Promise<ApiOperationResult> => {
   return requestJson<ApiOperationResult>("/api/npcs", {
     method: "POST",
-    body: JSON.stringify({ prompt, sessionId })
+    body: JSON.stringify({ prompt, sessionId, includePartyContext })
   });
 };
 

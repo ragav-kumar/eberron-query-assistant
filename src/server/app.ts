@@ -28,8 +28,8 @@ import { createFilesystemStateStore, type StateStore } from "../state/index.js";
 import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
 
 export interface WebApp {
-  askAssistant(prompt: string, sessionId?: string): Promise<WebOperationResult>;
-  generateNpcs(prompt: string, sessionId?: string): Promise<WebOperationResult>;
+  askAssistant(prompt: string, sessionId?: string, includePartyContext?: boolean): Promise<WebOperationResult>;
+  generateNpcs(prompt: string, sessionId?: string, includePartyContext?: boolean): Promise<WebOperationResult>;
   getContext(): Promise<string>;
   getLog(options?: string | { filePath?: string; sessionId?: string }): Promise<WebLogResponse>;
   getNpcs(): Promise<WebNpcResponse>;
@@ -195,6 +195,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       assistant: config.assistant,
       chat: dependencies.chat ?? createOpenAiChatAdapter(config.provider),
       config,
+      partyContext,
       retrieval
     });
     return session.npcSession;
@@ -280,12 +281,12 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   };
 
   return {
-    async askAssistant(prompt, sessionId = DEFAULT_SESSION_ID) {
+    async askAssistant(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true) {
       return runExclusive("assistant", async () => {
         const standardSession = readStandardSession(sessionId);
         try {
           await ensureRoutineRefresh();
-          await ensureAssistant(standardSession).ask(prompt);
+          await ensureAssistant(standardSession).ask(prompt, { includePartyContext });
         } catch (error) {
           const message = formatThrownValue(error);
           consoleFeed.error(`Assistant response failed: ${message}`);
@@ -299,12 +300,12 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
         };
       });
     },
-    async generateNpcs(prompt, sessionId = DEFAULT_SESSION_ID) {
+    async generateNpcs(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true) {
       return runExclusive("npcs", async () => {
         const npcSessionState = readNpcSession(sessionId);
         try {
           await ensureRoutineRefresh();
-          await ensureNpcSession(npcSessionState).generate(prompt);
+          await ensureNpcSession(npcSessionState).generate(prompt, { includePartyContext });
         } catch (error) {
           const message = formatThrownValue(error);
           consoleFeed.error(`NPC generation failed: ${message}`);

@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
+import type { ChatMessage } from "../src/provider/index.js";
 import { createWebApp, isBusyError, isWebOperationError } from "../src/server/app.js";
 import type { AssistantSessionAnswer } from "../src/runtime/assistant-session.js";
 import { createDefaultRuntimeState } from "../src/state/state-store.js";
@@ -64,6 +65,41 @@ describe("web app API model", () => {
         assistant: "Aerenal answer."
       }
     ]);
+  });
+
+  it("passes included party context into assistant prompts by default", async () => {
+    const partyContextBuild = vi.fn().mockResolvedValue("Current party context:\n- Party actors: Peanunt.");
+    const chat = vi.fn().mockResolvedValue(firstAnswer("Party", "Party Question", "Party answer."));
+    const app = createWebApp({
+      config: await writeConfig("assistant-party-default"),
+      ...mockRefreshDependencies(),
+      partyContext: { build: partyContextBuild },
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: chat }
+    });
+
+    await app.askAssistant("Who is with the party?");
+
+    expect(partyContextBuild).toHaveBeenCalledOnce();
+    expect(readChatMessages(chat).at(-1)?.content).toContain("Current party context:");
+  });
+
+  it("omits party context from assistant prompts when requested", async () => {
+    const partyContextBuild = vi.fn().mockResolvedValue("Current party context:\n- Party actors: Peanunt.");
+    const chat = vi.fn().mockResolvedValue(firstAnswer("World", "World Question", "World answer."));
+    const app = createWebApp({
+      config: await writeConfig("assistant-party-disabled"),
+      ...mockRefreshDependencies(),
+      partyContext: { build: partyContextBuild },
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: chat }
+    });
+
+    await app.askAssistant("Who rules Aundair?", undefined, false);
+
+    expect(partyContextBuild).not.toHaveBeenCalled();
+    expect(readChatMessages(chat)[0]?.content).toContain("world querying or world building");
+    expect(readChatMessages(chat).at(-1)?.content).not.toContain("Current party context:");
   });
 
   it("runs refresh and force reingest with the requested runtime option and console output", async () => {
@@ -553,6 +589,34 @@ describe("web app API model", () => {
     expect(response.log).toEqual(emptyLogResponse());
   });
 
+  it("passes included party context into NPC generation prompts", async () => {
+    const partyContextBuild = vi.fn().mockResolvedValue("Current party context:\n- Party actors: Peanunt.");
+    const chat = vi.fn().mockResolvedValue(
+      JSON.stringify({
+        npcs: [
+          {
+            id: 1,
+            name: "Jala ir'Wynarn",
+            description: "A sharp-eyed Aundairian envoy.",
+            bio: "She trades favors."
+          }
+        ]
+      })
+    );
+    const app = createWebApp({
+      config: await writeConfig("npc-party-enabled"),
+      ...mockRefreshDependencies(),
+      partyContext: { build: partyContextBuild },
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: chat }
+    });
+
+    await app.generateNpcs("Generate one envoy", undefined, true);
+
+    expect(partyContextBuild).toHaveBeenCalledOnce();
+    expect(readChatMessages(chat).at(-1)?.content).toContain("Current party context:");
+  });
+
   it("normalizes empty optional NPC details and rejects invalid generated detail values", async () => {
     const config = await writeConfig("npc-details-normalization");
     const chat = vi
@@ -897,7 +961,19 @@ const writeConfig = async (name: string): Promise<RuntimeConfig> => {
     "<session-title>Title</session-title><response-title>Heading</response-title><answer>Answer</answer>",
     "utf8"
   );
+  await writeFile(
+    config.assistant.worldQueryingModePromptPath,
+    [
+      "Party context is intentionally omitted.",
+      "Treat this request as world querying or world building, not as a question about the current party, current session status, or active party goals."
+    ].join("\n"),
+    "utf8"
+  );
   return config;
+};
+
+const readChatMessages = (chat: ReturnType<typeof vi.fn>): ChatMessage[] => {
+  return (chat.mock.calls[0]?.[0] ?? []) as ChatMessage[];
 };
 
 const mockRetrieval = (

@@ -147,6 +147,34 @@ describe("App", () => {
     expect(screen.getByRole("tab", { name: "Console" }).getAttribute("aria-selected")).toBe("false");
     expect(screen.getByRole("tab", { name: "Log" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("tab", { name: "NPCs" }).getAttribute("aria-selected")).toBe("false");
+    expect(screen.getByRole("checkbox", { name: "Include party info" })).toHaveProperty("checked", true);
+  });
+
+  it("uses one shared party info checkbox for standard and NPC submissions", async () => {
+    render(<App />);
+
+    const checkbox = await screen.findByRole("checkbox", { name: "Include party info" });
+    fireEvent.click(checkbox);
+    expect(checkbox).toHaveProperty("checked", false);
+
+    fireEvent.change(screen.getByPlaceholderText(/Ask about Eberron/i), {
+      target: { value: "What about Aundair?" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    await waitFor(() => {
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Aundair?", expect.any(String), false);
+    });
+
+    fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
+    expect(screen.getByRole("checkbox", { name: "Include party info" })).toHaveProperty("checked", false);
+    fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
+      target: { value: "Generate one envoy" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+
+    await waitFor(() => {
+      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one envoy", expect.any(String), false);
+    });
   });
 
   it("switches input modes with the radio group", async () => {
@@ -172,7 +200,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String));
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String), true);
     });
     expect(await screen.findByText("Answer")).toBeTruthy();
   });
@@ -214,7 +242,7 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String));
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String), true);
     });
     fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
     fireEvent.click(screen.getByRole("radio", { name: "Standard" }));
@@ -233,7 +261,7 @@ describe("App", () => {
     fireEvent.keyDown(prompt, { key: "Enter" });
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Sharn?", expect.any(String));
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Sharn?", expect.any(String), true);
     });
   });
 
@@ -247,7 +275,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate" }));
 
     await waitFor(() => {
-      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one Aundairian envoy", expect.any(String));
+      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one Aundairian envoy", expect.any(String), true);
     });
     expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
     expect(screen.getByText("Species")).toBeTruthy();
@@ -306,7 +334,7 @@ describe("App", () => {
     fireEvent.keyDown(prompt, { key: "Enter" });
 
     await waitFor(() => {
-      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one goblin", expect.any(String));
+      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one goblin", expect.any(String), true);
     });
   });
 
@@ -378,6 +406,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     expect(await screen.findByRole("button", { name: "Ask" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("checkbox", { name: "Include party info" })).toHaveProperty("disabled", true);
     expect(screen.getByRole("status", { name: "Loading output" })).toBeTruthy();
     fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
     expect(screen.getByRole("button", { name: "Generate" })).toHaveProperty("disabled", true);
@@ -673,7 +702,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("Write to active session", expect.any(String));
+      expect(api.askAssistant).toHaveBeenCalledWith("Write to active session", expect.any(String), true);
     });
     expect(await screen.findByText("Current session: logs/session.json")).toBeTruthy();
     expect(await screen.findAllByText("New Session Answer")).toHaveLength(2);

@@ -9,6 +9,7 @@ import type { ChatAdapter } from "../src/provider/index.js";
 import { createMemoryProgressReporter } from "../src/progress/reporter.js";
 import { type RetrievalService } from "../src/retrieval/index.js";
 import { loadDefaultConfig } from "../src/config/index.js";
+import { buildNpcGenerationMessages } from "../src/runtime/npc-session.js";
 import {
   buildAssistantMessages,
   createAssistantPromptShell,
@@ -40,6 +41,10 @@ const PROMPT_ASSETS: AssistantPromptAssets = {
     "Distinguish direct support from inference. Do not describe synthesized conclusions as quoted facts.",
     "Include concise references when evidence is available.",
     "Use PDF title plus page when present, article title plus URL, and foundry entity name plus type or identifier."
+  ].join("\n"),
+  worldQueryingModePrompt: [
+    "Party context is intentionally omitted.",
+    "Treat this request as world querying or world building, not as a question about the current party, current session status, or active party goals."
   ].join("\n")
 };
 
@@ -115,6 +120,20 @@ describe("assistant prompt assembly", () => {
     );
   });
 
+  it("omits party context and adds world querying instructions when party context is disabled", () => {
+    const messages = buildAssistantMessages({
+      evidence: [result("foundry", "world.actor.peanunt", "Peanunt", "Actor")],
+      includePartyContext: false,
+      partyContext: "Current party context:\n- Party actors: Peanunt.",
+      promptAssets: PROMPT_ASSETS,
+      question: "Who runs Aundair?"
+    });
+
+    expect(messages[0]?.content).toContain("world querying or world building");
+    expect(messages.at(-1)?.content).not.toContain("Current party context:");
+    expect(messages.at(-1)?.content).toContain("Retrieved evidence:");
+  });
+
   it("omits the local assistant context section when it is empty", () => {
     const messages = buildAssistantMessages({
       evidence: [],
@@ -155,8 +174,46 @@ describe("assistant prompt assembly", () => {
     expect(loaded.systemPrompt).toBe("System prompt from disk.");
     expect(loaded.sessionTitlePrompt).toContain("<session-title>");
     expect(loaded.npcGeneratorPrompt).toContain("NPC generator mode");
+    expect(loaded.worldQueryingModePrompt).toContain("world querying or world building");
     expect(loaded.additionalContext).toBe("");
     await expect(readFile(assistant.additionalContextPath, "utf8")).resolves.toBe("");
+  });
+});
+
+describe("NPC generator prompt assembly", () => {
+  it("includes current party context before retrieved evidence when enabled", () => {
+    const messages = buildNpcGenerationMessages({
+      evidence: [result("foundry", "world.actor.peanunt", "Peanunt", "Actor")],
+      history: [],
+      includePartyContext: true,
+      maxExistingId: 0,
+      npcs: [],
+      partyContext: "Current party context:\n- Party actors: Peanunt.",
+      prompt: "Generate one NPC",
+      promptAssets: PROMPT_ASSETS
+    });
+
+    expect(messages.at(-1)?.content).toContain("Current party context:");
+    expect(messages.at(-1)?.content.indexOf("Current party context:")).toBeLessThan(
+      messages.at(-1)?.content.indexOf("Retrieved evidence:") ?? 0
+    );
+  });
+
+  it("omits party context and adds world building instructions when disabled", () => {
+    const messages = buildNpcGenerationMessages({
+      evidence: [result("foundry", "world.actor.peanunt", "Peanunt", "Actor")],
+      history: [],
+      includePartyContext: false,
+      maxExistingId: 0,
+      npcs: [],
+      partyContext: "Current party context:\n- Party actors: Peanunt.",
+      prompt: "Generate one NPC",
+      promptAssets: PROMPT_ASSETS
+    });
+
+    expect(messages[0]?.content).toContain("world querying or world building");
+    expect(messages.at(-1)?.content).not.toContain("Current party context:");
+    expect(messages.at(-1)?.content).toContain("Retrieved evidence:");
   });
 });
 
@@ -430,11 +487,13 @@ const writeAssistantFiles = async (
     additionalContextPath: path.join(assistantDir, "additional-context.md"),
     npcGeneratorPromptPath: path.join(assistantDir, "npc-generator-prompt.md"),
     sessionTitlePromptPath: path.join(assistantDir, "session-title-prompt.md"),
-    systemPromptPath: path.join(assistantDir, "system-prompt.md")
+    systemPromptPath: path.join(assistantDir, "system-prompt.md"),
+    worldQueryingModePromptPath: path.join(assistantDir, "world-querying-mode-prompt.md")
   };
   await mkdir(assistantDir, { recursive: true });
   await writeFile(config.systemPromptPath, options.systemPrompt ?? PROMPT_ASSETS.systemPrompt, "utf8");
   await writeFile(config.npcGeneratorPromptPath, PROMPT_ASSETS.npcGeneratorPrompt, "utf8");
+  await writeFile(config.worldQueryingModePromptPath, PROMPT_ASSETS.worldQueryingModePrompt, "utf8");
   await writeFile(
     config.sessionTitlePromptPath,
     options.sessionTitlePrompt ?? PROMPT_ASSETS.sessionTitlePrompt,

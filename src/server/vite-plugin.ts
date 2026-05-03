@@ -82,13 +82,21 @@ const handleApiRequest = async (
 
   if (request.method === "POST" && url.pathname === "/api/assistant") {
     const body = await readJsonBody(request);
-    writeJson(response, 200, await app.askAssistant(readStringField(body, "prompt"), readOptionalStringField(body, "sessionId")));
+    writeJson(response, 200, await app.askAssistant(
+      readStringField(body, "prompt"),
+      readOptionalStringField(body, "sessionId"),
+      readOptionalBooleanField(body, "includePartyContext", true)
+    ));
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/api/npcs") {
     const body = await readJsonBody(request);
-    writeJson(response, 200, await app.generateNpcs(readStringField(body, "prompt"), readOptionalStringField(body, "sessionId")));
+    writeJson(response, 200, await app.generateNpcs(
+      readStringField(body, "prompt"),
+      readOptionalStringField(body, "sessionId"),
+      readOptionalBooleanField(body, "includePartyContext", true)
+    ));
     return;
   }
 
@@ -139,6 +147,17 @@ const readBooleanField = (body: unknown, field: string): boolean => {
   }
 
   return body[field];
+};
+
+const readOptionalBooleanField = (body: unknown, field: string, defaultValue: boolean): boolean => {
+  if (!isRecord(body) || body[field] === undefined) {
+    return defaultValue;
+  }
+  if (typeof body[field] === "boolean") {
+    return body[field];
+  }
+
+  throw new Error(`Expected JSON boolean field: ${field}.`);
 };
 
 const writeJson = (response: ServerResponse, statusCode: number, body: unknown): void => {

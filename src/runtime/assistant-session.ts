@@ -10,12 +10,16 @@ import { createSqlitePartyContextService, type PartyContextService } from "./par
 import type { SessionLogExchange } from "./session-log.js";
 
 export interface AssistantSession {
-  ask(question: string): Promise<AssistantSessionAnswer>;
+  ask(question: string, options?: AssistantAskOptions): Promise<AssistantSessionAnswer>;
 }
 
 export interface AssistantSessionAnswer {
   answer: string;
   evidence: RetrievalResult[];
+}
+
+export interface AssistantAskOptions {
+  includePartyContext?: boolean;
 }
 
 export interface AssistantSessionLogExchange extends SessionLogExchange {
@@ -46,12 +50,13 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
   };
 
   return {
-    async ask(question) {
+    async ask(question, askOptions = {}) {
       const normalizedQuestion = question.trim();
       if (normalizedQuestion.length === 0) {
         throw new Error("Assistant prompt cannot be empty.");
       }
 
+      const includePartyContext = askOptions.includePartyContext ?? true;
       const evidence = await options.retrieval.search({
         query: normalizedQuestion,
         limit: MAX_EVIDENCE_RESULTS
@@ -60,7 +65,8 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
         buildAssistantMessages({
           evidence,
           history,
-          partyContext: await partyContext.build(options.config),
+          includePartyContext,
+          partyContext: includePartyContext ? await partyContext.build(options.config) : "",
           promptAssets: await loadPromptAssets(),
           question: normalizedQuestion,
           requestSessionTitle: shouldRequestSessionTitle

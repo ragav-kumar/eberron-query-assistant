@@ -223,6 +223,19 @@ p {
   width: auto;
 }
 
+.checkbox-row {
+  align-items: center;
+  display: flex;
+  gap: 0.45rem;
+  width: fit-content;
+}
+
+.checkbox-row input {
+  min-height: auto;
+  padding: 0;
+  width: auto;
+}
+
 .panel {
   background: transparent;
   border: 0;

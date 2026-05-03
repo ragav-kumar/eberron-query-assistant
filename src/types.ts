@@ -23,6 +23,7 @@ export interface AssistantConfig {
   npcGeneratorPromptPath: string;
   sessionTitlePromptPath: string;
   systemPromptPath: string;
+  worldQueryingModePromptPath: string;
 }
 
 export interface CampaignConfig {

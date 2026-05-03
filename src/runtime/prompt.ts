@@ -117,6 +117,7 @@ const formatAssistantResponse = (response: string): string => {
 export interface AssistantMessageBuildRequest {
   evidence: RetrievalResult[];
   history?: ChatMessage[];
+  includePartyContext?: boolean;
   partyContext?: string;
   promptAssets: AssistantPromptAssets;
   question: string;
@@ -128,12 +129,14 @@ export interface AssistantPromptAssets {
   npcGeneratorPrompt: string;
   sessionTitlePrompt: string;
   systemPrompt: string;
+  worldQueryingModePrompt: string;
 }
 
 export const buildAssistantMessages = (request: AssistantMessageBuildRequest): ChatMessage[] => {
   const evidence = formatEvidence(request.evidence);
   const recentHistory = request.history ?? [];
-  const partyContext = request.partyContext?.trim() ?? "";
+  const includePartyContext = request.includePartyContext ?? true;
+  const partyContext = includePartyContext ? (request.partyContext?.trim() ?? "") : "";
   const userContentParts = [
     partyContext,
     partyContext.length > 0 ? "" : "",
@@ -147,6 +150,7 @@ export const buildAssistantMessages = (request: AssistantMessageBuildRequest): C
     request.promptAssets.additionalContext.length > 0
       ? ["Additional assistant context:", request.promptAssets.additionalContext].join("\n")
       : "",
+    includePartyContext ? "" : request.promptAssets.worldQueryingModePrompt,
     request.promptAssets.sessionTitlePrompt,
     request.requestSessionTitle === true
       ? "This response starts a new transcript session; include <session-title>."
@@ -169,10 +173,11 @@ export const buildAssistantMessages = (request: AssistantMessageBuildRequest): C
 export const loadAssistantPromptAssets = async (config: AssistantConfig): Promise<AssistantPromptAssets> => {
   await ensureAdditionalContextFile(config);
 
-  const [systemPrompt, sessionTitlePrompt, npcGeneratorPrompt, additionalContext] = await Promise.all([
+  const [systemPrompt, sessionTitlePrompt, npcGeneratorPrompt, worldQueryingModePrompt, additionalContext] = await Promise.all([
     readRequiredPromptFile(config.systemPromptPath, "system prompt"),
     readRequiredPromptFile(config.sessionTitlePromptPath, "session title prompt"),
     readRequiredPromptFile(config.npcGeneratorPromptPath, "NPC generator prompt"),
+    readRequiredPromptFile(config.worldQueryingModePromptPath, "world querying mode prompt"),
     readFile(config.additionalContextPath, "utf8")
   ]);
 
@@ -180,7 +185,8 @@ export const loadAssistantPromptAssets = async (config: AssistantConfig): Promis
     additionalContext: additionalContext.trim(),
     npcGeneratorPrompt: npcGeneratorPrompt.trim(),
     sessionTitlePrompt: sessionTitlePrompt.trim(),
-    systemPrompt: systemPrompt.trim()
+    systemPrompt: systemPrompt.trim(),
+    worldQueryingModePrompt: worldQueryingModePrompt.trim()
   };
 };
 

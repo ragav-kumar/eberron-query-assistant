@@ -15,7 +15,8 @@ export const loadDefaultConfig = (repoRoot = process.cwd()): RuntimeConfig => {
       additionalContextPath: path.join(assistantDir, "additional-context.md"),
       npcGeneratorPromptPath: path.join(assistantDir, "npc-generator-prompt.md"),
       sessionTitlePromptPath: path.join(assistantDir, "session-title-prompt.md"),
-      systemPromptPath: path.join(assistantDir, "system-prompt.md")
+      systemPromptPath: path.join(assistantDir, "system-prompt.md"),
+      worldQueryingModePromptPath: path.join(assistantDir, "world-querying-mode-prompt.md")
     },
     campaign: {
       campaignJournalFolder: getConfigValue("EQA_CAMPAIGN_JOURNAL_FOLDER", envFile) ?? "Legacy",

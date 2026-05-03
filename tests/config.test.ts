@@ -41,7 +41,8 @@ describe("loadDefaultConfig", () => {
         additionalContextPath: path.join(repoRoot, "assistant", "additional-context.md"),
         npcGeneratorPromptPath: path.join(repoRoot, "assistant", "npc-generator-prompt.md"),
         sessionTitlePromptPath: path.join(repoRoot, "assistant", "session-title-prompt.md"),
-        systemPromptPath: path.join(repoRoot, "assistant", "system-prompt.md")
+        systemPromptPath: path.join(repoRoot, "assistant", "system-prompt.md"),
+        worldQueryingModePromptPath: path.join(repoRoot, "assistant", "world-querying-mode-prompt.md")
       },
       campaign: {
         campaignJournalFolder: process.env.EQA_CAMPAIGN_JOURNAL_FOLDER ?? "Legacy",
