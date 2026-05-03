@@ -108,6 +108,8 @@ Document assumptions, invariants, and unresolved decisions explicitly in the gov
 
 Update `README.md` whenever intended user-visible behavior changes.
 
+Do not restore, recreate, or preserve obsolete untracked local files unless the current task explicitly requires that exact file. Gitignored runtime artifacts, generated logs, and converted legacy files may represent deliberate local cleanup or migration state. Treat changes made outside the current session as user-owned work: do not revert, reintroduce, or "helpfully" reconstruct them while doing unrelated implementation or documentation work.
+
 Do not attempt sandboxed runs of commands known to require network access or external write permissions, including `npm install`, `git push`, and similar package-management or remote-publishing commands. Request escalation directly for those commands when they are needed.
 
 ## Local Verification Workflow
