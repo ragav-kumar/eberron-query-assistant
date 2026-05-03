@@ -313,6 +313,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     expect(await screen.findByRole("button", { name: "Ask" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("status", { name: "Loading output" })).toBeTruthy();
     fireEvent.click(screen.getByRole("radio", { name: "Debug Query" }));
     expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", true);
     expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);

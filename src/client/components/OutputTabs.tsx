@@ -61,6 +61,7 @@ export const OutputTabs = ({
         >
           NPCs
         </button>
+        {isBusy ? <span className="output-loading-spinner" role="status" aria-label="Loading output" /> : null}
       </div>
       {tab === "log" ? (
         <LogToolbar

@@ -65,3 +65,9 @@ Verification added or preserved for this change covers client-owned mode and new
 The browser UI streams local Console entries while operations are still running, keeps submitted Standard and Name Generator text visible until a request succeeds, and creates Standard transcript filenames from the assistant-provided session title when available. New Standard transcripts must not use `GUI Session` as a fallback filename; if the assistant title is unavailable, the submitted question is used instead.
 
 Verification added for this change covers streamed console subscriptions, prompt clearing success and failure behavior, assistant-title transcript filenames, and fallback transcript filename behavior.
+
+## GUI Output Polish
+
+The right-column tab bar now shows a discreet loading spinner while an operation is running. NPC cards in the `NPCs` tab wrap into multiple columns when space allows, with each card capped around 500 pixels wide so wide output panes can show tiled cards instead of one long column.
+
+Verification added for this change covers the right-column loading indicator during busy operations.
