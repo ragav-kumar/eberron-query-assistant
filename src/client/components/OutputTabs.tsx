@@ -1,15 +1,17 @@
-import type { ApiConsole, ApiLog, ApiNpcResponse, ApiSessionMode } from "../api.js";
+import type { ApiConsole, ApiLog, ApiNpcResponse } from "../api.js";
 import { ConsoleFeed } from "./ConsoleFeed.js";
 import { MarkdownOutputPane } from "./MarkdownOutputPane.js";
 import { NpcCardsPane } from "./NpcCardsPane.js";
 import type { OutputTab } from "./ui-types.js";
+
+type SessionMode = "npcs" | "standard";
 
 interface OutputTabsProps {
   consoleOutput: ApiConsole;
   isBusy: boolean;
   log: ApiLog;
   npcs: ApiNpcResponse;
-  onNewSession: (mode: ApiSessionMode) => void;
+  onNewSession: (mode: SessionMode) => void;
   onSelectLog: (filePath: string) => void;
   onTabChange: (tab: OutputTab) => void;
   tab: OutputTab;
@@ -86,7 +88,7 @@ export const OutputTabs = ({
 interface LogToolbarProps {
   isBusy: boolean;
   log: ApiLog;
-  onNewSession: (mode: ApiSessionMode) => void;
+  onNewSession: (mode: SessionMode) => void;
   onSelectLog: (filePath: string) => void;
 }
 
@@ -147,7 +149,7 @@ const LogToolbar = ({ isBusy, log, onNewSession, onSelectLog }: LogToolbarProps)
 interface NpcToolbarProps {
   isBusy: boolean;
   npcs: ApiNpcResponse;
-  onNewSession: (mode: ApiSessionMode) => void;
+  onNewSession: (mode: SessionMode) => void;
 }
 
 const NpcToolbar = ({ isBusy, npcs, onNewSession }: NpcToolbarProps) => (

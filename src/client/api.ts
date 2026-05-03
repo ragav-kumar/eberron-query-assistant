@@ -36,11 +36,6 @@ export interface ApiConsole {
   entries: ApiConsoleEntry[];
 }
 
-export interface ApiStatus {
-  busy: boolean;
-  operation: string | null;
-}
-
 export interface ApiOperationResult {
   console: ApiConsole;
   log: ApiLog;
@@ -48,23 +43,13 @@ export interface ApiOperationResult {
   ok: true;
 }
 
-export type ApiSessionMode = "npcs" | "standard";
-
-export const getStatus = async (): Promise<ApiStatus> => {
-  return requestJson<ApiStatus>("/api/status");
-};
-
-export const getLog = async (filePath?: string): Promise<ApiLog> => {
-  const query = filePath === undefined ? "" : `?filePath=${encodeURIComponent(filePath)}`;
+export const getLog = async (options: { filePath?: string; sessionId: string }): Promise<ApiLog> => {
+  const params = new URLSearchParams({ sessionId: options.sessionId });
+  if (options.filePath !== undefined) {
+    params.set("filePath", options.filePath);
+  }
+  const query = `?${params.toString()}`;
   return requestJson<ApiLog>(`/api/log${query}`);
-};
-
-export const getConsole = async (): Promise<ApiConsole> => {
-  return requestJson<ApiConsole>("/api/console");
-};
-
-export const getNpcs = async (): Promise<ApiNpcResponse> => {
-  return requestJson<ApiNpcResponse>("/api/npcs");
 };
 
 export const getContext = async (): Promise<string> => {
@@ -79,17 +64,17 @@ export const writeContext = async (markdown: string): Promise<void> => {
   });
 };
 
-export const askAssistant = async (prompt: string): Promise<ApiOperationResult> => {
+export const askAssistant = async (prompt: string, sessionId: string): Promise<ApiOperationResult> => {
   return requestJson<ApiOperationResult>("/api/assistant", {
     method: "POST",
-    body: JSON.stringify({ prompt })
+    body: JSON.stringify({ prompt, sessionId })
   });
 };
 
-export const generateNpcs = async (prompt: string): Promise<ApiOperationResult> => {
+export const generateNpcs = async (prompt: string, sessionId: string): Promise<ApiOperationResult> => {
   return requestJson<ApiOperationResult>("/api/npcs", {
     method: "POST",
-    body: JSON.stringify({ prompt })
+    body: JSON.stringify({ prompt, sessionId })
   });
 };
 
@@ -107,20 +92,6 @@ export const refresh = async (forceReingest: boolean): Promise<ApiOperationResul
   });
 };
 
-export const startNewSession = async (mode: ApiSessionMode): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>("/api/log/session", {
-    method: "POST",
-    body: JSON.stringify({ mode })
-  });
-};
-
-export const switchSessionMode = async (mode: ApiSessionMode): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>("/api/session", {
-    method: "POST",
-    body: JSON.stringify({ mode })
-  });
-};
-
 const requestJson = async <T>(url: string, init: RequestInit = {}): Promise<T> => {
   const response = await fetch(url, {
     ...init,
@@ -132,10 +103,23 @@ const requestJson = async <T>(url: string, init: RequestInit = {}): Promise<T> =
   const body = (await response.json()) as unknown;
 
   if (!response.ok) {
-    throw new Error(readErrorMessage(body));
+    const error = new Error(readErrorMessage(body)) as ApiRequestError;
+    const console = readErrorConsole(body);
+    if (console) {
+      error.console = console;
+    }
+    throw error;
   }
 
   return body as T;
+};
+
+export interface ApiRequestError extends Error {
+  console?: ApiConsole;
+}
+
+export const isApiRequestError = (error: unknown): error is ApiRequestError => {
+  return error instanceof Error && "console" in error;
 };
 
 const readErrorMessage = (body: unknown): string => {
@@ -149,4 +133,20 @@ const readErrorMessage = (body: unknown): string => {
   }
 
   return "Request failed.";
+};
+
+const readErrorConsole = (body: unknown): ApiConsole | undefined => {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "console" in body &&
+    typeof body.console === "object" &&
+    body.console !== null &&
+    "entries" in body.console &&
+    Array.isArray(body.console.entries)
+  ) {
+    return body.console as ApiConsole;
+  }
+
+  return undefined;
 };

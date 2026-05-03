@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
-import { createWebApp, isBusyError } from "../src/server/app.js";
+import { createWebApp, isBusyError, isWebOperationError } from "../src/server/app.js";
 import type { AssistantSessionAnswer } from "../src/runtime/assistant-session.js";
 import { createDefaultRuntimeState } from "../src/state/state-store.js";
 import type { RuntimeConfig, RetrievalResult } from "../src/types.js";
@@ -210,12 +210,12 @@ describe("web app API model", () => {
     const first = await app.askAssistant("First question");
     const firstFiles = await readdir(config.logDir);
 
-    const reset = await app.startNewSession("standard");
+    const reset = await app.getLog({ sessionId: "second" });
     const filesAfterReset = await readdir(config.logDir);
-    const second = await app.askAssistant("Second question");
+    const second = await app.askAssistant("Second question", "second");
 
-    expect(reset.log.filePath).toBeNull();
-    expect(reset.log.activeFilePath).toBeNull();
+    expect(reset.filePath).toBeNull();
+    expect(reset.activeFilePath).toBeNull();
     expect(filesAfterReset).toEqual(firstFiles);
     expect(second.log.filePath).not.toBe(first.log.filePath);
     expect(second.log.markdown).toContain("Second question");
@@ -336,9 +336,10 @@ describe("web app API model", () => {
     });
 
     await app.generateNpcs("Generate one Aundairian envoy");
-    const reset = await app.startNewSession("npcs");
+    const reset = await app.generateNpcs("Generate one Aundairian envoy", "second-npc-session");
 
-    expect(reset.npcs.npcs).toEqual([]);
+    expect(reset.npcs.npcs).toHaveLength(1);
+    expect(reset.npcs.npcs[0]?.id).toBe(1);
     expect(await readFile(path.join(config.logDir, "generated_npcs.md"), "utf8")).toContain("Jala ir'Wynarn");
   });
 
@@ -366,12 +367,10 @@ describe("web app API model", () => {
       chat: { complete: chat }
     });
 
-    const npcResponse = await app.generateNpcs("Generate one envoy");
-    const standardMode = await app.switchSessionMode("standard");
+    const npcResponse = await app.generateNpcs("Generate one envoy", "npc-session");
     const assistantResponse = await app.askAssistant("What about Aerenal?");
 
     expect(npcResponse.npcs.npcs).toHaveLength(1);
-    expect(standardMode.npcs.npcs).toEqual([]);
     expect(assistantResponse.npcs.npcs).toEqual([]);
     expect(assistantResponse.log.markdown).toContain("Standard answer.");
   });
@@ -387,7 +386,7 @@ describe("web app API model", () => {
     await expect(app.generateNpcs("   ")).rejects.toThrow("NPC generation prompt cannot be empty.");
   });
 
-  it("writes NPC failures to console instead of generated_npcs.md", async () => {
+  it("writes NPC failures to operation errors instead of generated_npcs.md", async () => {
     const config = await writeConfig("npc-error");
     const app = createWebApp({
       config,
@@ -396,17 +395,23 @@ describe("web app API model", () => {
       chat: { complete: vi.fn().mockResolvedValue("not json") }
     });
 
-    await expect(app.generateNpcs("Generate one NPC")).rejects.toThrow();
-
-    expect(app.getConsole().entries.map((entry) => `${entry.level}:${entry.message}`).join("\n")).toContain(
-      "error:NPC generation failed:"
-    );
+    try {
+      await app.generateNpcs("Generate one NPC");
+      throw new Error("Expected NPC generation to fail.");
+    } catch (error) {
+      expect(isWebOperationError(error)).toBe(true);
+      if (!isWebOperationError(error)) {
+        throw error;
+      }
+      expect(error.console.entries.some((entry) => entry.message.includes("NPC generation failed:"))).toBe(true);
+      expect(error.message.length).toBeGreaterThan(0);
+    }
     await expect(readFile(path.join(config.logDir, "generated_npcs.md"), "utf8")).rejects.toMatchObject({
       code: "ENOENT"
     });
   });
 
-  it("writes assistant failures to console instead of transcript logs", async () => {
+  it("writes assistant failures to operation errors instead of transcript logs", async () => {
     const config = await writeConfig("assistant-error");
     const app = createWebApp({
       config,
@@ -418,11 +423,18 @@ describe("web app API model", () => {
       chat: { complete: vi.fn().mockResolvedValue("answer") }
     });
 
-    await expect(app.askAssistant("Will this fail?")).rejects.toThrow("provider failed");
+    try {
+      await app.askAssistant("Will this fail?");
+      throw new Error("Expected assistant prompt to fail.");
+    } catch (error) {
+      expect(isWebOperationError(error)).toBe(true);
+      if (!isWebOperationError(error)) {
+        throw error;
+      }
+      expect(error.console.entries.some((entry) => entry.message.includes("Assistant response failed: provider failed"))).toBe(true);
+      expect(error.message).toBe("provider failed");
+    }
 
-    expect(app.getConsole().entries.map((entry) => `${entry.level}:${entry.message}`).join("\n")).toContain(
-      "error:Assistant response failed: provider failed"
-    );
     await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
   });
 

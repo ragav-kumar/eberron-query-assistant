@@ -51,3 +51,11 @@ Name Generator mode now asks the assistant for structured NPC records with numer
 Generated NPCs render as cards in the right-column `NPCs` tab and are appended to `logs/generated_npcs.md`. This file is write-only from the UI, is excluded from the transcript browser, and is not loaded as future assistant memory. Switching between Standard and Name Generator closes the other in-memory session; `New session` clears the active Standard transcript session or current NPC cards without deleting append-only log files.
 
 Verification added for this change covers structured NPC parsing, id-based card patching, append-only NPC logging, failure behavior, session switching, `New session` behavior, and React rendering for the Name Generator workflow.
+
+## Thin Local Runtime Bridge
+
+The React GUI now owns browser-session state such as selected mode, current prompts, busy display, selected output tab, current NPC cards, and fresh-session identity. The Vite middleware remains only as a local Node bridge for filesystem, retrieval, refresh, provider, and log-reading capabilities that cannot reasonably run in the browser.
+
+This intentionally reduces fake REST-style state polling while preserving the local browser-plus-Node runtime model. Standard and NPC sessions are identified by browser-owned session ids when an operation needs Node runtime work.
+
+Verification added or preserved for this change covers client-owned mode and new-session behavior, the slimmer bridge route surface, operation result output updates, safe log reads, refresh behavior, and server-side operation locking.

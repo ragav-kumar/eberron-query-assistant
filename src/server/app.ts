@@ -26,17 +26,12 @@ import { createFilesystemStateStore, type StateStore } from "../state/index.js";
 import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
 
 export interface WebApp {
-  askAssistant(prompt: string): Promise<WebOperationResult>;
+  askAssistant(prompt: string, sessionId?: string): Promise<WebOperationResult>;
   debugRetrieval(query: string): Promise<WebOperationResult>;
-  generateNpcs(prompt: string): Promise<WebOperationResult>;
-  getConsole(): WebConsoleResponse;
+  generateNpcs(prompt: string, sessionId?: string): Promise<WebOperationResult>;
   getContext(): Promise<string>;
-  getLog(filePath?: string): Promise<WebLogResponse>;
-  getNpcs(): WebNpcResponse;
-  getStatus(): WebStatus;
+  getLog(options?: string | { filePath?: string; sessionId?: string }): Promise<WebLogResponse>;
   refresh(forceReingest: boolean): Promise<WebOperationResult>;
-  startNewSession(mode: WebSessionMode): Promise<WebOperationResult>;
-  switchSessionMode(mode: WebSessionMode): Promise<WebOperationResult>;
   writeContext(markdown: string): Promise<void>;
 }
 
@@ -85,31 +80,69 @@ export interface WebNpcResponse {
   npcs: GeneratedNpc[];
 }
 
-export type WebSessionMode = "npcs" | "standard";
+const DEBUG_RETRIEVAL_LIMIT = 8;
+const DEFAULT_SESSION_ID = "default";
 
-export interface WebStatus {
-  busy: boolean;
-  operation: string | null;
+interface StandardSessionState {
+  assistant: AssistantSession | null;
+  log: SessionLog | null;
 }
 
-const DEBUG_RETRIEVAL_LIMIT = 8;
+interface NpcSessionState {
+  npcSession: NpcGenerationSession | null;
+}
 
 export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   const config = dependencies.config ?? loadDefaultConfig();
-  let log: SessionLog | null = dependencies.log ?? null;
-  let displayedLogFilePath: string | null = log?.filePath ?? null;
-  let assistant: AssistantSession | null = dependencies.assistant ?? null;
-  let npcSession: NpcGenerationSession | null = dependencies.npcSession ?? null;
   let hasRoutineRefresh = false;
   const consoleFeed = createMemoryConsoleFeed();
+  const standardSessions = new Map<string, StandardSessionState>();
+  const npcSessions = new Map<string, NpcSessionState>();
 
-  const ensureLog = async (): Promise<SessionLog> => {
-    log ??= await createSessionLog({
+  if (dependencies.log || dependencies.assistant) {
+    standardSessions.set(DEFAULT_SESSION_ID, {
+      assistant: dependencies.assistant ?? null,
+      log: dependencies.log ?? null
+    });
+  }
+
+  if (dependencies.npcSession) {
+    npcSessions.set(DEFAULT_SESSION_ID, {
+      npcSession: dependencies.npcSession
+    });
+  }
+
+  const readStandardSession = (sessionId: string): StandardSessionState => {
+    const normalizedSessionId = normalizeSessionId(sessionId);
+    let session = standardSessions.get(normalizedSessionId);
+    if (!session) {
+      session = {
+        assistant: null,
+        log: null
+      };
+      standardSessions.set(normalizedSessionId, session);
+    }
+    return session;
+  };
+
+  const readNpcSession = (sessionId: string): NpcSessionState => {
+    const normalizedSessionId = normalizeSessionId(sessionId);
+    let session = npcSessions.get(normalizedSessionId);
+    if (!session) {
+      session = {
+        npcSession: null
+      };
+      npcSessions.set(normalizedSessionId, session);
+    }
+    return session;
+  };
+
+  const ensureLog = async (session: StandardSessionState): Promise<SessionLog> => {
+    session.log ??= await createSessionLog({
       logDir: config.logDir,
       title: "GUI Session"
     });
-    displayedLogFilePath = log.filePath;
-    return log;
+    return session.log;
   };
   let activeOperation: string | null = null;
   const defaultReporter = createQueuedConsoleProgressReporter(consoleFeed);
@@ -119,36 +152,38 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       embeddingAdapter: createOpenAiEmbeddingAdapter(config.provider),
       reporter: defaultReporter
     });
-  const ensureAssistant = async (): Promise<AssistantSession> => {
-    assistant ??= createAssistantSession({
+  const ensureAssistant = async (session: StandardSessionState): Promise<AssistantSession> => {
+    session.assistant ??= createAssistantSession({
       assistant: config.assistant,
       chat: dependencies.chat ?? createOpenAiChatAdapter(config.provider),
-      log: await ensureLog(),
+      log: await ensureLog(session),
       retrieval
     });
-    return assistant;
+    return session.assistant;
   };
-  const ensureNpcSession = (): NpcGenerationSession => {
-    npcSession ??= createNpcGenerationSession({
+  const ensureNpcSession = (session: NpcSessionState): NpcGenerationSession => {
+    session.npcSession ??= createNpcGenerationSession({
       assistant: config.assistant,
       chat: dependencies.chat ?? createOpenAiChatAdapter(config.provider),
       logDir: config.logDir,
       retrieval
     });
-    return npcSession;
+    return session.npcSession;
   };
 
-  const readNpcs = (): WebNpcResponse => ({
-    npcs: npcSession?.read() ?? []
+  const readNpcs = (sessionId: string): WebNpcResponse => ({
+    npcs: readNpcSession(sessionId).npcSession?.read() ?? []
   });
 
-  const readLog = async (selectedFilePath?: string): Promise<WebLogResponse> => {
-    if (selectedFilePath !== undefined) {
-      displayedLogFilePath = selectedFilePath.trim().length > 0 ? selectedFilePath : null;
-    }
-
-    const activeFilePath = log?.filePath ?? null;
-    const filePath = displayedLogFilePath;
+  const readLog = async (options: string | { filePath?: string; sessionId?: string } = {}): Promise<WebLogResponse> => {
+    const normalizedOptions = typeof options === "string" ? { filePath: options } : options;
+    const sessionId = normalizedOptions.sessionId ?? DEFAULT_SESSION_ID;
+    const activeFilePath = readStandardSession(sessionId).log?.filePath ?? null;
+    const filePath = normalizedOptions.filePath !== undefined
+      ? normalizedOptions.filePath.trim().length > 0
+        ? normalizedOptions.filePath
+        : null
+      : activeFilePath;
     const files = await listSessionLogFiles(config.logDir, activeFilePath);
 
     if (!filePath) {
@@ -216,21 +251,22 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   };
 
   return {
-    async askAssistant(prompt) {
+    async askAssistant(prompt, sessionId = DEFAULT_SESSION_ID) {
       return runExclusive("assistant", async () => {
+        const standardSession = readStandardSession(sessionId);
         try {
-          npcSession = null;
           await ensureRoutineRefresh();
-          await (await ensureAssistant()).ask(prompt);
+          await (await ensureAssistant(standardSession)).ask(prompt);
         } catch (error) {
-          consoleFeed.error(`Assistant response failed: ${formatThrownValue(error)}`);
-          throw error;
+          const message = formatThrownValue(error);
+          consoleFeed.error(`Assistant response failed: ${message}`);
+          throw createWebOperationError(message, consoleFeed.read());
         }
         return {
           ok: true,
           console: consoleFeed.read(),
-          log: await readLog(),
-          npcs: readNpcs()
+          log: await readLog({ sessionId }),
+          npcs: { npcs: [] }
         };
       });
     },
@@ -250,48 +286,35 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
         return {
           ok: true,
           console: consoleFeed.read(),
-          log: await readLog(),
-          npcs: readNpcs()
+          log: emptyLogResponse(await listSessionLogFiles(config.logDir, null)),
+          npcs: { npcs: [] }
         };
       });
     },
-    async generateNpcs(prompt) {
+    async generateNpcs(prompt, sessionId = DEFAULT_SESSION_ID) {
       return runExclusive("npcs", async () => {
+        const npcSessionState = readNpcSession(sessionId);
         try {
-          log = null;
-          assistant = null;
-          displayedLogFilePath = null;
           await ensureRoutineRefresh();
-          await ensureNpcSession().generate(prompt);
+          await ensureNpcSession(npcSessionState).generate(prompt);
         } catch (error) {
-          consoleFeed.error(`NPC generation failed: ${formatThrownValue(error)}`);
-          throw error;
+          const message = formatThrownValue(error);
+          consoleFeed.error(`NPC generation failed: ${message}`);
+          throw createWebOperationError(message, consoleFeed.read());
         }
         return {
           ok: true,
           console: consoleFeed.read(),
-          log: await readLog(),
-          npcs: readNpcs()
+          log: emptyLogResponse(await listSessionLogFiles(config.logDir, null)),
+          npcs: readNpcs(sessionId)
         };
       });
-    },
-    getConsole() {
-      return consoleFeed.read();
     },
     async getContext() {
       await ensureAdditionalContextFile(config);
       return readFile(config.assistant.additionalContextPath, "utf8");
     },
     getLog: readLog,
-    getNpcs() {
-      return readNpcs();
-    },
-    getStatus() {
-      return {
-        busy: activeOperation !== null,
-        operation: activeOperation
-      };
-    },
     async refresh(forceReingest) {
       return runExclusive(forceReingest ? "force-reingest" : "refresh", async () => {
         const summary = await runRefreshTask(forceReingest);
@@ -299,42 +322,8 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           ok: true,
           console: consoleFeed.read(),
           summary,
-          log: await readLog(),
-          npcs: readNpcs()
-        };
-      });
-    },
-    async startNewSession(mode) {
-      return runExclusive("new-session", async () => {
-        if (mode === "npcs") {
-          ensureNpcSession().reset();
-        } else {
-          log = null;
-          assistant = null;
-          displayedLogFilePath = null;
-        }
-        return {
-          ok: true,
-          console: consoleFeed.read(),
-          log: await readLog(),
-          npcs: readNpcs()
-        };
-      });
-    },
-    async switchSessionMode(mode) {
-      return runExclusive("switch-session-mode", async () => {
-        if (mode === "npcs") {
-          log = null;
-          assistant = null;
-          displayedLogFilePath = null;
-        } else {
-          npcSession = null;
-        }
-        return {
-          ok: true,
-          console: consoleFeed.read(),
-          log: await readLog(),
-          npcs: readNpcs()
+          log: emptyLogResponse(await listSessionLogFiles(config.logDir, null)),
+          npcs: { npcs: [] }
         };
       });
     },
@@ -349,6 +338,12 @@ export interface BusyError {
   kind: "busy";
   message: string;
   operation: string;
+}
+
+export interface WebOperationError {
+  console: WebConsoleResponse;
+  kind: "web-operation";
+  message: string;
 }
 
 export const isBusyError = (error: unknown): error is BusyError => {
@@ -366,6 +361,36 @@ const createBusyError = (operation: string): BusyError => ({
   kind: "busy",
   message: `Another operation is already running: ${operation}.`,
   operation
+});
+
+export const isWebOperationError = (error: unknown): error is WebOperationError => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "kind" in error &&
+    error.kind === "web-operation" &&
+    "console" in error &&
+    typeof error.console === "object"
+  );
+};
+
+const createWebOperationError = (message: string, console: WebConsoleResponse): WebOperationError => ({
+  console,
+  kind: "web-operation",
+  message
+});
+
+const normalizeSessionId = (sessionId: string): string => {
+  const normalized = sessionId.trim();
+  return normalized.length > 0 ? normalized : DEFAULT_SESSION_ID;
+};
+
+const emptyLogResponse = (files: SessionLogFile[]): WebLogResponse => ({
+  activeFilePath: null,
+  files,
+  filePath: null,
+  markdown: "",
+  readOnly: false
 });
 
 const ensureAdditionalContextFile = async (config: RuntimeConfig): Promise<void> => {

@@ -30,14 +30,10 @@ vi.mock("../src/client/api.js", () => ({
   askAssistant: vi.fn(),
   debugRetrieval: vi.fn(),
   generateNpcs: vi.fn(),
-  getConsole: vi.fn(),
   getContext: vi.fn(),
   getLog: vi.fn(),
-  getNpcs: vi.fn(),
-  getStatus: vi.fn(),
   refresh: vi.fn(),
-  startNewSession: vi.fn(),
-  switchSessionMode: vi.fn(),
+  isApiRequestError: vi.fn((error: unknown) => error instanceof Error && "console" in error),
   writeContext: vi.fn()
 }));
 
@@ -82,10 +78,7 @@ beforeEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
   vi.mocked(api.getContext).mockResolvedValue("");
-  vi.mocked(api.getConsole).mockResolvedValue(initialConsole);
   vi.mocked(api.getLog).mockResolvedValue(initialLog);
-  vi.mocked(api.getNpcs).mockResolvedValue(emptyNpcs());
-  vi.mocked(api.getStatus).mockResolvedValue({ busy: false, operation: null });
   vi.mocked(api.askAssistant).mockResolvedValue(operationResult({ log: { ...initialLog, markdown: "## Assistant\n\nAnswer" } }));
   vi.mocked(api.debugRetrieval).mockResolvedValue(operationResult({
     console: {
@@ -123,8 +116,6 @@ beforeEach(() => {
       ]
     }
   }));
-  vi.mocked(api.startNewSession).mockResolvedValue(operationResult({ log: emptyLog() }));
-  vi.mocked(api.switchSessionMode).mockResolvedValue(operationResult());
   vi.mocked(api.writeContext).mockResolvedValue(undefined);
 });
 
@@ -171,7 +162,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?");
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String));
     });
     expect(await screen.findByText("Answer")).toBeTruthy();
   });
@@ -186,7 +177,7 @@ describe("App", () => {
     fireEvent.keyDown(prompt, { key: "Enter" });
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Sharn?");
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Sharn?", expect.any(String));
     });
   });
 
@@ -225,16 +216,13 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
-    await waitFor(() => {
-      expect(api.switchSessionMode).toHaveBeenCalledWith("npcs");
-    });
     fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
       target: { value: "Generate one Aundairian envoy" }
     });
     fireEvent.click(screen.getByRole("button", { name: "Generate" }));
 
     await waitFor(() => {
-      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one Aundairian envoy");
+      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one Aundairian envoy", expect.any(String));
     });
     expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
     expect(screen.getByText("#1")).toBeTruthy();
@@ -245,9 +233,6 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
-    await waitFor(() => {
-      expect(api.switchSessionMode).toHaveBeenCalledWith("npcs");
-    });
     const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
     fireEvent.change(prompt, {
       target: { value: "Generate one goblin" }
@@ -255,32 +240,35 @@ describe("App", () => {
     fireEvent.keyDown(prompt, { key: "Enter" });
 
     await waitFor(() => {
-      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one goblin");
+      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one goblin", expect.any(String));
     });
   });
 
   it("starts a new NPC session from the NPCs tab", async () => {
-    vi.mocked(api.getNpcs).mockResolvedValue({
-      npcs: [
-        {
-          id: 1,
-          name: "Jala ir'Wynarn",
-          description: "A sharp-eyed Aundairian envoy.",
-          bio: "She trades favors."
-        }
-      ]
-    });
-    vi.mocked(api.startNewSession).mockResolvedValue(operationResult({ npcs: emptyNpcs() }));
+    vi.mocked(api.generateNpcs).mockResolvedValue(operationResult({
+      npcs: {
+        npcs: [
+          {
+            id: 1,
+            name: "Jala ir'Wynarn",
+            description: "A sharp-eyed Aundairian envoy.",
+            bio: "She trades favors."
+          }
+        ]
+      }
+    }));
 
     render(<App />);
 
+    fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
+    fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
+      target: { value: "Generate one Aundairian envoy" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
     fireEvent.click(await screen.findByRole("tab", { name: "NPCs" }));
     expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "New session" }));
 
-    await waitFor(() => {
-      expect(api.startNewSession).toHaveBeenCalledWith("npcs");
-    });
     expect(await screen.findByText("Generate NPCs to show cards for this session.")).toBeTruthy();
   });
 
@@ -307,15 +295,27 @@ describe("App", () => {
     expect(editor).toHaveProperty("value", "Existing campaign context");
   });
 
-  it("disables operations while busy", async () => {
-    vi.mocked(api.getStatus).mockResolvedValue({ busy: true, operation: "refresh" });
+  it("disables operations while a client-owned operation is busy", async () => {
+    let resolveAsk: ((value: api.ApiOperationResult) => void) | undefined;
+    vi.mocked(api.askAssistant).mockReturnValue(
+      new Promise((resolve) => {
+        resolveAsk = resolve;
+      })
+    );
 
     render(<App />);
+
+    fireEvent.change(await screen.findByPlaceholderText(/Ask about Eberron/i), {
+      target: { value: "What about Sharn?" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     expect(await screen.findByRole("button", { name: "Ask" })).toHaveProperty("disabled", true);
     fireEvent.click(screen.getByRole("radio", { name: "Debug Query" }));
     expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", true);
     expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
+
+    resolveAsk?.(operationResult());
   });
 
   it("renders the active log Markdown", async () => {
@@ -360,7 +360,11 @@ describe("App", () => {
     fireEvent.change(select, { target: { value: "logs/old.md" } });
 
     await waitFor(() => {
-      expect(api.getLog).toHaveBeenCalledWith("logs/old.md");
+      expect(
+        vi.mocked(api.getLog).mock.calls.some(([options]) => (
+          options.filePath === "logs/old.md" && typeof options.sessionId === "string"
+        ))
+      ).toBe(true);
     });
     expect(await screen.findByText("Read only: logs/old.md")).toBeTruthy();
     expect(await screen.findByText("Old Session")).toBeTruthy();
@@ -372,9 +376,6 @@ describe("App", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "New session" }));
 
-    await waitFor(() => {
-      expect(api.startNewSession).toHaveBeenCalledWith("standard");
-    });
     expect(await screen.findByText("No log selected")).toBeTruthy();
     expect(await screen.findByText("Submit an assistant prompt to start the log.")).toBeTruthy();
   });
@@ -416,7 +417,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("Write to active session");
+      expect(api.askAssistant).toHaveBeenCalledWith("Write to active session", expect.any(String));
     });
     expect(await screen.findByText("Current session: logs/session.md")).toBeTruthy();
     expect(await screen.findByText("New answer.")).toBeTruthy();

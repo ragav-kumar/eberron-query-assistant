@@ -3,7 +3,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Plugin } from "vite";
 
 import { formatThrownValue } from "../errors.js";
-import { createWebApp, isBusyError, type WebApp } from "./app.js";
+import { createWebApp, isBusyError, isWebOperationError, type WebApp } from "./app.js";
 
 export const eberronApiPlugin = (): Plugin => {
   let app: WebApp | null = null;
@@ -26,7 +26,8 @@ export const eberronApiPlugin = (): Plugin => {
           .catch((error: unknown) => {
             writeJson(response, isBusyError(error) ? 409 : 500, {
               error: formatThrownValue(error),
-              ...(isBusyError(error) ? { operation: error.operation } : {})
+              ...(isBusyError(error) ? { operation: error.operation } : {}),
+              ...(isWebOperationError(error) ? { console: error.console } : {})
             });
           });
       });
@@ -41,35 +42,12 @@ const handleApiRequest = async (
 ): Promise<void> => {
   const url = new URL(request.url ?? "/", "http://localhost");
 
-  if (request.method === "GET" && url.pathname === "/api/status") {
-    writeJson(response, 200, app.getStatus());
-    return;
-  }
-
   if (request.method === "GET" && url.pathname === "/api/log") {
-    writeJson(response, 200, await app.getLog(url.searchParams.get("filePath") ?? undefined));
-    return;
-  }
-
-  if (request.method === "POST" && url.pathname === "/api/log/session") {
-    const body = await readJsonBody(request);
-    writeJson(response, 200, await app.startNewSession(readSessionModeField(body)));
-    return;
-  }
-
-  if (request.method === "POST" && url.pathname === "/api/session") {
-    const body = await readJsonBody(request);
-    writeJson(response, 200, await app.switchSessionMode(readSessionModeField(body)));
-    return;
-  }
-
-  if (request.method === "GET" && url.pathname === "/api/console") {
-    writeJson(response, 200, app.getConsole());
-    return;
-  }
-
-  if (request.method === "GET" && url.pathname === "/api/npcs") {
-    writeJson(response, 200, app.getNpcs());
+    const filePath = url.searchParams.get("filePath");
+    writeJson(response, 200, await app.getLog({
+      ...(filePath === null ? {} : { filePath }),
+      sessionId: url.searchParams.get("sessionId") ?? ""
+    }));
     return;
   }
 
@@ -87,13 +65,13 @@ const handleApiRequest = async (
 
   if (request.method === "POST" && url.pathname === "/api/assistant") {
     const body = await readJsonBody(request);
-    writeJson(response, 200, await app.askAssistant(readStringField(body, "prompt")));
+    writeJson(response, 200, await app.askAssistant(readStringField(body, "prompt"), readOptionalStringField(body, "sessionId")));
     return;
   }
 
   if (request.method === "POST" && url.pathname === "/api/npcs") {
     const body = await readJsonBody(request);
-    writeJson(response, 200, await app.generateNpcs(readStringField(body, "prompt")));
+    writeJson(response, 200, await app.generateNpcs(readStringField(body, "prompt"), readOptionalStringField(body, "sessionId")));
     return;
   }
 
@@ -133,23 +111,23 @@ const readStringField = (body: unknown, field: string): string => {
   return body[field];
 };
 
+const readOptionalStringField = (body: unknown, field: string): string => {
+  if (!isRecord(body) || body[field] === undefined) {
+    return "";
+  }
+  if (typeof body[field] === "string") {
+    return body[field];
+  }
+
+  throw new Error(`Expected JSON string field: ${field}.`);
+};
+
 const readBooleanField = (body: unknown, field: string): boolean => {
   if (!isRecord(body) || typeof body[field] !== "boolean") {
     return false;
   }
 
   return body[field];
-};
-
-const readSessionModeField = (body: unknown): "npcs" | "standard" => {
-  if (!isRecord(body) || body.mode === undefined) {
-    return "standard";
-  }
-  if (body.mode === "npcs" || body.mode === "standard") {
-    return body.mode;
-  }
-
-  throw new Error("Expected JSON session mode field to be standard or npcs.");
 };
 
 const writeJson = (response: ServerResponse, statusCode: number, body: unknown): void => {
