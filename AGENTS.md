@@ -5,6 +5,28 @@ This file defines durable repository rules for `eberron-query-assistant`.
 
 Follow these rules unless a later instruction in the repo or task explicitly overrides them. The frozen historical-document rule is not overrideable.
 
+## Critical Rules
+These are the highest-priority repo rules. Check them before making edits, running verification, or updating documentation.
+
+- Work against the current branch unless later repo instructions or active enhancement documentation explicitly say otherwise.
+- Do not modify frozen historical documents:
+  - `docs/specification.md`
+  - `docs/phase-01-project-scaffold.md`
+  - `docs/phase-02-source-discovery-and-state.md`
+  - `docs/phase-03-ingestion-pipelines.md`
+  - `docs/phase-04-retrieval-layer.md`
+  - `docs/phase-05-interactive-assistant.md`
+  - `docs/phase-05.5-vector-storage-migration.md`
+  - `docs/phase-06-hardening-and-alignment.md`
+- Record post-Phase 6 intended behavior only in `docs/enhancements.md`.
+- Update `README.md` whenever active enhancement documentation changes intended user-visible behavior.
+- Do not create additional enhancement, planning, or specification documents unless the user explicitly asks for them.
+- Do not restore, recreate, or preserve obsolete untracked local files unless the current task explicitly requires that exact file.
+- Request escalation directly for commands known to need network access, external write permissions, or esbuild process spawning, including `npm install`, `git push`, `npm test`, targeted Vitest runs, and `npm run start`.
+- Use `npm run prestart` for the TypeScript no-emit check. There is no `npm run build` script.
+- Do not add project-authored classes or constructors unless later active enhancement documentation explicitly requires them.
+- Preserve app-owned corpus and retrieval artifacts across routine startup. Only explicit force re-ingest through `--force-reingest` or `npm run reingest` may intentionally discard, clear, or force-rebuild them.
+
 ## Branch Policy
 Work against the current branch unless later instructions or active enhancement documentation explicitly say otherwise.
 
@@ -39,12 +61,11 @@ Each document has a distinct audience and purpose.
 - `docs/specification.md` and phase documents through Phase 6 are historical baseline documents.
 - They describe the completed baseline through Phase 6 and are no longer active planning or specification targets.
 - They are frozen after their historical status notice has been added.
-- Do not modify them again.
+- Do not modify them again. This rule is repeated in the Critical Rules list because it is not overrideable.
 
 ### New Enhancement Documentation
 - Any further changes after Phase 6 are enhancements on top of the historical baseline.
 - Record post-Phase 6 intended behavior only in `docs/enhancements.md` instead of editing `docs/specification.md` or phase documents through Phase 6.
-- Do not create additional enhancement, planning, or specification documents unless the user explicitly asks for them.
 - `docs/enhancements.md` is a high-level change log for intentional deviations from the historical baseline, so future sessions can tell that those changes are deliberate.
 - Keep entries concise. Record the behavior change, the reason it exists when useful, and any verification note needed to understand that the divergence is intentional.
 
@@ -54,19 +75,7 @@ Each document has a distinct audience and purpose.
 - A user document, not a planning or contributor workflow document.
 
 ## Historical Baseline Rules
-`docs/specification.md` is the authoritative historical baseline spec through Phase 6.
-
-The following documents are frozen historical records:
-- `docs/specification.md`
-- `docs/phase-01-project-scaffold.md`
-- `docs/phase-02-source-discovery-and-state.md`
-- `docs/phase-03-ingestion-pipelines.md`
-- `docs/phase-04-retrieval-layer.md`
-- `docs/phase-05-interactive-assistant.md`
-- `docs/phase-05.5-vector-storage-migration.md`
-- `docs/phase-06-hardening-and-alignment.md`
-
-Do not modify these frozen historical documents again.
+`docs/specification.md` is the authoritative historical baseline spec through Phase 6. The frozen historical records are listed in Critical Rules and must not be modified again.
 
 New enhancement documentation must:
 - Live only in `docs/enhancements.md`.
