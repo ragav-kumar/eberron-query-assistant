@@ -349,8 +349,71 @@ p {
 }
 
 .markdown-output h2 {
-  border-top: 1px solid #e5e7eb;
   font-size: 1rem;
+}
+
+.log-toc {
+  background: #f4f7fa;
+  border: 1px solid #ccd5de;
+  border-radius: 8px;
+  margin-bottom: 1.1rem;
+  padding: 0.85rem 1rem;
+}
+
+.log-toc h2 {
+  margin-bottom: 0.45rem;
+}
+
+.log-toc ol {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.log-toc a {
+  color: #1f6feb;
+  font-weight: 700;
+}
+
+.log-exchanges {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.log-exchange {
+  border: 2px solid #ccd5de;
+  border-radius: 8px;
+  padding: 1rem;
+  scroll-margin-top: 1rem;
+}
+
+.log-exchange > h2 {
+  border-bottom: 1px solid #e5e7eb;
+  margin-bottom: 0.8rem;
+  padding-bottom: 0.55rem;
+}
+
+.log-question {
+  background: #f8fafc;
+  border-left: 4px solid #1f6feb;
+  margin-bottom: 0.9rem;
+  padding: 0.65rem 0.8rem;
+}
+
+.log-answer {
+  min-width: 0;
+}
+
+.log-question h3,
+.log-answer h3 {
+  color: #52616f;
+  font-size: 0.8rem;
+  margin: 0 0 0.35rem;
+  text-transform: uppercase;
+}
+
+.markdown-output .log-answer h2 {
+  border-top: 1px solid #e5e7eb;
   margin-top: 1rem;
   padding-top: 1rem;
 }

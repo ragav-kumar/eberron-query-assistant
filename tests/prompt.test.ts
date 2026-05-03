@@ -27,8 +27,9 @@ const PROMPT_ASSETS: AssistantPromptAssets = {
     "For new NPCs, ids must be greater than {{maxExistingId}}."
   ].join("\n"),
   sessionTitlePrompt: [
-    "For this first response only, return exactly this Markdown metadata wrapper before the answer:",
-    "<session-title>A concise filesystem-safe title of at most 8 words</session-title>",
+    "Return exactly this metadata wrapper before every answer.",
+    "<session-title>A concise filesystem-safe session title</session-title>",
+    "<response-title>A concise heading for this user prompt</response-title>",
     "<answer>",
     "Your normal answer.",
     "</answer>"
@@ -137,8 +138,10 @@ describe("assistant prompt assembly", () => {
       requestSessionTitle: true
     });
 
-    expect(normalMessages[0]?.content).not.toContain("<session-title>");
+    expect(normalMessages[0]?.content).toContain("omit <session-title>");
+    expect(normalMessages[0]?.content).toContain("<response-title>");
     expect(firstResponseMessages[0]?.content).toContain("<session-title>");
+    expect(firstResponseMessages[0]?.content).toContain("include <session-title>");
   });
 
   it("loads prompt text from assistant files and creates missing local context", async () => {
@@ -189,6 +192,7 @@ describe("assistant prompt shell", () => {
     const complete = vi.fn<ChatAdapter["complete"]>().mockResolvedValue(
       [
         "<session-title>Aerenal Ancestors</session-title>",
+        "<response-title>Aerenal Ancestors</response-title>",
         "<answer>",
         "Aerenal answer.",
         "References: Eberron Rising, page 4",
@@ -209,15 +213,18 @@ describe("assistant prompt shell", () => {
 
     const filenames = await readdir(logDir);
     expect(filenames).toHaveLength(1);
-    expect(filenames[0]).toMatch(/^\d{14} Aerenal Ancestors\.md$/);
+    expect(filenames[0]).toMatch(/^\d{14} Aerenal Ancestors\.json$/);
     expect(output.text()).toContain("Aerenal answer.");
     expect(output.text()).not.toContain("<session-title>");
 
-    const logText = await readFile(path.join(logDir, filenames[0] ?? ""), "utf8");
-    expect(logText).toContain("# Aerenal Ancestors");
-    expect(logText).toContain("## User\n\nWhat about Aerenal?");
-    expect(logText).toContain("## Assistant\n\nAerenal answer.\nReferences: Eberron Rising, page 4");
-    expect(logText).not.toContain("<answer>");
+    const log = JSON.parse(await readFile(path.join(logDir, filenames[0] ?? ""), "utf8")) as unknown;
+    expect(log).toEqual([
+      {
+        user: "What about Aerenal?",
+        title: "Aerenal Ancestors",
+        assistant: "Aerenal answer.\nReferences: Eberron Rising, page 4"
+      }
+    ]);
   });
 
   it("appends later successful responses to the same session transcript", async () => {
@@ -225,8 +232,8 @@ describe("assistant prompt shell", () => {
     const input = new PassThrough();
     const complete = vi
       .fn<ChatAdapter["complete"]>()
-      .mockResolvedValueOnce("<session-title>Dragonmark Notes</session-title>\n<answer>\nFirst answer.\n</answer>")
-      .mockResolvedValueOnce("Second answer.");
+      .mockResolvedValueOnce("<session-title>Dragonmark Notes</session-title>\n<response-title>First Question</response-title>\n<answer>\nFirst answer.\n</answer>")
+      .mockResolvedValueOnce("<response-title>Second Question</response-title>\n<answer>\nSecond answer.\n</answer>");
     const output = createWritableCapture();
 
     const prompt = createAssistantPromptShell({
@@ -251,12 +258,15 @@ describe("assistant prompt shell", () => {
     const filenames = await readdir(logDir);
     expect(filenames).toHaveLength(1);
 
-    const logText = await readFile(path.join(logDir, filenames[0] ?? ""), "utf8");
-    expect(logText.match(/## User/g)).toHaveLength(2);
-    expect(logText).toContain("First question");
-    expect(logText).toContain("First answer.");
-    expect(logText).toContain("Second question");
-    expect(logText).toContain("Second answer.");
+    const log = JSON.parse(await readFile(path.join(logDir, filenames[0] ?? ""), "utf8")) as Array<{
+      assistant: string;
+      title: string;
+      user: string;
+    }>;
+    expect(log).toEqual([
+      { user: "First question", title: "First Question", assistant: "First answer." },
+      { user: "Second question", title: "Second Question", assistant: "Second answer." }
+    ]);
   });
 
   it("falls back to a sanitized first-question title when title metadata is missing", async () => {
@@ -274,7 +284,7 @@ describe("assistant prompt shell", () => {
 
     const filenames = await readdir(logDir);
     expect(filenames).toHaveLength(1);
-    expect(filenames[0]).toMatch(/^\d{14} What about Aerenal\.md$/);
+    expect(filenames[0]).toMatch(/^\d{14} What about Aerenal\.json$/);
   });
 
   it("does not create an empty session transcript when the user exits before a response", async () => {
@@ -298,7 +308,7 @@ describe("assistant prompt shell", () => {
     const secondChat = mockChat();
     const logDir = path.join(TEST_ROOT, "logs-history");
     await mkdir(logDir, { recursive: true });
-    await writeFile(path.join(logDir, "20260102030405 Old Session.md"), "Old logged question", "utf8");
+    await writeFile(path.join(logDir, "20260102030405 Old Session.json"), JSON.stringify([{ user: "Old logged question", title: "Old", assistant: "Old answer" }]), "utf8");
 
     await createAssistantPromptShell({
       ...promptShellConfig(await writeAssistantFiles("logs-history-first")),

@@ -75,14 +75,15 @@ export const createAssistantPromptShell = (options: PromptShellOptions): PromptS
                 requestSessionTitle: shouldRequestSessionTitle
               });
               const response = await options.chat.complete(messages);
-              const parsedResponse = shouldRequestSessionTitle ? parseFirstAssistantResponse(response) : null;
+              const parsedResponse = parseAssistantResponse(response, shouldRequestSessionTitle);
               const assistantResponse = parsedResponse?.answer ?? response;
               output.write(formatAssistantResponse(assistantResponse));
               await appendSessionExchange({
                 assistantResponse,
                 fallbackTitle: question,
                 logDir: options.logDir,
-                parsedTitle: parsedResponse?.title,
+                parsedResponseTitle: parsedResponse?.responseTitle,
+                parsedSessionTitle: parsedResponse?.sessionTitle,
                 reporter,
                 sessionLog,
                 setSessionLog(value) {
@@ -146,7 +147,10 @@ export const buildAssistantMessages = (request: AssistantMessageBuildRequest): C
     request.promptAssets.additionalContext.length > 0
       ? ["Additional assistant context:", request.promptAssets.additionalContext].join("\n")
       : "",
-    request.requestSessionTitle === true ? request.promptAssets.sessionTitlePrompt : ""
+    request.promptAssets.sessionTitlePrompt,
+    request.requestSessionTitle === true
+      ? "This response starts a new transcript session; include <session-title>."
+      : "This response continues an existing transcript session; omit <session-title>."
   ].filter((part) => part.length > 0);
 
   return [
@@ -205,36 +209,44 @@ const readRequiredPromptFile = async (filePath: string, label: string): Promise<
   }
 };
 
-interface FirstAssistantResponse {
+interface ParsedAssistantResponse {
   answer: string;
-  title: string;
+  responseTitle: string;
+  sessionTitle?: string;
 }
 
 interface AppendSessionExchangeRequest {
   assistantResponse: string;
   fallbackTitle: string;
   logDir: string | undefined;
-  parsedTitle: string | undefined;
+  parsedResponseTitle: string | undefined;
+  parsedSessionTitle: string | undefined;
   reporter: ProgressReporter;
   sessionLog: SessionLog | null;
   setSessionLog(sessionLog: SessionLog): void;
   userQuestion: string;
 }
 
-const parseFirstAssistantResponse = (response: string): FirstAssistantResponse | null => {
-  const match = response.match(
-    /^\s*<session-title>(?<title>[\s\S]*?)<\/session-title>\s*<answer>\s*(?<answer>[\s\S]*?)\s*<\/answer>\s*$/i
-  );
-  const title = match?.groups?.title?.trim();
+const parseAssistantResponse = (response: string, expectSessionTitle: boolean): ParsedAssistantResponse | null => {
+  const match = expectSessionTitle
+    ? response.match(
+        /^\s*<session-title>(?<sessionTitle>[\s\S]*?)<\/session-title>\s*<response-title>(?<responseTitle>[\s\S]*?)<\/response-title>\s*<answer>\s*(?<answer>[\s\S]*?)\s*<\/answer>\s*$/i
+      )
+    : response.match(
+        /^\s*<response-title>(?<responseTitle>[\s\S]*?)<\/response-title>\s*<answer>\s*(?<answer>[\s\S]*?)\s*<\/answer>\s*$/i
+      );
+  const sessionTitle = match?.groups?.sessionTitle?.trim();
+  const responseTitle = match?.groups?.responseTitle?.trim();
   const answer = match?.groups?.answer?.trim();
 
-  if (!title || !answer) {
+  if ((expectSessionTitle && !sessionTitle) || !responseTitle || !answer) {
     return null;
   }
 
   return {
     answer,
-    title
+    responseTitle,
+    ...(sessionTitle ? { sessionTitle } : {})
   };
 };
 
@@ -248,14 +260,15 @@ const appendSessionExchange = async (request: AppendSessionExchangeRequest): Pro
       request.sessionLog ??
       (await createSessionLog({
         logDir: request.logDir,
-        title: request.parsedTitle ?? request.fallbackTitle
+        title: request.parsedSessionTitle ?? request.fallbackTitle
       }));
     if (request.sessionLog === null) {
       request.setSessionLog(sessionLog);
     }
     await sessionLog.append({
-      assistantResponse: request.assistantResponse,
-      userQuestion: request.userQuestion
+      assistant: request.assistantResponse,
+      title: request.parsedResponseTitle ?? request.fallbackTitle,
+      user: request.userQuestion
     });
   } catch (error) {
     request.reporter.warn(`Session log update failed: ${formatThrownValue(error)}`);

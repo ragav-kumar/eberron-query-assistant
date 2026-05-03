@@ -58,7 +58,7 @@ Verification added or preserved for this change covers structured console API be
 
 ## GUI Log Browser And Sessions
 
-The Log tab can browse saved Markdown transcripts from `logs/` with a dropdown. Historical transcripts are read-only display targets; Standard assistant input always writes to the current writable browser-server session, creating one lazily if no current session exists.
+The Log tab can browse saved transcripts from `logs/` with a dropdown. Historical transcripts are read-only display targets; Standard assistant input always writes to the current writable browser-server session, creating one lazily if no current session exists.
 
 The app initially shows an empty Log pane instead of loading an existing transcript automatically. A `New session` button clears the current writable assistant session and conversation history without creating an empty file; the next successful Standard assistant exchange creates the new transcript. Refresh and Force reingest still do not create transcript files.
 
@@ -121,3 +121,9 @@ Verification added for this change covers environment config, Foundry metadata i
 NPC Generator cards now support structured species, ethnicity, gender, role, and age details in addition to name, physical description, and bio. The assistant is instructed to provide those details when they apply and are knowable in-setting, while omitting details that do not apply or cannot reasonably be known.
 
 Existing generated NPC state remains valid without migration. Verification added for this change covers legacy saved cards, optional detail normalization and validation, persistence, id-based revisions, and React card metadata rendering.
+
+## JSON Transcript Logs
+
+Standard assistant transcript logs are now JSON files under `logs/` named from the timestamp and assistant-provided session title. Each file stores an array of `{ user, assistant, title }` exchanges. The exchange title is a concise table-of-contents heading for the user prompt; the assistant field remains Markdown answer text.
+
+The Log tab renders a linked table of contents from exchange titles and displays each Q&A pair as a separated section. Existing local Markdown transcript files were converted once into JSON logs, with generic `GUI Session` filenames replaced by better inferred session titles. Legacy `logs/generated_npcs.md` is obsolete because generated NPCs live in JSON state; it is not recreated or browsed as a Standard transcript.

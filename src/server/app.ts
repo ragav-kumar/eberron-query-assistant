@@ -20,6 +20,7 @@ import {
   listSessionLogFiles,
   readSessionLogFile,
   type SessionLog,
+  type SessionLogExchange,
   type SessionLogFile
 } from "../runtime/session-log.js";
 import { createFilesystemSourceDiscoveryService, type SourceDiscoveryService } from "../source-discovery/index.js";
@@ -53,9 +54,9 @@ export interface WebAppDependencies {
 
 export interface WebLogResponse {
   activeFilePath: string | null;
+  exchanges: SessionLogExchange[];
   files: SessionLogFile[];
   filePath: string | null;
-  markdown: string;
   readOnly: boolean;
 }
 
@@ -171,8 +172,9 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   ): Promise<void> => {
     const log = await ensureLog(session, exchange.sessionTitle);
     await log.append({
-      assistantResponse: exchange.assistantResponse,
-      userQuestion: exchange.userQuestion
+      assistant: exchange.assistant,
+      title: exchange.title,
+      user: exchange.user
     });
   };
   const ensureAssistant = (session: StandardSessionState): AssistantSession => {
@@ -216,18 +218,18 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     if (!filePath) {
       return {
         activeFilePath,
+        exchanges: [],
         files,
         filePath: null,
-        markdown: "",
         readOnly: false
       };
     }
 
     return {
       activeFilePath,
+      exchanges: await readSessionLogFile(config.logDir, filePath),
       files,
       filePath,
-      markdown: await readSessionLogFile(config.logDir, filePath),
       readOnly: activeFilePath === null || path.resolve(filePath) !== path.resolve(activeFilePath)
     };
   };
@@ -407,9 +409,9 @@ const normalizeSessionId = (sessionId: string): string => {
 
 const emptyLogResponse = (files: SessionLogFile[]): WebLogResponse => ({
   activeFilePath: null,
+  exchanges: [],
   files,
   filePath: null,
-  markdown: "",
   readOnly: false
 });
 

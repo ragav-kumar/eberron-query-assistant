@@ -1,9 +1,15 @@
 export interface ApiLog {
   activeFilePath: string | null;
+  exchanges: ApiLogExchange[];
   files: ApiLogFile[];
   filePath: string | null;
-  markdown: string;
   readOnly: boolean;
+}
+
+export interface ApiLogExchange {
+  assistant: string;
+  title: string;
+  user: string;
 }
 
 export interface ApiLogFile {

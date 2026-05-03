@@ -49,7 +49,7 @@ describe("web app API model", () => {
       ...mockRefreshDependencies(),
       retrieval: mockRetrieval([result()]).retrieval,
       chat: {
-        complete: vi.fn().mockResolvedValue("<session-title>Aerenal</session-title>\n<answer>\nAerenal answer.\n</answer>")
+        complete: vi.fn().mockResolvedValue(firstAnswer("Aerenal", "Aerenal Overview", "Aerenal answer."))
       }
     });
 
@@ -57,9 +57,13 @@ describe("web app API model", () => {
 
     expect(path.basename(response.log.filePath ?? "")).toContain("Aerenal");
     expect(path.basename(response.log.filePath ?? "")).not.toContain("GUI Session");
-    expect(response.log.markdown).toContain("## User\n\nWhat about Aerenal?");
-    expect(response.log.markdown).toContain("## Assistant\n\nAerenal answer.");
-    expect(response.log.markdown).not.toContain("<session-title>");
+    expect(response.log.exchanges).toEqual([
+      {
+        user: "What about Aerenal?",
+        title: "Aerenal Overview",
+        assistant: "Aerenal answer."
+      }
+    ]);
   });
 
   it("runs refresh and force reingest with the requested runtime option and console output", async () => {
@@ -198,44 +202,45 @@ describe("web app API model", () => {
     unsubscribe();
   });
 
-  it("lists Markdown logs newest first and reads selected historical logs", async () => {
+  it("lists JSON logs newest first and reads selected historical logs", async () => {
     const config = await writeConfig("log-browser");
     await mkdir(config.logDir, { recursive: true });
-    await writeFile(path.join(config.logDir, "20260101000000 Old.md"), "# Old", "utf8");
-    await writeFile(path.join(config.logDir, "20260201000000 New.md"), "# New", "utf8");
+    await writeFile(path.join(config.logDir, "20260101000000 Old.json"), JSON.stringify([{ user: "Old?", title: "Old", assistant: "Old." }]), "utf8");
+    await writeFile(path.join(config.logDir, "20260201000000 New.json"), JSON.stringify([{ user: "New?", title: "New", assistant: "New." }]), "utf8");
     await writeFile(path.join(config.logDir, "notes.txt"), "not a transcript", "utf8");
+    await writeFile(path.join(config.logDir, "legacy.md"), "# Legacy", "utf8");
     await mkdir(path.join(config.logDir, "nested"), { recursive: true });
-    await writeFile(path.join(config.logDir, "nested", "20260301000000 Nested.md"), "# Nested", "utf8");
+    await writeFile(path.join(config.logDir, "nested", "20260301000000 Nested.json"), "[]", "utf8");
     const app = createWebApp({
       config,
       retrieval: mockRetrieval([]).retrieval,
       chat: { complete: vi.fn().mockResolvedValue("answer") }
     });
 
-    const response = await app.getLog(path.join(config.logDir, "20260101000000 Old.md"));
+    const response = await app.getLog(path.join(config.logDir, "20260101000000 Old.json"));
 
-    expect(response.markdown).toBe("# Old");
+    expect(response.exchanges).toEqual([{ user: "Old?", title: "Old", assistant: "Old." }]);
     expect(response.readOnly).toBe(true);
-    expect(response.files.map((file) => file.label)).toEqual(["20260201000000 New.md", "20260101000000 Old.md"]);
+    expect(response.files.map((file) => file.label)).toEqual(["20260201000000 New.json", "20260101000000 Old.json"]);
   });
 
   it("rejects unsafe or missing log selections", async () => {
     const config = await writeConfig("unsafe-log-selection");
     await mkdir(config.logDir, { recursive: true });
-    await writeFile(path.join(config.logDir, "20260101000000 Old.md"), "# Old", "utf8");
+    await writeFile(path.join(config.logDir, "20260101000000 Old.json"), "[]", "utf8");
     const app = createWebApp({
       config,
       retrieval: mockRetrieval([]).retrieval,
       chat: { complete: vi.fn().mockResolvedValue("answer") }
     });
 
-    await expect(app.getLog(path.join(config.logDir, "nested", "Bad.md"))).rejects.toThrow(
-      "Selected log file must be a Markdown file directly inside the log directory."
+    await expect(app.getLog(path.join(config.logDir, "nested", "Bad.json"))).rejects.toThrow(
+      "Selected log file must be a JSON file directly inside the log directory."
     );
-    await expect(app.getLog(path.join(config.logDir, "..", "Bad.md"))).rejects.toThrow(
-      "Selected log file must be a Markdown file directly inside the log directory."
+    await expect(app.getLog(path.join(config.logDir, "..", "Bad.json"))).rejects.toThrow(
+      "Selected log file must be a JSON file directly inside the log directory."
     );
-    await expect(app.getLog(path.join(config.logDir, "missing.md"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(app.getLog(path.join(config.logDir, "missing.json"))).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("reads missing generated NPC state as an empty list", async () => {
@@ -414,14 +419,14 @@ describe("web app API model", () => {
   it("keeps historical log browsing read-only while assistant prompts write to the active session", async () => {
     const config = await writeConfig("historical-readonly");
     await mkdir(config.logDir, { recursive: true });
-    const oldPath = path.join(config.logDir, "20260101000000 Old.md");
-    await writeFile(oldPath, "# Old\n\nOriginal", "utf8");
+    const oldPath = path.join(config.logDir, "20260101000000 Old.json");
+    await writeFile(oldPath, JSON.stringify([{ user: "Old?", title: "Old", assistant: "Original" }]), "utf8");
     const app = createWebApp({
       config,
       ...mockRefreshDependencies(),
       retrieval: mockRetrieval([result()]).retrieval,
       chat: {
-        complete: vi.fn().mockResolvedValue("<session-title>Current</session-title>\n<answer>\nCurrent answer.\n</answer>")
+        complete: vi.fn().mockResolvedValue(firstAnswer("Current", "Current Question", "Current answer."))
       }
     });
 
@@ -430,20 +435,23 @@ describe("web app API model", () => {
 
     const response = await app.askAssistant("New question");
 
-    expect(await readFile(oldPath, "utf8")).toBe("# Old\n\nOriginal");
+    expect(JSON.parse(await readFile(oldPath, "utf8"))).toEqual([{ user: "Old?", title: "Old", assistant: "Original" }]);
     expect(response.log.filePath).not.toBe(oldPath);
     expect(response.log.activeFilePath).toBe(response.log.filePath);
     expect(response.log.readOnly).toBe(false);
-    expect(response.log.markdown).toContain("New question");
-    expect(response.log.markdown).toContain("Current answer.");
+    expect(response.log.exchanges[0]).toEqual({
+      user: "New question",
+      title: "Current Question",
+      assistant: "Current answer."
+    });
   });
 
   it("starts a lazy new session without creating an empty transcript", async () => {
     const config = await writeConfig("new-session");
     const chat = vi
       .fn()
-      .mockResolvedValueOnce("<session-title>First</session-title>\n<answer>\nFirst answer.\n</answer>")
-      .mockResolvedValueOnce("<session-title>Second</session-title>\n<answer>\nSecond answer.\n</answer>");
+      .mockResolvedValueOnce(firstAnswer("First", "First Question", "First answer."))
+      .mockResolvedValueOnce(firstAnswer("Second", "Second Question", "Second answer."));
     const app = createWebApp({
       config,
       ...mockRefreshDependencies(),
@@ -463,9 +471,10 @@ describe("web app API model", () => {
     expect(second.log.filePath).not.toBe(first.log.filePath);
     expect(path.basename(first.log.filePath ?? "")).toContain("First");
     expect(path.basename(second.log.filePath ?? "")).toContain("Second");
-    expect(second.log.markdown).toContain("Second question");
+    expect(second.log.exchanges[0]?.user).toBe("Second question");
     const secondMessages = chat.mock.calls[1]?.[0] as Array<{ content: string }> | undefined;
     expect(secondMessages?.[0]?.content).toContain("<session-title>");
+    expect(secondMessages?.[0]?.content).toContain("<response-title>");
   });
 
   it("falls back to the submitted question when the first response has no session title", async () => {
@@ -482,7 +491,11 @@ describe("web app API model", () => {
 
     expect(path.basename(response.log.filePath ?? "")).toContain("What about the Mournland");
     expect(path.basename(response.log.filePath ?? "")).not.toContain("GUI Session");
-    expect(response.log.markdown).toContain("Plain answer.");
+    expect(response.log.exchanges[0]).toEqual({
+      user: "What about the Mournland?",
+      title: "What about the Mournland?",
+      assistant: "Plain answer."
+    });
   });
 
   it("generates NPC cards, writes generated NPC state, and keeps transcript logs separate", async () => {
@@ -692,7 +705,7 @@ describe("web app API model", () => {
           ]
         })
       )
-      .mockResolvedValueOnce("<session-title>Standard</session-title>\n<answer>\nStandard answer.\n</answer>");
+      .mockResolvedValueOnce(firstAnswer("Standard", "Standard Question", "Standard answer."));
     const app = createWebApp({
       config,
       ...mockRefreshDependencies(),
@@ -706,7 +719,7 @@ describe("web app API model", () => {
     expect(npcResponse.npcs.npcs).toHaveLength(1);
     expect(assistantResponse.npcs.npcs).toHaveLength(1);
     expect(assistantResponse.npcs.npcs[0]?.name).toBe("Jala ir'Wynarn");
-    expect(assistantResponse.log.markdown).toContain("Standard answer.");
+    expect(assistantResponse.log.exchanges[0]?.assistant).toBe("Standard answer.");
   });
 
   it("rejects empty NPC prompts", async () => {
@@ -876,7 +889,11 @@ const writeConfig = async (name: string): Promise<RuntimeConfig> => {
     ].join("\n"),
     "utf8"
   );
-  await writeFile(config.assistant.sessionTitlePromptPath, "<session-title>Title</session-title><answer>Answer</answer>", "utf8");
+  await writeFile(
+    config.assistant.sessionTitlePromptPath,
+    "<session-title>Title</session-title><response-title>Heading</response-title><answer>Answer</answer>",
+    "utf8"
+  );
   return config;
 };
 
@@ -906,10 +923,18 @@ const result = (): RetrievalResult => ({
   matchKind: "hybrid"
 });
 
+const firstAnswer = (sessionTitle: string, responseTitle: string, answer: string): string => [
+  `<session-title>${sessionTitle}</session-title>`,
+  `<response-title>${responseTitle}</response-title>`,
+  "<answer>",
+  answer,
+  "</answer>"
+].join("\n");
+
 const emptyLogResponse = () => ({
   activeFilePath: null,
+  exchanges: [],
   files: [],
   filePath: null,
-  markdown: "",
   readOnly: false
 });

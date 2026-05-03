@@ -66,14 +66,15 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
           requestSessionTitle: shouldRequestSessionTitle
         })
       );
-      const parsedResponse = shouldRequestSessionTitle ? parseFirstAssistantResponse(response) : null;
+      const parsedResponse = parseAssistantResponse(response, shouldRequestSessionTitle);
       const answer = parsedResponse?.answer ?? response.trim();
       shouldRequestSessionTitle = false;
 
       await options.appendExchange({
-        assistantResponse: answer,
-        sessionTitle: parsedResponse?.title ?? normalizedQuestion,
-        userQuestion: normalizedQuestion
+        assistant: answer,
+        sessionTitle: parsedResponse?.sessionTitle ?? normalizedQuestion,
+        title: parsedResponse?.responseTitle ?? normalizedQuestion,
+        user: normalizedQuestion
       });
       history.push({ role: "user", content: normalizedQuestion }, { role: "assistant", content: answer });
       history.splice(0, Math.max(0, history.length - MAX_HISTORY_MESSAGES));
@@ -86,24 +87,31 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
   };
 };
 
-interface FirstAssistantResponse {
+interface ParsedAssistantResponse {
   answer: string;
-  title: string;
+  responseTitle: string;
+  sessionTitle?: string;
 }
 
-const parseFirstAssistantResponse = (response: string): FirstAssistantResponse | null => {
-  const match = response.match(
-    /^\s*<session-title>(?<title>[\s\S]*?)<\/session-title>\s*<answer>\s*(?<answer>[\s\S]*?)\s*<\/answer>\s*$/i
-  );
-  const title = match?.groups?.title?.trim();
+const parseAssistantResponse = (response: string, expectSessionTitle: boolean): ParsedAssistantResponse | null => {
+  const match = expectSessionTitle
+    ? response.match(
+        /^\s*<session-title>(?<sessionTitle>[\s\S]*?)<\/session-title>\s*<response-title>(?<responseTitle>[\s\S]*?)<\/response-title>\s*<answer>\s*(?<answer>[\s\S]*?)\s*<\/answer>\s*$/i
+      )
+    : response.match(
+        /^\s*<response-title>(?<responseTitle>[\s\S]*?)<\/response-title>\s*<answer>\s*(?<answer>[\s\S]*?)\s*<\/answer>\s*$/i
+      );
+  const sessionTitle = match?.groups?.sessionTitle?.trim();
+  const responseTitle = match?.groups?.responseTitle?.trim();
   const answer = match?.groups?.answer?.trim();
 
-  if (!title || !answer) {
+  if ((expectSessionTitle && !sessionTitle) || !responseTitle || !answer) {
     return null;
   }
 
   return {
     answer,
-    title
+    responseTitle,
+    ...(sessionTitle ? { sessionTitle } : {})
   };
 };

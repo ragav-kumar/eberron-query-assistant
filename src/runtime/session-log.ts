@@ -3,13 +3,13 @@ import path from "node:path";
 
 export interface SessionLog {
   append(exchange: SessionLogExchange): Promise<void>;
-  appendMarkdown(markdown: string): Promise<void>;
   readonly filePath: string;
 }
 
 export interface SessionLogExchange {
-  assistantResponse: string;
-  userQuestion: string;
+  assistant: string;
+  title: string;
+  user: string;
 }
 
 export interface SessionLogCreateRequest {
@@ -25,7 +25,6 @@ export interface SessionLogFile {
 }
 
 const FALLBACK_TITLE = "Untitled Session";
-const NON_TRANSCRIPT_LOG_FILES = new Set(["generated_npcs.md"]);
 
 export const createSessionLog = async (request: SessionLogCreateRequest): Promise<SessionLog> => {
   const startedAt = request.now ?? new Date();
@@ -37,27 +36,20 @@ export const createSessionLog = async (request: SessionLogCreateRequest): Promis
   return {
     filePath,
     async append(exchange) {
-      await writeFile(filePath, formatExchange(exchange), {
-        flag: "a",
-        encoding: "utf8"
-      });
-    },
-    async appendMarkdown(markdown) {
-      await writeFile(filePath, normalizeMarkdownAppend(markdown), {
-        flag: "a",
-        encoding: "utf8"
-      });
+      const exchanges = await readSessionLogFile(path.dirname(filePath), filePath);
+      exchanges.push(normalizeExchange(exchange));
+      await writeFile(filePath, `${JSON.stringify(exchanges, null, 2)}\n`, "utf8");
     }
   };
 };
 
 const createUniqueSessionLogFile = async (logDir: string, startedAt: Date, title: string): Promise<string> => {
   const timestamp = formatTimestamp(startedAt);
-  const content = [`# ${title}`, "", `Started: ${startedAt.toISOString()}`, ""].join("\n");
+  const content = "[]\n";
 
   for (let attempt = 1; attempt <= 100; attempt += 1) {
     const suffix = attempt === 1 ? "" : ` ${attempt}`;
-    const filePath = path.join(logDir, `${timestamp} ${title}${suffix}.md`);
+    const filePath = path.join(logDir, `${timestamp} ${title}${suffix}.json`);
     try {
       await writeFile(filePath, content, {
         flag: "wx",
@@ -105,8 +97,7 @@ export const listSessionLogFiles = async (
     .filter(
       (entry) =>
         entry.isFile() &&
-        path.extname(entry.name).toLowerCase() === ".md" &&
-        !NON_TRANSCRIPT_LOG_FILES.has(entry.name.toLowerCase())
+        path.extname(entry.name).toLowerCase() === ".json"
     )
     .map((entry) => {
       const filePath = path.join(logDir, entry.name);
@@ -119,15 +110,29 @@ export const listSessionLogFiles = async (
     .sort((left, right) => right.label.localeCompare(left.label));
 };
 
-export const readSessionLogFile = async (logDir: string, filePath: string): Promise<string> => {
+export const readSessionLogFile = async (logDir: string, filePath: string): Promise<SessionLogExchange[]> => {
   const root = path.resolve(logDir);
   const candidate = path.resolve(root, filePath);
 
-  if (path.dirname(candidate) !== root || path.extname(candidate).toLowerCase() !== ".md") {
-    throw new Error("Selected log file must be a Markdown file directly inside the log directory.");
+  if (path.dirname(candidate) !== root || path.extname(candidate).toLowerCase() !== ".json") {
+    throw new Error("Selected log file must be a JSON file directly inside the log directory.");
   }
 
-  return readFile(candidate, "utf8");
+  const parsed = JSON.parse(await readFile(candidate, "utf8")) as unknown;
+  if (!Array.isArray(parsed)) {
+    throw new Error("Session log file must contain a JSON array.");
+  }
+
+  return parsed.map((exchange): SessionLogExchange => {
+    if (isSessionLogExchangeRecord(exchange)) {
+      return normalizeExchange({
+        assistant: exchange.assistant,
+        title: exchange.title,
+        user: exchange.user
+      });
+    }
+    throw new Error("Session log file contains an invalid exchange record.");
+  });
 };
 
 const isUnsafeFilenameCharacter = (character: string): boolean => {
@@ -157,20 +162,23 @@ const formatTimestamp = (date: Date): string => {
   ].join("");
 };
 
-const formatExchange = (exchange: SessionLogExchange): string => {
-  return [
-    "## User",
-    "",
-    exchange.userQuestion.trimEnd(),
-    "",
-    "## Assistant",
-    "",
-    exchange.assistantResponse.trimEnd(),
-    ""
-  ].join("\n");
+const normalizeExchange = (exchange: SessionLogExchange): SessionLogExchange => {
+  return {
+    assistant: exchange.assistant.trim(),
+    title: exchange.title.trim() || "Untitled Response",
+    user: exchange.user.trim()
+  };
 };
 
-const normalizeMarkdownAppend = (markdown: string): string => {
-  const trimmed = markdown.trimEnd();
-  return trimmed.length > 0 ? `${trimmed}\n\n` : "";
+const isSessionLogExchangeRecord = (value: unknown): value is SessionLogExchange => {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "user" in value &&
+    typeof value.user === "string" &&
+    "assistant" in value &&
+    typeof value.assistant === "string" &&
+    "title" in value &&
+    typeof value.title === "string"
+  );
 };

@@ -81,7 +81,7 @@ export const OutputTabs = ({
     ) : tab === "npcs" ? (
       <NpcCardsPane npcs={npcs.npcs} />
     ) : (
-      <MarkdownOutputPane markdown={log.markdown} emptyMessage="Submit an assistant prompt to start the log." />
+      <MarkdownOutputPane exchanges={log.exchanges} emptyMessage="Submit an assistant prompt to start the log." />
     )}
   </aside>
 );
@@ -114,7 +114,7 @@ const LogToolbar = ({ isBusy, log, onNewSession, onSelectLog }: LogToolbarProps)
           value={selectedFilePath}
           onChange={(event) => onSelectLog(event.currentTarget.value)}
           disabled={log.files.length === 0}
-          title="Browse saved Markdown transcript logs."
+          title="Browse saved JSON transcript logs."
         >
           {log.files.length === 0 ? (
             <option value="">No saved logs</option>

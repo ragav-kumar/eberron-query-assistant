@@ -40,16 +40,22 @@ vi.mock("../src/client/api.js", () => ({
 }));
 
 const initialLog = {
-  activeFilePath: "logs/session.md" as string | null,
+  activeFilePath: "logs/session.json" as string | null,
+  exchanges: [
+    {
+      user: "Initial prompt",
+      title: "GUI Session",
+      assistant: "Ready."
+    }
+  ],
   files: [
     {
       active: true,
-      filePath: "logs/session.md",
-      label: "session.md"
+      filePath: "logs/session.json",
+      label: "session.json"
     }
   ],
-  filePath: "logs/session.md" as string | null,
-  markdown: "# GUI Session\n\nReady.",
+  filePath: "logs/session.json" as string | null,
   readOnly: false
 };
 
@@ -89,7 +95,12 @@ beforeEach(() => {
     npcs: emptyNpcs()
   });
   vi.mocked(api.subscribeConsole).mockReturnValue(() => undefined);
-  vi.mocked(api.askAssistant).mockResolvedValue(operationResult({ log: { ...initialLog, markdown: "## Assistant\n\nAnswer" } }));
+  vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
+    log: {
+      ...initialLog,
+      exchanges: [{ user: "What about Aerenal?", title: "Aerenal Overview", assistant: "Answer" }]
+    }
+  }));
   vi.mocked(api.generateNpcs).mockResolvedValue(operationResult({
     npcs: {
       npcs: [
@@ -180,7 +191,10 @@ describe("App", () => {
       }
     }));
     vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
-      log: { ...initialLog, markdown: "## Assistant\n\nAnswer" },
+      log: {
+        ...initialLog,
+        exchanges: [{ user: "What about Aerenal?", title: "Aerenal Overview", assistant: "Answer" }]
+      },
       npcs: {
         npcs: [
           {
@@ -559,7 +573,9 @@ describe("App", () => {
   it("renders the active log Markdown", async () => {
     render(<App />);
 
-    expect(await screen.findByText("GUI Session")).toBeTruthy();
+    expect(await screen.findByText("Contents")).toBeTruthy();
+    expect(await screen.findAllByText("GUI Session")).toHaveLength(2);
+    expect(await screen.findByText("Initial prompt")).toBeTruthy();
     expect(await screen.findByText("Ready.")).toBeTruthy();
   });
 
@@ -575,8 +591,8 @@ describe("App", () => {
   it("browses historical logs as read-only selections", async () => {
     const historicalLog = {
       ...initialLog,
-      filePath: "logs/old.md",
-      markdown: "# Old Session\n\nPast answer.",
+      filePath: "logs/old.json",
+      exchanges: [{ user: "Past question", title: "Old Session", assistant: "Past answer." }],
       readOnly: true
     };
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({ log: {
@@ -585,8 +601,8 @@ describe("App", () => {
         ...(initialLog.files ?? []),
         {
           active: false,
-          filePath: "logs/old.md",
-          label: "old.md"
+          filePath: "logs/old.json",
+          label: "old.json"
         }
       ]
     } }));
@@ -595,17 +611,18 @@ describe("App", () => {
     render(<App />);
 
     const select = await screen.findByLabelText("Log file");
-    fireEvent.change(select, { target: { value: "logs/old.md" } });
+    fireEvent.change(select, { target: { value: "logs/old.json" } });
 
     await waitFor(() => {
       expect(
         vi.mocked(api.getLog).mock.calls.some(([options]) => (
-          options.filePath === "logs/old.md" && typeof options.sessionId === "string"
+          options.filePath === "logs/old.json" && typeof options.sessionId === "string"
         ))
       ).toBe(true);
     });
-    expect(await screen.findByText("Read only: logs/old.md")).toBeTruthy();
-    expect(await screen.findByText("Old Session")).toBeTruthy();
+    expect(await screen.findByText("Read only: logs/old.json")).toBeTruthy();
+    expect(await screen.findAllByText("Old Session")).toHaveLength(2);
+    expect(await screen.findByText("Past question")).toBeTruthy();
     expect(await screen.findByText("Past answer.")).toBeTruthy();
   });
 
@@ -625,29 +642,29 @@ describe("App", () => {
         ...(initialLog.files ?? []),
         {
           active: false,
-          filePath: "logs/old.md",
-          label: "old.md"
+          filePath: "logs/old.json",
+          label: "old.json"
         }
       ]
     } }));
     vi.mocked(api.getLog).mockResolvedValueOnce({
       ...initialLog,
-      filePath: "logs/old.md",
-      markdown: "# Old Session",
+      filePath: "logs/old.json",
+      exchanges: [{ user: "Old prompt", title: "Old Session", assistant: "Old answer." }],
       readOnly: true
     });
     vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
       log: {
         ...initialLog,
-        markdown: "# GUI Session\n\n## Assistant\n\nNew answer."
+        exchanges: [{ user: "Write to active session", title: "New Session Answer", assistant: "New answer." }]
       }
     }));
 
     render(<App />);
 
     const select = await screen.findByLabelText("Log file");
-    fireEvent.change(select, { target: { value: "logs/old.md" } });
-    expect(await screen.findByText("Old Session")).toBeTruthy();
+    fireEvent.change(select, { target: { value: "logs/old.json" } });
+    expect(await screen.findAllByText("Old Session")).toHaveLength(2);
 
     fireEvent.change(screen.getByPlaceholderText(/Ask about Eberron/i), {
       target: { value: "Write to active session" }
@@ -657,7 +674,8 @@ describe("App", () => {
     await waitFor(() => {
       expect(api.askAssistant).toHaveBeenCalledWith("Write to active session", expect.any(String));
     });
-    expect(await screen.findByText("Current session: logs/session.md")).toBeTruthy();
+    expect(await screen.findByText("Current session: logs/session.json")).toBeTruthy();
+    expect(await screen.findAllByText("New Session Answer")).toHaveLength(2);
     expect(await screen.findByText("New answer.")).toBeTruthy();
   });
 
@@ -723,9 +741,9 @@ describe("App", () => {
 
 const emptyLog = (): api.ApiLog => ({
   activeFilePath: null,
+  exchanges: [],
   files: [],
   filePath: null,
-  markdown: "",
   readOnly: false
 });
 

@@ -34,9 +34,9 @@ const SAVE_DELAY_MS = 500;
 const RECOVERY_POLL_MS = 1_000;
 const EMPTY_LOG: ApiLog = {
   activeFilePath: null,
+  exchanges: [],
   files: [],
   filePath: null,
-  markdown: "",
   readOnly: false
 };
 const EMPTY_NPCS: ApiNpcResponse = {
