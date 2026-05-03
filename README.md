@@ -10,7 +10,7 @@ Assistant instructions are stored in tracked Markdown files under `assistant/`. 
 
 Standard assistant prompts also receive automatic party context assembled from the local Foundry corpus. Configure the party actor UUIDs and campaign journal names in `.env`; `.env.example` documents the supported keys. Session Notes are used for what happened in play, Quests are used for active or expected quest threads, actor-sheet mechanics are treated as character-sheet facts, and actor backstory is treated as what the character believes rather than guaranteed objective truth.
 
-The application refreshes its retrieval layer automatically before the first assistant or debug query in a browser-server session when needed. It also provides controls to refresh during use. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine refreshes stay fast, and a force-reingest control is available when a full rebuild is needed.
+The application refreshes its retrieval layer automatically before the first assistant or debug query in a browser-server session when needed. It also provides controls to refresh during use. It checks whether the latest foundry export has changed, detects newly added or removed PDFs, and looks for new Keith Baker articles on the configured schedule. Unchanged sources are skipped so routine refreshes stay fast, and a force-reingest control is available when a full rebuild is needed. Keith Baker raw index and article HTML is cached locally so force reingest can usually rebuild article corpus rows without refetching every article page.
 
 The local Console output streams what is being checked, skipped, refreshed, rebuilt, or degraded while operations run. If the browser reloads or reconnects while the same local server process is still running, the Console feed and active operation status are restored from server memory. If one source fails while another source remains usable, the app can continue in degraded mode and names the affected source type. If no retrieval corpus is available, refresh fails clearly. Console output is a transient local feed and is not saved to transcript logs.
 
@@ -37,7 +37,7 @@ The project expects these source locations by default:
 - optional local assistant context in `assistant/additional-context.md`
 - optional automatic party context settings in `.env`
 
-Keith Baker articles are discovered from the Eberron index and cached into the local retrieval layer after ingestion.
+Keith Baker articles are discovered from the Eberron index and cached into the local retrieval layer after ingestion. The raw Keith Baker HTML cache is stored under `.eberron-query-assistant/cache/keith-baker/`; delete that directory before force reingest only when you intentionally want to redownload article pages.
 Article pages that return HTTP 403 or 404 are recorded as permanently inaccessible and skipped on later runs.
 
 ## Usage

@@ -8,10 +8,12 @@ import { loadDefaultConfig } from "../src/config/index.js";
 import { createTaggedError } from "../src/errors.js";
 import {
   createFilesystemIngestionService,
+  createFilesystemArticleRawCache,
   createSqliteCorpusStore,
   discoverArticleLinks,
   getCorpusDatabasePath,
   normalizeArticle,
+  type ArticleRawCache,
   type ArticleFetcher,
   type CorpusStore,
   type PdfParser
@@ -222,6 +224,145 @@ describe("Phase 3 ingestion", () => {
     ]);
   });
 
+  it("caches Keith Baker index and article raw HTML after a successful article ingest", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const state = createDefaultRuntimeState();
+    const indexUrl = "https://keith-baker.com/eberron-index/";
+    const articleUrl = "https://keith-baker.com/cached-article/";
+    const indexHtml = '<main><a href="/cached-article/">Cached</a></main>';
+    const articleHtml = "<article><h1>Cached Article</h1><p>House Sivis keeps careful records.</p></article>";
+    const fetcher = createMapArticleFetcher(
+      new Map([
+        [indexUrl, indexHtml],
+        [articleUrl, articleHtml]
+      ])
+    );
+
+    const service = createService({ articleFetcher: fetcher });
+    await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+
+    const cache = createFilesystemArticleRawCache();
+    await expect(cache.read(config, indexUrl)).resolves.toBe(indexHtml);
+    await expect(cache.read(config, articleUrl)).resolves.toBe(articleHtml);
+  });
+
+  it("uses cached article raw HTML during force reingest without fetching the article page", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const cache = createFilesystemArticleRawCache();
+    const articleUrl = "https://keith-baker.com/cached-force/";
+    await cache.write(
+      config,
+      articleUrl,
+      "<article><h1>Cached Force</h1><p>The cached version rebuilds the corpus.</p></article>"
+    );
+
+    const state = createDefaultRuntimeState();
+    state.article.knownArticles = [
+      {
+        canonicalUrl: articleUrl,
+        firstSeenAt: "2026-04-20T10:00:00.000Z",
+        lastIngestedAt: "2026-04-20T10:00:00.000Z",
+        scrapeStatus: "succeeded",
+        title: "Old Title"
+      }
+    ];
+
+    const fetchedUrls: string[] = [];
+    const fetcher: ArticleFetcher = {
+      fetchText(url) {
+        fetchedUrls.push(url);
+        if (url === "https://keith-baker.com/eberron-index/") {
+          return Promise.resolve('<main><a href="/cached-force/">Cached Force</a></main>');
+        }
+        throw createTaggedError("unexpected-article-fetch", `Unexpected article fetch: ${url}`);
+      }
+    };
+
+    const service = createService({ articleFetcher: fetcher });
+    const result = await service.ingest(config, { forceReingest: true, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+
+    expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "article")).toMatchObject({
+      ingested: 1,
+      status: "succeeded"
+    });
+    expect(fetchedUrls).toEqual(["https://keith-baker.com/eberron-index/"]);
+    expect(readRows(config, "SELECT source_key, title FROM sources")).toEqual([
+      {
+        source_key: articleUrl,
+        title: "Cached Force"
+      }
+    ]);
+  });
+
+  it("fetches and caches force reingest article cache misses", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const state = createDefaultRuntimeState();
+    const articleUrl = "https://keith-baker.com/cache-miss/";
+    const articleHtml = "<article><h1>Cache Miss</h1><p>The live page fills the missing cache.</p></article>";
+    state.article.knownArticles = [
+      {
+        canonicalUrl: articleUrl,
+        firstSeenAt: "2026-04-20T10:00:00.000Z",
+        lastIngestedAt: "2026-04-20T10:00:00.000Z",
+        scrapeStatus: "succeeded",
+        title: "Cache Miss"
+      }
+    ];
+    const fetcher = createMapArticleFetcher(
+      new Map([
+        ["https://keith-baker.com/eberron-index/", '<main><a href="/cache-miss/">Cache Miss</a></main>'],
+        [articleUrl, articleHtml]
+      ])
+    );
+
+    const service = createService({ articleFetcher: fetcher });
+    await service.ingest(config, { forceReingest: true, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+
+    await expect(createFilesystemArticleRawCache().read(config, articleUrl)).resolves.toBe(articleHtml);
+  });
+
+  it("uses the cached Keith Baker index during force reingest when the live index fetch fails", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const cache = createFilesystemArticleRawCache();
+    const articleUrl = "https://keith-baker.com/cached-index/";
+    await cache.write(config, "https://keith-baker.com/eberron-index/", '<main><a href="/cached-index/">Cached Index</a></main>');
+    await cache.write(
+      config,
+      articleUrl,
+      "<article><h1>Cached Index</h1><p>The index cache protects force reingest.</p></article>"
+    );
+    const state = createDefaultRuntimeState();
+    state.article.knownArticles = [
+      {
+        canonicalUrl: articleUrl,
+        firstSeenAt: "2026-04-20T10:00:00.000Z",
+        lastIngestedAt: "2026-04-20T10:00:00.000Z",
+        scrapeStatus: "succeeded",
+        title: "Cached Index"
+      }
+    ];
+
+    const service = createService({
+      articleFetcher: {
+        fetchText: () => {
+          throw createTaggedError("index-down", "simulated index outage");
+        }
+      }
+    });
+    const result = await service.ingest(config, { forceReingest: true, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+
+    expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "article")).toMatchObject({
+      ingested: 1,
+      status: "succeeded"
+    });
+    expect(readRows(config, "SELECT source_key, title FROM sources")).toEqual([
+      {
+        source_key: articleUrl,
+        title: "Cached Index"
+      }
+    ]);
+  });
+
   it("dedupes and canonicalizes Keith Baker index links", () => {
     const result = discoverArticleLinks(
       '<main><a href="/a/?x=1#part">A</a><a href="https://keith-baker.com/a/">A2</a></main>',
@@ -335,6 +476,7 @@ describe("Phase 3 ingestion", () => {
         scrapeStatus: "failed"
       }
     ]);
+    await expect(createFilesystemArticleRawCache().read(config, "https://keith-baker.com/new-article/")).resolves.toBeNull();
   });
 
   it("marks 403 and 404 Keith Baker articles inaccessible and excludes them from future retries", async () => {
@@ -434,7 +576,7 @@ describe("Phase 3 ingestion", () => {
   });
 });
 
-const createService = (options: { articleFetcher?: ArticleFetcher; pdfParser?: PdfParser } = {}) => {
+const createService = (options: { articleFetcher?: ArticleFetcher; articleRawCache?: ArticleRawCache; pdfParser?: PdfParser } = {}) => {
   const corpusStore = createSqliteCorpusStore();
   stores.push(corpusStore);
   const dependencies = {
@@ -453,6 +595,7 @@ const createService = (options: { articleFetcher?: ArticleFetcher; pdfParser?: P
       info: () => undefined,
       warn: () => undefined
     },
+    ...(options.articleRawCache ? { articleRawCache: options.articleRawCache } : {}),
     ...(options.articleFetcher ? { articleFetcher: options.articleFetcher } : {})
   };
   return createFilesystemIngestionService({

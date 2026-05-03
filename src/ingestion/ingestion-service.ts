@@ -11,11 +11,13 @@ import {
   isPermanentlyInaccessibleArticleFetch,
   normalizeArticle
 } from "./article-ingestion.js";
+import { createFilesystemArticleRawCache, type ArticleRawCache } from "./article-raw-cache.js";
 import type { CorpusStore } from "./corpus-store.js";
 import { parseFoundryRecords } from "./foundry-ingestion.js";
 import { createPdfDataExtractParser, type PdfParser, normalizePdf } from "./pdf-ingestion.js";
 
 export interface IngestionServiceDependencies {
+  articleRawCache?: ArticleRawCache;
   articleFetcher?: ArticleFetcher;
   corpusStore: CorpusStore;
   now?: () => Date;
@@ -36,6 +38,7 @@ export interface IngestionService {
 }
 
 export const createFilesystemIngestionService = (dependencies: IngestionServiceDependencies): IngestionService => {
+  const articleRawCache = dependencies.articleRawCache ?? createFilesystemArticleRawCache();
   const articleFetcher = dependencies.articleFetcher ?? createFetchArticleFetcher();
   const corpusStore = dependencies.corpusStore;
   const now = dependencies.now ?? (() => new Date());
@@ -142,8 +145,13 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
 
     const nowIso = now().toISOString();
     try {
-      dependencies.reporter.info(`article: fetching Keith Baker index ${KEITH_BAKER_INDEX_URL}.`);
-      const indexHtml = await articleFetcher.fetchText(KEITH_BAKER_INDEX_URL);
+      const indexHtml = await readArticleIndexHtml({
+        articleFetcher,
+        articleRawCache,
+        config,
+        forceReingest: options.forceReingest,
+        reporter: dependencies.reporter
+      });
       const discovered = discoverArticleLinks(indexHtml, state.article.knownArticles, nowIso);
       const articleMap = new Map(discovered.articles.map((article) => [article.canonicalUrl, article]));
       const ingestCandidates = discovered.articles.filter(
@@ -161,8 +169,16 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
 
       for (const [index, article] of ingestCandidates.entries()) {
         try {
-          dependencies.reporter.info(`article: fetching ${article.canonicalUrl} (${index + 1}/${ingestCandidates.length}).`);
-          const html = await articleFetcher.fetchText(article.canonicalUrl);
+          const html = await readArticleHtml({
+            article,
+            articleFetcher,
+            articleRawCache,
+            config,
+            forceReingest: options.forceReingest,
+            index,
+            total: ingestCandidates.length,
+            reporter: dependencies.reporter
+          });
           const normalized = normalizeArticle(article.canonicalUrl, html, article, nowIso);
           await corpusStore.replaceSource(config, normalized.source, normalized.chunks);
           articleMap.set(article.canonicalUrl, normalized.article);
@@ -242,6 +258,63 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
       };
     }
   };
+};
+
+const readArticleIndexHtml = async (options: {
+  articleFetcher: ArticleFetcher;
+  articleRawCache: ArticleRawCache;
+  config: RuntimeConfig;
+  forceReingest: boolean;
+  reporter: ProgressReporter;
+}): Promise<string> => {
+  const { articleFetcher, articleRawCache, config, forceReingest, reporter } = options;
+  try {
+    reporter.info(`article: fetching Keith Baker index ${KEITH_BAKER_INDEX_URL}.`);
+    const indexHtml = await articleFetcher.fetchText(KEITH_BAKER_INDEX_URL);
+    await articleRawCache.write(config, KEITH_BAKER_INDEX_URL, indexHtml);
+    return indexHtml;
+  } catch (error) {
+    if (!forceReingest) {
+      throw error;
+    }
+
+    const cached = await articleRawCache.read(config, KEITH_BAKER_INDEX_URL);
+    if (cached === null) {
+      throw error;
+    }
+
+    reporter.warn(
+      `article: live Keith Baker index fetch failed during force reingest; using cached index: ${formatThrownValue(error)}.`
+    );
+    return cached;
+  }
+};
+
+const readArticleHtml = async (options: {
+  article: ArticleStateRecord;
+  articleFetcher: ArticleFetcher;
+  articleRawCache: ArticleRawCache;
+  config: RuntimeConfig;
+  forceReingest: boolean;
+  index: number;
+  reporter: ProgressReporter;
+  total: number;
+}): Promise<string> => {
+  const { article, articleFetcher, articleRawCache, config, forceReingest, index, reporter, total } = options;
+  if (forceReingest && article.scrapeStatus === "succeeded" && article.lastIngestedAt) {
+    const cached = await articleRawCache.read(config, article.canonicalUrl);
+    if (cached !== null) {
+      reporter.info(`article: using cached raw HTML ${article.canonicalUrl} (${index + 1}/${total}).`);
+      return cached;
+    }
+    reporter.info(`article: fetching cache miss ${article.canonicalUrl} (${index + 1}/${total}).`);
+  } else {
+    reporter.info(`article: fetching ${article.canonicalUrl} (${index + 1}/${total}).`);
+  }
+
+  const html = await articleFetcher.fetchText(article.canonicalUrl);
+  await articleRawCache.write(config, article.canonicalUrl, html);
+  return html;
 };
 
 const skippedSummary = (sourceType: SourceIngestionSummary["sourceType"], message: string): SourceIngestionSummary => {

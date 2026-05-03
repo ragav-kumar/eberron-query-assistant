@@ -16,6 +16,14 @@ This intentionally diverges from any older baseline behavior that invalidated st
 
 Verification added or preserved for this change covers state normalization with old, non-semver, or missing versions; runtime force-rebuild behavior; ingestion reset behavior; and incompatible corpus artifact handling.
 
+## Keith Baker Raw HTML Cache
+
+Keith Baker index and article HTML is cached under `.eberron-query-assistant/cache/keith-baker/`. Force reingest rebuilds article corpus rows from cached raw article HTML when available, so schema, chunking, or citation changes do not require refetching every article page.
+
+Routine article refresh still checks the live index on the configured cadence and populates missing raw page cache entries as needed. During force reingest, a missing cached article page is fetched and cached; permanently inaccessible 403/404 pages remain excluded from retries. To force a complete redownload, delete the Keith Baker cache directory before running force reingest.
+
+Verification added for this change covers raw cache writes, force-reingest cache hits, cache misses, cached-index fallback during force reingest, failed-page cache avoidance, and preserved inaccessible-page handling.
+
 ## Assistant Prompt Assets And Local Context
 
 Assistant prompt instructions live in tracked Markdown files under `assistant/`. Local-only context lives in `assistant/additional-context.md`, is gitignored, is created empty when missing, and is included in assistant requests only when it contains text.
