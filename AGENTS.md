@@ -90,6 +90,8 @@ Keep the system modular. Maintain clear separation between:
 - retrieval/indexing
 - provider adapters
 
+Keep the Node layer as thin as practical. Use Node for filesystem access, process/runtime concerns, provider boundaries, persistence, and other capabilities that genuinely require the host environment. Prefer keeping product logic, UI state transitions, presentation decisions, and user workflow behavior in the React/client layer when that logic does not require privileged Node access.
+
 Prefer small, testable units and explicit interfaces over hidden coupling or cross-cutting implicit behavior.
 
 Keep persistent-state changes versioned and migration-safe. Do not make silent breaking changes to stored state or retrieval artifacts without documenting the new version and the expected upgrade path. Incompatible persisted artifacts should fail clearly and instruct the user to run `npm run reingest`; they should not be silently deleted or rebuilt during routine startup.
