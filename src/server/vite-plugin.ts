@@ -92,12 +92,6 @@ const handleApiRequest = async (
     return;
   }
 
-  if (request.method === "POST" && url.pathname === "/api/debug-retrieval") {
-    const body = await readJsonBody(request);
-    writeJson(response, 200, await app.debugRetrieval(readStringField(body, "query")));
-    return;
-  }
-
   if (request.method === "POST" && url.pathname === "/api/refresh") {
     const body = await readJsonBody(request);
     writeJson(response, 200, await app.refresh(readBooleanField(body, "forceReingest")));

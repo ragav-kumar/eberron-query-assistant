@@ -25,19 +25,16 @@ const AppContent = () => {
           contextLoaded={state.contextLoaded}
           contextMarkdown={state.contextMarkdown}
           contextSaveState={state.contextSaveState}
-          debugQuery={state.debugQuery}
           inputMode={state.inputMode}
           isBusy={state.isBusy}
           leftTab={state.leftTab}
           nameGeneratorPrompt={state.nameGeneratorPrompt}
           onAssistantPromptChange={state.setAssistantPrompt}
           onContextChange={state.setContextMarkdown}
-          onDebugQueryChange={state.setDebugQuery}
           onInputModeChange={state.changeInputMode}
           onLeftTabChange={state.setLeftTab}
           onNameGeneratorPromptChange={state.setNameGeneratorPrompt}
           onSubmitAssistant={state.submitAssistantPrompt}
-          onSubmitDebugQuery={state.submitDebugQuery}
           onSubmitNameGenerator={state.submitNameGeneratorPrompt}
         />
       </section>

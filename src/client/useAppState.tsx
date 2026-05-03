@@ -13,7 +13,6 @@ import {
 
 import {
   askAssistant,
-  debugRetrieval,
   generateNpcs,
   getContext,
   getLog,
@@ -58,7 +57,6 @@ export interface AppState {
   contextLoaded: boolean;
   contextMarkdown: string;
   contextSaveState: string;
-  debugQuery: string;
   error: string | null;
   inputMode: InputMode;
   isBusy: boolean;
@@ -71,14 +69,12 @@ export interface AppState {
   selectLog: (filePath: string) => void;
   setAssistantPrompt: (prompt: string) => void;
   setContextMarkdown: (markdown: string) => void;
-  setDebugQuery: (query: string) => void;
   setLeftTab: (tab: LeftTab) => void;
   setNameGeneratorPrompt: (prompt: string) => void;
   setOutputTab: (tab: OutputTab) => void;
   startSession: (mode: SessionMode) => void;
   status: BusyState;
   submitAssistantPrompt: () => void;
-  submitDebugQuery: () => void;
   submitNameGeneratorPrompt: () => void;
 }
 
@@ -103,7 +99,6 @@ const useCreateAppState = (): AppState => {
   const initialStandardSessionId = useRef("standard-1");
   const [npcSessionId, setNpcSessionId] = useState("npcs-1");
   const [assistantPrompt, setAssistantPrompt] = useState("");
-  const [debugQuery, setDebugQuery] = useState("");
   const [nameGeneratorPrompt, setNameGeneratorPrompt] = useState("");
   const [contextMarkdown, setContextMarkdown] = useState("");
   const [lastSavedContext, setLastSavedContext] = useState("");
@@ -299,15 +294,6 @@ const useCreateAppState = (): AppState => {
     );
   }, [clearLogSelection, nameGeneratorPrompt, npcSessionId, runOperation, status.busy]);
 
-  const submitDebugQuery = useCallback(() => {
-    const query = debugQuery.trim();
-    if (query.length === 0 || status.busy) {
-      return;
-    }
-    setOutputTab("console");
-    void runOperation("debug-retrieval", () => debugRetrieval(query), () => undefined);
-  }, [debugQuery, runOperation, status.busy]);
-
   const runRefresh = useCallback(
     (forceReingest: boolean) => {
       if (status.busy) {
@@ -381,7 +367,6 @@ const useCreateAppState = (): AppState => {
     contextLoaded,
     contextMarkdown,
     contextSaveState,
-    debugQuery,
     error,
     inputMode,
     isBusy: status.busy,
@@ -394,14 +379,12 @@ const useCreateAppState = (): AppState => {
     selectLog,
     setAssistantPrompt,
     setContextMarkdown,
-    setDebugQuery,
     setLeftTab,
     setNameGeneratorPrompt,
     setOutputTab,
     startSession,
     status,
     submitAssistantPrompt,
-    submitDebugQuery,
     submitNameGeneratorPrompt
   };
 };

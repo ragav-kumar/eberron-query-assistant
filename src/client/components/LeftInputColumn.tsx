@@ -1,6 +1,5 @@
 import { AdditionalContextPanel } from "./AdditionalContextPanel.js";
 import { AssistantPromptPanel } from "./AssistantPromptPanel.js";
-import { DebugQueryPanel } from "./DebugQueryPanel.js";
 import { InputModeSelector } from "./InputModeSelector.js";
 import { NameGeneratorPanel } from "./NameGeneratorPanel.js";
 import type { InputMode, LeftTab } from "./ui-types.js";
@@ -10,19 +9,16 @@ interface LeftInputColumnProps {
   contextLoaded: boolean;
   contextMarkdown: string;
   contextSaveState: string;
-  debugQuery: string;
   inputMode: InputMode;
   isBusy: boolean;
   leftTab: LeftTab;
   nameGeneratorPrompt: string;
   onAssistantPromptChange: (prompt: string) => void;
   onContextChange: (markdown: string) => void;
-  onDebugQueryChange: (query: string) => void;
   onInputModeChange: (mode: InputMode) => void;
   onLeftTabChange: (tab: LeftTab) => void;
   onNameGeneratorPromptChange: (prompt: string) => void;
   onSubmitAssistant: () => void;
-  onSubmitDebugQuery: () => void;
   onSubmitNameGenerator: () => void;
 }
 
@@ -32,19 +28,16 @@ export const LeftInputColumn = ({
   contextLoaded,
   contextMarkdown,
   contextSaveState,
-  debugQuery,
   inputMode,
   isBusy,
   leftTab,
   nameGeneratorPrompt,
   onAssistantPromptChange,
   onContextChange,
-  onDebugQueryChange,
   onInputModeChange,
   onLeftTabChange,
   onNameGeneratorPromptChange,
   onSubmitAssistant,
-  onSubmitDebugQuery,
   onSubmitNameGenerator
 }: LeftInputColumnProps) => (
   <>
@@ -55,7 +48,7 @@ export const LeftInputColumn = ({
         aria-selected={leftTab === "input"}
         className={leftTab === "input" ? "tab active" : "tab"}
         onClick={() => onLeftTabChange("input")}
-        title="Show assistant, debug, and future generator inputs."
+        title="Show assistant and generator inputs."
       >
         Input
       </button>
@@ -80,14 +73,6 @@ export const LeftInputColumn = ({
             onPromptChange={onAssistantPromptChange}
             onSubmit={onSubmitAssistant}
             prompt={assistantPrompt}
-          />
-        ) : null}
-        {inputMode === "debug" ? (
-          <DebugQueryPanel
-            disabled={isBusy}
-            onQueryChange={onDebugQueryChange}
-            onSubmit={onSubmitDebugQuery}
-            query={debugQuery}
           />
         ) : null}
         {inputMode === "name-generator" ? (

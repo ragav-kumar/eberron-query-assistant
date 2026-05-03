@@ -28,7 +28,6 @@ import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../ty
 
 export interface WebApp {
   askAssistant(prompt: string, sessionId?: string): Promise<WebOperationResult>;
-  debugRetrieval(query: string): Promise<WebOperationResult>;
   generateNpcs(prompt: string, sessionId?: string): Promise<WebOperationResult>;
   getContext(): Promise<string>;
   getLog(options?: string | { filePath?: string; sessionId?: string }): Promise<WebLogResponse>;
@@ -94,7 +93,6 @@ export interface WebStatusResponse {
   npcs: WebNpcResponse;
 }
 
-const DEBUG_RETRIEVAL_LIMIT = 8;
 const DEFAULT_SESSION_ID = "default";
 
 interface StandardSessionState {
@@ -295,27 +293,6 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           ok: true,
           console: consoleFeed.read(),
           log: await readLog({ sessionId }),
-          npcs: await readNpcs()
-        };
-      });
-    },
-    async debugRetrieval(query) {
-      return runExclusive("debug-retrieval", async () => {
-        const normalizedQuery = query.trim();
-        if (normalizedQuery.length === 0) {
-          throw new Error("Debug retrieval query cannot be empty.");
-        }
-
-        await ensureRoutineRefresh();
-        const results = await retrieval.search({
-          query: normalizedQuery,
-          limit: DEBUG_RETRIEVAL_LIMIT
-        });
-        appendDebugRetrievalConsoleEntries(consoleFeed, normalizedQuery, results);
-        return {
-          ok: true,
-          console: consoleFeed.read(),
-          log: emptyLogResponse(await listSessionLogFiles(config.logDir, null)),
           npcs: await readNpcs()
         };
       });
@@ -533,23 +510,6 @@ const createQueuedConsoleProgressReporter = (consoleFeed: MemoryConsoleFeed): Qu
       append("warn", message);
     }
   };
-};
-
-const appendDebugRetrievalConsoleEntries = (
-  consoleFeed: MemoryConsoleFeed,
-  query: string,
-  results: Awaited<ReturnType<RetrievalService["search"]>>
-): void => {
-  consoleFeed.debug(`Debug retrieval query: ${query}`);
-  consoleFeed.debug(`Debug retrieval results: ${results.length}`);
-
-  for (const [index, result] of results.entries()) {
-    const locator = result.citation.locator ? ` ${result.citation.locator}` : "";
-    const url = result.citation.url ? ` ${result.citation.url}` : "";
-    consoleFeed.debug(
-      `${index + 1}. [${result.matchKind} ${result.score.toFixed(3)}] ${result.sourceType}:${result.sourceTitle}${locator}${url} chunk=${result.chunkId}\n${result.content}`
-    );
-  }
 };
 
 const formatRefreshSummaryMessage = (summary: StartupRefreshSummary): string => {

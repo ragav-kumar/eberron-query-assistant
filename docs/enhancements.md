@@ -32,9 +32,15 @@ This file is prompt context, not a retrieval source. It intentionally gives loca
 
 Verification added or preserved for this change covers prompt path configuration, file-backed system and title prompts, empty and non-empty additional context, and creation of the missing local context file.
 
+## NPC Generator Prompt Asset
+
+NPC Generator model instructions now live in `assistant/npc-generator-prompt.md` instead of source-code string literals. Runtime code still assembles that prompt asset with retrieved evidence, saved NPC state, the current user prompt, and the current maximum saved NPC id.
+
+Durable repo guidance now requires reusable model prompt instructions to live in tracked `assistant/` Markdown files as much as is reasonable. Verification covers prompt path configuration, prompt asset loading, and NPC generation behavior through the existing server and client workflows.
+
 ## GUI Replacement
 
-The user-facing assistant workflow is now a local React 19 and Vite browser UI launched with `npm run start`. The GUI supports assistant prompts, retrieval debugging, normal refresh, force reingest, active session log rendering, and editing `assistant/additional-context.md`.
+The user-facing assistant workflow is now a local React 19 and Vite browser UI launched with `npm run start`. The GUI supports assistant prompts, normal refresh, force reingest, active session log rendering, and editing `assistant/additional-context.md`.
 
 This intentionally replaces the old interactive terminal assistant workflow for normal use. The app remains local-only; `logs/` and `assistant/additional-context.md` remain gitignored and are not loaded as future assistant memory.
 
@@ -42,11 +48,11 @@ Verification added or preserved for this change covers package metadata and scri
 
 ## GUI Input And Output Tabs
 
-The browser UI separates left-side inputs from right-side outputs. The left column has `Input` and `Additional Context` tabs; the `Input` tab uses radio buttons for Standard assistant prompts, Debug Query retrieval inspection, and Name Generator mode.
+The browser UI separates left-side inputs from right-side outputs. The left column has `Input` and `Additional Context` tabs; the `Input` tab uses radio buttons for Standard assistant prompts and NPC Generator mode.
 
 The right column has a transient plain-text `Console` feed for local progress, refresh, debug, warning, and error output, a persisted Markdown `Log` tab for assistant transcript output, and an `NPCs` tab for saved generated NPC cards. Console output is process-local, is not written to `logs/`, and output panes auto-scroll as new output arrives.
 
-Assistant, name-generator, and debug-query input do not require the user to run refresh manually first. If the current browser-server session has not completed a refresh yet, the app runs a routine refresh automatically before continuing with the requested input. Input panels use unframed layouts rather than cards, and Enter submits the active input mode while Shift+Enter preserves multiline text-area prompts.
+Assistant and NPC generator input do not require the user to run refresh manually first. If the current browser-server session has not completed a refresh yet, the app runs a routine refresh automatically before continuing with the requested input. Input panels use unframed layouts rather than cards, and Enter submits the active input mode while Shift+Enter preserves multiline text-area prompts.
 
 Verification added or preserved for this change covers structured console API behavior, transcript separation, tab and radio rendering, autosaved additional context, output auto-scroll, tooltips, and componentized React UI behavior.
 
@@ -54,23 +60,29 @@ Verification added or preserved for this change covers structured console API be
 
 The Log tab can browse saved Markdown transcripts from `logs/` with a dropdown. Historical transcripts are read-only display targets; Standard assistant input always writes to the current writable browser-server session, creating one lazily if no current session exists.
 
-The app initially shows an empty Log pane instead of loading an existing transcript automatically. A `New session` button clears the current writable assistant session and conversation history without creating an empty file; the next successful Standard assistant exchange creates the new transcript. Debug Query, Refresh, and Force reingest still do not create transcript files.
+The app initially shows an empty Log pane instead of loading an existing transcript automatically. A `New session` button clears the current writable assistant session and conversation history without creating an empty file; the next successful Standard assistant exchange creates the new transcript. Refresh and Force reingest still do not create transcript files.
+
+## GUI Debug Query Removal
+
+The browser UI no longer includes the Debug Query retrieval-inspection mode or its local web API route. Retrieval inspection remains available only through historical developer/runtime paths rather than the normal user-facing GUI.
+
+Verification updated for this change removes GUI debug-query assertions while preserving Standard assistant, NPC Generator, refresh, Console, and log-browser coverage.
 
 Verification added for this change covers safe log-file listing and selection, read-only historical browsing, active-session writes while viewing history, lazy new-session behavior, and React controls for selecting logs and starting sessions.
 
-## Name Generator NPC Cards
+## NPC Generator Cards
 
-Name Generator mode now asks the assistant for structured NPC records with numeric ids, names, physical descriptions, and very short bios. The model infers the requested count from the prompt, uses retrieval evidence and local assistant context for Eberron accuracy, and can revise saved NPCs by returning an existing id while assigning new NPCs ids above the current maximum.
+NPC Generator mode now asks the assistant for structured NPC records with numeric ids, names, physical descriptions, and very short bios. The model infers the requested count from the prompt, uses retrieval evidence and local assistant context for Eberron accuracy, and can revise saved NPCs by returning an existing id while assigning new NPCs ids above the current maximum.
 
-Generated NPCs render as cards in the right-column `NPCs` tab and are saved as local runtime state in `.eberron-query-assistant/state/generated-npcs.json`. This state is excluded from transcript browsing and is not loaded as future assistant memory. Switching between Standard and Name Generator closes the other in-memory session; `New session` clears the active Standard transcript session or resets NPC generation context without deleting saved NPC cards.
+Generated NPCs render as cards in the right-column `NPCs` tab and are saved as local runtime state in `.eberron-query-assistant/state/generated-npcs.json`. This state is excluded from transcript browsing and is not loaded as future assistant memory. Switching between Standard and NPC Generator closes the other in-memory session; `New session` clears the active Standard transcript session or resets NPC generation context without deleting saved NPC cards.
 
-Verification added for this change covers structured NPC parsing, id-based card patching, NPC persistence failure behavior, session switching, `New session` behavior, and React rendering for the Name Generator workflow.
+Verification added for this change covers structured NPC parsing, id-based card patching, NPC persistence failure behavior, session switching, `New session` behavior, and React rendering for the NPC Generator workflow.
 
 ## Persistent NPC Browsing
 
 The `NPCs` tab now always renders saved generated NPC cards from runtime state, sorted newest to oldest. NPC state is stored as a JSON array at `.eberron-query-assistant/state/generated-npcs.json`; each record includes its numeric id, card text, creation timestamp, and update timestamp.
 
-Name Generator responses that return an existing id update that saved NPC card instead of appending a duplicate revision. Responses that return new ids must still assign ids above the saved maximum. Legacy local `logs/generated_npcs.md` files are migrated into JSON state only when the JSON state file does not already exist, and malformed or duplicate legacy/state records fail clearly.
+NPC Generator responses that return an existing id update that saved NPC card instead of appending a duplicate revision. Responses that return new ids must still assign ids above the saved maximum. Legacy local `logs/generated_npcs.md` files are migrated into JSON state only when the JSON state file does not already exist, and malformed or duplicate legacy/state records fail clearly.
 
 Verification added for this change covers missing state, JSON loading and validation, newest-first rendering, generation inserts and revisions, legacy Markdown migration, and preserving saved cards across Standard prompts, mode switches, and NPC generation-context resets.
 
@@ -84,7 +96,7 @@ Verification added or preserved for this change covers client-owned mode and new
 
 ## GUI Operation Responsiveness Fixes
 
-The browser UI streams local Console entries while operations are still running, keeps submitted Standard and Name Generator text visible until a request succeeds, and creates Standard transcript filenames from the assistant-provided session title when available. New Standard transcripts must not use `GUI Session` as a fallback filename; if the assistant title is unavailable, the submitted question is used instead.
+The browser UI streams local Console entries while operations are still running, keeps submitted Standard and NPC Generator text visible until a request succeeds, and creates Standard transcript filenames from the assistant-provided session title when available. New Standard transcripts must not use `GUI Session` as a fallback filename; if the assistant title is unavailable, the submitted question is used instead.
 
 Verification added for this change covers streamed console subscriptions, prompt clearing success and failure behavior, assistant-title transcript filenames, and fallback transcript filename behavior.
 
@@ -106,6 +118,6 @@ Verification added for this change covers environment config, Foundry metadata i
 
 ## Rich NPC Card Details
 
-Name Generator NPC cards now support structured species, ethnicity, gender, role, and age details in addition to name, physical description, and bio. The assistant is instructed to provide those details when they apply and are knowable in-setting, while omitting details that do not apply or cannot reasonably be known.
+NPC Generator cards now support structured species, ethnicity, gender, role, and age details in addition to name, physical description, and bio. The assistant is instructed to provide those details when they apply and are knowable in-setting, while omitting details that do not apply or cannot reasonably be known.
 
 Existing generated NPC state remains valid without migration. Verification added for this change covers legacy saved cards, optional detail normalization and validation, persistence, id-based revisions, and React card metadata rendering.

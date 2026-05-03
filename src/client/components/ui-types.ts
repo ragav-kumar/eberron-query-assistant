@@ -1,4 +1,4 @@
-export type InputMode = "debug" | "name-generator" | "standard";
+export type InputMode = "name-generator" | "standard";
 
 export type LeftTab = "additional-context" | "input";
 

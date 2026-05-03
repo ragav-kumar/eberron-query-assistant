@@ -62,29 +62,6 @@ describe("web app API model", () => {
     expect(response.log.markdown).not.toContain("<session-title>");
   });
 
-  it("writes debug retrieval results to console without creating a transcript", async () => {
-    const config = await writeConfig("debug");
-    const retrievalFixture = mockRetrieval([result()]);
-    const app = createWebApp({
-      config,
-      ...mockRefreshDependencies(),
-      retrieval: retrievalFixture.retrieval,
-      chat: { complete: vi.fn().mockResolvedValue("answer") }
-    });
-
-    const response = await app.debugRetrieval("aerenal deathless");
-
-    expect(response.log).toEqual(emptyLogResponse());
-    expect(response.console.entries.map((entry) => entry.message).join("\n")).toContain(
-      "Debug retrieval query: aerenal deathless"
-    );
-    expect(response.console.entries.map((entry) => entry.message).join("\n")).toContain(
-      "[hybrid 0.900] pdf:Eberron Rising page 4"
-    );
-    expect(retrievalFixture.retrieval.refresh).toHaveBeenCalledWith(config, { forceRebuild: false });
-    await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
-  });
-
   it("runs refresh and force reingest with the requested runtime option and console output", async () => {
     const config = await writeConfig("refresh");
     const state = createDefaultRuntimeState();
@@ -214,10 +191,10 @@ describe("web app API model", () => {
     const unsubscribe = app.subscribeConsole((entry) => {
       streamedMessages.push(entry.message);
     });
-    await app.debugRetrieval("aerenal");
+    await app.refresh(true);
 
     expect(streamedMessages.some((message) => message.includes("Refresh complete"))).toBe(true);
-    expect(streamedMessages.some((message) => message.includes("Debug retrieval query: aerenal"))).toBe(true);
+    expect(streamedMessages.some((message) => message.includes("Force re-ingest requested"))).toBe(true);
     unsubscribe();
   });
 
@@ -813,7 +790,7 @@ describe("web app API model", () => {
     });
 
     const pending = app.askAssistant("Slow question");
-    await expect(app.debugRetrieval("blocked")).rejects.toSatisfy(isBusyError);
+    await expect(app.refresh(false)).rejects.toSatisfy(isBusyError);
     await vi.waitFor(() => {
       expect(resolveAsk).toBeDefined();
     });
@@ -890,6 +867,15 @@ const writeConfig = async (name: string): Promise<RuntimeConfig> => {
   const config = loadDefaultConfig(path.join(TEST_ROOT, name));
   await mkdir(config.assistant.assistantDir, { recursive: true });
   await writeFile(config.assistant.systemPromptPath, "System prompt.", "utf8");
+  await writeFile(
+    config.assistant.npcGeneratorPromptPath,
+    [
+      "You are in NPC generator mode.",
+      "Return only strict JSON with this exact shape: {\"npcs\":[{\"id\":number,\"name\":\"...\",\"description\":\"...\",\"bio\":\"...\"}]}",
+      "For new NPCs, ids must be greater than {{maxExistingId}}."
+    ].join("\n"),
+    "utf8"
+  );
   await writeFile(config.assistant.sessionTitlePromptPath, "<session-title>Title</session-title><answer>Answer</answer>", "utf8");
   return config;
 };

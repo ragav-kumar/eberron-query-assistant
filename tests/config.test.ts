@@ -39,6 +39,7 @@ describe("loadDefaultConfig", () => {
       assistant: {
         assistantDir: path.join(repoRoot, "assistant"),
         additionalContextPath: path.join(repoRoot, "assistant", "additional-context.md"),
+        npcGeneratorPromptPath: path.join(repoRoot, "assistant", "npc-generator-prompt.md"),
         sessionTitlePromptPath: path.join(repoRoot, "assistant", "session-title-prompt.md"),
         systemPromptPath: path.join(repoRoot, "assistant", "system-prompt.md")
       },

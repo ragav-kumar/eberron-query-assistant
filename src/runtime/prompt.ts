@@ -124,6 +124,7 @@ export interface AssistantMessageBuildRequest {
 
 export interface AssistantPromptAssets {
   additionalContext: string;
+  npcGeneratorPrompt: string;
   sessionTitlePrompt: string;
   systemPrompt: string;
 }
@@ -164,14 +165,16 @@ export const buildAssistantMessages = (request: AssistantMessageBuildRequest): C
 export const loadAssistantPromptAssets = async (config: AssistantConfig): Promise<AssistantPromptAssets> => {
   await ensureAdditionalContextFile(config);
 
-  const [systemPrompt, sessionTitlePrompt, additionalContext] = await Promise.all([
+  const [systemPrompt, sessionTitlePrompt, npcGeneratorPrompt, additionalContext] = await Promise.all([
     readRequiredPromptFile(config.systemPromptPath, "system prompt"),
     readRequiredPromptFile(config.sessionTitlePromptPath, "session title prompt"),
+    readRequiredPromptFile(config.npcGeneratorPromptPath, "NPC generator prompt"),
     readFile(config.additionalContextPath, "utf8")
   ]);
 
   return {
     additionalContext: additionalContext.trim(),
+    npcGeneratorPrompt: npcGeneratorPrompt.trim(),
     sessionTitlePrompt: sessionTitlePrompt.trim(),
     systemPrompt: systemPrompt.trim()
   };

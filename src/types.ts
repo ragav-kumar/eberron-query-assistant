@@ -20,6 +20,7 @@ export interface RuntimeConfig {
 export interface AssistantConfig {
   assistantDir: string;
   additionalContextPath: string;
+  npcGeneratorPromptPath: string;
   sessionTitlePromptPath: string;
   systemPromptPath: string;
 }

@@ -101,13 +101,6 @@ export const generateNpcs = async (prompt: string, sessionId: string): Promise<A
   });
 };
 
-export const debugRetrieval = async (query: string): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>("/api/debug-retrieval", {
-    method: "POST",
-    body: JSON.stringify({ query })
-  });
-};
-
 export const refresh = async (forceReingest: boolean): Promise<ApiOperationResult> => {
   return requestJson<ApiOperationResult>("/api/refresh", {
     method: "POST",

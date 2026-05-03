@@ -28,7 +28,6 @@ vi.mock("@mdxeditor/editor", () => ({
 
 vi.mock("../src/client/api.js", () => ({
   askAssistant: vi.fn(),
-  debugRetrieval: vi.fn(),
   generateNpcs: vi.fn(),
   getContext: vi.fn(),
   getLog: vi.fn(),
@@ -91,18 +90,6 @@ beforeEach(() => {
   });
   vi.mocked(api.subscribeConsole).mockReturnValue(() => undefined);
   vi.mocked(api.askAssistant).mockResolvedValue(operationResult({ log: { ...initialLog, markdown: "## Assistant\n\nAnswer" } }));
-  vi.mocked(api.debugRetrieval).mockResolvedValue(operationResult({
-    console: {
-      entries: [
-        {
-          id: "2",
-          level: "debug",
-          message: "Debug retrieval query: deathless",
-          timestamp: "2026-05-02T12:00:01.000Z"
-        }
-      ]
-    }
-  }));
   vi.mocked(api.generateNpcs).mockResolvedValue(operationResult({
     npcs: {
       npcs: [
@@ -157,13 +144,9 @@ describe("App", () => {
     expect(await screen.findByRole("radio", { name: "Standard" })).toHaveProperty("checked", true);
     expect(screen.getByPlaceholderText(/Ask about Eberron/i)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("radio", { name: "Debug Query" }));
-    expect(screen.getByPlaceholderText("aerenal deathless")).toBeTruthy();
-    expect(screen.queryByPlaceholderText(/Ask about Eberron/i)).toBeNull();
-
-    fireEvent.click(screen.getByRole("radio", { name: "Name Generator" }));
+    fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
     expect(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i)).toBeTruthy();
-    expect(screen.queryByPlaceholderText("aerenal deathless")).toBeNull();
+    expect(screen.queryByPlaceholderText(/Ask about Eberron/i)).toBeNull();
   });
 
   it("submits assistant prompts and renders the returned log", async () => {
@@ -219,7 +202,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String));
     });
-    fireEvent.click(screen.getByRole("radio", { name: "Name Generator" }));
+    fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
     fireEvent.click(screen.getByRole("radio", { name: "Standard" }));
     fireEvent.click(screen.getByRole("tab", { name: "NPCs" }));
 
@@ -240,41 +223,10 @@ describe("App", () => {
     });
   });
 
-  it("submits debug retrieval queries", async () => {
+  it("submits NPC generator prompts and renders NPC cards", async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("radio", { name: "Debug Query" }));
-    fireEvent.change(screen.getByPlaceholderText("aerenal deathless"), {
-      target: { value: "deathless" }
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Run" }));
-
-    await waitFor(() => {
-      expect(api.debugRetrieval).toHaveBeenCalledWith("deathless");
-    });
-    expect(await screen.findByText("Debug retrieval query: deathless")).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Console" }).getAttribute("aria-selected")).toBe("true");
-  });
-
-  it("submits debug retrieval queries with Enter", async () => {
-    render(<App />);
-
-    fireEvent.click(await screen.findByRole("radio", { name: "Debug Query" }));
-    const query = screen.getByPlaceholderText("aerenal deathless");
-    fireEvent.change(query, {
-      target: { value: "sharn" }
-    });
-    fireEvent.keyDown(query, { key: "Enter" });
-
-    await waitFor(() => {
-      expect(api.debugRetrieval).toHaveBeenCalledWith("sharn");
-    });
-  });
-
-  it("submits name generator prompts and renders NPC cards", async () => {
-    render(<App />);
-
-    fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
+    fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
     fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
       target: { value: "Generate one Aundairian envoy" }
     });
@@ -329,10 +281,10 @@ describe("App", () => {
     expect(screen.queryByText("Unknown")).toBeNull();
   });
 
-  it("submits name generator prompts with Enter", async () => {
+  it("submits NPC generator prompts with Enter", async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
+    fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
     const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
     fireEvent.change(prompt, {
       target: { value: "Generate one goblin" }
@@ -360,7 +312,7 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
+    fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
     fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
       target: { value: "Generate one Aundairian envoy" }
     });
@@ -413,8 +365,8 @@ describe("App", () => {
 
     expect(await screen.findByRole("button", { name: "Ask" })).toHaveProperty("disabled", true);
     expect(screen.getByRole("status", { name: "Loading output" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("radio", { name: "Debug Query" }));
-    expect(screen.getByRole("button", { name: "Run" })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
+    expect(screen.getByRole("button", { name: "Generate" })).toHaveProperty("disabled", true);
     expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
 
     resolveAsk?.(operationResult());
@@ -460,7 +412,7 @@ describe("App", () => {
     expect(prompt).toHaveProperty("value", "What about Sharn?");
   });
 
-  it("clears name generator prompts only after success", async () => {
+  it("clears NPC generator prompts only after success", async () => {
     let resolveGenerate: ((value: api.ApiOperationResult) => void) | undefined;
     vi.mocked(api.generateNpcs).mockReturnValue(
       new Promise((resolve) => {
@@ -470,7 +422,7 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
+    fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
     const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
     fireEvent.change(prompt, {
       target: { value: "Generate one envoy" }
@@ -497,12 +449,12 @@ describe("App", () => {
     });
   });
 
-  it("keeps name generator prompts visible when the request fails", async () => {
+  it("keeps NPC generator prompts visible when the request fails", async () => {
     vi.mocked(api.generateNpcs).mockRejectedValue(new Error("generation failed"));
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("radio", { name: "Name Generator" }));
+    fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
     const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
     fireEvent.change(prompt, {
       target: { value: "Generate one envoy" }

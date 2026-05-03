@@ -22,6 +22,10 @@ import type { RetrievalResult } from "../src/types.js";
 const TEST_ROOT = path.resolve(".test-tmp", "prompt");
 const PROMPT_ASSETS: AssistantPromptAssets = {
   additionalContext: "",
+  npcGeneratorPrompt: [
+    "You are in NPC generator mode.",
+    "For new NPCs, ids must be greater than {{maxExistingId}}."
+  ].join("\n"),
   sessionTitlePrompt: [
     "For this first response only, return exactly this Markdown metadata wrapper before the answer:",
     "<session-title>A concise filesystem-safe title of at most 8 words</session-title>",
@@ -147,6 +151,7 @@ describe("assistant prompt assembly", () => {
 
     expect(loaded.systemPrompt).toBe("System prompt from disk.");
     expect(loaded.sessionTitlePrompt).toContain("<session-title>");
+    expect(loaded.npcGeneratorPrompt).toContain("NPC generator mode");
     expect(loaded.additionalContext).toBe("");
     await expect(readFile(assistant.additionalContextPath, "utf8")).resolves.toBe("");
   });
@@ -413,11 +418,13 @@ const writeAssistantFiles = async (
   const config: AssistantConfig = {
     assistantDir,
     additionalContextPath: path.join(assistantDir, "additional-context.md"),
+    npcGeneratorPromptPath: path.join(assistantDir, "npc-generator-prompt.md"),
     sessionTitlePromptPath: path.join(assistantDir, "session-title-prompt.md"),
     systemPromptPath: path.join(assistantDir, "system-prompt.md")
   };
   await mkdir(assistantDir, { recursive: true });
   await writeFile(config.systemPromptPath, options.systemPrompt ?? PROMPT_ASSETS.systemPrompt, "utf8");
+  await writeFile(config.npcGeneratorPromptPath, PROMPT_ASSETS.npcGeneratorPrompt, "utf8");
   await writeFile(
     config.sessionTitlePromptPath,
     options.sessionTitlePrompt ?? PROMPT_ASSETS.sessionTitlePrompt,

@@ -12,11 +12,6 @@ const inputModeOptions: Array<{ label: string; mode: InputMode; title: string }>
     title: "Ask the assistant a normal grounded lore or campaign question."
   },
   {
-    label: "Debug Query",
-    mode: "debug",
-    title: "Inspect retrieved chunks for a query without asking the assistant."
-  },
-  {
     label: "NPC Generator",
     mode: "name-generator",
     title: "Generate NPC cards."

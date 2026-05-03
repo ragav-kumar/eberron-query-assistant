@@ -7,7 +7,7 @@ interface NameGeneratorPanelProps {
   prompt: string;
 }
 
-/** Renders the NPC name generator prompt form. */
+/** Renders the NPC generator prompt form. */
 export const NameGeneratorPanel = ({ disabled, onPromptChange, onSubmit, prompt }: NameGeneratorPanelProps) => {
   const submitPrompt = (event: SubmitEvent<HTMLFormElement>): void => {
     event.preventDefault();
