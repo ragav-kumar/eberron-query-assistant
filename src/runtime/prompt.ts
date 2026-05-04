@@ -75,12 +75,19 @@ export const createAssistantPromptShell = (options: PromptShellOptions): PromptS
                 requestSessionTitle: shouldRequestSessionTitle
               });
               const response = await options.chat.complete(messages);
-              const parsedResponse = parseAssistantResponse(response, shouldRequestSessionTitle);
+              const parsedResponse = parseAssistantResponse(response, shouldRequestSessionTitle) ??
+                parseAssistantResponse(
+                  await options.chat.complete([
+                    ...messages,
+                    { role: "assistant", content: response },
+                    { role: "user", content: buildMetadataRepairPrompt(shouldRequestSessionTitle) }
+                  ]),
+                  shouldRequestSessionTitle
+                );
               const assistantResponse = parsedResponse?.answer ?? response;
               output.write(formatAssistantResponse(assistantResponse));
               await appendSessionExchange({
                 assistantResponse,
-                fallbackTitle: question,
                 logDir: options.logDir,
                 parsedResponseTitle: parsedResponse?.responseTitle,
                 parsedSessionTitle: parsedResponse?.sessionTitle,
@@ -223,7 +230,6 @@ interface ParsedAssistantResponse {
 
 interface AppendSessionExchangeRequest {
   assistantResponse: string;
-  fallbackTitle: string;
   logDir: string | undefined;
   parsedResponseTitle: string | undefined;
   parsedSessionTitle: string | undefined;
@@ -234,27 +240,35 @@ interface AppendSessionExchangeRequest {
 }
 
 const parseAssistantResponse = (response: string, expectSessionTitle: boolean): ParsedAssistantResponse | null => {
-  const match = expectSessionTitle
-    ? response.match(
-        /^\s*<session-title>(?<sessionTitle>[\s\S]*?)<\/session-title>\s*<response-title>(?<responseTitle>[\s\S]*?)<\/response-title>\s*<answer>\s*(?<answer>[\s\S]*?)\s*<\/answer>\s*$/i
-      )
-    : response.match(
-        /^\s*<response-title>(?<responseTitle>[\s\S]*?)<\/response-title>\s*<answer>\s*(?<answer>[\s\S]*?)\s*<\/answer>\s*$/i
-      );
-  const sessionTitle = match?.groups?.sessionTitle?.trim();
-  const responseTitle = match?.groups?.responseTitle?.trim();
-  const answer = match?.groups?.answer?.trim();
+  const sessionTitle = readTag(response, "session-title");
+  const responseTitle = readTag(response, "response-title");
+  const answer = readTag(response, "answer");
 
-  if ((expectSessionTitle && !sessionTitle) || !responseTitle || !answer) {
+  if (!responseTitle || !answer) {
     return null;
   }
 
   return {
     answer,
     responseTitle,
-    ...(sessionTitle ? { sessionTitle } : {})
+    sessionTitle: expectSessionTitle ? (sessionTitle ?? responseTitle) : responseTitle
   };
 };
+
+const readTag = (text: string, tagName: string): string | null => {
+  const match = new RegExp(`<${tagName}>\\s*([\\s\\S]*?)\\s*<\\/${tagName}>`, "i").exec(text);
+  const content = match?.[1]?.trim();
+  return content && content.length > 0 ? content : null;
+};
+
+const buildMetadataRepairPrompt = (requestSessionTitle: boolean): string => [
+  "Your previous response was missing required title metadata.",
+  "Return the same answer content again, but wrap it exactly in the required XML-like metadata tags.",
+  requestSessionTitle
+    ? "Include <session-title>, <response-title>, and <answer>."
+    : "Include <response-title> and <answer>. Do not include <session-title>.",
+  "Do not add commentary outside the tags."
+].join("\n");
 
 const appendSessionExchange = async (request: AppendSessionExchangeRequest): Promise<void> => {
   if (!request.logDir) {
@@ -262,18 +276,21 @@ const appendSessionExchange = async (request: AppendSessionExchangeRequest): Pro
   }
 
   try {
+    if (!request.parsedResponseTitle) {
+      throw new Error("Assistant response did not include required title metadata.");
+    }
     const sessionLog =
       request.sessionLog ??
       (await createSessionLog({
         logDir: request.logDir,
-        title: request.parsedSessionTitle ?? request.fallbackTitle
+        title: request.parsedSessionTitle ?? request.parsedResponseTitle
       }));
     if (request.sessionLog === null) {
       request.setSessionLog(sessionLog);
     }
     await sessionLog.append({
       assistant: request.assistantResponse,
-      title: request.parsedResponseTitle ?? request.fallbackTitle,
+      title: request.parsedResponseTitle,
       user: request.userQuestion
     });
   } catch (error) {

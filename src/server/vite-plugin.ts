@@ -9,7 +9,10 @@ export const eberronApiPlugin = (): Plugin => {
   let app: WebApp | null = null;
 
   const getApp = (): WebApp => {
-    app ??= createWebApp();
+    if (!app) {
+      app = createWebApp();
+      app.startStartupRefresh();
+    }
     return app;
   };
 

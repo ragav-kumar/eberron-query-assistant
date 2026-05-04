@@ -556,6 +556,29 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
   });
 
+  it("displays startup refresh status and console output", async () => {
+    vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
+      activeOperation: "startup-refresh",
+      console: {
+        entries: [
+          {
+            id: "startup-1",
+            level: "info",
+            message: "Starting source inventory checks.",
+            timestamp: "2026-05-02T12:00:04.000Z"
+          }
+        ]
+      }
+    }));
+
+    render(<App />);
+
+    expect(await screen.findByText("Running startup-refresh")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
+    fireEvent.click(screen.getByRole("tab", { name: "Console" }));
+    expect(await screen.findByText(/Starting source inventory checks/)).toBeTruthy();
+  });
+
   it("polls recovered operations until final output is available", async () => {
     vi.mocked(api.getStatus)
       .mockResolvedValueOnce(statusResponse({

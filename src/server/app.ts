@@ -25,6 +25,7 @@ import {
 } from "../runtime/session-log.js";
 import { createFilesystemSourceDiscoveryService, type SourceDiscoveryService } from "../source-discovery/index.js";
 import { createFilesystemStateStore, type StateStore } from "../state/index.js";
+import { createJsonlTimingReporter, type TimingContext, type TimingReporter } from "../timing.js";
 import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
 
 export interface WebApp {
@@ -35,6 +36,7 @@ export interface WebApp {
   getNpcs(): Promise<WebNpcResponse>;
   getStatus(options?: { sessionId?: string }): Promise<WebStatusResponse>;
   refresh(forceReingest: boolean): Promise<WebOperationResult>;
+  startStartupRefresh(): void;
   subscribeConsole(listener: WebConsoleListener): () => void;
   writeContext(markdown: string): Promise<void>;
 }
@@ -50,6 +52,7 @@ export interface WebAppDependencies {
   partyContext?: PartyContextService;
   retrieval?: RetrievalService;
   stateStore?: StateStore;
+  timing?: TimingReporter;
 }
 
 export interface WebLogResponse {
@@ -108,7 +111,9 @@ interface NpcSessionState {
 export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   const config = dependencies.config ?? loadDefaultConfig();
   let hasRoutineRefresh = false;
+  let nextOperationId = 1;
   const consoleFeed = createMemoryConsoleFeed();
+  const timingReporter = dependencies.timing ?? createJsonlTimingReporter({ repoRoot: config.repoRoot });
   const standardSessions = new Map<string, StandardSessionState>();
   const npcSessions = new Map<string, NpcSessionState>();
 
@@ -235,17 +240,39 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     };
   };
 
-  const runExclusive = async <T>(operation: string, task: () => Promise<T>): Promise<T> => {
+  const runExclusive = async <T>(operation: string, task: (timing: TimingContext) => Promise<T>): Promise<T> => {
     if (activeOperation !== null) {
       throw createBusyError(activeOperation);
     }
 
     activeOperation = operation;
+    const timing = {
+      operation,
+      operationId: `${new Date().toISOString()}-${operation}-${nextOperationId}`,
+      reporter: timingReporter
+    };
+    nextOperationId += 1;
     try {
-      return await task();
+      return await timingReporter.time(timing, "web.operation", () => task(timing));
     } finally {
       activeOperation = null;
     }
+  };
+
+  const startStartupRefresh = (): void => {
+    if (hasRoutineRefresh || activeOperation !== null) {
+      return;
+    }
+
+    void runExclusive("startup-refresh", async (timing) => {
+      try {
+        await timing.reporter.time(timing, "web.startup_refresh.run", () => runRefreshTask(false));
+      } catch (error) {
+        const message = formatThrownValue(error);
+        consoleFeed.error(`Startup refresh failed: ${message}`);
+        throw error;
+      }
+    }).catch(() => undefined);
   };
 
   const runRefreshTask = async (forceReingest: boolean): Promise<StartupRefreshSummary> => {
@@ -272,21 +299,27 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     return summary;
   };
 
-  const ensureRoutineRefresh = async (): Promise<void> => {
+  const ensureRoutineRefresh = async (timing?: TimingContext): Promise<void> => {
     if (hasRoutineRefresh) {
       return;
     }
     consoleFeed.info("No completed refresh found for this server session; running routine refresh before continuing.");
+    if (timing) {
+      await timing.reporter.time(timing, "web.refresh.ensure", () => runRefreshTask(false));
+      return;
+    }
     await runRefreshTask(false);
   };
 
   return {
     async askAssistant(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true) {
-      return runExclusive("assistant", async () => {
+      return runExclusive("assistant", async (timing) => {
         const standardSession = readStandardSession(sessionId);
         try {
-          await ensureRoutineRefresh();
-          await ensureAssistant(standardSession).ask(prompt, { includePartyContext });
+          await ensureRoutineRefresh(timing);
+          await timing.reporter.time(timing, "web.assistant.ask", () =>
+            ensureAssistant(standardSession).ask(prompt, { includePartyContext, timing })
+          );
         } catch (error) {
           const message = formatThrownValue(error);
           consoleFeed.error(`Assistant response failed: ${message}`);
@@ -301,11 +334,13 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       });
     },
     async generateNpcs(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true) {
-      return runExclusive("npcs", async () => {
+      return runExclusive("npcs", async (timing) => {
         const npcSessionState = readNpcSession(sessionId);
         try {
-          await ensureRoutineRefresh();
-          await ensureNpcSession(npcSessionState).generate(prompt, { includePartyContext });
+          await ensureRoutineRefresh(timing);
+          await timing.reporter.time(timing, "web.npcs.generate", () =>
+            ensureNpcSession(npcSessionState).generate(prompt, { includePartyContext, timing })
+          );
         } catch (error) {
           const message = formatThrownValue(error);
           consoleFeed.error(`NPC generation failed: ${message}`);
@@ -336,8 +371,8 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       };
     },
     async refresh(forceReingest) {
-      return runExclusive(forceReingest ? "force-reingest" : "refresh", async () => {
-        const summary = await runRefreshTask(forceReingest);
+      return runExclusive(forceReingest ? "force-reingest" : "refresh", async (timing) => {
+        const summary = await timing.reporter.time(timing, "web.refresh.run", () => runRefreshTask(forceReingest));
         return {
           ok: true,
           console: consoleFeed.read(),
@@ -347,6 +382,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
         };
       });
     },
+    startStartupRefresh,
     subscribeConsole(listener) {
       return consoleFeed.subscribe(listener);
     },

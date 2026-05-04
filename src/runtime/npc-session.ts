@@ -1,5 +1,6 @@
 import type { ChatAdapter, ChatMessage } from "../provider/index.js";
 import type { RetrievalService } from "../retrieval/index.js";
+import { createNoopTimingReporter, type TimingContext } from "../timing.js";
 import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "../types.js";
 import { readGeneratedNpcState, updateGeneratedNpcState } from "./npc-store.js";
 import {
@@ -29,6 +30,7 @@ export interface NpcGenerationSession {
 
 export interface NpcGenerationOptions {
   includePartyContext?: boolean;
+  timing?: TimingContext;
 }
 
 export interface NpcGenerationAnswer {
@@ -65,25 +67,43 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
       }
 
       const includePartyContext = generationOptions.includePartyContext ?? true;
-      const evidence = await options.retrieval.search({
-        query: normalizedPrompt,
-        limit: MAX_EVIDENCE_RESULTS
-      });
-      const existingNpcs = await readGeneratedNpcState(options.config);
+      const timing = generationOptions.timing ?? {
+        operation: "npcs",
+        operationId: "untracked",
+        reporter: createNoopTimingReporter()
+      };
+      const evidence = await timing.reporter.time(timing, "npcs.retrieval.search", () =>
+        options.retrieval.search({
+          query: normalizedPrompt,
+          timing,
+          limit: MAX_EVIDENCE_RESULTS
+        })
+      );
+      const existingNpcs = await timing.reporter.time(timing, "npcs.state.read", () =>
+        readGeneratedNpcState(options.config)
+      );
       const maxExistingId = readMaxNpcId(existingNpcs);
+      const partyContextText = includePartyContext
+        ? await timing.reporter.time(timing, "npcs.party_context", () => partyContext.build(options.config))
+        : "";
+      const promptAssets = await timing.reporter.time(timing, "npcs.prompt_assets", () => loadPromptAssets());
       const messages = buildNpcGenerationMessages({
         evidence,
         history,
         includePartyContext,
         maxExistingId,
         npcs: existingNpcs,
-        partyContext: includePartyContext ? await partyContext.build(options.config) : "",
+        partyContext: partyContextText,
         prompt: normalizedPrompt,
-        promptAssets: await loadPromptAssets()
+        promptAssets
       });
-      const response = await options.chat.complete(messages);
-      const returnedNpcs = parseNpcGenerationResponse(response, existingNpcs);
-      const savedNpcs = await updateGeneratedNpcState(options.config, returnedNpcs);
+      const response = await timing.reporter.time(timing, "npcs.chat.complete", () => options.chat.complete(messages));
+      const returnedNpcs = await timing.reporter.time(timing, "npcs.response.parse", () =>
+        parseNpcGenerationResponse(response, existingNpcs)
+      );
+      const savedNpcs = await timing.reporter.time(timing, "npcs.state.update", () =>
+        updateGeneratedNpcState(options.config, returnedNpcs)
+      );
 
       const structuredResponse = JSON.stringify({ npcs: returnedNpcs });
       history.push({ role: "user", content: normalizedPrompt }, { role: "assistant", content: structuredResponse });

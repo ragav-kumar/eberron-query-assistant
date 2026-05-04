@@ -2,6 +2,22 @@
 
 This file records intentional high-level changes on top of the frozen Phase 6 historical baseline. Its purpose is to prevent future sessions from mistaking deliberate changes for unintended divergence.
 
+## Request Timing Diagnostics And Mini Default
+
+The default OpenAI chat model is `gpt-5.4-mini` to favor faster routine assistant responses while preserving an override through `OPENAI_CHAT_MODEL`.
+
+Assistant, NPC generation, refresh, retrieval, chat, party-context, state, and transcript-log timing spans are written as JSON lines to `.test-tmp/timing.jsonl`. This diagnostic file is gitignored and exists to make slow local requests analyzable after a run without saving timing data into user transcripts.
+
+Verification added for this change covers the model default and structured timing output for assistant operations.
+
+## Browser-Load Startup Refresh
+
+The local web app starts one routine refresh in the background when the browser first connects to the API. The UI reports `startup-refresh` as the active operation while it runs, streams normal Console output, and prevents overlapping assistant, NPC, refresh, or force-reingest work until startup refresh finishes.
+
+If startup refresh fails, the Console records the failure, active-operation state clears, and the next prompt or manual refresh can retry the same routine refresh path. Force reingest remains explicit-only.
+
+Verification added for this change covers startup refresh status, busy rejection during startup refresh, retry after startup refresh failure, avoiding redundant first-prompt refresh, and client display of startup refresh state.
+
 ## Operation Reconnect Recovery
 
 The browser UI now restores current in-process operation status after a reload or reconnect to the same local Vite server. Runtime artifact directories are excluded from Vite file watching so force reingest writes do not trigger dev-server reloads, and the transient Console feed replays existing in-memory entries before streaming new ones.
@@ -96,7 +112,7 @@ Verification added or preserved for this change covers client-owned mode and new
 
 ## GUI Operation Responsiveness Fixes
 
-The browser UI streams local Console entries while operations are still running, keeps submitted Standard and NPC Generator text visible until a request succeeds, and creates Standard transcript filenames from the assistant-provided session title when available. New Standard transcripts must not use `GUI Session` as a fallback filename; if the assistant title is unavailable, the submitted question is used instead.
+The browser UI streams local Console entries while operations are still running, keeps submitted Standard and NPC Generator text visible until a request succeeds, and creates Standard transcript filenames from assistant-provided title metadata. New Standard transcripts must not use `GUI Session` or the submitted question as fallback filenames; if a session title is omitted but a response title is present, the response title is used, and missing title metadata fails clearly.
 
 Verification added for this change covers streamed console subscriptions, prompt clearing success and failure behavior, assistant-title transcript filenames, and fallback transcript filename behavior.
 

@@ -6,6 +6,7 @@ import Database from "better-sqlite3";
 
 import type { EmbeddingAdapter } from "../provider/index.js";
 import type { ProgressReporter } from "../progress/reporter.js";
+import { createNoopTimingReporter } from "../timing.js";
 import type {
   CitationMetadata,
   RetrievalResult,
@@ -112,10 +113,21 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
     }
 
     const database = openDatabase();
+    const timing = request.timing ?? {
+      operation: "retrieval",
+      operationId: "untracked",
+      reporter: createNoopTimingReporter()
+    };
     try {
-      const lexicalResults = searchLexical(database, request, limit);
-      const semanticResults = await searchVector(database, request, limit, dependencies.embeddingAdapter);
-      return mergeResults(lexicalResults, semanticResults, limit);
+      const lexicalResults = await timing.reporter.time(timing, "retrieval.lexical", () =>
+        searchLexical(database, request, limit)
+      );
+      const semanticResults = await timing.reporter.time(timing, "retrieval.vector", () =>
+        searchVector(database, request, limit, dependencies.embeddingAdapter)
+      );
+      return await timing.reporter.time(timing, "retrieval.merge", () =>
+        mergeResults(lexicalResults, semanticResults, limit)
+      );
     } finally {
       database.close();
     }
@@ -272,41 +284,55 @@ const searchVector = async (
   limit: number,
   embeddingAdapter: EmbeddingAdapter
 ): Promise<RetrievalResult[]> => {
-  const chunks = readAllChunks(database).filter((chunk) => matchesRequestFilters(chunk, request));
+  const timing = request.timing ?? {
+    operation: "retrieval",
+    operationId: "untracked",
+    reporter: createNoopTimingReporter()
+  };
+  const chunks = await timing.reporter.time(timing, "retrieval.vector.read_chunks", () =>
+    readAllChunks(database).filter((chunk) => matchesRequestFilters(chunk, request))
+  );
   if (chunks.length === 0) {
     return [];
   }
 
   const chunkById = new Map(chunks.map((chunk) => [chunk.chunkId, chunk]));
-  const queryEmbedding = await embeddingAdapter.embed(toEmbeddingInput(request.query));
+  const queryEmbedding = await timing.reporter.time(timing, "retrieval.vector.embed_query", () =>
+    embeddingAdapter.embed(toEmbeddingInput(request.query))
+  );
+  const compatibleRows = await timing.reporter.time(timing, "retrieval.vector.read_vectors", () =>
+    readCompatibleVectorRows(database, embeddingAdapter)
+  );
 
-  return readCompatibleVectorRows(database, embeddingAdapter)
-    .map((entry) => {
-      const chunk = chunkById.get(entry.chunkId);
-      if (!chunk || chunk.contentHash !== entry.contentHash) {
-        return null;
-      }
+  return await timing.reporter.time(timing, "retrieval.vector.score_sort", () =>
+    compatibleRows
+      .map((entry) => {
+        const chunk = chunkById.get(entry.chunkId);
+        if (!chunk || chunk.contentHash !== entry.contentHash) {
+          return null;
+        }
 
-      return {
-        chunk,
-        score: cosineSimilarity(queryEmbedding, entry.embedding)
-      };
-    })
-    .filter((entry): entry is { chunk: StoredChunk; score: number } => entry !== null)
-    .filter((entry) => entry.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map(({ chunk, score }) => ({
-      chunkId: chunk.chunkId,
-      sourceId: chunk.sourceId,
-      sourceType: chunk.sourceType,
-      sourceKey: chunk.sourceKey,
-      sourceTitle: chunk.sourceTitle,
-      content: chunk.content,
-      citation: chunk.citation,
-      score,
-      matchKind: "vector"
-    }));
+        return {
+          chunk,
+          score: cosineSimilarity(queryEmbedding, entry.embedding)
+        };
+      })
+      .filter((entry): entry is { chunk: StoredChunk; score: number } => entry !== null)
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+      .map(({ chunk, score }) => ({
+        chunkId: chunk.chunkId,
+        sourceId: chunk.sourceId,
+        sourceType: chunk.sourceType,
+        sourceKey: chunk.sourceKey,
+        sourceTitle: chunk.sourceTitle,
+        content: chunk.content,
+        citation: chunk.citation,
+        score,
+        matchKind: "vector"
+      }))
+  );
 };
 
 const mergeResults = (

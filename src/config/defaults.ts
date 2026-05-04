@@ -34,7 +34,7 @@ export const loadDefaultConfig = (repoRoot = process.cwd()): RuntimeConfig => {
     provider: {
       apiKey: getConfigValue("OPENAI_API_KEY", envFile) ?? null,
       baseUrl: normalizeBaseUrl(getConfigValue("OPENAI_BASE_URL", envFile) ?? "https://api.openai.com/v1"),
-      chatModel: getConfigValue("OPENAI_CHAT_MODEL", envFile) ?? "gpt-5.2",
+      chatModel: getConfigValue("OPENAI_CHAT_MODEL", envFile) ?? "gpt-5.4-mini",
       embeddingModel: getConfigValue("OPENAI_EMBEDDING_MODEL", envFile) ?? "text-embedding-3-small"
     }
   };

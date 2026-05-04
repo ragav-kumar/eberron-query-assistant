@@ -60,7 +60,7 @@ describe("loadDefaultConfig", () => {
       provider: {
         apiKey: process.env.OPENAI_API_KEY ?? null,
         baseUrl: process.env.OPENAI_BASE_URL?.replace(/\/+$/, "") ?? "https://api.openai.com/v1",
-        chatModel: process.env.OPENAI_CHAT_MODEL ?? "gpt-5.2",
+        chatModel: process.env.OPENAI_CHAT_MODEL ?? "gpt-5.4-mini",
         embeddingModel: process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small"
       }
     });
@@ -134,7 +134,7 @@ describe("loadDefaultConfig", () => {
     expect(loadDefaultConfig(TEST_ROOT).provider).toEqual({
       apiKey: null,
       baseUrl: "https://api.openai.com/v1",
-      chatModel: "gpt-5.2",
+      chatModel: "gpt-5.4-mini",
       embeddingModel: "text-embedding-3-small"
     });
     expect(loadDefaultConfig(TEST_ROOT).campaign).toEqual({

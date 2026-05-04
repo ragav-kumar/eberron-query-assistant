@@ -67,6 +67,33 @@ describe("web app API model", () => {
     ]);
   });
 
+  it("writes structured timing spans for assistant operations", async () => {
+    const config = await writeConfig("assistant-timing");
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: {
+        complete: vi.fn().mockResolvedValue(firstAnswer("Timing", "Timing Check", "Timing answer."))
+      }
+    });
+
+    await app.askAssistant("How long does this take?");
+
+    const timingLog = await readFile(path.join(config.repoRoot, ".test-tmp", "timing.jsonl"), "utf8");
+    const entries = timingLog.trim().split(/\r?\n/).map((line) => JSON.parse(line) as { label: string; ok: boolean });
+
+    expect(entries.map((entry) => entry.label)).toEqual(expect.arrayContaining([
+      "web.operation",
+      "web.refresh.ensure",
+      "web.assistant.ask",
+      "assistant.retrieval.search",
+      "assistant.chat.complete",
+      "assistant.log.append_exchange"
+    ]));
+    expect(entries.every((entry) => entry.ok)).toBe(true);
+  });
+
   it("passes included party context into assistant prompts by default", async () => {
     const partyContextBuild = vi.fn().mockResolvedValue("Current party context:\n- Party actors: Peanunt.");
     const chat = vi.fn().mockResolvedValue(firstAnswer("Party", "Party Question", "Party answer."));
@@ -215,6 +242,152 @@ describe("web app API model", () => {
     });
     await pending;
     expect((await app.getStatus()).activeOperation).toBeNull();
+  });
+
+  it("starts routine refresh in the background and reports startup-refresh status", async () => {
+    const config = await writeConfig("startup-refresh");
+    const state = createDefaultRuntimeState();
+    const nextState = createDefaultRuntimeState();
+    let resolveIngest: ((value: {
+      nextState: typeof nextState;
+      summary: {
+        corpusSourceCount: number;
+        degraded: boolean;
+        sourceSummaries: [];
+      };
+    }) => void) | undefined;
+    const ingest = vi.fn().mockReturnValue(new Promise((resolve) => {
+      resolveIngest = resolve;
+    }));
+    const app = createWebApp({
+      config,
+      discovery: {
+        inspectSources: vi.fn().mockResolvedValue({
+          degraded: false,
+          nextState,
+          inventories: []
+        })
+      },
+      ingestion: { ingest },
+      retrieval: mockRetrieval([]).retrieval,
+      stateStore: {
+        load: vi.fn().mockResolvedValue({ state }),
+        save: vi.fn().mockResolvedValue(undefined)
+      },
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+
+    app.startStartupRefresh();
+    await vi.waitFor(() => {
+      expect(ingest).toHaveBeenCalled();
+    });
+
+    expect((await app.getStatus()).activeOperation).toBe("startup-refresh");
+    await expect(app.askAssistant("What about Aerenal?")).rejects.toSatisfy(isBusyError);
+    await expect(app.refresh(false)).rejects.toSatisfy(isBusyError);
+
+    resolveIngest?.({
+      nextState,
+      summary: {
+        corpusSourceCount: 1,
+        degraded: false,
+        sourceSummaries: []
+      }
+    });
+    await vi.waitFor(async () => {
+      expect((await app.getStatus()).activeOperation).toBeNull();
+    });
+  });
+
+  it("does not run routine refresh again on the first prompt after startup refresh completes", async () => {
+    const config = await writeConfig("startup-refresh-before-prompt");
+    const state = createDefaultRuntimeState();
+    const nextState = createDefaultRuntimeState();
+    const refresh = vi.fn().mockResolvedValue({ chunkCount: 1, reusedEmbeddings: 1, regeneratedEmbeddings: 0 });
+    const chat = vi.fn().mockResolvedValue(firstAnswer("Aerenal", "Aerenal Question", "Aerenal answer."));
+    const app = createWebApp({
+      config,
+      discovery: {
+        inspectSources: vi.fn().mockResolvedValue({
+          degraded: false,
+          nextState,
+          inventories: []
+        })
+      },
+      ingestion: {
+        ingest: vi.fn().mockResolvedValue({
+          nextState,
+          summary: {
+            corpusSourceCount: 1,
+            degraded: false,
+            sourceSummaries: []
+          }
+        })
+      },
+      retrieval: {
+        refresh,
+        search: vi.fn().mockResolvedValue([result()])
+      },
+      stateStore: {
+        load: vi.fn().mockResolvedValue({ state }),
+        save: vi.fn().mockResolvedValue(undefined)
+      },
+      chat: { complete: chat }
+    });
+
+    app.startStartupRefresh();
+    await vi.waitFor(async () => {
+      expect((await app.getStatus()).activeOperation).toBeNull();
+    });
+    const response = await app.askAssistant("What about Aerenal?");
+
+    expect(refresh).toHaveBeenCalledTimes(1);
+    expect(response.log.exchanges[0]?.assistant).toBe("Aerenal answer.");
+  });
+
+  it("logs startup refresh failures and lets later prompts retry refresh", async () => {
+    const config = await writeConfig("startup-refresh-failure");
+    const state = createDefaultRuntimeState();
+    const nextState = createDefaultRuntimeState();
+    const inspectSources = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("inventory failed"))
+      .mockResolvedValueOnce({
+        degraded: false,
+        nextState,
+        inventories: []
+      });
+    const app = createWebApp({
+      config,
+      discovery: { inspectSources },
+      ingestion: {
+        ingest: vi.fn().mockResolvedValue({
+          nextState,
+          summary: {
+            corpusSourceCount: 1,
+            degraded: false,
+            sourceSummaries: []
+          }
+        })
+      },
+      retrieval: mockRetrieval([result()]).retrieval,
+      stateStore: {
+        load: vi.fn().mockResolvedValue({ state }),
+        save: vi.fn().mockResolvedValue(undefined)
+      },
+      chat: { complete: vi.fn().mockResolvedValue(firstAnswer("Retry", "Retry Question", "Retry answer.")) }
+    });
+
+    app.startStartupRefresh();
+    await vi.waitFor(async () => {
+      const status = await app.getStatus();
+      expect(status.activeOperation).toBeNull();
+      expect(status.console.entries.some((entry) => entry.message.includes("Startup refresh failed: inventory failed"))).toBe(true);
+    });
+    const response = await app.askAssistant("Can this retry?");
+
+    expect(inspectSources).toHaveBeenCalledTimes(2);
+    expect(response.log.exchanges[0]?.assistant).toBe("Retry answer.");
   });
 
   it("replays existing console entries to new subscribers before streaming new ones", async () => {
@@ -516,9 +689,37 @@ describe("web app API model", () => {
     expect(secondMessages?.[0]?.content).toContain("<response-title>");
   });
 
-  it("falls back to the submitted question when the first response has no session title", async () => {
+  it("uses assistant response title for the transcript filename when session title is omitted", async () => {
     const app = createWebApp({
-      config: await writeConfig("fallback-title"),
+      config: await writeConfig("response-title-filename"),
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: {
+        complete: vi.fn().mockResolvedValue([
+          "<response-title>Mournland Overview</response-title>",
+          "<answer>",
+          "Plain answer.",
+          "</answer>"
+        ].join("\n"))
+      }
+    });
+
+    const response = await app.askAssistant("What about the Mournland?");
+
+    expect(path.basename(response.log.filePath ?? "")).toContain("Mournland Overview");
+    expect(path.basename(response.log.filePath ?? "")).not.toContain("What about the Mournland");
+    expect(path.basename(response.log.filePath ?? "")).not.toContain("GUI Session");
+    expect(response.log.exchanges[0]).toEqual({
+      user: "What about the Mournland?",
+      title: "Mournland Overview",
+      assistant: "Plain answer."
+    });
+  });
+
+  it("rejects assistant responses without title metadata instead of using the prompt as a filename", async () => {
+    const config = await writeConfig("missing-title");
+    const app = createWebApp({
+      config,
       ...mockRefreshDependencies(),
       retrieval: mockRetrieval([result()]).retrieval,
       chat: {
@@ -526,15 +727,58 @@ describe("web app API model", () => {
       }
     });
 
-    const response = await app.askAssistant("What about the Mournland?");
-
-    expect(path.basename(response.log.filePath ?? "")).toContain("What about the Mournland");
-    expect(path.basename(response.log.filePath ?? "")).not.toContain("GUI Session");
-    expect(response.log.exchanges[0]).toEqual({
-      user: "What about the Mournland?",
-      title: "What about the Mournland?",
-      assistant: "Plain answer."
+    await expect(app.askAssistant("What about the Mournland?")).rejects.toMatchObject({
+      message: "Assistant response did not include required title metadata."
     });
+    await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("repairs missing second-response title metadata through the assistant", async () => {
+    const chat = vi
+      .fn()
+      .mockResolvedValueOnce(firstAnswer("Spark Crafting", "Crafting Setup", "First answer."))
+      .mockResolvedValueOnce("Second answer without tags.")
+      .mockResolvedValueOnce([
+        "<response-title>Crafting Materials</response-title>",
+        "<answer>",
+        "Second answer without tags.",
+        "</answer>"
+      ].join("\n"));
+    const app = createWebApp({
+      config: await writeConfig("second-title-repair"),
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: chat }
+    });
+
+    await app.askAssistant("Set up Spark crafting.");
+    const response = await app.askAssistant("What materials should be available?");
+
+    expect(chat).toHaveBeenCalledTimes(3);
+    expect(response.log.exchanges[1]).toEqual({
+      user: "What materials should be available?",
+      title: "Crafting Materials",
+      assistant: "Second answer without tags."
+    });
+  });
+
+  it("caps long assistant-provided transcript filenames", async () => {
+    const longTitle = "Spark crafting materials and faster downtime rules for a chronically underfunded artificer party";
+    const app = createWebApp({
+      config: await writeConfig("long-assistant-title"),
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: {
+        complete: vi.fn().mockResolvedValue(firstAnswer(longTitle, longTitle, "Crafting answer."))
+      }
+    });
+
+    const response = await app.askAssistant("I want setup a smoother crafting system for Spark.");
+    const filename = path.basename(response.log.filePath ?? "");
+
+    expect(filename).toContain("Spark crafting materials");
+    expect(filename).not.toContain("I want setup");
+    expect(filename.length).toBeLessThanOrEqual(100);
   });
 
   it("generates NPC cards, writes generated NPC state, and keeps transcript logs separate", async () => {

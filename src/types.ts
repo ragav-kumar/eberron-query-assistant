@@ -1,3 +1,5 @@
+import type { TimingContext } from "./timing.js";
+
 export interface RuntimeOptions {
   forceReingest: boolean;
   retrievalQuery: string | null;
@@ -97,6 +99,7 @@ export interface RetrievalSearchRequest {
   query: string;
   sourceTypes?: SourceType[];
   sourceKeys?: string[];
+  timing?: TimingContext;
   limit?: number;
 }
 

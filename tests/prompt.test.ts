@@ -220,7 +220,17 @@ describe("NPC generator prompt assembly", () => {
 describe("assistant prompt shell", () => {
   it("retrieves evidence and calls chat for user questions", async () => {
     const retrievalFixture = mockRetrieval([result("pdf", "eberron.pdf", "Eberron Rising", "page 4")]);
-    const complete = vi.fn().mockResolvedValue("Aerenal answer.\nReferences: Eberron Rising, page 4");
+    const complete = vi
+      .fn()
+      .mockResolvedValueOnce("Aerenal answer.\nReferences: Eberron Rising, page 4")
+      .mockResolvedValueOnce([
+        "<session-title>Aerenal</session-title>",
+        "<response-title>Aerenal Answer</response-title>",
+        "<answer>",
+        "Aerenal answer.",
+        "References: Eberron Rising, page 4",
+        "</answer>"
+      ].join("\n"));
     const chat: ChatAdapter = {
       complete
     };
@@ -239,7 +249,7 @@ describe("assistant prompt shell", () => {
       query: "What about Aerenal?",
       limit: 8
     });
-    expect(complete).toHaveBeenCalledOnce();
+    expect(complete).toHaveBeenCalledTimes(2);
     expect(output.text()).toContain("Aerenal answer.");
     expect(output.text()).toContain("\nAerenal answer.\nReferences: Eberron Rising, page 4\n\n");
   });
@@ -326,22 +336,66 @@ describe("assistant prompt shell", () => {
     ]);
   });
 
-  it("falls back to a sanitized first-question title when title metadata is missing", async () => {
-    const logDir = path.join(TEST_ROOT, "logs-fallback");
+  it("does not create a session transcript when title metadata is missing", async () => {
+    const logDir = path.join(TEST_ROOT, "logs-missing-title");
+    const reporter = createMemoryProgressReporter();
 
     await createAssistantPromptShell({
-      ...promptShellConfig(await writeAssistantFiles("logs-fallback")),
+      ...promptShellConfig(await writeAssistantFiles("logs-missing-title")),
       chat: { complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("Plain answer.") },
       input: Readable.from(["What/about:Aerenal?\nexit\n"]),
       logDir,
       output: createWritableCapture(),
+      reporter,
+      retrieval: mockRetrieval([]).retrieval
+    }).start();
+
+    await expect(readdir(logDir)).rejects.toMatchObject({ code: "ENOENT" });
+    expect(reporter.warnings).toContain(
+      "Session log update failed: Assistant response did not include required title metadata."
+    );
+  });
+
+  it("repairs missing title metadata before appending a later transcript exchange", async () => {
+    const logDir = path.join(TEST_ROOT, "logs-title-repair");
+    const input = new PassThrough();
+    const complete = vi
+      .fn<ChatAdapter["complete"]>()
+      .mockResolvedValueOnce("<session-title>Crafting</session-title>\n<response-title>Setup</response-title>\n<answer>\nFirst answer.\n</answer>")
+      .mockResolvedValueOnce("Second answer without tags.")
+      .mockResolvedValueOnce("<response-title>Materials</response-title>\n<answer>\nSecond answer without tags.\n</answer>");
+    const output = createWritableCapture();
+
+    const prompt = createAssistantPromptShell({
+      ...promptShellConfig(await writeAssistantFiles("logs-title-repair")),
+      chat: { complete },
+      input,
+      logDir,
+      output,
       reporter: createMemoryProgressReporter(),
       retrieval: mockRetrieval([]).retrieval
     }).start();
 
+    input.write("First question\n");
+    await waitForCallCount(complete, 1);
+    await waitForPromptCount(output, 2);
+    input.write("Second question\n");
+    await waitForCallCount(complete, 3);
+    await waitForPromptCount(output, 3);
+    input.write("exit\n");
+    await prompt;
+
     const filenames = await readdir(logDir);
-    expect(filenames).toHaveLength(1);
-    expect(filenames[0]).toMatch(/^\d{14} What about Aerenal\.json$/);
+    const log = JSON.parse(await readFile(path.join(logDir, filenames[0] ?? ""), "utf8")) as Array<{
+      assistant: string;
+      title: string;
+      user: string;
+    }>;
+    expect(log[1]).toEqual({
+      user: "Second question",
+      title: "Materials",
+      assistant: "Second answer without tags."
+    });
   });
 
   it("does not create an empty session transcript when the user exits before a response", async () => {

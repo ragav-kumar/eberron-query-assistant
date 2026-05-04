@@ -25,6 +25,7 @@ export interface SessionLogFile {
 }
 
 const FALLBACK_TITLE = "Untitled Session";
+const MAX_SESSION_TITLE_LENGTH = 80;
 const TIMESTAMPED_LOG_FILENAME_PATTERN = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s+(.+)$/;
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -77,7 +78,10 @@ export const sanitizeSessionTitle = (title: string): string => {
     .trim()
     .replace(/^[\s.()[\]{}_-]+|[\s.()[\]{}_-]+$/g, "");
 
-  return sanitized.length > 0 ? sanitized : FALLBACK_TITLE;
+  const normalizedTitle = sanitized.length > 0 ? sanitized : FALLBACK_TITLE;
+  return normalizedTitle.length <= MAX_SESSION_TITLE_LENGTH
+    ? normalizedTitle
+    : normalizedTitle.slice(0, MAX_SESSION_TITLE_LENGTH).trimEnd();
 };
 
 export const listSessionLogFiles = async (
