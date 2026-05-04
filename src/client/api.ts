@@ -49,11 +49,32 @@ export interface ApiConsole {
   entries: ApiConsoleEntry[];
 }
 
+export interface ApiProviderDebugEntry {
+  assistantContent?: string;
+  endpoint: string;
+  error?: string;
+  ok: boolean;
+  operation: string;
+  operationId: string;
+  purpose: string;
+  requestBody: {
+    messages: Array<{
+      content: string;
+      role: "assistant" | "system" | "user";
+    }>;
+    model: string;
+  };
+  responseBody?: unknown;
+  status?: number;
+  timestamp: string;
+}
+
 export interface ApiOperationResult {
   console: ApiConsole;
   log: ApiLog;
   npcs: ApiNpcResponse;
   ok: true;
+  providerDebug?: ApiProviderDebugEntry[];
 }
 
 export interface ApiStatus {
@@ -154,6 +175,10 @@ const requestJson = async <T>(url: string, init: RequestInit = {}): Promise<T> =
     if (console) {
       error.console = console;
     }
+    const providerDebug = readProviderDebug(body);
+    if (providerDebug) {
+      error.providerDebug = providerDebug;
+    }
     throw error;
   }
 
@@ -162,6 +187,7 @@ const requestJson = async <T>(url: string, init: RequestInit = {}): Promise<T> =
 
 export interface ApiRequestError extends Error {
   console?: ApiConsole;
+  providerDebug?: ApiProviderDebugEntry[];
 }
 
 export const isApiRequestError = (error: unknown): error is ApiRequestError => {
@@ -192,6 +218,19 @@ const readErrorConsole = (body: unknown): ApiConsole | undefined => {
     Array.isArray(body.console.entries)
   ) {
     return body.console as ApiConsole;
+  }
+
+  return undefined;
+};
+
+const readProviderDebug = (body: unknown): ApiProviderDebugEntry[] | undefined => {
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "providerDebug" in body &&
+    Array.isArray(body.providerDebug)
+  ) {
+    return body.providerDebug as ApiProviderDebugEntry[];
   }
 
   return undefined;

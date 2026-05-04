@@ -10,6 +10,14 @@ Assistant, NPC generation, refresh, retrieval, chat, party-context, state, and t
 
 Verification added for this change covers the model default and structured timing output for assistant operations.
 
+## Opt-In Provider Debug Console
+
+Setting `EQA_PROVIDER_DEBUG=true` enables local raw chat diagnostics for Standard assistant and NPC Generator provider calls. When enabled, each completed chat call returns its raw provider request body, raw JSON response body when available, extracted assistant content, status, endpoint, and operation metadata to the browser, which prints the entry with `console.debug("[EQA provider debug]", entry)`.
+
+This diagnostic path is off by default because request bodies can include full prompt context, retrieved evidence, and local assistant notes. It never includes authorization headers or API keys, is not saved to transcript logs, is not written to `.test-tmp/` or `.eberron-query-assistant/`, and is not replayed through status recovery.
+
+Verification added for this change covers the config flag, provider diagnostic capture, disabled-by-default server responses, enabled assistant and NPC operation diagnostics, and browser console printing.
+
 ## Retrieval Vector Cache
 
 Compatible SQLite vector rows are cached in memory per retrieval service instance after successful refresh or first search load. Subsequent searches with the same corpus database path, embedding model, and embedding schema reuse the parsed vectors instead of reading and JSON-parsing every compatible vector row from SQLite.

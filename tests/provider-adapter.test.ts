@@ -11,6 +11,7 @@ const config: ProviderConfig = {
   apiKey: "sk-test-secret",
   baseUrl: "https://provider.example/v1",
   chatModel: "gpt-test-chat",
+  debug: false,
   embeddingModel: "text-embedding-test"
 };
 
@@ -47,6 +48,72 @@ describe("OpenAI-compatible provider adapters", () => {
         messages
       })
     );
+  });
+
+  it("captures successful chat diagnostics only when provider debug is enabled", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        choices: [
+          {
+            message: {
+              content: "Debug answer."
+            }
+          }
+        ]
+      })
+    );
+    const onDiagnostic = vi.fn();
+    const messages: ChatMessage[] = [{ role: "user", content: "Debug this." }];
+
+    await expect(createOpenAiChatAdapter({ ...config, debug: true }, { fetchImpl }).complete(messages, {
+      debug: {
+        operation: "assistant",
+        operationId: "operation-1",
+        purpose: "assistant"
+      },
+      onDiagnostic
+    })).resolves.toBe("Debug answer.");
+
+    expect(onDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
+      assistantContent: "Debug answer.",
+      endpoint: "https://provider.example/v1/chat/completions",
+      ok: true,
+      operation: "assistant",
+      operationId: "operation-1",
+      purpose: "assistant",
+      requestBody: {
+        model: "gpt-test-chat",
+        messages
+      },
+      status: 200
+    }));
+    expect(JSON.stringify(onDiagnostic.mock.calls[0]?.[0])).not.toContain("sk-test-secret");
+  });
+
+  it("does not capture chat diagnostics when provider debug is disabled", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        choices: [
+          {
+            message: {
+              content: "Debug answer."
+            }
+          }
+        ]
+      })
+    );
+    const onDiagnostic = vi.fn();
+
+    await createOpenAiChatAdapter(config, { fetchImpl }).complete([{ role: "user", content: "Debug this." }], {
+      debug: {
+        operation: "assistant",
+        operationId: "operation-1",
+        purpose: "assistant"
+      },
+      onDiagnostic
+    });
+
+    expect(onDiagnostic).not.toHaveBeenCalled();
   });
 
   it("returns embedding vectors from the embeddings endpoint", async () => {
@@ -205,6 +272,43 @@ describe("OpenAI-compatible provider adapters", () => {
     await failure.catch((error: unknown) => {
       expect(JSON.stringify(error)).not.toContain("sk-test-secret");
     });
+  });
+
+  it("captures failed chat diagnostics without leaking request secrets", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse(
+        {
+          error: {
+            message: "model unavailable"
+          }
+        },
+        400
+      )
+    );
+    const onDiagnostic = vi.fn();
+
+    await expect(createOpenAiChatAdapter({ ...config, debug: true }, { fetchImpl }).complete([], {
+      debug: {
+        operation: "assistant",
+        operationId: "operation-2",
+        purpose: "assistant"
+      },
+      onDiagnostic
+    })).rejects.toMatchObject({
+      message: "Chat completion failed: model unavailable"
+    });
+
+    expect(onDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
+      error: "Chat completion failed: model unavailable",
+      ok: false,
+      responseBody: {
+        error: {
+          message: "model unavailable"
+        }
+      },
+      status: 400
+    }));
+    expect(JSON.stringify(onDiagnostic.mock.calls[0]?.[0])).not.toContain("sk-test-secret");
   });
 });
 

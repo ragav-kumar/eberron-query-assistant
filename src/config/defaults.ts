@@ -35,6 +35,7 @@ export const loadDefaultConfig = (repoRoot = process.cwd()): RuntimeConfig => {
       apiKey: getConfigValue("OPENAI_API_KEY", envFile) ?? null,
       baseUrl: normalizeBaseUrl(getConfigValue("OPENAI_BASE_URL", envFile) ?? "https://api.openai.com/v1"),
       chatModel: getConfigValue("OPENAI_CHAT_MODEL", envFile) ?? "gpt-5.4-mini",
+      debug: parseBoolean(getConfigValue("EQA_PROVIDER_DEBUG", envFile)),
       embeddingModel: getConfigValue("OPENAI_EMBEDDING_MODEL", envFile) ?? "text-embedding-3-small"
     }
   };
@@ -93,6 +94,10 @@ const parseCommaSeparatedList = (value: string | undefined): string[] => {
     .split(",")
     .map((item) => item.trim())
     .filter((item) => item.length > 0);
+};
+
+const parseBoolean = (value: string | undefined): boolean => {
+  return value?.toLowerCase() === "true";
 };
 
 const normalizeBaseUrl = (value: string): string => {

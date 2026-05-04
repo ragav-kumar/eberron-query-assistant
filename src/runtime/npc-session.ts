@@ -1,4 +1,4 @@
-import type { ChatAdapter, ChatMessage } from "../provider/index.js";
+import type { ChatAdapter, ChatCompletionDiagnostic, ChatMessage } from "../provider/index.js";
 import type { RetrievalService } from "../retrieval/index.js";
 import { createNoopTimingReporter, type TimingContext } from "../timing.js";
 import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "../types.js";
@@ -30,6 +30,7 @@ export interface NpcGenerationSession {
 
 export interface NpcGenerationOptions {
   includePartyContext?: boolean;
+  onProviderDiagnostic?: (diagnostic: ChatCompletionDiagnostic) => void;
   timing?: TimingContext;
 }
 
@@ -97,7 +98,14 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
         prompt: normalizedPrompt,
         promptAssets
       });
-      const response = await timing.reporter.time(timing, "npcs.chat.complete", () => options.chat.complete(messages));
+      const response = await timing.reporter.time(timing, "npcs.chat.complete", () => options.chat.complete(messages, {
+        debug: {
+          operation: timing.operation,
+          operationId: timing.operationId,
+          purpose: "npcs"
+        },
+        onDiagnostic: generationOptions.onProviderDiagnostic
+      }));
       const returnedNpcs = await timing.reporter.time(timing, "npcs.response.parse", () =>
         parseNpcGenerationResponse(response, existingNpcs)
       );

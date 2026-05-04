@@ -30,7 +30,10 @@ export const eberronApiPlugin = (): Plugin => {
             writeJson(response, isBusyError(error) ? 409 : 500, {
               error: formatThrownValue(error),
               ...(isBusyError(error) ? { operation: error.operation } : {}),
-              ...(isWebOperationError(error) ? { console: error.console } : {})
+              ...(isWebOperationError(error) ? {
+                console: error.console,
+                ...(error.providerDebug ? { providerDebug: error.providerDebug } : {})
+              } : {})
             });
           });
       });

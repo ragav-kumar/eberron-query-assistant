@@ -39,6 +39,7 @@ export interface ProviderConfig {
   apiKey: string | null;
   baseUrl: string;
   chatModel: string;
+  debug: boolean;
   embeddingModel: string;
 }
 

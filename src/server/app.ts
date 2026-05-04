@@ -4,7 +4,12 @@ import path from "node:path";
 import { loadDefaultConfig } from "../config/index.js";
 import { formatThrownValue, hasErrorCode } from "../errors.js";
 import { createFilesystemIngestionService, createSqliteCorpusStore, type IngestionService } from "../ingestion/index.js";
-import { createOpenAiChatAdapter, createOpenAiEmbeddingAdapter, type ChatAdapter } from "../provider/index.js";
+import {
+  createOpenAiChatAdapter,
+  createOpenAiEmbeddingAdapter,
+  type ChatAdapter,
+  type ChatCompletionDiagnostic
+} from "../provider/index.js";
 import type { ProgressReporter } from "../progress/reporter.js";
 import { createSqliteRetrievalService, type RetrievalService } from "../retrieval/index.js";
 import { createAssistantSession, type AssistantSession, type AssistantSessionLogExchange } from "../runtime/assistant-session.js";
@@ -83,6 +88,7 @@ export interface WebOperationResult {
   log: WebLogResponse;
   npcs: WebNpcResponse;
   ok: true;
+  providerDebug?: ChatCompletionDiagnostic[];
   summary?: StartupRefreshSummary;
 }
 
@@ -316,42 +322,54 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     async askAssistant(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true) {
       return runExclusive("assistant", async (timing) => {
         const standardSession = readStandardSession(sessionId);
+        const providerDebug = createProviderDebugCollector(config);
         try {
           await ensureRoutineRefresh(timing);
           await timing.reporter.time(timing, "web.assistant.ask", () =>
-            ensureAssistant(standardSession).ask(prompt, { includePartyContext, timing })
+            ensureAssistant(standardSession).ask(prompt, {
+              includePartyContext,
+              onProviderDiagnostic: providerDebug.collect,
+              timing
+            })
           );
         } catch (error) {
           const message = formatThrownValue(error);
           consoleFeed.error(`Assistant response failed: ${message}`);
-          throw createWebOperationError(message, consoleFeed.read());
+          throw createWebOperationError(message, consoleFeed.read(), providerDebug.entries);
         }
         return {
           ok: true,
           console: consoleFeed.read(),
           log: await readLog({ sessionId }),
-          npcs: await readNpcs()
+          npcs: await readNpcs(),
+          providerDebug: providerDebug.entries
         };
       });
     },
     async generateNpcs(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true) {
       return runExclusive("npcs", async (timing) => {
         const npcSessionState = readNpcSession(sessionId);
+        const providerDebug = createProviderDebugCollector(config);
         try {
           await ensureRoutineRefresh(timing);
           await timing.reporter.time(timing, "web.npcs.generate", () =>
-            ensureNpcSession(npcSessionState).generate(prompt, { includePartyContext, timing })
+            ensureNpcSession(npcSessionState).generate(prompt, {
+              includePartyContext,
+              onProviderDiagnostic: providerDebug.collect,
+              timing
+            })
           );
         } catch (error) {
           const message = formatThrownValue(error);
           consoleFeed.error(`NPC generation failed: ${message}`);
-          throw createWebOperationError(message, consoleFeed.read());
+          throw createWebOperationError(message, consoleFeed.read(), providerDebug.entries);
         }
         return {
           ok: true,
           console: consoleFeed.read(),
           log: emptyLogResponse(await listSessionLogFiles(config.logDir, null)),
-          npcs: await readNpcs(sessionId)
+          npcs: await readNpcs(sessionId),
+          providerDebug: providerDebug.entries
         };
       });
     },
@@ -404,6 +422,7 @@ export interface WebOperationError {
   console: WebConsoleResponse;
   kind: "web-operation";
   message: string;
+  providerDebug?: ChatCompletionDiagnostic[];
 }
 
 export const isBusyError = (error: unknown): error is BusyError => {
@@ -434,11 +453,32 @@ export const isWebOperationError = (error: unknown): error is WebOperationError 
   );
 };
 
-const createWebOperationError = (message: string, console: WebConsoleResponse): WebOperationError => ({
+const createWebOperationError = (
+  message: string,
+  console: WebConsoleResponse,
+  providerDebug: ChatCompletionDiagnostic[] = []
+): WebOperationError => ({
   console,
   kind: "web-operation",
-  message
+  message,
+  ...(providerDebug.length > 0 ? { providerDebug } : {})
 });
+
+const createProviderDebugCollector = (config: RuntimeConfig): {
+  collect: (diagnostic: ChatCompletionDiagnostic) => void;
+  entries: ChatCompletionDiagnostic[];
+} => {
+  const entries: ChatCompletionDiagnostic[] = [];
+
+  return {
+    collect(diagnostic) {
+      if (config.provider.debug) {
+        entries.push(diagnostic);
+      }
+    },
+    entries
+  };
+};
 
 const normalizeSessionId = (sessionId: string): string => {
   const normalized = sessionId.trim();

@@ -9,6 +9,7 @@ const TEST_ROOT = path.resolve(".test-tmp", "config");
 const ENV_KEYS = [
   "EQA_CAMPAIGN_JOURNAL_FOLDER",
   "EQA_PARTY_ACTOR_UUIDS",
+  "EQA_PROVIDER_DEBUG",
   "EQA_QUESTS_JOURNAL",
   "EQA_SESSION_NOTES_JOURNAL",
   "OPENAI_API_KEY",
@@ -61,6 +62,7 @@ describe("loadDefaultConfig", () => {
         apiKey: process.env.OPENAI_API_KEY ?? null,
         baseUrl: process.env.OPENAI_BASE_URL?.replace(/\/+$/, "") ?? "https://api.openai.com/v1",
         chatModel: process.env.OPENAI_CHAT_MODEL ?? "gpt-5.4-mini",
+        debug: process.env.EQA_PROVIDER_DEBUG === "true",
         embeddingModel: process.env.OPENAI_EMBEDDING_MODEL ?? "text-embedding-3-small"
       }
     });
@@ -79,6 +81,7 @@ describe("loadDefaultConfig", () => {
         "OPENAI_BASE_URL=https://provider.example/v1/",
         "OPENAI_CHAT_MODEL=gpt-test-chat",
         "OPENAI_EMBEDDING_MODEL=gpt-test-embedding",
+        "EQA_PROVIDER_DEBUG=true",
         "EQA_PARTY_ACTOR_UUIDS=Actor.a, Actor.b,, Actor.c",
         "EQA_SESSION_NOTES_JOURNAL=Minutes",
         "EQA_QUESTS_JOURNAL=Leads",
@@ -91,6 +94,7 @@ describe("loadDefaultConfig", () => {
       apiKey: "sk-test-value",
       baseUrl: "https://provider.example/v1",
       chatModel: "gpt-test-chat",
+      debug: true,
       embeddingModel: "gpt-test-embedding"
     });
     expect(loadDefaultConfig(TEST_ROOT).campaign).toEqual({
@@ -121,6 +125,7 @@ describe("loadDefaultConfig", () => {
       apiKey: "sk-process",
       baseUrl: "https://env-file.example/v1",
       chatModel: "process-chat",
+      debug: false,
       embeddingModel: "env-file-embedding"
     });
     expect(loadDefaultConfig(TEST_ROOT).campaign.partyActorUuids).toEqual(["Actor.process"]);
@@ -135,6 +140,7 @@ describe("loadDefaultConfig", () => {
       apiKey: null,
       baseUrl: "https://api.openai.com/v1",
       chatModel: "gpt-5.4-mini",
+      debug: false,
       embeddingModel: "text-embedding-3-small"
     });
     expect(loadDefaultConfig(TEST_ROOT).campaign).toEqual({

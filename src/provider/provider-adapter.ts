@@ -10,8 +10,36 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface ChatCompletionDebugContext {
+  operation: string;
+  operationId: string;
+  purpose: string;
+}
+
+export interface ChatCompletionDiagnostic {
+  assistantContent?: string;
+  endpoint: string;
+  error?: string;
+  ok: boolean;
+  operation: string;
+  operationId: string;
+  purpose: string;
+  requestBody: {
+    messages: ChatMessage[];
+    model: string;
+  };
+  responseBody?: unknown;
+  status?: number;
+  timestamp: string;
+}
+
+export interface ChatCompletionOptions {
+  debug?: ChatCompletionDebugContext;
+  onDiagnostic?: ((diagnostic: ChatCompletionDiagnostic) => void) | undefined;
+}
+
 export interface ChatAdapter {
-  complete(messages: ChatMessage[]): Promise<string>;
+  complete(messages: ChatMessage[], options?: ChatCompletionOptions): Promise<string>;
 }
 
 export interface EmbeddingAdapter {
@@ -37,26 +65,61 @@ export const createOpenAiChatAdapter = (
   const fetchImpl = options.fetchImpl ?? fetch;
 
   return {
-    async complete(messages) {
-      const response = await fetchImpl(`${provider.baseUrl}/chat/completions`, {
+    async complete(messages, completionOptions = {}) {
+      const endpoint = `${provider.baseUrl}/chat/completions`;
+      const requestBody = {
+        model: config.chatModel,
+        messages
+      };
+      const emitDiagnostic = (diagnostic: Omit<ChatCompletionDiagnostic, "endpoint" | "operation" | "operationId" | "purpose" | "requestBody" | "timestamp">): void => {
+        if (!config.debug || !completionOptions.debug || !completionOptions.onDiagnostic) {
+          return;
+        }
+
+        completionOptions.onDiagnostic({
+          ...completionOptions.debug,
+          ...diagnostic,
+          endpoint,
+          requestBody,
+          timestamp: new Date().toISOString()
+        });
+      };
+
+      const response = await fetchImpl(endpoint, {
         method: "POST",
         headers: provider.headers,
-        body: JSON.stringify({
-          model: config.chatModel,
-          messages
-        })
+        body: JSON.stringify(requestBody)
       });
 
       const body = await readJsonResponse(response);
       if (!response.ok) {
-        throw createTaggedError("provider-chat-failed", formatProviderError("Chat completion failed", body));
+        const message = formatProviderError("Chat completion failed", body);
+        emitDiagnostic({
+          error: message,
+          ok: false,
+          responseBody: body,
+          status: response.status
+        });
+        throw createTaggedError("provider-chat-failed", message);
       }
 
       const content = readChatCompletionContent(body);
       if (!content) {
+        emitDiagnostic({
+          error: "Chat completion response did not include assistant content.",
+          ok: false,
+          responseBody: body,
+          status: response.status
+        });
         throw createTaggedError("provider-chat-empty", "Chat completion response did not include assistant content.");
       }
 
+      emitDiagnostic({
+        assistantContent: content,
+        ok: true,
+        responseBody: body,
+        status: response.status
+      });
       return content;
     }
   };

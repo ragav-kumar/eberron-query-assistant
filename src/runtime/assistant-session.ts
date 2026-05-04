@@ -1,4 +1,4 @@
-import type { ChatAdapter, ChatMessage } from "../provider/index.js";
+import type { ChatAdapter, ChatCompletionDiagnostic, ChatMessage } from "../provider/index.js";
 import type { RetrievalService } from "../retrieval/index.js";
 import { createNoopTimingReporter, type TimingContext } from "../timing.js";
 import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "../types.js";
@@ -21,6 +21,7 @@ export interface AssistantSessionAnswer {
 
 export interface AssistantAskOptions {
   includePartyContext?: boolean;
+  onProviderDiagnostic?: (diagnostic: ChatCompletionDiagnostic) => void;
   timing?: TimingContext;
 }
 
@@ -84,14 +85,28 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
         question: normalizedQuestion,
         requestSessionTitle: shouldRequestSessionTitle
       });
-      const response = await timing.reporter.time(timing, "assistant.chat.complete", () => options.chat.complete(messages));
+      const response = await timing.reporter.time(timing, "assistant.chat.complete", () => options.chat.complete(messages, {
+        debug: {
+          operation: timing.operation,
+          operationId: timing.operationId,
+          purpose: "assistant"
+        },
+        onDiagnostic: askOptions.onProviderDiagnostic
+      }));
       const parsedResponse = parseAssistantResponse(response, shouldRequestSessionTitle) ??
         await timing.reporter.time(timing, "assistant.chat.repair_metadata", async () => {
           const repairedResponse = await options.chat.complete([
             ...messages,
             { role: "assistant", content: response },
             { role: "user", content: buildMetadataRepairPrompt(shouldRequestSessionTitle) }
-          ]);
+          ], {
+            debug: {
+              operation: timing.operation,
+              operationId: timing.operationId,
+              purpose: "assistant-metadata-repair"
+            },
+            onDiagnostic: askOptions.onProviderDiagnostic
+          });
           return parseAssistantResponse(repairedResponse, shouldRequestSessionTitle);
         });
       if (!parsedResponse) {

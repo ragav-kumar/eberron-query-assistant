@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
-import type { ChatMessage } from "../src/provider/index.js";
+import type { ChatCompletionOptions, ChatMessage } from "../src/provider/index.js";
 import { createWebApp, isBusyError, isWebOperationError } from "../src/server/app.js";
 import type { AssistantSessionAnswer } from "../src/runtime/assistant-session.js";
 import { createDefaultRuntimeState } from "../src/state/state-store.js";
@@ -92,6 +92,64 @@ describe("web app API model", () => {
       "assistant.log.append_exchange"
     ]));
     expect(entries.every((entry) => entry.ok)).toBe(true);
+  });
+
+  it("omits provider debug entries by default", async () => {
+    const app = createWebApp({
+      config: await writeConfig("provider-debug-disabled"),
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: createDiagnosticChat(firstAnswer("Debug", "Debug Answer", "Debug answer."))
+    });
+
+    const response = await app.askAssistant("What about debug?");
+
+    expect(response.providerDebug).toEqual([]);
+  });
+
+  it("returns provider debug entries for assistant and NPC operations when enabled", async () => {
+    const assistantConfig = await writeConfig("provider-debug-assistant");
+    assistantConfig.provider.debug = true;
+    const assistantApp = createWebApp({
+      config: assistantConfig,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: createDiagnosticChat(firstAnswer("Debug", "Debug Answer", "Debug answer."))
+    });
+
+    const assistantResponse = await assistantApp.askAssistant("What about debug?");
+
+    expect(assistantResponse.providerDebug).toHaveLength(1);
+    expect(assistantResponse.providerDebug?.[0]).toMatchObject({
+      assistantContent: firstAnswer("Debug", "Debug Answer", "Debug answer."),
+      endpoint: "https://provider.example/v1/chat/completions",
+      ok: true,
+      operation: "assistant",
+      purpose: "assistant",
+      status: 200
+    });
+    expect(assistantResponse.providerDebug?.[0]?.requestBody.model).toBe("gpt-test-chat");
+
+    const npcConfig = await writeConfig("provider-debug-npcs");
+    npcConfig.provider.debug = true;
+    const npcApp = createWebApp({
+      config: npcConfig,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: createDiagnosticChat(JSON.stringify({
+        npcs: [{ id: 1, name: "Jala", description: "A mage.", bio: "A contact." }]
+      }))
+    });
+
+    const npcResponse = await npcApp.generateNpcs("Generate one NPC");
+
+    expect(npcResponse.providerDebug).toHaveLength(1);
+    expect(npcResponse.providerDebug?.[0]).toMatchObject({
+      ok: true,
+      operation: "npcs",
+      purpose: "npcs"
+    });
+    expect(npcResponse.providerDebug?.[0]?.requestBody.model).toBe("gpt-test-chat");
   });
 
   it("passes included party context into assistant prompts by default", async () => {
@@ -1276,6 +1334,35 @@ const mockRetrieval = (
     refresh: vi.fn().mockResolvedValue({ chunkCount: results.length, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
     search: vi.fn().mockResolvedValue(results)
   }
+});
+
+const createDiagnosticChat = (response: string) => ({
+  complete: vi.fn().mockImplementation((messages: ChatMessage[], options?: ChatCompletionOptions) => {
+    options?.onDiagnostic?.({
+      assistantContent: response,
+      endpoint: "https://provider.example/v1/chat/completions",
+      ok: true,
+      operation: options.debug?.operation ?? "unknown",
+      operationId: options.debug?.operationId ?? "unknown",
+      purpose: options.debug?.purpose ?? "unknown",
+      requestBody: {
+        messages,
+        model: "gpt-test-chat"
+      },
+      responseBody: {
+        choices: [
+          {
+            message: {
+              content: response
+            }
+          }
+        ]
+      },
+      status: 200,
+      timestamp: "2026-05-03T12:00:00.000Z"
+    });
+    return Promise.resolve(response);
+  })
 });
 
 const result = (): RetrievalResult => ({
