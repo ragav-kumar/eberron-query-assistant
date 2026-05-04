@@ -164,7 +164,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   };
   let activeOperation: string | null = null;
   const defaultReporter = createQueuedConsoleProgressReporter(consoleFeed);
-  const partyContext = dependencies.partyContext ?? createSqlitePartyContextService();
+  const partyContext = createCachedPartyContextService(dependencies.partyContext ?? createSqlitePartyContextService());
   const retrieval =
     dependencies.retrieval ??
     createSqliteRetrievalService({
@@ -295,6 +295,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     });
     await reporter.flush();
     hasRoutineRefresh = true;
+    partyContext.clear();
     consoleFeed.info(formatRefreshSummaryMessage(summary));
     return summary;
   };
@@ -451,6 +452,27 @@ const emptyLogResponse = (files: SessionLogFile[]): WebLogResponse => ({
   filePath: null,
   readOnly: false
 });
+
+interface CachedPartyContextService extends PartyContextService {
+  clear(): void;
+}
+
+const createCachedPartyContextService = (inner: PartyContextService): CachedPartyContextService => {
+  let cached: Promise<string> | null = null;
+
+  return {
+    build(config) {
+      cached ??= inner.build(config).catch((error: unknown) => {
+        cached = null;
+        throw error;
+      });
+      return cached;
+    },
+    clear() {
+      cached = null;
+    }
+  };
+};
 
 const ensureAdditionalContextFile = async (config: RuntimeConfig): Promise<void> => {
   await mkdir(config.assistant.assistantDir, { recursive: true });

@@ -111,6 +111,55 @@ describe("web app API model", () => {
     expect(readChatMessages(chat).at(-1)?.content).toContain("Current party context:");
   });
 
+  it("reuses cached party context across prompts and NPC generation", async () => {
+    const partyContextBuild = vi.fn().mockResolvedValue("Current party context:\n- Party actors: Peanunt.");
+    const chat = vi
+      .fn()
+      .mockResolvedValueOnce(firstAnswer("Party", "Party Question", "Party answer."))
+      .mockResolvedValueOnce(firstAnswer("Second", "Second Question", "Second answer."))
+      .mockResolvedValueOnce(JSON.stringify({ npcs: [{ id: 1, name: "Jala", description: "A mage.", bio: "A contact." }] }));
+    const app = createWebApp({
+      config: await writeConfig("party-cache"),
+      ...mockRefreshDependencies(),
+      partyContext: { build: partyContextBuild },
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: chat }
+    });
+
+    await app.askAssistant("Who is with the party?");
+    await app.askAssistant("What else?");
+    await app.generateNpcs("Generate one envoy");
+
+    expect(partyContextBuild).toHaveBeenCalledOnce();
+    expect(readChatMessages(chat).at(-1)?.content).toContain("Current party context:");
+  });
+
+  it("invalidates cached party context after routine refresh", async () => {
+    const config = await writeConfig("party-cache-refresh");
+    const partyContextBuild = vi
+      .fn()
+      .mockResolvedValueOnce("Current party context:\n- Party actors: Peanunt.")
+      .mockResolvedValueOnce("Current party context:\n- Party actors: Peanunt and Spark.");
+    const chat = vi
+      .fn()
+      .mockResolvedValueOnce(firstAnswer("Party", "Party Question", "Party answer."))
+      .mockResolvedValueOnce(firstAnswer("Party Updated", "Party Question Updated", "Updated party answer."));
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      partyContext: { build: partyContextBuild },
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: chat }
+    });
+
+    await app.askAssistant("Who is with the party?");
+    await app.refresh(false);
+    await app.askAssistant("Who is with the party now?");
+
+    expect(partyContextBuild).toHaveBeenCalledTimes(2);
+    expect(readChatMessages(chat, 1).at(-1)?.content).toContain("Peanunt and Spark");
+  });
+
   it("omits party context from assistant prompts when requested", async () => {
     const partyContextBuild = vi.fn().mockResolvedValue("Current party context:\n- Party actors: Peanunt.");
     const chat = vi.fn().mockResolvedValue(firstAnswer("World", "World Question", "World answer."));
@@ -1216,8 +1265,8 @@ const writeConfig = async (name: string): Promise<RuntimeConfig> => {
   return config;
 };
 
-const readChatMessages = (chat: ReturnType<typeof vi.fn>): ChatMessage[] => {
-  return (chat.mock.calls[0]?.[0] ?? []) as ChatMessage[];
+const readChatMessages = (chat: ReturnType<typeof vi.fn>, callIndex = 0): ChatMessage[] => {
+  return (chat.mock.calls[callIndex]?.[0] ?? []) as ChatMessage[];
 };
 
 const mockRetrieval = (

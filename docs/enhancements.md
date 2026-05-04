@@ -18,6 +18,12 @@ If startup refresh fails, the Console records the failure, active-operation stat
 
 Verification added for this change covers startup refresh status, busy rejection during startup refresh, retry after startup refresh failure, avoiding redundant first-prompt refresh, and client display of startup refresh state.
 
+## Cached Party Context
+
+The web runtime caches assembled party context after the first Standard or NPC Generator prompt that includes party info. Routine refresh and force reingest clear the cache so later prompts rebuild party context from the latest corpus.
+
+Verification added for this change covers cache reuse across Standard and NPC workflows and cache invalidation after refresh.
+
 ## Operation Reconnect Recovery
 
 The browser UI now restores current in-process operation status after a reload or reconnect to the same local Vite server. Runtime artifact directories are excluded from Vite file watching so force reingest writes do not trigger dev-server reloads, and the transient Console feed replays existing in-memory entries before streaming new ones.
