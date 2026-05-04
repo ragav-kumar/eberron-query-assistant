@@ -10,6 +10,12 @@ Assistant, NPC generation, refresh, retrieval, chat, party-context, state, and t
 
 Verification added for this change covers the model default and structured timing output for assistant operations.
 
+## Retrieval Vector Cache
+
+Compatible SQLite vector rows are cached in memory per retrieval service instance after successful refresh or first search load. Subsequent searches with the same corpus database path, embedding model, and embedding schema reuse the parsed vectors instead of reading and JSON-parsing every compatible vector row from SQLite.
+
+Routine refresh and force reingest clear and repopulate the cache through the existing retrieval sync path, preserving refresh semantics, force-rebuild behavior, retrieval scoring, and timing labels.
+
 ## Browser-Load Startup Refresh
 
 The local web app starts one routine refresh in the background when the browser first connects to the API. The UI reports `startup-refresh` as the active operation while it runs, streams normal Console output, and prevents overlapping assistant, NPC, refresh, or force-reingest work until startup refresh finishes.

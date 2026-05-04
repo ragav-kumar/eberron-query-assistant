@@ -61,8 +61,20 @@ interface StoredVectorEntry {
   embedding: number[];
 }
 
+interface VectorCacheEntry {
+  dbPath: string;
+  embeddingModelId: string;
+  embeddingSchemaVersion: string;
+  entries: StoredVectorEntry[];
+}
+
+interface VectorSyncResult extends RetrievalSyncSummary {
+  vectorEntries: StoredVectorEntry[];
+}
+
 export const createSqliteRetrievalService = (dependencies: RetrievalServiceDependencies): RetrievalService => {
   let config: RuntimeConfig | null = null;
+  let vectorCache: VectorCacheEntry | null = null;
 
   const openDatabase = (): Database.Database => {
     if (!config) {
@@ -78,6 +90,7 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
   ): Promise<RetrievalSyncSummary> => {
     config = nextConfig;
     await mkdir(nextConfig.retrievalDir, { recursive: true });
+    vectorCache = null;
     if (options.forceRebuild) {
       await deleteLegacyVectorIndex(nextConfig, dependencies.reporter);
     }
@@ -94,7 +107,16 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
 
       const chunks = readAllChunks(database);
       deleteStaleVectorRows(database);
-      const summary = await syncVectorStore(chunks, database, dependencies.embeddingAdapter, dependencies.reporter);
+      const syncResult = await syncVectorStore(chunks, database, dependencies.embeddingAdapter, dependencies.reporter);
+      const summary = {
+        chunkCount: syncResult.chunkCount,
+        regeneratedEmbeddings: syncResult.regeneratedEmbeddings,
+        reusedEmbeddings: syncResult.reusedEmbeddings
+      };
+      vectorCache = {
+        ...createVectorCacheKey(nextConfig, dependencies.embeddingAdapter),
+        entries: syncResult.vectorEntries
+      };
 
       dependencies.reporter.info(
         `Retrieval vector index synchronized: chunks=${summary.chunkCount}, reused=${summary.reusedEmbeddings}, regenerated=${summary.regeneratedEmbeddings}, model=${dependencies.embeddingAdapter.modelId}.`
@@ -123,7 +145,20 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
         searchLexical(database, request, limit)
       );
       const semanticResults = await timing.reporter.time(timing, "retrieval.vector", () =>
-        searchVector(database, request, limit, dependencies.embeddingAdapter)
+        searchVector(database, request, limit, dependencies.embeddingAdapter, {
+          read() {
+            return readCachedVectorRows(vectorCache, config, dependencies.embeddingAdapter);
+          },
+          write(entries) {
+            if (!config) {
+              return;
+            }
+            vectorCache = {
+              ...createVectorCacheKey(config, dependencies.embeddingAdapter),
+              entries
+            };
+          }
+        })
       );
       return await timing.reporter.time(timing, "retrieval.merge", () =>
         mergeResults(lexicalResults, semanticResults, limit)
@@ -282,7 +317,11 @@ const searchVector = async (
   database: Database.Database,
   request: RetrievalSearchRequest,
   limit: number,
-  embeddingAdapter: EmbeddingAdapter
+  embeddingAdapter: EmbeddingAdapter,
+  vectorCache: {
+    read(): StoredVectorEntry[] | null;
+    write(entries: StoredVectorEntry[]): void;
+  }
 ): Promise<RetrievalResult[]> => {
   const timing = request.timing ?? {
     operation: "retrieval",
@@ -300,9 +339,16 @@ const searchVector = async (
   const queryEmbedding = await timing.reporter.time(timing, "retrieval.vector.embed_query", () =>
     embeddingAdapter.embed(toEmbeddingInput(request.query))
   );
-  const compatibleRows = await timing.reporter.time(timing, "retrieval.vector.read_vectors", () =>
-    readCompatibleVectorRows(database, embeddingAdapter)
-  );
+  const compatibleRows = await timing.reporter.time(timing, "retrieval.vector.read_vectors", () => {
+    const cachedRows = vectorCache.read();
+    if (cachedRows) {
+      return cachedRows;
+    }
+
+    const rows = readCompatibleVectorRows(database, embeddingAdapter);
+    vectorCache.write(rows);
+    return rows;
+  });
 
   return await timing.reporter.time(timing, "retrieval.vector.score_sort", () =>
     compatibleRows
@@ -364,19 +410,21 @@ const syncVectorStore = async (
   database: Database.Database,
   embeddingAdapter: EmbeddingAdapter,
   reporter: ProgressReporter
-): Promise<RetrievalSyncSummary> => {
+): Promise<VectorSyncResult> => {
   const compatibleEntries = new Map(
     readCompatibleVectorRows(database, embeddingAdapter).map((entry) => [entry.chunkId, entry])
   );
 
   let reusedEmbeddings = 0;
   let regeneratedEmbeddings = 0;
+  const syncedEntries = new Map<string, StoredVectorEntry>();
   const missingChunks: StoredChunk[] = [];
 
   for (const chunk of chunks) {
     const existingEntry = compatibleEntries.get(chunk.chunkId);
     if (existingEntry?.contentHash === chunk.contentHash) {
       reusedEmbeddings += 1;
+      syncedEntries.set(chunk.chunkId, existingEntry);
       continue;
     }
 
@@ -409,6 +457,9 @@ const syncVectorStore = async (
     });
 
     upsertVectorRows(database, entries, embeddingAdapter);
+    for (const entry of entries) {
+      syncedEntries.set(entry.chunkId, entry);
+    }
     regeneratedEmbeddings += entries.length;
 
     reportProgress(
@@ -419,8 +470,11 @@ const syncVectorStore = async (
 
   return {
     chunkCount: chunks.length,
+    regeneratedEmbeddings,
     reusedEmbeddings,
-    regeneratedEmbeddings
+    vectorEntries: chunks
+      .map((chunk) => syncedEntries.get(chunk.chunkId))
+      .filter((entry): entry is StoredVectorEntry => entry !== undefined)
   };
 };
 
@@ -472,6 +526,32 @@ const readCompatibleVectorRows = (
       };
     })
     .filter((entry): entry is StoredVectorEntry => entry !== null);
+};
+
+const createVectorCacheKey = (
+  config: RuntimeConfig,
+  embeddingAdapter: EmbeddingAdapter
+): Omit<VectorCacheEntry, "entries"> => ({
+  dbPath: getCorpusDatabasePath(config),
+  embeddingModelId: embeddingAdapter.modelId,
+  embeddingSchemaVersion: embeddingAdapter.schemaVersion
+});
+
+const readCachedVectorRows = (
+  cache: VectorCacheEntry | null,
+  config: RuntimeConfig | null,
+  embeddingAdapter: EmbeddingAdapter
+): StoredVectorEntry[] | null => {
+  if (!cache || !config) {
+    return null;
+  }
+
+  const key = createVectorCacheKey(config, embeddingAdapter);
+  return cache.dbPath === key.dbPath &&
+    cache.embeddingModelId === key.embeddingModelId &&
+    cache.embeddingSchemaVersion === key.embeddingSchemaVersion
+    ? cache.entries
+    : null;
 };
 
 const upsertVectorRows = (

@@ -10,6 +10,7 @@ import { createSqliteCorpusStore, getCorpusDatabasePath, type CorpusStore } from
 import { createDeterministicEmbeddingAdapter, type EmbeddingAdapter } from "../src/provider/index.js";
 import { createMemoryProgressReporter, type ProgressReporter } from "../src/progress/reporter.js";
 import { createSqliteRetrievalService, getVectorIndexPath } from "../src/retrieval/index.js";
+import type { TimingContext } from "../src/timing.js";
 import type { CorpusChunk, CorpusSource, RuntimeConfig, SourceType } from "../src/types.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "retrieval");
@@ -261,6 +262,63 @@ describe("Phase 4 retrieval", () => {
     expect(readVectorRows(config).map((row) => row.chunk_id)).not.toContain("pdf:eberron.pdf:0");
     expect(readVectorRows(config)).toHaveLength(2);
   });
+
+  it("reuses cached compatible vectors on later searches without reading mutated SQLite vector JSON", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await seedCorpus(config);
+    const retrieval = createRetrieval();
+    const timing = createCapturingTimingContext();
+
+    await retrieval.refresh(config);
+    const first = await retrieval.search({ query: "deathless aerenal", limit: 3, timing });
+    rewriteVectorJson(config, "not-json");
+    const second = await retrieval.search({ query: "deathless aerenal", limit: 3, timing });
+
+    expect(second).toEqual(first);
+    expect(timing.labels).toContain("retrieval.vector.read_vectors");
+  });
+
+  it("invalidates and repopulates cached vectors after routine refresh", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const store = await seedCorpus(config);
+    const retrieval = createRetrieval(keywordEmbeddingAdapter("aerenal", "mror"));
+
+    await retrieval.refresh(config);
+    const first = await retrieval.search({ query: "aerenal", limit: 1 });
+    rewriteVectorJson(config, JSON.stringify([0, 1]));
+
+    await store.replaceSource(config, source("pdf", "eberron.pdf", "Eberron Rising"), [
+      chunk("pdf:eberron.pdf:0", "pdf:eberron.pdf", 0, "Mror dwarves study the Holds.", {
+        sourceType: "pdf",
+        label: "Eberron Rising",
+        locator: "page 5",
+        url: null
+      })
+    ]);
+    await retrieval.refresh(config);
+    rewriteVectorJson(config, JSON.stringify([1, 0]), "pdf:eberron.pdf:0");
+    const second = await retrieval.search({ query: "mror", limit: 1 });
+
+    expect(first[0]?.chunkId).toBe("pdf:eberron.pdf:0");
+    expect(first[0]?.content).toContain("Aerenal");
+    expect(second[0]?.chunkId).toBe("pdf:eberron.pdf:0");
+    expect(second[0]?.content).toContain("Mror");
+  });
+
+  it("invalidates and repopulates cached vectors after force rebuild", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await seedCorpus(config);
+    const adapter = countingAdapter("force-cache-model", "force-cache-schema");
+    const retrieval = createRetrieval(adapter.adapter);
+
+    await retrieval.refresh(config);
+    rewriteVectorJson(config, "not-json");
+    await retrieval.refresh(config, { forceRebuild: true });
+    rewriteVectorJson(config, "not-json");
+
+    await expect(retrieval.search({ query: "deathless aerenal", limit: 1 })).resolves.toHaveLength(1);
+    expect(adapter.embedBatch).toHaveBeenCalledTimes(2);
+  });
 });
 
 const seedCorpus = async (config: RuntimeConfig, chunkCount = 3): Promise<CorpusStore> => {
@@ -432,6 +490,41 @@ const captureEmbeddingInputAdapter = (): { adapter: EmbeddingAdapter; inputs: st
   };
 };
 
+const keywordEmbeddingAdapter = (...keywords: string[]): EmbeddingAdapter => {
+  const embedKeywordVector = (input: string): number[] => {
+    const lower = input.toLowerCase();
+    const vector = keywords.map((keyword) => (lower.includes(keyword) ? 1 : 0));
+    return vector.some((value) => value > 0) ? vector : keywords.map(() => 0);
+  };
+
+  return {
+    failedRetries: 0,
+    modelId: `keyword-${keywords.join("-")}`,
+    schemaVersion: "keyword-v1",
+    embed(input) {
+      return Promise.resolve(embedKeywordVector(input));
+    },
+    embedBatch(inputs) {
+      return Promise.resolve(inputs.map(embedKeywordVector));
+    }
+  };
+};
+
+const createCapturingTimingContext = (): TimingContext & { labels: string[] } => {
+  const labels: string[] = [];
+  return {
+    labels,
+    operation: "test",
+    operationId: "test",
+    reporter: {
+      async time(_context, label, task) {
+        labels.push(label);
+        return task();
+      }
+    }
+  };
+};
+
 const readRows = (config: RuntimeConfig, sql: string): Array<Record<string, unknown>> => {
   const database = new Database(getCorpusDatabasePath(config), { readonly: true });
   try {
@@ -446,4 +539,17 @@ const readVectorRows = (config: RuntimeConfig): Array<Record<string, unknown>> =
     config,
     "SELECT chunk_id, content_hash, embedding_model_id, embedding_schema_version, embedding_json FROM chunk_vectors ORDER BY chunk_id"
   );
+};
+
+const rewriteVectorJson = (config: RuntimeConfig, embeddingJson: string, chunkId?: string): void => {
+  const database = new Database(getCorpusDatabasePath(config));
+  try {
+    if (chunkId) {
+      database.prepare("UPDATE chunk_vectors SET embedding_json = ? WHERE chunk_id = ?").run(embeddingJson, chunkId);
+      return;
+    }
+    database.prepare("UPDATE chunk_vectors SET embedding_json = ?").run(embeddingJson);
+  } finally {
+    database.close();
+  }
 };
