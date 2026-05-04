@@ -17,6 +17,7 @@ import {
   loadAssistantPromptAssets,
   type AssistantPromptAssets
 } from "../src/runtime/prompt.js";
+import { sanitizeSessionTitle } from "../src/runtime/session-log.js";
 import type { AssistantConfig, RuntimeConfig } from "../src/types.js";
 import type { RetrievalResult } from "../src/types.js";
 
@@ -29,7 +30,8 @@ const PROMPT_ASSETS: AssistantPromptAssets = {
   ].join("\n"),
   sessionTitlePrompt: [
     "Return exactly this metadata wrapper before every answer.",
-    "<session-title>A concise filesystem-safe session title</session-title>",
+    "For the first response in a session only, include <session-title> as a concise human-readable session title of at most 8 words. Use normal words with spaces, not kebab-case, snake_case, PascalCase, camelCase, or file-name style. Omit <session-title> on later responses.",
+    "<session-title>A concise human-readable session title</session-title>",
     "<response-title>A concise heading for this user prompt</response-title>",
     "<answer>",
     "Your normal answer.",
@@ -53,6 +55,19 @@ afterEach(async () => {
 });
 
 describe("assistant prompt assembly", () => {
+  it("asks for readable session titles instead of machine-case filenames", () => {
+    const messages = buildAssistantMessages({
+      evidence: [],
+      promptAssets: PROMPT_ASSETS,
+      question: "What is happening in the Mournland?",
+      requestSessionTitle: true
+    });
+
+    expect(messages[0]?.content).toContain("human-readable session title");
+    expect(messages[0]?.content).toContain("not kebab-case, snake_case, PascalCase, camelCase");
+    expect(messages[0]?.content).not.toContain("filesystem-safe session title");
+  });
+
   it("separates instructions, evidence, and user question", () => {
     const messages = buildAssistantMessages({
       evidence: [result("pdf", "eberron.pdf", "Eberron Rising", "page 4")],
@@ -445,6 +460,21 @@ describe("assistant prompt shell", () => {
     expect(firstMessages.some((message) => message.content.includes("First question"))).toBe(true);
     expect(secondMessages.some((message) => message.content.includes("First question"))).toBe(false);
     expect(secondMessages.some((message) => message.content.includes("Old logged question"))).toBe(false);
+  });
+});
+
+describe("session title sanitization", () => {
+  it("turns machine-case assistant titles into readable words", () => {
+    expect(sanitizeSessionTitle("mournland-overview")).toBe("Mournland Overview");
+    expect(sanitizeSessionTitle("dragonmark_research_notes")).toBe("Dragonmark Research Notes");
+    expect(sanitizeSessionTitle("MOURNLAND_OVERVIEW")).toBe("Mournland Overview");
+    expect(sanitizeSessionTitle("MournlandOverview")).toBe("Mournland Overview");
+    expect(sanitizeSessionTitle("mournlandOverview")).toBe("Mournland Overview");
+  });
+
+  it("preserves already-readable assistant titles while removing unsafe filename characters", () => {
+    expect(sanitizeSessionTitle("Aerenal and the Undying Court")).toBe("Aerenal and the Undying Court");
+    expect(sanitizeSessionTitle("What/about:Aerenal?")).toBe("What about Aerenal");
   });
 });
 

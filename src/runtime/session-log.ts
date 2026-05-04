@@ -70,7 +70,8 @@ const createUniqueSessionLogFile = async (logDir: string, startedAt: Date, title
 };
 
 export const sanitizeSessionTitle = (title: string): string => {
-  const sanitized = title
+  const readableTitle = normalizeReadableTitle(title);
+  const sanitized = readableTitle
     .split("")
     .map((character) => (isUnsafeFilenameCharacter(character) ? " " : character))
     .join("")
@@ -82,6 +83,39 @@ export const sanitizeSessionTitle = (title: string): string => {
   return normalizedTitle.length <= MAX_SESSION_TITLE_LENGTH
     ? normalizedTitle
     : normalizedTitle.slice(0, MAX_SESSION_TITLE_LENGTH).trimEnd();
+};
+
+const normalizeReadableTitle = (title: string): string => {
+  const trimmed = title.trim();
+  const hadSpaces = /\s/.test(trimmed);
+  const hadMachineSeparators = /[_-]/.test(trimmed);
+  const separated = trimmed
+    .replace(/[_-]+/g, " ")
+    .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1 $2")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!hadSpaces && (hadMachineSeparators || /^[a-z]/.test(separated))) {
+    return titleCaseWords(separated);
+  }
+
+  return separated;
+};
+
+const titleCaseWords = (title: string): string => {
+  return title
+    .split(" ")
+    .map((word) => {
+      if (word.length === 0 || /[a-z][A-Z]/.test(word)) {
+        return word;
+      }
+      if (/^[A-Z]{2,3}$/.test(word)) {
+        return word;
+      }
+      return `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`;
+    })
+    .join(" ");
 };
 
 export const listSessionLogFiles = async (

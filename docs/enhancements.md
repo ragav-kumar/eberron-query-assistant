@@ -10,6 +10,12 @@ Assistant, NPC generation, refresh, retrieval, chat, party-context, state, and t
 
 Verification added for this change covers the model default and structured timing output for assistant operations.
 
+## Readable Session Titles
+
+Assistant transcript session titles are requested as normal human-readable phrases with spaces instead of machine-style kebab-case, snake_case, PascalCase, or camelCase. Transcript filename sanitization also repairs those common machine-case forms before creating the JSON log file.
+
+Verification added for this change covers prompt instructions and session-title sanitization.
+
 ## Opt-In Provider Debug Console
 
 Setting `EQA_PROVIDER_DEBUG=true` enables local raw chat diagnostics for Standard assistant and NPC Generator provider calls. When enabled, each completed chat call returns its raw provider request body, raw JSON response body when available, extracted assistant content, status, endpoint, and operation metadata to the browser, which prints the entry with `console.debug("[EQA provider debug]", entry)`.
