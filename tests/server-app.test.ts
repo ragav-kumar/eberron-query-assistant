@@ -1160,6 +1160,73 @@ describe("web app API model", () => {
     expect(readChatMessages(chat).at(-1)?.content).toContain("Current party context:");
   });
 
+  it("passes retrieval turn limits into NPC requests", async () => {
+    const generate = vi.fn().mockResolvedValue({ evidence: [], npcs: [] });
+    const app = createWebApp({
+      config: await writeConfig("npc-turn-limit"),
+      ...mockRefreshDependencies(),
+      npcSession: { generate, read: vi.fn().mockResolvedValue([]), reset: vi.fn() },
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("{}") }
+    });
+
+    await app.generateNpcs("Generate one envoy", undefined, true, 3);
+
+    expect(generate).toHaveBeenCalledWith("Generate one envoy", expect.objectContaining({
+      includePartyContext: true,
+      retrievalTurnLimit: 3
+    }));
+  });
+
+  it("writes NPC retrieval-tool progress to the console without creating transcript log entries", async () => {
+    const search = vi
+      .fn()
+      .mockResolvedValueOnce([result()])
+      .mockResolvedValueOnce([result()]);
+    const completeStructured = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: "",
+        kind: "tool-calls",
+        toolCalls: [
+          {
+            arguments: JSON.stringify({
+              query: "house phiarlan fixer",
+              userMessage: "Checking Phiarlan lore for a fixer."
+            }),
+            id: "tool-1",
+            name: "search_corpus"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          npcs: [{ id: 1, name: "Varen", description: "A polished fixer.", bio: "He keeps theater doors open." }]
+        }),
+        kind: "text"
+      });
+    const app = createWebApp({
+      config: await writeConfig("npc-tool-console"),
+      ...mockRefreshDependencies(),
+      retrieval: {
+        prepare: vi.fn().mockResolvedValue(undefined),
+        refresh: vi.fn().mockResolvedValue({ chunkCount: 1, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
+        search
+      },
+      chat: {
+        complete: vi.fn().mockResolvedValue("unused"),
+        completeStructured
+      }
+    });
+
+    const response = await app.generateNpcs("Generate one Phiarlan fixer", undefined, true, 1);
+
+    expect(response.console.entries.some((entry) =>
+      entry.message === "Assistant called search_corpus (turn 1/1): Checking Phiarlan lore for a fixer."
+    )).toBe(true);
+    expect(response.log).toEqual(emptyLogResponse());
+  });
+
   it("normalizes empty optional NPC details and rejects invalid generated detail values", async () => {
     const config = await writeConfig("npc-details-normalization");
     const chat = vi

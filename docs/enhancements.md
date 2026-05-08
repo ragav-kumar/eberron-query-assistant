@@ -20,13 +20,15 @@ Assistant, NPC generation, refresh, retrieval, chat, party-context, state, and t
 
 Verification added for this change covers the model default and structured timing output for assistant operations.
 
-## Standard Assistant Retrieval Tool
+## Assistant And NPC Retrieval Tools
 
-Standard assistant mode now keeps the existing first retrieval pass and can optionally make a bounded number of additional local corpus searches through a native `search_corpus` provider tool. The browser Input tab exposes a shared `Extra retrieval turns` slider with range `0` to `3` and default `1`; in this phase the slider is shown for both Standard and NPC Generator workflows, but only Standard assistant requests use it.
+Standard assistant mode keeps the existing first retrieval pass and can optionally make a bounded number of additional local corpus searches through a native `search_corpus` provider tool. NPC Generator mode now uses the same bounded tool loop and the same shared `Extra retrieval turns` slider with range `0` to `3` and default `1`.
 
 When Standard mode uses follow-up retrieval, concise progress text is written into the active transcript log before the final answer. Transcript JSON now stores a mixed ordered list of final Q&A exchanges and persisted progress entries, while historical exchange-only logs remain readable without migration.
 
-Verification added for this change covers provider tool-call payloads, Standard assistant tool-loop behavior, persisted progress log ordering, assistant request payloads carrying the selected turn limit, and Log-tab rendering of mixed progress and final-answer entries.
+When NPC Generator mode uses follow-up retrieval, progress text goes only to the transient Console stream. Final NPC output still has to parse as strict JSON before any saved NPC state is updated, and one provider-driven JSON-only repair pass is allowed before the request fails.
+
+Verification added for this change covers provider tool-call payloads, Standard assistant tool-loop behavior, NPC Generator tool-loop behavior, persisted Standard progress log ordering, Console-only NPC progress, selected turn limits for both workflows, and strict NPC JSON repair and failure handling.
 
 ## Readable Session Titles
 

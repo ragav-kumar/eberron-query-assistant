@@ -1,22 +1,24 @@
 import type {
   ChatAdapter,
-  ChatCompletionOptions,
   ChatCompletionDiagnostic,
-  ChatMessage,
-  ChatStructuredResult,
-  ChatToolCall,
-  ChatToolDefinition
+  ChatMessage
 } from "../provider/index.js";
 import type { RetrievalService } from "../retrieval/index.js";
 import { createNoopTimingReporter, type TimingContext } from "../timing.js";
-import type { AssistantConfig, RetrievalResult, RuntimeConfig, SourceType } from "../types.js";
+import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "../types.js";
 import {
   buildAssistantMessages,
-  formatEvidence,
   loadAssistantPromptAssets,
   type AssistantPromptAssets
 } from "./assistant-prompts.js";
 import { createSqlitePartyContextService, type PartyContextService } from "./party-context.js";
+import {
+  buildRetrievalToolInstructions,
+  clampRetrievalTurnLimit,
+  completeStructured,
+  RETRIEVAL_TOOL,
+  runRetrievalToolLoop
+} from "./retrieval-tool.js";
 import type { SessionLogExchange, SessionLogProgress } from "./session-log.js";
 
 export interface AssistantSession {
@@ -52,42 +54,6 @@ export interface AssistantSessionOptions {
 
 const MAX_EVIDENCE_RESULTS = 8;
 const MAX_HISTORY_MESSAGES = 8;
-const MAX_RETRIEVAL_TOOL_TURNS = 3;
-const SEARCH_CORPUS_TOOL_NAME = "search_corpus";
-const RETRIEVAL_TOOL: ChatToolDefinition = {
-  description: "Search the local Eberron corpus for targeted supporting evidence.",
-  name: SEARCH_CORPUS_TOOL_NAME,
-  parameters: {
-    type: "object",
-    properties: {
-      query: {
-        type: "string"
-      },
-      sourceTypes: {
-        type: "array",
-        items: {
-          type: "string",
-          enum: ["foundry", "pdf", "article"]
-        }
-      },
-      sourceKeys: {
-        type: "array",
-        items: {
-          type: "string"
-        }
-      },
-      limit: {
-        type: "integer",
-        minimum: 1,
-        maximum: MAX_EVIDENCE_RESULTS
-      },
-      userMessage: {
-        type: "string"
-      }
-    },
-    required: ["query", "userMessage"]
-  }
-};
 
 export const createAssistantSession = (options: AssistantSessionOptions): AssistantSession => {
   const history: ChatMessage[] = [];
@@ -145,16 +111,17 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
         ...(retrievalTurnLimit > 0 ? { tools: [RETRIEVAL_TOOL] } : {})
       }));
       const completion = await runRetrievalToolLoop({
-        appendProgress: options.appendProgress,
         chat: options.chat,
         initialMessages: messages,
         initialResponse: response,
         onProviderDiagnostic: askOptions.onProviderDiagnostic,
-        reportStatus: options.reportStatus,
-        remainingTurns: retrievalTurnLimit,
+        purpose: "assistant",
+        ...(options.reportStatus ? { reportStatus: (message: string) => options.reportStatus?.(message) } : {}),
         retrieval: options.retrieval,
-        shouldRequestSessionTitle,
-        timing
+        retrievalTurnLimit,
+        timing,
+        writeProgress: async (entry) =>
+          requestProgressAppend((progressEntry) => options.appendProgress(progressEntry), timing, entry.message)
       });
       const parsedResponse = parseAssistantResponse(completion.responseText, shouldRequestSessionTitle) ??
         await timing.reporter.time(timing, "assistant.chat.repair_metadata", async () => {
@@ -195,146 +162,6 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
   };
 };
 
-interface RetrievalToolLoopRequest {
-  appendProgress: AssistantSessionOptions["appendProgress"];
-  chat: ChatAdapter;
-  initialMessages: ChatMessage[];
-  initialResponse: ChatStructuredResult;
-  onProviderDiagnostic: ((diagnostic: ChatCompletionDiagnostic) => void) | undefined;
-  reportStatus: AssistantSessionOptions["reportStatus"];
-  remainingTurns: number;
-  retrieval: RetrievalService;
-  shouldRequestSessionTitle: boolean;
-  timing: TimingContext;
-}
-
-interface RetrievalToolLoopResult {
-  messages: ChatMessage[];
-  responseText: string;
-}
-
-interface SearchCorpusArgs {
-  limit: number;
-  query: string;
-  sourceKeys?: string[];
-  sourceTypes?: SourceType[];
-  userMessage: string;
-}
-
-const runRetrievalToolLoop = async (request: RetrievalToolLoopRequest): Promise<RetrievalToolLoopResult> => {
-  const messages = [...request.initialMessages];
-  let response = request.initialResponse;
-  let remainingTurns = request.remainingTurns;
-
-  while (response.kind === "tool-calls") {
-    messages.push({
-      content: response.content,
-      role: "assistant",
-      toolCalls: response.toolCalls
-    });
-
-    for (const toolCall of response.toolCalls) {
-      const toolResult = await executeToolCall({
-        appendProgress: request.appendProgress,
-        remainingTurns,
-        reportStatus: request.reportStatus,
-        retrieval: request.retrieval,
-        timing: request.timing,
-        totalTurns: request.remainingTurns,
-        toolCall
-      });
-      if (toolResult.consumeTurn) {
-        remainingTurns -= 1;
-      }
-      messages.push({
-        content: toolResult.content,
-        name: toolCall.name,
-        role: "tool",
-        toolCallId: toolCall.id
-      });
-    }
-
-    response = await request.timing.reporter.time(request.timing, "assistant.chat.complete", () => completeStructured(
-      request.chat,
-      messages,
-      {
-        debug: {
-          operation: request.timing.operation,
-          operationId: request.timing.operationId,
-          purpose: "assistant"
-        },
-        onDiagnostic: request.onProviderDiagnostic,
-        ...(remainingTurns > 0 ? { tools: [RETRIEVAL_TOOL] } : {})
-      }
-    ));
-  }
-
-  return {
-    messages,
-    responseText: response.content
-  };
-};
-
-const executeToolCall = async (
-  request: {
-    appendProgress: AssistantSessionOptions["appendProgress"];
-    remainingTurns: number;
-    reportStatus: AssistantSessionOptions["reportStatus"];
-    retrieval: RetrievalService;
-    timing: TimingContext;
-    totalTurns: number;
-    toolCall: ChatToolCall;
-  }
-): Promise<{ consumeTurn: boolean; content: string }> => {
-  if (request.toolCall.name !== SEARCH_CORPUS_TOOL_NAME) {
-    return {
-      consumeTurn: false,
-      content: `Tool error: unsupported tool "${request.toolCall.name}". Use ${SEARCH_CORPUS_TOOL_NAME} for local retrieval.`
-    };
-  }
-
-  if (request.remainingTurns <= 0) {
-    return {
-      consumeTurn: false,
-      content: "No more retrieval turns are available for this answer. Produce the final response from the evidence already provided."
-    };
-  }
-
-  const parsedArgs = readSearchCorpusArgs(request.toolCall.arguments);
-  if (!parsedArgs.ok) {
-    return {
-      consumeTurn: false,
-      content: `Tool error: ${parsedArgs.message}`
-    };
-  }
-
-  const turnNumber = request.totalTurns - request.remainingTurns + 1;
-  await request.reportStatus?.(
-    `Assistant called ${SEARCH_CORPUS_TOOL_NAME} (turn ${turnNumber}/${request.totalTurns}): ${parsedArgs.value.userMessage}`
-  );
-  await request.timing.reporter.time(request.timing, "assistant.log.append_progress", () => request.appendProgress({
-    kind: "progress",
-    message: parsedArgs.value.userMessage
-  }));
-  const results = await request.timing.reporter.time(request.timing, "assistant.retrieval.search", () => request.retrieval.search({
-    query: parsedArgs.value.query,
-    ...(parsedArgs.value.sourceKeys ? { sourceKeys: parsedArgs.value.sourceKeys } : {}),
-    ...(parsedArgs.value.sourceTypes ? { sourceTypes: parsedArgs.value.sourceTypes } : {}),
-    timing: request.timing,
-    limit: parsedArgs.value.limit
-  }));
-
-  return {
-    consumeTurn: true,
-    content: [
-      `Search progress: ${parsedArgs.value.userMessage}`,
-      "",
-      "Retrieved evidence:",
-      formatEvidence(results)
-    ].join("\n")
-  };
-};
-
 interface ParsedAssistantResponse {
   answer: string;
   responseTitle: string;
@@ -372,143 +199,15 @@ const buildMetadataRepairPrompt = (requestSessionTitle: boolean): string => [
   "Do not add commentary outside the tags."
 ].join("\n");
 
-const buildRetrievalToolInstructions = (retrievalTurnLimit: number): string => retrievalTurnLimit > 0
-  ? [
-    `You may call the ${SEARCH_CORPUS_TOOL_NAME} tool when the initial evidence is not enough.`,
-    "Use it only for targeted follow-up retrieval.",
-    `You may make at most ${retrievalTurnLimit} additional retrieval request${retrievalTurnLimit === 1 ? "" : "s"}.`,
-    "Set userMessage to concise progress text suitable for the transcript log. Do not include hidden reasoning."
-  ].join("\n")
-  : "No additional retrieval tool calls are available for this response. Answer from the initial evidence only.";
-
-const clampRetrievalTurnLimit = (value: number): number => {
-  if (!Number.isFinite(value)) {
-    return 1;
-  }
-
-  return Math.min(MAX_RETRIEVAL_TOOL_TURNS, Math.max(0, Math.trunc(value)));
-};
-
-const readSearchCorpusArgs = (rawArguments: string): { ok: true; value: SearchCorpusArgs } | { message: string; ok: false } => {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawArguments) as unknown;
-  } catch {
-    return {
-      message: "tool arguments must be valid JSON.",
-      ok: false
-    };
-  }
-
-  if (typeof parsed !== "object" || parsed === null) {
-    return {
-      message: "tool arguments must be a JSON object.",
-      ok: false
-    };
-  }
-
-  const record = parsed as Record<string, unknown>;
-  const query = typeof record.query === "string" ? record.query.trim() : "";
-  const userMessage = typeof record.userMessage === "string" ? record.userMessage.trim() : "";
-  if (query.length === 0) {
-    return {
-      message: "query is required.",
-      ok: false
-    };
-  }
-  if (userMessage.length === 0) {
-    return {
-      message: "userMessage is required.",
-      ok: false
-    };
-  }
-
-  const sourceTypes = readSourceTypes(record.sourceTypes);
-  if (!sourceTypes.ok) {
-    return sourceTypes;
-  }
-  const sourceKeys = readStringArray(record.sourceKeys, "sourceKeys");
-  if (!sourceKeys.ok) {
-    return sourceKeys;
-  }
-
-  return {
-    ok: true,
-    value: {
-      limit: clampEvidenceLimit(record.limit),
-      query,
-      ...(sourceKeys.value ? { sourceKeys: sourceKeys.value } : {}),
-      ...(sourceTypes.value ? { sourceTypes: sourceTypes.value } : {}),
-      userMessage
-    }
-  };
-};
-
-const readSourceTypes = (value: unknown):
-{ ok: true; value?: SourceType[] } |
-{ message: string; ok: false } => {
-  const sourceTypes = readStringArray(value, "sourceTypes");
-  if (!sourceTypes.ok) {
-    return sourceTypes;
-  }
-  if (!sourceTypes.value) {
-    return { ok: true };
-  }
-  if (sourceTypes.value.some((sourceType) => !isSourceType(sourceType))) {
-    return {
-      message: "sourceTypes must contain only foundry, pdf, or article.",
-      ok: false
-    };
-  }
-  return {
-    ok: true,
-    value: sourceTypes.value as SourceType[]
-  };
-};
-
-const readStringArray = (
-  value: unknown,
-  field: string
-): { ok: true; value?: string[] } | { message: string; ok: false } => {
-  if (value === undefined) {
-    return { ok: true };
-  }
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
-    return {
-      message: `${field} must be an array of strings.`,
-      ok: false
-    };
-  }
-  const normalized = value.map((item) => item.trim()).filter((item) => item.length > 0);
-  return {
-    ok: true,
-    ...(normalized.length > 0 ? { value: normalized } : {})
-  };
-};
-
-const clampEvidenceLimit = (value: unknown): number => {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return MAX_EVIDENCE_RESULTS;
-  }
-
-  return Math.min(MAX_EVIDENCE_RESULTS, Math.max(1, Math.trunc(value)));
-};
-
-const isSourceType = (value: string): value is SourceType => {
-  return value === "foundry" || value === "pdf" || value === "article";
-};
-
-const completeStructured = async (
-  chat: ChatAdapter,
-  messages: ChatMessage[],
-  options: ChatCompletionOptions
-): Promise<ChatStructuredResult> => {
-  if (chat.completeStructured) {
-    return chat.completeStructured(messages, options);
-  }
-
-  return {
-    content: await chat.complete(messages, options),
-    kind: "text"
-  };
+const requestProgressAppend = async (
+  appendProgress: AssistantSessionOptions["appendProgress"],
+  timing: TimingContext,
+  message: string
+): Promise<void> => {
+  await timing.reporter.time(timing, "assistant.log.append_progress", () =>
+    appendProgress({
+      kind: "progress",
+      message
+    })
+  );
 };

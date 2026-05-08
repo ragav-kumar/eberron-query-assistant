@@ -13,7 +13,7 @@ import {
   type AssistantPromptAssets
 } from "../src/runtime/assistant-prompts.js";
 import { createAssistantSession } from "../src/runtime/assistant-session.js";
-import { buildNpcGenerationMessages } from "../src/runtime/npc-session.js";
+import { buildNpcGenerationMessages, createNpcGenerationSession } from "../src/runtime/npc-session.js";
 import { createSessionLog, sanitizeSessionTitle, type SessionLog } from "../src/runtime/session-log.js";
 import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "../src/types.js";
 
@@ -225,6 +225,249 @@ describe("NPC generator prompt assembly", () => {
     expect(messages[0]?.content).toContain("world querying or world building");
     expect(messages.at(-1)?.content).not.toContain("Current party context:");
     expect(messages.at(-1)?.content).toContain("Retrieved evidence:");
+  });
+});
+
+describe("NPC generation session", () => {
+  it("handles one retrieval tool call before the final NPC JSON", async () => {
+    const config = loadDefaultConfig(path.join(TEST_ROOT, "runtime", "npc-tool-loop"));
+    const search = vi
+      .fn<RetrievalService["search"]>()
+      .mockResolvedValueOnce([result("pdf", "eberron.pdf", "Eberron Rising", "page 4")])
+      .mockResolvedValueOnce([result("article", "aerenal-rites", "Aerenal Rites", null, "https://example.test/aerenal")]);
+    const reportStatus = vi.fn();
+    const completeStructured = vi
+      .fn<NonNullable<ChatAdapter["completeStructured"]>>()
+      .mockResolvedValueOnce({
+        content: "",
+        kind: "tool-calls",
+        toolCalls: [
+          {
+            arguments: JSON.stringify({
+              limit: 2,
+              query: "aerenal patrons",
+              sourceTypes: ["article"],
+              userMessage: "Checking article evidence for an Aerenal patron."
+            }),
+            id: "tool-1",
+            name: "search_corpus"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          npcs: [{ id: 1, name: "Taela", description: "An elf patron.", bio: "She sponsors expeditions." }]
+        }),
+        kind: "text"
+      });
+
+    const response = await createNpcGenerationSession({
+      assistant: await writeAssistantFiles("npc-tool-loop"),
+      chat: {
+        complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("unused"),
+        completeStructured
+      },
+      config,
+      reportStatus,
+      retrieval: {
+        prepare: vi.fn().mockResolvedValue(undefined),
+        refresh: vi.fn().mockResolvedValue({ chunkCount: 0, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
+        search
+      }
+    }).generate("Generate one Aereni patron.", { retrievalTurnLimit: 1 });
+
+    expect(search).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      limit: 8,
+      query: "Generate one Aereni patron."
+    }));
+    expect(search).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      limit: 2,
+      query: "aerenal patrons",
+      sourceTypes: ["article"]
+    }));
+    expect(reportStatus).toHaveBeenCalledWith(
+      "Assistant called search_corpus (turn 1/1): Checking article evidence for an Aerenal patron."
+    );
+    expect(response.npcs).toEqual([
+      { id: 1, name: "Taela", description: "An elf patron.", bio: "She sponsors expeditions." }
+    ]);
+    expect(completeStructured.mock.calls[0]?.[1]?.tools).toHaveLength(1);
+  });
+
+  it("preserves single-pass NPC behavior when retrieval turn limit is zero", async () => {
+    const completeStructured = vi.fn<NonNullable<ChatAdapter["completeStructured"]>>().mockResolvedValue({
+      content: JSON.stringify({
+        npcs: [{ id: 1, name: "Doran", description: "A veteran scout.", bio: "He favors the borderlands." }]
+      }),
+      kind: "text"
+    });
+
+    await createNpcGenerationSession({
+      assistant: await writeAssistantFiles("npc-tool-limit-zero"),
+      chat: {
+        complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("unused"),
+        completeStructured
+      },
+      config: loadDefaultConfig(path.join(TEST_ROOT, "runtime", "npc-tool-limit-zero")),
+      retrieval: mockRetrieval([]).retrieval
+    }).generate("Generate one scout.", { retrievalTurnLimit: 0 });
+
+    expect(completeStructured.mock.calls[0]?.[1]?.tools).toBeUndefined();
+  });
+
+  it("repairs malformed NPC JSON once before saving state", async () => {
+    const config = loadDefaultConfig(path.join(TEST_ROOT, "runtime", "npc-json-repair"));
+    const complete = vi
+      .fn<ChatAdapter["complete"]>()
+      .mockResolvedValueOnce("not json")
+      .mockResolvedValueOnce(JSON.stringify({
+        npcs: [{ id: 1, name: "Sola", description: "A quiet artificer.", bio: "She studies schema fragments." }]
+      }));
+
+    const response = await createNpcGenerationSession({
+      assistant: await writeAssistantFiles("npc-json-repair"),
+      chat: { complete },
+      config,
+      retrieval: mockRetrieval([]).retrieval
+    }).generate("Generate one artificer.");
+
+    expect(complete).toHaveBeenCalledTimes(2);
+    expect(complete.mock.calls[1]?.[0].at(-1)?.content).toContain("strict JSON only");
+    expect(response.npcs).toEqual([
+      { id: 1, name: "Sola", description: "A quiet artificer.", bio: "She studies schema fragments." }
+    ]);
+  });
+
+  it("returns a no-more-turns tool result when the NPC tool loop exceeds the limit", async () => {
+    const completeStructured = vi
+      .fn<NonNullable<ChatAdapter["completeStructured"]>>()
+      .mockResolvedValueOnce({
+        content: "",
+        kind: "tool-calls",
+        toolCalls: [
+          {
+            arguments: JSON.stringify({
+              query: "first pass",
+              userMessage: "Checking one lead."
+            }),
+            id: "tool-1",
+            name: "search_corpus"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        content: "",
+        kind: "tool-calls",
+        toolCalls: [
+          {
+            arguments: JSON.stringify({
+              query: "second pass",
+              userMessage: "Checking one more lead."
+            }),
+            id: "tool-2",
+            name: "search_corpus"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          npcs: [{ id: 1, name: "Ilan", description: "A wary envoy.", bio: "He survives on old favors." }]
+        }),
+        kind: "text"
+      });
+
+    await createNpcGenerationSession({
+      assistant: await writeAssistantFiles("npc-tool-limit-hit"),
+      chat: {
+        complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("unused"),
+        completeStructured
+      },
+      config: loadDefaultConfig(path.join(TEST_ROOT, "runtime", "npc-tool-limit-hit")),
+      retrieval: mockRetrieval([]).retrieval
+    }).generate("Generate one envoy.", { retrievalTurnLimit: 1 });
+
+    expect(completeStructured.mock.calls[1]?.[0].some((message) =>
+      message.role === "tool" &&
+      message.content.includes("No more retrieval turns are available")
+    )).toBe(true);
+  });
+
+  it("returns a tool error for invalid NPC retrieval arguments without consuming a turn", async () => {
+    const search = vi
+      .fn<RetrievalService["search"]>()
+      .mockResolvedValueOnce([result("pdf", "eberron.pdf", "Eberron Rising", "page 4")])
+      .mockResolvedValueOnce([result("article", "valid-follow-up", "Valid Follow Up", null, "https://example.test/follow-up")]);
+    const completeStructured = vi
+      .fn<NonNullable<ChatAdapter["completeStructured"]>>()
+      .mockResolvedValueOnce({
+        content: "",
+        kind: "tool-calls",
+        toolCalls: [
+          {
+            arguments: JSON.stringify({
+              userMessage: "Missing query."
+            }),
+            id: "tool-1",
+            name: "search_corpus"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        content: "",
+        kind: "tool-calls",
+        toolCalls: [
+          {
+            arguments: JSON.stringify({
+              query: "valid follow up",
+              userMessage: "Checking a valid follow-up."
+            }),
+            id: "tool-2",
+            name: "search_corpus"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          npcs: [{ id: 1, name: "Sera", description: "A discreet courier.", bio: "She trades in secrets." }]
+        }),
+        kind: "text"
+      });
+
+    await createNpcGenerationSession({
+      assistant: await writeAssistantFiles("npc-tool-invalid-args"),
+      chat: {
+        complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("unused"),
+        completeStructured
+      },
+      config: loadDefaultConfig(path.join(TEST_ROOT, "runtime", "npc-tool-invalid-args")),
+      retrieval: {
+        prepare: vi.fn().mockResolvedValue(undefined),
+        refresh: vi.fn().mockResolvedValue({ chunkCount: 0, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
+        search
+      }
+    }).generate("Generate one courier.", { retrievalTurnLimit: 1 });
+
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(completeStructured.mock.calls[1]?.[0].some((message) =>
+      message.role === "tool" &&
+      message.content.includes("Tool error: query is required.")
+    )).toBe(true);
+  });
+
+  it("fails when the NPC JSON repair pass still returns invalid records", async () => {
+    const complete = vi
+      .fn<ChatAdapter["complete"]>()
+      .mockResolvedValueOnce("not json")
+      .mockResolvedValueOnce(JSON.stringify({
+        npcs: [{ id: 1, name: "Broken", species: 42, description: "Invalid NPC.", bio: "Still invalid." }]
+      }));
+
+    await expect(createNpcGenerationSession({
+      assistant: await writeAssistantFiles("npc-json-repair-invalid"),
+      chat: { complete },
+      config: loadDefaultConfig(path.join(TEST_ROOT, "runtime", "npc-json-repair-invalid")),
+      retrieval: mockRetrieval([]).retrieval
+    }).generate("Generate one broken NPC.")).rejects.toThrow("NPC generation response included an invalid NPC record.");
   });
 });
 

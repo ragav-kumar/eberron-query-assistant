@@ -102,7 +102,8 @@ const handleApiRequest = async (
     writeJson(response, 200, await app.generateNpcs(
       readStringField(body, "prompt"),
       readOptionalStringField(body, "sessionId"),
-      readOptionalBooleanField(body, "includePartyContext", true)
+      readOptionalBooleanField(body, "includePartyContext", true),
+      readOptionalNumberField(body, "retrievalTurnLimit", 1)
     ));
     return;
   }

@@ -41,7 +41,12 @@ export interface WebApp {
     includePartyContext?: boolean,
     retrievalTurnLimit?: number
   ): Promise<WebOperationResult>;
-  generateNpcs(prompt: string, sessionId?: string, includePartyContext?: boolean): Promise<WebOperationResult>;
+  generateNpcs(
+    prompt: string,
+    sessionId?: string,
+    includePartyContext?: boolean,
+    retrievalTurnLimit?: number
+  ): Promise<WebOperationResult>;
   getContext(): Promise<string>;
   getLog(options?: string | { filePath?: string; sessionId?: string }): Promise<WebLogResponse>;
   getNpcs(): Promise<WebNpcResponse>;
@@ -241,6 +246,9 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       chat: dependencies.chat ?? createOpenAiChatAdapter(config.provider),
       config,
       partyContext,
+      reportStatus: (message) => {
+        consoleFeed.info(message);
+      },
       retrieval
     });
     return session.npcSession;
@@ -414,7 +422,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
         };
       });
     },
-    async generateNpcs(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true) {
+    async generateNpcs(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true, retrievalTurnLimit = 1) {
       return runExclusive("npcs", async (timing) => {
         const npcSessionState = readNpcSession(sessionId);
         const providerDebug = createProviderDebugCollector(config, consoleFeed);
@@ -424,6 +432,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
             ensureNpcSession(npcSessionState).generate(prompt, {
               includePartyContext,
               onProviderDiagnostic: providerDebug.collect,
+              retrievalTurnLimit,
               timing
             })
           );
