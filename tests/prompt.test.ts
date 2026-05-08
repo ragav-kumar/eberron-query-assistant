@@ -453,6 +453,7 @@ describe("assistant session", () => {
         completeStructured
       },
       retrieval: {
+        prepare: vi.fn().mockResolvedValue(undefined),
         refresh: vi.fn().mockResolvedValue({ chunkCount: 0, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
         search
       }
@@ -546,6 +547,7 @@ const mockRetrieval = (
   const search = vi.fn<RetrievalService["search"]>().mockResolvedValue(results);
   return {
     retrieval: {
+      prepare: vi.fn().mockResolvedValue(undefined),
       refresh: vi.fn().mockResolvedValue({ chunkCount: results.length, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
       search
     },

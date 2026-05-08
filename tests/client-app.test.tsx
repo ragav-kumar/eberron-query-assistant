@@ -225,50 +225,6 @@ describe("App", () => {
     expect(await screen.findByText("Answer")).toBeTruthy();
   });
 
-  it("prints returned provider debug entries to the browser console", async () => {
-    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => undefined);
-    vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
-      providerDebug: [
-        {
-          assistantContent: "Raw answer.",
-          endpoint: "https://provider.example/v1/chat/completions",
-          ok: true,
-          operation: "assistant",
-          operationId: "operation-1",
-          purpose: "assistant",
-          requestBody: {
-            messages: [{ role: "user", content: "What about Aerenal?" }],
-            model: "gpt-test-chat"
-          },
-          responseBody: {
-            choices: [{ message: { content: "Raw answer." } }]
-          },
-          status: 200,
-          timestamp: "2026-05-03T12:00:00.000Z"
-        }
-      ]
-    }));
-
-    try {
-      render(<App />);
-
-      fireEvent.change(await screen.findByPlaceholderText(/Ask about Eberron/i), {
-        target: { value: "What about Aerenal?" }
-      });
-      fireEvent.click(screen.getByRole("button", { name: "Ask" }));
-
-      await waitFor(() => {
-        expect(debugSpy).toHaveBeenCalled();
-      });
-      const debugEntry = debugSpy.mock.calls[0]?.[1] as api.ApiProviderDebugEntry | undefined;
-      expect(debugSpy.mock.calls[0]?.[0]).toBe("[EQA provider debug]");
-      expect(debugEntry?.assistantContent).toBe("Raw answer.");
-      expect(debugEntry?.requestBody.model).toBe("gpt-test-chat");
-    } finally {
-      debugSpy.mockRestore();
-    }
-  });
-
   it("keeps saved NPC cards after standard assistant prompts and mode switches", async () => {
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
       npcs: {

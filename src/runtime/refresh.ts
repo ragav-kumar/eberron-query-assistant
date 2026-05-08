@@ -69,7 +69,7 @@ export const runStartupRefresh = async (
   }
 
   const retrieval = dependencies.retrieval
-    ? await refreshRetrievalIndexes(config, options, dependencies)
+    ? await refreshRetrievalIndexes(config, options, dependencies, discovery.inventories, ingestion.summary.sourceSummaries)
     : undefined;
   throwIfAborted(options.abortSignal);
 
@@ -96,9 +96,17 @@ export const runStartupRefresh = async (
 const refreshRetrievalIndexes = async (
   config: RuntimeConfig,
   options: RuntimeOptions,
-  dependencies: StartupRefreshDependencies
+  dependencies: StartupRefreshDependencies,
+  inventories: SourceInventoryResult[],
+  sourceSummaries: SourceIngestionSummary[]
 ): Promise<RetrievalSyncSummary | undefined> => {
   if (!dependencies.retrieval) {
+    return undefined;
+  }
+
+  if (!shouldRefreshRetrievalIndexes(options, inventories, sourceSummaries)) {
+    await dependencies.retrieval.prepare(config);
+    dependencies.reporter.info("Retrieval indexes already current; skipping retrieval refresh.");
     return undefined;
   }
 
@@ -109,6 +117,26 @@ const refreshRetrievalIndexes = async (
   });
   dependencies.reporter.info("Retrieval indexes ready.");
   return retrieval;
+};
+
+const shouldRefreshRetrievalIndexes = (
+  options: RuntimeOptions,
+  inventories: SourceInventoryResult[],
+  sourceSummaries: SourceIngestionSummary[]
+): boolean => {
+  if (options.forceReingest) {
+    return true;
+  }
+
+  if (inventories.length === 0 && sourceSummaries.length === 0) {
+    return true;
+  }
+
+  if (inventories.some((inventory) => inventory.added > 0 || inventory.updated > 0 || inventory.removed > 0)) {
+    return true;
+  }
+
+  return sourceSummaries.some((summary) => summary.ingested > 0 || summary.removed > 0 || summary.status !== "skipped");
 };
 
 const summarizeDegradation = (

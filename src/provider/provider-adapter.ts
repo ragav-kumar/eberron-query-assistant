@@ -121,11 +121,24 @@ export const createOpenAiChatAdapter = (
       });
     };
 
-    const response = await fetchImpl(endpoint, {
-      method: "POST",
-      headers: provider.headers,
-      body: JSON.stringify(requestBody)
-    });
+    let response: Response;
+    try {
+      response = await fetchWithRetry(
+        endpoint,
+        {
+          method: "POST",
+          headers: provider.headers,
+          body: JSON.stringify(requestBody)
+        },
+        options
+      );
+    } catch (error) {
+      emitDiagnostic({
+        error: formatThrownValue(error),
+        ok: false
+      });
+      throw error;
+    }
 
     const body = await readJsonResponse(response);
     if (!response.ok) {

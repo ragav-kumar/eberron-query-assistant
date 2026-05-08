@@ -7,6 +7,7 @@ import { loadDefaultConfig } from "../src/config/index.js";
 import type { IngestionService } from "../src/ingestion/index.js";
 import type { ChatCompletionOptions, ChatMessage } from "../src/provider/index.js";
 import { createWebApp, isBusyError, isWebOperationError } from "../src/server/app.js";
+import { getProviderDebugLogPath } from "../src/server/provider-debug-log.js";
 import type { AssistantSessionAnswer } from "../src/runtime/assistant-session.js";
 import { createDefaultRuntimeState } from "../src/state/state-store.js";
 import type { RuntimeConfig, RetrievalResult } from "../src/types.js";
@@ -98,6 +99,7 @@ describe("web app API model", () => {
       config: await writeConfig("assistant-tool-progress"),
       ...mockRefreshDependencies(),
       retrieval: {
+        prepare: vi.fn().mockResolvedValue(undefined),
         refresh: vi.fn().mockResolvedValue({ chunkCount: 1, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
         search
       },
@@ -162,8 +164,9 @@ describe("web app API model", () => {
   });
 
   it("omits provider debug entries by default", async () => {
+    const config = await writeConfig("provider-debug-disabled");
     const app = createWebApp({
-      config: await writeConfig("provider-debug-disabled"),
+      config,
       ...mockRefreshDependencies(),
       retrieval: mockRetrieval([result()]).retrieval,
       chat: createDiagnosticChat(firstAnswer("Debug", "Debug Answer", "Debug answer."))
@@ -172,6 +175,7 @@ describe("web app API model", () => {
     const response = await app.askAssistant("What about debug?");
 
     expect(response.providerDebug).toEqual([]);
+    await expect(readFile(getProviderDebugLogPath(config.runtimeDir), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("returns provider debug entries for assistant and NPC operations when enabled", async () => {
@@ -196,6 +200,7 @@ describe("web app API model", () => {
       status: 200
     });
     expect(assistantResponse.providerDebug?.[0]?.requestBody.model).toBe("gpt-test-chat");
+    await expect(readFile(getProviderDebugLogPath(assistantConfig.runtimeDir), "utf8")).resolves.toContain("\"message\":\"{\\\"kind\\\":\\\"provider-diagnostic\\\"");
 
     const npcConfig = await writeConfig("provider-debug-npcs");
     npcConfig.provider.debug = true;
@@ -217,6 +222,23 @@ describe("web app API model", () => {
       purpose: "npcs"
     });
     expect(npcResponse.providerDebug?.[0]?.requestBody.model).toBe("gpt-test-chat");
+  });
+
+  it("writes startup refresh console progress into the debug log when enabled", async () => {
+    const config = await writeConfig("provider-debug-startup-refresh");
+    config.provider.debug = true;
+    const app = createWebApp({
+      config,
+      ...mockRefreshDependencies(),
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: createDiagnosticChat(firstAnswer("Debug", "Debug Answer", "Debug answer."))
+    });
+
+    await app.askAssistant("What about debug?");
+
+    const debugLog = await readFile(getProviderDebugLogPath(config.runtimeDir), "utf8");
+    expect(debugLog).toContain("\"kind\":\"console-entry\"");
+    expect(debugLog).toContain("No completed refresh found for this server session");
   });
 
   it("passes included party context into assistant prompts by default", async () => {
@@ -326,6 +348,7 @@ describe("web app API model", () => {
       discovery: { inspectSources },
       ingestion: { ingest },
       retrieval: {
+        prepare: vi.fn().mockResolvedValue(undefined),
         refresh,
         search: vi.fn().mockResolvedValue([])
       },
@@ -564,6 +587,7 @@ describe("web app API model", () => {
         })
       },
       retrieval: {
+        prepare: vi.fn().mockResolvedValue(undefined),
         refresh,
         search: vi.fn().mockResolvedValue([result()])
       },
@@ -1451,8 +1475,9 @@ const readChatMessages = (chat: ReturnType<typeof vi.fn>, callIndex = 0): ChatMe
 
 const mockRetrieval = (
   results: RetrievalResult[]
-): { retrieval: { refresh: ReturnType<typeof vi.fn>; search: ReturnType<typeof vi.fn> } } => ({
+): { retrieval: { prepare: ReturnType<typeof vi.fn>; refresh: ReturnType<typeof vi.fn>; search: ReturnType<typeof vi.fn> } } => ({
   retrieval: {
+    prepare: vi.fn().mockResolvedValue(undefined),
     refresh: vi.fn().mockResolvedValue({ chunkCount: results.length, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
     search: vi.fn().mockResolvedValue(results)
   }

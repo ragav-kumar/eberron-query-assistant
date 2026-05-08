@@ -504,8 +504,10 @@ p {
 }
 
 .console-message {
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .empty-output {

@@ -33,6 +33,7 @@ export interface RetrievalSyncSummary {
 }
 
 export interface RetrievalService {
+  prepare(config: RuntimeConfig): Promise<void>;
   refresh(config: RuntimeConfig, options?: { abortSignal?: AbortSignal; forceRebuild?: boolean }): Promise<RetrievalSyncSummary>;
   search(request: RetrievalSearchRequest): Promise<RetrievalResult[]>;
 }
@@ -112,11 +113,8 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
     nextConfig: RuntimeConfig,
     options: { abortSignal?: AbortSignal; forceRebuild?: boolean } = {}
   ): Promise<RetrievalSyncSummary> => {
-    config = nextConfig;
+    await prepare(nextConfig);
     throwIfAborted(options.abortSignal);
-    await mkdir(nextConfig.retrievalDir, { recursive: true });
-    shouldCacheVectorRows = await shouldUseVectorCache(nextConfig, vectorCacheByteLimit);
-    vectorCache = null;
     if (options.forceRebuild) {
       await deleteLegacyVectorIndex(nextConfig, dependencies.reporter);
     }
@@ -150,6 +148,13 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
     }
   };
 
+  const prepare = async (nextConfig: RuntimeConfig): Promise<void> => {
+    config = nextConfig;
+    await mkdir(nextConfig.retrievalDir, { recursive: true });
+    shouldCacheVectorRows = await shouldUseVectorCache(nextConfig, vectorCacheByteLimit);
+    vectorCache = null;
+  };
+
   const search = async (request: RetrievalSearchRequest): Promise<RetrievalResult[]> => {
     const limit = request.limit ?? DEFAULT_LIMIT;
     if (request.query.trim().length === 0 || limit <= 0) {
@@ -167,6 +172,19 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
       const lexicalResults = await timing.reporter.time(timing, "retrieval.lexical", () =>
         searchLexical(database, request, limit)
       );
+      if (!shouldCacheVectorRows && lexicalResults.length > 0) {
+        dependencies.reporter.info(
+          `Large corpus retrieval is using lexical matches only for this query; skipping full semantic vector scan. lexicalResults=${lexicalResults.length}, limit=${limit}.`
+        );
+        return lexicalResults;
+      }
+
+      if (!shouldCacheVectorRows) {
+        dependencies.reporter.info(
+          "Large corpus retrieval found no lexical matches; starting direct semantic vector scan from SQLite."
+        );
+      }
+
       const semanticResults = await timing.reporter.time(timing, "retrieval.vector", () =>
         searchVector(database, request, limit, dependencies.embeddingAdapter, {
           canCache() {
@@ -196,6 +214,7 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
   };
 
   return {
+    prepare,
     refresh,
     search
   };

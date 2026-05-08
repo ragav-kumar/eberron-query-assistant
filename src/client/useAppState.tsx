@@ -26,7 +26,6 @@ import {
   type ApiLog,
   type ApiNpcResponse,
   type ApiOperationResult,
-  type ApiProviderDebugEntry,
   type ApiStatus
 } from "./api.js";
 import type { InputMode, LeftTab, OutputTab } from "./components/ui-types.js";
@@ -100,7 +99,6 @@ export const useAppState = (): AppState => {
 
 const useCreateAppState = (): AppState => {
   const sessionCounter = useRef(1);
-  const providerDebugKeys = useRef(new Set<string>());
   const [standardSessionId, setStandardSessionId] = useState("standard-1");
   const initialStandardSessionId = useRef("standard-1");
   const [npcSessionId, setNpcSessionId] = useState("npcs-1");
@@ -255,16 +253,12 @@ const useCreateAppState = (): AppState => {
       setStatus({ busy: true, operation: operationName });
       try {
         const result = await operation();
-        printProviderDebugEntries(result.providerDebug, providerDebugKeys.current);
         setConsoleOutput(result.console);
         setNpcs(result.npcs);
         applyResult(result);
       } catch (requestError) {
         if (isApiRequestError(requestError) && requestError.console) {
           setConsoleOutput(requestError.console);
-        }
-        if (isApiRequestError(requestError)) {
-          printProviderDebugEntries(requestError.providerDebug, providerDebugKeys.current);
         }
         setError(formatError(requestError));
       } finally {
@@ -432,26 +426,6 @@ const appendConsoleEntry = (consoleOutput: ApiConsole, entry: ApiConsoleEntry): 
   return {
     entries: [...consoleOutput.entries, entry]
   };
-};
-
-const printProviderDebugEntries = (
-  entries: ApiProviderDebugEntry[] | undefined,
-  printedKeys: Set<string>
-): void => {
-  for (const entry of entries ?? []) {
-    const key = [
-      entry.operationId,
-      entry.purpose,
-      entry.timestamp,
-      String(entry.status ?? ""),
-      String(entry.ok)
-    ].join("|");
-    if (printedKeys.has(key)) {
-      continue;
-    }
-    printedKeys.add(key);
-    console.debug("[EQA provider debug]", entry);
-  }
 };
 
 interface StatusSnapshotSetters {

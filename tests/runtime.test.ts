@@ -103,6 +103,7 @@ describe("startup refresh skeleton", () => {
         },
         reporter: createMemoryProgressReporter(),
         retrieval: {
+          prepare: vi.fn().mockResolvedValue(undefined),
           refresh: vi.fn().mockRejectedValue(new Error("simulated retrieval failure")),
           search: vi.fn().mockResolvedValue([])
         },
@@ -120,6 +121,7 @@ describe("startup refresh skeleton", () => {
     const state = createDefaultRuntimeState();
     const save = vi.fn<(_config: ReturnType<typeof loadDefaultConfig>, _state: RuntimeState) => Promise<void>>().mockResolvedValue(undefined);
     const retrieval = {
+      prepare: vi.fn().mockResolvedValue(undefined),
       refresh: vi.fn().mockResolvedValue({ chunkCount: 0, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
       search: vi.fn().mockResolvedValue([])
     };
@@ -237,6 +239,7 @@ describe("startup refresh skeleton", () => {
     const state = createDefaultRuntimeState();
     const nextState = createDefaultRuntimeState();
     const retrieval = {
+      prepare: vi.fn().mockResolvedValue(undefined),
       refresh: vi.fn().mockResolvedValue({ chunkCount: 1, reusedEmbeddings: 0, regeneratedEmbeddings: 1 }),
       search: vi.fn().mockResolvedValue([])
     };
@@ -275,6 +278,70 @@ describe("startup refresh skeleton", () => {
     expect(retrieval.refresh).toHaveBeenNthCalledWith(2, loadDefaultConfig(PLACEHOLDER_ROOT), {
       forceRebuild: true
     });
+  });
+
+  it("skips retrieval refresh when startup work found no source changes", async () => {
+    const state = createDefaultRuntimeState();
+    const retrieval = {
+      prepare: vi.fn().mockResolvedValue(undefined),
+      refresh: vi.fn().mockResolvedValue({ chunkCount: 1, reusedEmbeddings: 1, regeneratedEmbeddings: 0 }),
+      search: vi.fn().mockResolvedValue([])
+    };
+    const reporter = createMemoryProgressReporter();
+
+    const summary = await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false }, {
+      discovery: {
+        inspectSources: vi.fn().mockResolvedValue({
+          degraded: false,
+          nextState: state,
+          inventories: [
+            {
+              sourceType: "foundry",
+              discovered: 1,
+              added: 0,
+              updated: 0,
+              removed: 0,
+              failed: 0,
+              status: "skipped",
+              message: "foundry: unchanged.",
+              details: []
+            }
+          ]
+        })
+      },
+      ingestion: {
+        ingest: vi.fn().mockResolvedValue({
+          nextState: state,
+          summary: {
+            corpusSourceCount: 1,
+            degraded: false,
+            sourceSummaries: [
+              {
+                sourceType: "foundry",
+                status: "skipped",
+                discovered: 0,
+                ingested: 0,
+                removed: 0,
+                failed: 0,
+                message: "foundry: ingestion skipped.",
+                details: []
+              }
+            ]
+          }
+        })
+      },
+      reporter,
+      retrieval,
+      stateStore: {
+        load: vi.fn().mockResolvedValue({ state }),
+        save: vi.fn().mockResolvedValue(undefined)
+      }
+    });
+
+    expect(summary.retrieval).toBeUndefined();
+    expect(retrieval.prepare).toHaveBeenCalledWith(loadDefaultConfig(PLACEHOLDER_ROOT));
+    expect(retrieval.refresh).not.toHaveBeenCalled();
+    expect(reporter.messages).toContain("Retrieval indexes already current; skipping retrieval refresh.");
   });
 });
 

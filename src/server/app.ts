@@ -28,6 +28,7 @@ import {
   type SessionLog,
   type SessionLogFile
 } from "../runtime/session-log.js";
+import { createProviderDebugLog } from "./provider-debug-log.js";
 import { createFilesystemSourceDiscoveryService, type SourceDiscoveryService } from "../source-discovery/index.js";
 import { createFilesystemStateStore, type StateStore } from "../state/index.js";
 import { createJsonlTimingReporter, type TimingContext, type TimingReporter } from "../timing.js";
@@ -132,7 +133,8 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   const config = dependencies.config ?? loadDefaultConfig();
   let hasRoutineRefresh = false;
   let nextOperationId = 1;
-  const consoleFeed = createMemoryConsoleFeed();
+  const debugLog = config.provider.debug ? createProviderDebugLog(config.runtimeDir) : null;
+  const consoleFeed = createMemoryConsoleFeed(debugLog);
   const timingReporter = dependencies.timing ?? createJsonlTimingReporter({ repoRoot: config.repoRoot });
   const standardSessions = new Map<string, StandardSessionState>();
   const npcSessions = new Map<string, NpcSessionState>();
@@ -382,7 +384,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     async askAssistant(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true, retrievalTurnLimit = 1) {
       return runExclusive("assistant", async (timing) => {
         const standardSession = readStandardSession(sessionId);
-        const providerDebug = createProviderDebugCollector(config);
+        const providerDebug = createProviderDebugCollector(config, consoleFeed);
         try {
           await ensureRoutineRefresh(timing);
           await timing.reporter.time(timing, "web.assistant.ask", () =>
@@ -393,7 +395,9 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
               timing
             })
           );
+          await providerDebug.flush();
         } catch (error) {
+          await providerDebug.flush();
           const message = formatThrownValue(error);
           consoleFeed.error(`Assistant response failed: ${message}`);
           throw createWebOperationError(message, consoleFeed.read(), providerDebug.entries);
@@ -410,7 +414,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     async generateNpcs(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true) {
       return runExclusive("npcs", async (timing) => {
         const npcSessionState = readNpcSession(sessionId);
-        const providerDebug = createProviderDebugCollector(config);
+        const providerDebug = createProviderDebugCollector(config, consoleFeed);
         try {
           await ensureRoutineRefresh(timing);
           await timing.reporter.time(timing, "web.npcs.generate", () =>
@@ -420,7 +424,9 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
               timing
             })
           );
+          await providerDebug.flush();
         } catch (error) {
+          await providerDebug.flush();
           const message = formatThrownValue(error);
           consoleFeed.error(`NPC generation failed: ${message}`);
           throw createWebOperationError(message, consoleFeed.read(), providerDebug.entries);
@@ -525,9 +531,13 @@ const createWebOperationError = (
   ...(providerDebug.length > 0 ? { providerDebug } : {})
 });
 
-const createProviderDebugCollector = (config: RuntimeConfig): {
+const createProviderDebugCollector = (
+  config: RuntimeConfig,
+  consoleFeed: MemoryConsoleFeed
+): {
   collect: (diagnostic: ChatCompletionDiagnostic) => void;
   entries: ChatCompletionDiagnostic[];
+  flush: () => Promise<void>;
 } => {
   const entries: ChatCompletionDiagnostic[] = [];
 
@@ -535,9 +545,13 @@ const createProviderDebugCollector = (config: RuntimeConfig): {
     collect(diagnostic) {
       if (config.provider.debug) {
         entries.push(diagnostic);
+        consoleFeed.debug(formatProviderDiagnosticMessage(diagnostic));
       }
     },
-    entries
+    entries,
+    flush() {
+      return Promise.resolve();
+    }
   };
 };
 
@@ -601,7 +615,7 @@ interface MemoryConsoleFeed {
   warn(message: string): void;
 }
 
-const createMemoryConsoleFeed = (): MemoryConsoleFeed => {
+const createMemoryConsoleFeed = (debugLog: ReturnType<typeof createProviderDebugLog> | null): MemoryConsoleFeed => {
   const entries: WebConsoleEntry[] = [];
   const listeners = new Set<WebConsoleListener>();
   let nextId = 1;
@@ -614,6 +628,12 @@ const createMemoryConsoleFeed = (): MemoryConsoleFeed => {
       message,
       timestamp: new Date().toISOString()
     };
+    debugLog?.append({
+      kind: "console-entry",
+      level,
+      message,
+      timestamp: entry.timestamp
+    });
     entries.push(entry);
     nextId += 1;
     if (entries.length > MAX_CONSOLE_ENTRIES) {
@@ -699,6 +719,13 @@ const formatRefreshSummaryMessage = (summary: StartupRefreshSummary): string => 
     : "";
   const degraded = summary.degraded ? ` Degraded sources: ${summary.degradedSources.join(", ")}.` : "";
   return `Refresh complete. Force reingest: ${String(summary.forceReingest)}.${retrieval}${degraded}`;
+};
+
+const formatProviderDiagnosticMessage = (diagnostic: ChatCompletionDiagnostic): string => {
+  return JSON.stringify({
+    kind: "provider-diagnostic",
+    ...diagnostic
+  });
 };
 
 export const toPublicPath = (filePath: string): string => {

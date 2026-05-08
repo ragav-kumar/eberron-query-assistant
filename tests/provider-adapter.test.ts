@@ -183,6 +183,49 @@ describe("OpenAI-compatible provider adapters", () => {
     expect(onDiagnostic).not.toHaveBeenCalled();
   });
 
+  it("retries transient chat failures", async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse({ error: { message: "rate limit" } }, 429))
+      .mockResolvedValueOnce(jsonResponse({
+        choices: [
+          {
+            message: {
+              content: "Retry answer."
+            }
+          }
+        ]
+      }));
+
+    await expect(createOpenAiChatAdapter(config, {
+      fetchImpl,
+      maxRetries: 1,
+      retryDelayMs: 0
+    }).complete([{ role: "user", content: "Retry this." }])).resolves.toBe("Retry answer.");
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
+  });
+
+  it("times out stalled chat requests", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockImplementation((_url, init) => {
+      return new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+
+    await expect(createOpenAiChatAdapter(config, {
+      fetchImpl,
+      maxRetries: 0,
+      requestTimeoutMs: 1
+    }).complete([{ role: "user", content: "Timeout." }])).rejects.toMatchObject({
+      name: "AbortError"
+    });
+
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
   it("returns embedding vectors from the embeddings endpoint", async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({

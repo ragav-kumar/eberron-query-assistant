@@ -72,6 +72,20 @@ describe("Phase 4 retrieval", () => {
     expect(foundryResults[0]?.sourceKey).toBe("actor-ashana");
   });
 
+  it("can search after prepare without running a full retrieval refresh", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const store = await seedCorpus(config);
+    const firstRetrieval = createRetrieval();
+    const secondRetrieval = createRetrieval();
+
+    await firstRetrieval.refresh(config);
+    await secondRetrieval.prepare(config);
+    const results = await secondRetrieval.search({ query: "deathless aerenal", limit: 3 });
+
+    expect(results[0]?.sourceKey).toBe("eberron.pdf");
+    store.close();
+  });
+
   it("removes stale source chunks from retrieval results", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = await seedCorpus(config);

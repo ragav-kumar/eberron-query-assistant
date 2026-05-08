@@ -2,6 +2,16 @@
 
 This file records intentional high-level changes on top of the frozen Phase 6 historical baseline. Its purpose is to prevent future sessions from mistaking deliberate changes for unintended divergence.
 
+## Capped Provider Debug Log
+
+Setting `EQA_PROVIDER_DEBUG=true` still returns provider diagnostics to the browser, but those diagnostics are now also written as JSON lines into a bounded runtime log at `.eberron-query-assistant/provider-debug.jsonl`. The file keeps only the newest entries up to its configured line cap and drops older lines from the top as new diagnostics arrive.
+
+The same file also mirrors local Console/debug progress entries, including startup refresh flow, so long-running or stalled requests can be correlated with what the local runtime was doing before any provider call happened. Provider diagnostics are now mirrored through that same server-side Console stream instead of a separate client-only browser `console.debug(...)` path.
+
+This keeps raw provider request and response diagnostics available after a stalled or failed browser interaction without mixing them into transcript logs. Authorization headers and API keys remain excluded from the captured diagnostic payloads.
+
+Verification added for this change covers disabled-by-default disk behavior, enabled app-level file writing, and low-cap line trimming behavior.
+
 ## Request Timing Diagnostics And Mini Default
 
 The default OpenAI chat model is `gpt-5.4-mini` to favor faster routine assistant responses while preserving an override through `OPENAI_CHAT_MODEL`.
@@ -26,11 +36,17 @@ Verification added for this change covers prompt instructions and session-title 
 
 ## Opt-In Provider Debug Console
 
-Setting `EQA_PROVIDER_DEBUG=true` enables local raw chat diagnostics for Standard assistant and NPC Generator provider calls. When enabled, each completed chat call returns its raw provider request body, raw JSON response body when available, extracted assistant content, status, endpoint, and operation metadata to the browser, which prints the entry with `console.debug("[EQA provider debug]", entry)`.
+Setting `EQA_PROVIDER_DEBUG=true` enables local raw chat diagnostics for Standard assistant and NPC Generator provider calls. When enabled, each completed chat call still returns its raw provider request body, raw JSON response body when available, extracted assistant content, status, endpoint, and operation metadata to the browser, and the server now emits the same diagnostic payload into the app Console/debug stream.
 
-This diagnostic path is off by default because request bodies can include full prompt context, retrieved evidence, and local assistant notes. It never includes authorization headers or API keys, is not saved to transcript logs, is not written to `.test-tmp/` or `.eberron-query-assistant/`, and is not replayed through status recovery.
+This diagnostic path is off by default because request bodies can include full prompt context, retrieved evidence, and local assistant notes. It never includes authorization headers or API keys, is not saved to transcript logs, is not replayed through status recovery, and is mirrored into the bounded runtime log described above through the same server-side Console path the browser UI reads.
 
-Verification added for this change covers the config flag, provider diagnostic capture, disabled-by-default server responses, enabled assistant and NPC operation diagnostics, and browser console printing.
+Verification added for this change covers the config flag, provider diagnostic capture, disabled-by-default server responses, enabled assistant and NPC operation diagnostics, and server-side Console mirroring.
+
+## Startup Retrieval Refresh Skip
+
+Routine startup refresh now skips retrieval-index refresh entirely when discovery and ingestion both found no source changes and the run is not a force reingest. This preserves the existing explicit force-rebuild path while avoiding expensive retrieval maintenance work on unchanged corpora during app startup.
+
+Verification added for this change covers skipped retrieval refresh on unchanged startup runs and preserved force-reingest rebuild behavior.
 
 ## Retrieval Vector Cache
 
