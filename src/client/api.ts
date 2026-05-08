@@ -1,3 +1,36 @@
+/**
+ * Browser-side client for the local Node/Vite runtime exposed under `/api/*`.
+ *
+ * This module is the intended boundary between React UI code and the non-React
+ * runtime. UI code should treat these functions as the contract for reading
+ * persisted state, starting server-owned operations, and subscribing to the
+ * transient Console stream.
+ *
+ * Data model notes for UI work:
+ * - `ApiLog` is persisted Standard assistant transcript data. It may represent
+ *   the active writable session or a read-only historical log selected by path.
+ * - `ApiNpcResponse` is persisted generated NPC state, independent of the
+ *   current prompt mode or current assistant session.
+ * - `ApiConsole` is transient process-local operational output. It is not a
+ *   transcript and is not recovered across server restarts.
+ * - `ApiStatus` is a snapshot used to recover browser state after reloads or to
+ *   discover any server-owned operation that is already in progress.
+ *
+ * Session id expectations:
+ * - `askAssistant`, `getLog`, and `getStatus` use the Standard assistant
+ *   session id owned by the browser UI.
+ * - `generateNpcs` uses the NPC generation session id owned by the browser UI.
+ * - The runtime uses those ids to keep browser-owned session state separate; it
+ *   does not derive them from URL state or server-side user identity.
+ *
+ * Error behavior:
+ * - All request helpers throw on non-2xx responses.
+ * - When the server includes Console output or provider diagnostics in an error
+ *   response, `requestJson` attaches them to the thrown `ApiRequestError`.
+ * - `isApiRequestError` is the supported guard when UI code wants to recover
+ *   streamed Console state from a failed request without treating every error as
+ *   a plain string message.
+ */
 export interface ApiLog {
   activeFilePath: string | null;
   exchanges: ApiLogEntry[];
@@ -90,6 +123,7 @@ export interface ApiStatus {
   npcs: ApiNpcResponse;
 }
 
+/** Reads a Standard assistant transcript snapshot for the given browser-owned session id. */
 export const getLog = async (options: { filePath?: string; sessionId: string }): Promise<ApiLog> => {
   const params = new URLSearchParams({ sessionId: options.sessionId });
   if (options.filePath !== undefined) {
@@ -99,20 +133,24 @@ export const getLog = async (options: { filePath?: string; sessionId: string }):
   return requestJson<ApiLog>(`/api/log${query}`);
 };
 
+/** Reads the current contents of `assistant/additional-context.md` as markdown text. */
 export const getContext = async (): Promise<string> => {
   const response = await requestJson<{ markdown: string }>("/api/context");
   return response.markdown;
 };
 
+/** Reads the currently persisted generated NPC collection. */
 export const getNpcs = async (): Promise<ApiNpcResponse> => {
   return requestJson<ApiNpcResponse>("/api/npcs");
 };
 
+/** Reads the current process snapshot, including active operation, Console replay, log, and NPC state. */
 export const getStatus = async (options: { sessionId: string }): Promise<ApiStatus> => {
   const params = new URLSearchParams({ sessionId: options.sessionId });
   return requestJson<ApiStatus>(`/api/status?${params.toString()}`);
 };
 
+/** Persists the browser-edited additional context markdown back to local disk. */
 export const writeContext = async (markdown: string): Promise<void> => {
   await requestJson<{ ok: true }>("/api/context", {
     method: "PUT",
@@ -120,6 +158,7 @@ export const writeContext = async (markdown: string): Promise<void> => {
   });
 };
 
+/** Starts one Standard assistant operation and returns updated Console, log, and NPC snapshots when it completes. */
 export const askAssistant = async (
   prompt: string,
   sessionId: string,
@@ -132,6 +171,7 @@ export const askAssistant = async (
   });
 };
 
+/** Starts one NPC generation operation and returns updated Console, log, and persisted NPC snapshots when it completes. */
 export const generateNpcs = async (
   prompt: string,
   sessionId: string,
@@ -144,6 +184,7 @@ export const generateNpcs = async (
   });
 };
 
+/** Starts a routine refresh or explicit force reingest against the local corpus and retrieval artifacts. */
 export const refresh = async (forceReingest: boolean): Promise<ApiOperationResult> => {
   return requestJson<ApiOperationResult>("/api/refresh", {
     method: "POST",
@@ -151,6 +192,14 @@ export const refresh = async (forceReingest: boolean): Promise<ApiOperationResul
   });
 };
 
+/**
+ * Subscribes to transient process-local Console events via Server-Sent Events.
+ *
+ * This stream is operational output, not transcript history. A new browser
+ * subscriber can receive replayed in-memory entries from the current server
+ * process, but the stream is intentionally lost if that local server process is
+ * restarted.
+ */
 export const subscribeConsole = (onEntry: (entry: ApiConsoleEntry) => void): (() => void) => {
   if (typeof EventSource === "undefined") {
     return () => undefined;
@@ -167,6 +216,7 @@ export const subscribeConsole = (onEntry: (entry: ApiConsoleEntry) => void): (()
   };
 };
 
+/** Issues a JSON request and throws an enriched error when the local runtime responds with a failure status. */
 const requestJson = async <T>(url: string, init: RequestInit = {}): Promise<T> => {
   const response = await fetch(url, {
     ...init,
@@ -198,6 +248,7 @@ export interface ApiRequestError extends Error {
   providerDebug?: ApiProviderDebugEntry[];
 }
 
+/** Narrows an unknown thrown value to the enriched API error shape used by `requestJson`. */
 export const isApiRequestError = (error: unknown): error is ApiRequestError => {
   return error instanceof Error && "console" in error;
 };
