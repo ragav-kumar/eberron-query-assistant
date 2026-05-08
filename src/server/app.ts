@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { loadDefaultConfig } from "../config/index.js";
-import { formatThrownValue, hasErrorCode } from "../errors.js";
+import { formatThrownValue, hasErrorCode, isOperationAbortedError } from "../errors.js";
 import { createFilesystemIngestionService, createSqliteCorpusStore, type IngestionService } from "../ingestion/index.js";
 import {
   createOpenAiChatAdapter,
@@ -114,6 +114,13 @@ interface NpcSessionState {
   npcSession: NpcGenerationSession | null;
 }
 
+interface ActiveOperation {
+  abortController: AbortController;
+  done: Promise<void>;
+  id: string;
+  name: string;
+}
+
 export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   const config = dependencies.config ?? loadDefaultConfig();
   let hasRoutineRefresh = false;
@@ -168,7 +175,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     });
     return session.log;
   };
-  let activeOperation: string | null = null;
+  let activeOperation: ActiveOperation | null = null;
   const defaultReporter = createQueuedConsoleProgressReporter(consoleFeed);
   const partyContext = createCachedPartyContextService(dependencies.partyContext ?? createSqlitePartyContextService());
   const retrieval =
@@ -246,22 +253,47 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     };
   };
 
-  const runExclusive = async <T>(operation: string, task: (timing: TimingContext) => Promise<T>): Promise<T> => {
+  const runExclusive = async <T>(
+    operation: string,
+    task: (timing: TimingContext, abortSignal: AbortSignal) => Promise<T>,
+    options: { cancelStartupRefresh?: boolean } = {}
+  ): Promise<T> => {
     if (activeOperation !== null) {
-      throw createBusyError(activeOperation);
+      if (options.cancelStartupRefresh && activeOperation.name === "startup-refresh") {
+        const canceledOperation = activeOperation;
+        consoleFeed.warn("Canceling startup refresh before force reingest.");
+        canceledOperation.abortController.abort();
+        await canceledOperation.done;
+      } else {
+        throw createBusyError(activeOperation.name);
+      }
     }
 
-    activeOperation = operation;
+    const abortController = new AbortController();
+    let resolveDone: () => void = () => undefined;
+    const done = new Promise<void>((resolve) => {
+      resolveDone = resolve;
+    });
+    const operationId = `${new Date().toISOString()}-${operation}-${nextOperationId}`;
+    activeOperation = {
+      abortController,
+      done,
+      id: operationId,
+      name: operation
+    };
     const timing = {
       operation,
-      operationId: `${new Date().toISOString()}-${operation}-${nextOperationId}`,
+      operationId,
       reporter: timingReporter
     };
     nextOperationId += 1;
     try {
-      return await timingReporter.time(timing, "web.operation", () => task(timing));
+      return await timingReporter.time(timing, "web.operation", () => task(timing, abortController.signal));
     } finally {
-      activeOperation = null;
+      if (activeOperation?.id === operationId) {
+        activeOperation = null;
+      }
+      resolveDone();
     }
   };
 
@@ -270,10 +302,14 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       return;
     }
 
-    void runExclusive("startup-refresh", async (timing) => {
+    void runExclusive("startup-refresh", async (timing, abortSignal) => {
       try {
-        await timing.reporter.time(timing, "web.startup_refresh.run", () => runRefreshTask(false));
+        await timing.reporter.time(timing, "web.startup_refresh.run", () => runRefreshTask(false, abortSignal));
       } catch (error) {
+        if (isOperationAbortedError(error)) {
+          consoleFeed.warn("Startup refresh canceled.");
+          return;
+        }
         const message = formatThrownValue(error);
         consoleFeed.error(`Startup refresh failed: ${message}`);
         throw error;
@@ -281,9 +317,11 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     }).catch(() => undefined);
   };
 
-  const runRefreshTask = async (forceReingest: boolean): Promise<StartupRefreshSummary> => {
+  const runRefreshTask = async (forceReingest: boolean, abortSignal?: AbortSignal): Promise<StartupRefreshSummary> => {
     const reporter = createQueuedConsoleProgressReporter(consoleFeed);
+    const stateStore = dependencies.stateStore ?? createFilesystemStateStore();
     const options: RuntimeOptions = {
+      abortSignal,
       forceReingest,
       retrievalQuery: null
     };
@@ -293,11 +331,12 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
         dependencies.ingestion ??
         createFilesystemIngestionService({
           corpusStore: createSqliteCorpusStore(),
-          reporter
+          reporter,
+          stateStore
         }),
       reporter,
       retrieval,
-      stateStore: dependencies.stateStore ?? createFilesystemStateStore()
+      stateStore
     });
     await reporter.flush();
     hasRoutineRefresh = true;
@@ -312,7 +351,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     }
     consoleFeed.info("No completed refresh found for this server session; running routine refresh before continuing.");
     if (timing) {
-      await timing.reporter.time(timing, "web.refresh.ensure", () => runRefreshTask(false));
+        await timing.reporter.time(timing, "web.refresh.ensure", () => runRefreshTask(false));
       return;
     }
     await runRefreshTask(false);
@@ -383,15 +422,15 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     },
     async getStatus(options = {}) {
       return {
-        activeOperation,
+        activeOperation: activeOperation?.name ?? null,
         console: consoleFeed.read(),
         log: await readLog({ sessionId: options.sessionId ?? DEFAULT_SESSION_ID }),
         npcs: await readNpcs()
       };
     },
     async refresh(forceReingest) {
-      return runExclusive(forceReingest ? "force-reingest" : "refresh", async (timing) => {
-        const summary = await timing.reporter.time(timing, "web.refresh.run", () => runRefreshTask(forceReingest));
+      return runExclusive(forceReingest ? "force-reingest" : "refresh", async (timing, abortSignal) => {
+        const summary = await timing.reporter.time(timing, "web.refresh.run", () => runRefreshTask(forceReingest, abortSignal));
         return {
           ok: true,
           console: consoleFeed.read(),
@@ -399,7 +438,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           log: emptyLogResponse(await listSessionLogFiles(config.logDir, null)),
           npcs: await readNpcs()
         };
-      });
+      }, { cancelStartupRefresh: forceReingest });
     },
     startStartupRefresh,
     subscribeConsole(listener) {

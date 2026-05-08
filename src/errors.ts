@@ -4,6 +4,11 @@ export interface TaggedError {
   name: string;
 }
 
+export interface OperationAbortedError extends TaggedError {
+  kind: "operation-aborted";
+  name: "operation-aborted";
+}
+
 export const createTaggedError = (kind: string, message: string): TaggedError => {
   return {
     kind,
@@ -18,6 +23,16 @@ export const formatThrownValue = (value: unknown): string => {
   }
 
   return String(value);
+};
+
+export const throwIfAborted = (signal: AbortSignal | undefined, message = "Operation was canceled."): void => {
+  if (signal?.aborted) {
+    throw createTaggedError("operation-aborted", message);
+  }
+};
+
+export const isOperationAbortedError = (value: unknown): value is OperationAbortedError => {
+  return isRecord(value) && value.kind === "operation-aborted";
 };
 
 export const hasErrorCode = (value: unknown, code: string): boolean => {

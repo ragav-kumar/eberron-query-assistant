@@ -1,6 +1,7 @@
 import type { TimingContext } from "./timing.js";
 
 export interface RuntimeOptions {
+  abortSignal?: AbortSignal | undefined;
   forceReingest: boolean;
   retrievalQuery: string | null;
 }

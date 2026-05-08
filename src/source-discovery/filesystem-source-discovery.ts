@@ -67,10 +67,14 @@ export const createFilesystemSourceDiscoveryService = (
         });
       }
 
-      nextState.foundry.lastSuccessfulExport = scheduledMarkers.at(-1) ?? null;
       nextState.foundry.appliedExportFilenames = options.forceReingest
         ? scheduledMarkers.map((marker) => marker.filename)
         : [...appliedFilenames, ...scheduledMarkers.map((marker) => marker.filename)].sort((a, b) => a.localeCompare(b));
+      nextState.foundry.lastSuccessfulExport = selectLatestAppliedMarker(
+        markers,
+        nextState.foundry.appliedExportFilenames,
+        state.foundry.lastSuccessfulExport
+      );
 
       return createInventoryResult({
         sourceType: "foundry",
@@ -246,6 +250,20 @@ const parseFoundryExportManifest = async (foundryExportDir: string, filename: st
   }
 
   return parseFoundryManifestEnvelope(filename, parsed);
+};
+
+const selectLatestAppliedMarker = (
+  markers: FoundryExportMarker[],
+  appliedFilenames: string[],
+  fallback: FoundryExportMarker | null
+): FoundryExportMarker | null => {
+  const markerByFilename = new Map(markers.map((marker) => [marker.filename, marker]));
+  const latestFilename = [...appliedFilenames].sort((a, b) => a.localeCompare(b)).at(-1);
+  if (!latestFilename) {
+    return null;
+  }
+
+  return markerByFilename.get(latestFilename) ?? (fallback?.filename === latestFilename ? { ...fallback } : null);
 };
 
 const readFirstLine = async (filePath: string): Promise<string> => {

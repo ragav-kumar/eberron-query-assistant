@@ -11,7 +11,7 @@ import type {
   SourceType,
   StartupRefreshSummary
 } from "../types.js";
-import { createTaggedError } from "../errors.js";
+import { createTaggedError, throwIfAborted } from "../errors.js";
 
 export interface StartupRefreshDependencies {
   discovery: SourceDiscoveryService;
@@ -27,14 +27,17 @@ export const runStartupRefresh = async (
   dependencies: StartupRefreshDependencies
 ): Promise<StartupRefreshSummary> => {
   dependencies.reporter.info("Starting source inventory checks.");
+  throwIfAborted(options.abortSignal);
   const stateLoad = await dependencies.stateStore.load(config);
   const state = stateLoad.state;
+  throwIfAborted(options.abortSignal);
 
   if (options.forceReingest) {
     dependencies.reporter.info("Force re-ingest requested; source inventory will schedule all available sources.");
   }
 
   const discovery = await dependencies.discovery.inspectSources(config, options, state);
+  throwIfAborted(options.abortSignal);
 
   for (const inventory of discovery.inventories) {
     const report = `${inventory.message} discovered=${inventory.discovered}, added=${inventory.added}, updated=${inventory.updated}, removed=${inventory.removed}, failed=${inventory.failed}, status=${inventory.status}.`;
@@ -47,6 +50,7 @@ export const runStartupRefresh = async (
   }
 
   const ingestion = await dependencies.ingestion.ingest(config, options, state, discovery);
+  throwIfAborted(options.abortSignal);
 
   for (const summary of ingestion.summary.sourceSummaries) {
     const report = `${summary.message} discovered=${summary.discovered}, ingested=${summary.ingested}, removed=${summary.removed}, failed=${summary.failed}, status=${summary.status}.`;
@@ -67,6 +71,7 @@ export const runStartupRefresh = async (
   const retrieval = dependencies.retrieval
     ? await refreshRetrievalIndexes(config, options, dependencies)
     : undefined;
+  throwIfAborted(options.abortSignal);
 
   await dependencies.stateStore.save(config, ingestion.nextState);
 
@@ -99,6 +104,7 @@ const refreshRetrievalIndexes = async (
 
   dependencies.reporter.info("Refreshing retrieval indexes.");
   const retrieval = await dependencies.retrieval.refresh(config, {
+    ...(options.abortSignal ? { abortSignal: options.abortSignal } : {}),
     forceRebuild: options.forceReingest
   });
   dependencies.reporter.info("Retrieval indexes ready.");

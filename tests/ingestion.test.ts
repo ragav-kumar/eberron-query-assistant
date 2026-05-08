@@ -20,7 +20,7 @@ import {
 } from "../src/ingestion/index.js";
 import { chunkText } from "../src/ingestion/chunking.js";
 import type { SourceDiscoverySummary } from "../src/source-discovery/index.js";
-import { createDefaultRuntimeState, type RuntimeState } from "../src/state/state-store.js";
+import { createDefaultRuntimeState, type RuntimeState, type StateStore } from "../src/state/state-store.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "ingestion");
 const NOW = new Date("2026-04-24T12:00:00.000Z");
@@ -38,42 +38,47 @@ describe("Phase 3 ingestion", () => {
     await rm(TEST_ROOT, { force: true, recursive: true });
   });
 
-  it("does not apply scheduled Foundry delta exports before delta application is implemented", async () => {
+  it("applies scheduled Foundry delta upserts", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
-    await mkdir(config.foundryExportDir, { recursive: true });
-    await writeFile(
-      path.join(config.foundryExportDir, "records.ndjson"),
-      `${JSON.stringify({
-        id: "actor-1",
-        type: "Actor",
+    await writeDeltaExport(config, "20260424T100000000Z-foundry-export.ndjson", "run-1", [
+      upsertRecord({
+        recordId: "actor-1",
+        sourceType: "Actor",
         name: "Ashana",
         system: {
           description: {
             value: "A kalashtar emissary from Sharn."
           }
         }
-      })}\n`,
-      "utf8"
-    );
+      })
+    ]);
 
     const service = createService();
     const state = createDefaultRuntimeState();
     const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["foundry"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
-      status: "failed",
-      failed: 1
+      status: "succeeded",
+      ingested: 1,
+      failed: 0
     });
-    expect(result.nextState.foundry.lastSuccessfulExport).toBeNull();
-    expect(readRows(config, "SELECT source_type, source_key, title, metadata_json FROM sources")).toEqual([]);
+    expect(result.nextState.foundry.lastSuccessfulExport).toMatchObject({
+      filename: "20260424T100000000Z-foundry-export.ndjson",
+      runId: "run-1"
+    });
+    expect(readRows(config, "SELECT source_type, source_key, title FROM sources")).toEqual([
+      {
+        source_type: "foundry",
+        source_key: "actor-1",
+        title: "Ashana"
+      }
+    ]);
   });
 
-  it("does not claim Foundry metadata preservation before delta application succeeds", async () => {
+  it("preserves rich Foundry metadata from delta upserts", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
-    await mkdir(config.foundryExportDir, { recursive: true });
-    await writeFile(
-      path.join(config.foundryExportDir, "records.ndjson"),
-      `${JSON.stringify({
+    await writeDeltaExport(config, "20260424T100000000Z-foundry-export.ndjson", "run-1", [
+      upsertRecord({
         recordId: "world.journalentrypage.session.note",
         sourceType: "JournalEntryPage",
         sourceScope: "world",
@@ -101,25 +106,33 @@ describe("Phase 3 ingestion", () => {
           createdTime: 1770000000000,
           modifiedTime: 1771000000000
         }
-      })}\n`,
-      "utf8"
-    );
+      })
+    ]);
 
     const service = createService();
     const state = createDefaultRuntimeState();
     const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["foundry"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
-      status: "failed",
-      failed: 1
+      status: "succeeded",
+      failed: 0
     });
-    expect(readRows(config, "SELECT source_key, title, metadata_json FROM sources")).toEqual([]);
+    const rows = readRows(config, "SELECT source_key, title, metadata_json FROM sources");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.source_key).toBe("world.journalentrypage.session.note");
+    expect(JSON.parse(String(rows[0]?.metadata_json))).toMatchObject({
+      citationAnchor: "Session Notes > 2026-04-25",
+      classificationTags: ["page-type:text"],
+      exportRunId: "run-1",
+      provenancePath: ["Session Notes", "2026-04-25"],
+      sourceUuid: "JournalEntry.session.JournalEntryPage.note"
+    });
   });
 
-  it("does not commit foundry state when NDJSON parsing fails", async () => {
+  it("does not commit foundry state when delta NDJSON parsing fails", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await mkdir(config.foundryExportDir, { recursive: true });
-    await writeFile(path.join(config.foundryExportDir, "records.ndjson"), "{not-json}\n", "utf8");
+    await writeFile(path.join(config.foundryExportDir, "20260424T100000000Z-foundry-export.ndjson"), "{not-json}\n", "utf8");
 
     const service = createService();
     const state = createDefaultRuntimeState();
@@ -131,6 +144,242 @@ describe("Phase 3 ingestion", () => {
     });
     expect(result.nextState.foundry.lastSuccessfulExport).toBeNull();
     expect(readRows(config, "SELECT * FROM sources")).toHaveLength(0);
+  });
+
+  it("applies mixed Foundry upserts and deletes in operation order", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await writeDeltaExport(config, "20260424T100000000Z-foundry-export.ndjson", "run-1", [
+      upsertRecord({ recordId: "actor-1", sourceType: "Actor", name: "Old Ashana", body: "Old text." })
+    ]);
+    await writeDeltaExport(config, "20260424T110000000Z-foundry-export.ndjson", "run-2", [
+      deleteRecord("actor-1"),
+      upsertRecord({ recordId: "actor-2", sourceType: "Actor", name: "Tarin", body: "A Brelish scout." })
+    ], { recordCount: 1 });
+
+    const service = createService();
+    const state = createDefaultRuntimeState();
+    const result = await service.ingest(
+      config,
+      { forceReingest: false, retrievalQuery: null },
+      state,
+      scheduledDiscovery(state, ["foundry"], {
+        foundryAppliedFilenames: [
+          "20260424T100000000Z-foundry-export.ndjson",
+          "20260424T110000000Z-foundry-export.ndjson"
+        ],
+        foundryLastSuccessfulExport: createFoundryMarker("20260424T110000000Z-foundry-export.ndjson"),
+        foundryScheduledFilenames: [
+          "20260424T100000000Z-foundry-export.ndjson",
+          "20260424T110000000Z-foundry-export.ndjson"
+        ]
+      })
+    );
+
+    expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
+      ingested: 2,
+      removed: 1,
+      status: "succeeded"
+    });
+    expect(readRows(config, "SELECT source_key, title FROM sources WHERE source_type = 'foundry'")).toEqual([
+      {
+        source_key: "actor-2",
+        title: "Tarin"
+      }
+    ]);
+  });
+
+  it("rejects invalid Foundry delta operation envelopes and count mismatches", async () => {
+    const cases: Array<{ filename: string; lines: string[] }> = [
+      {
+        filename: "20260424T100000000Z-foundry-export.ndjson",
+        lines: ["{"]
+      },
+      {
+        filename: "20260424T110000000Z-foundry-export.ndjson",
+        lines: [JSON.stringify({ kind: "upsert", manifest: validManifest("run-1", 1, 0) })]
+      },
+      {
+        filename: "20260424T120000000Z-foundry-export.ndjson",
+        lines: [
+          JSON.stringify({ kind: "manifest", manifest: { ...validManifest("run-1", 1, 0), schemaVersion: "1.0.0" } })
+        ]
+      },
+      {
+        filename: "20260424T130000000Z-foundry-export.ndjson",
+        lines: [
+          JSON.stringify({ kind: "manifest", manifest: validManifest("run-1", 1, 0) }),
+          JSON.stringify({ kind: "delete", record: {} })
+        ]
+      },
+      {
+        filename: "20260424T140000000Z-foundry-export.ndjson",
+        lines: [
+          JSON.stringify({ kind: "manifest", manifest: validManifest("run-1", 2, 0) }),
+          JSON.stringify(upsertRecord({ recordId: "actor-1", name: "Ashana" }))
+        ]
+      }
+    ];
+
+    for (const testCase of cases) {
+      for (const store of stores.splice(0)) {
+        store.close();
+      }
+      await rm(TEST_ROOT, { force: true, recursive: true });
+      const config = loadDefaultConfig(TEST_ROOT);
+      await mkdir(config.foundryExportDir, { recursive: true });
+      await writeFile(path.join(config.foundryExportDir, testCase.filename), `${testCase.lines.join("\n")}\n`, "utf8");
+
+      const state = createDefaultRuntimeState();
+      const result = await createService().ingest(
+        config,
+        { forceReingest: false, retrievalQuery: null },
+        state,
+        scheduledDiscovery(state, ["foundry"], {
+          foundryAppliedFilenames: [testCase.filename],
+          foundryLastSuccessfulExport: createFoundryMarker(testCase.filename),
+          foundryScheduledFilenames: [testCase.filename]
+        })
+      );
+
+      expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
+        failed: 1,
+        status: "failed"
+      });
+      expect(result.nextState.foundry.appliedExportFilenames).toEqual([]);
+    }
+  });
+
+  it("checkpoints successful Foundry files before a later file fails", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await writeDeltaExport(config, "20260424T100000000Z-foundry-export.ndjson", "run-1", [
+      upsertRecord({ recordId: "actor-1", sourceType: "Actor", name: "Ashana", body: "First file." })
+    ]);
+    await mkdir(config.foundryExportDir, { recursive: true });
+    await writeFile(
+      path.join(config.foundryExportDir, "20260424T110000000Z-foundry-export.ndjson"),
+      `${JSON.stringify({ kind: "manifest", manifest: validManifest("run-2", 1, 0) })}\n{bad-json}\n`,
+      "utf8"
+    );
+    const savedStates: RuntimeState[] = [];
+    const stateStore: StateStore = {
+      load: () => Promise.resolve({ state: createDefaultRuntimeState() }),
+      save: (_config, savedState) => {
+        savedStates.push(cloneRuntimeState(savedState));
+        return Promise.resolve();
+      }
+    };
+
+    const state = createDefaultRuntimeState();
+    const result = await createService({ stateStore }).ingest(
+      config,
+      { forceReingest: false, retrievalQuery: null },
+      state,
+      scheduledDiscovery(state, ["foundry"], {
+        foundryAppliedFilenames: [
+          "20260424T100000000Z-foundry-export.ndjson",
+          "20260424T110000000Z-foundry-export.ndjson"
+        ],
+        foundryLastSuccessfulExport: createFoundryMarker("20260424T110000000Z-foundry-export.ndjson"),
+        foundryScheduledFilenames: [
+          "20260424T100000000Z-foundry-export.ndjson",
+          "20260424T110000000Z-foundry-export.ndjson"
+        ]
+      })
+    );
+
+    expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
+      status: "failed"
+    });
+    expect(savedStates).toHaveLength(1);
+    expect(savedStates[0]?.foundry.appliedExportFilenames).toEqual(["20260424T100000000Z-foundry-export.ndjson"]);
+    expect(readRows(config, "SELECT source_key FROM sources WHERE source_type = 'foundry'")).toEqual([
+      {
+        source_key: "actor-1"
+      }
+    ]);
+  });
+
+  it("replays Foundry history for a late backfilled delta without removing other source types", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const seedStore = createSqliteCorpusStore();
+    stores.push(seedStore);
+    await seedStore.initialize(config);
+    await seedStore.replaceSource(config, {
+      sourceId: "pdf:existing.pdf",
+      sourceType: "pdf",
+      sourceKey: "existing.pdf",
+      title: "Existing PDF",
+      metadata: {},
+      status: "succeeded"
+    }, []);
+    await seedStore.replaceSource(config, {
+      sourceId: "foundry:stale",
+      sourceType: "foundry",
+      sourceKey: "stale",
+      title: "Stale Foundry",
+      metadata: {},
+      status: "succeeded"
+    }, []);
+
+    await writeDeltaExport(config, "20260424T100000000Z-foundry-export.ndjson", "run-10", [
+      upsertRecord({ recordId: "actor-1", sourceType: "Actor", name: "Ashana", body: "Version 10." })
+    ]);
+    await writeDeltaExport(config, "20260424T110000000Z-foundry-export.ndjson", "run-11", [
+      upsertRecord({ recordId: "actor-2", sourceType: "Actor", name: "Bryn", body: "Version 11." })
+    ], { recordCount: 2 });
+    await writeDeltaExport(config, "20260424T120000000Z-foundry-export.ndjson", "run-12", [
+      deleteRecord("actor-1")
+    ], { recordCount: 1 });
+    await writeDeltaExport(config, "20260424T130000000Z-foundry-export.ndjson", "run-13", [
+      upsertRecord({ recordId: "actor-3", sourceType: "Actor", name: "Cazha", body: "Version 13." })
+    ], { recordCount: 2 });
+
+    const state = createDefaultRuntimeState();
+    state.foundry.appliedExportFilenames = [
+      "20260424T100000000Z-foundry-export.ndjson",
+      "20260424T110000000Z-foundry-export.ndjson",
+      "20260424T130000000Z-foundry-export.ndjson"
+    ];
+    state.foundry.lastSuccessfulExport = createFoundryMarker("20260424T130000000Z-foundry-export.ndjson");
+
+    const result = await createService().ingest(
+      config,
+      { forceReingest: false, retrievalQuery: null },
+      state,
+      scheduledDiscovery(state, ["foundry"], {
+        foundryAppliedFilenames: [
+          "20260424T100000000Z-foundry-export.ndjson",
+          "20260424T110000000Z-foundry-export.ndjson",
+          "20260424T120000000Z-foundry-export.ndjson",
+          "20260424T130000000Z-foundry-export.ndjson"
+        ],
+        foundryLastSuccessfulExport: createFoundryMarker("20260424T130000000Z-foundry-export.ndjson"),
+        foundryScheduledFilenames: ["20260424T120000000Z-foundry-export.ndjson"]
+      })
+    );
+
+    expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
+      removed: 1,
+      status: "succeeded"
+    });
+    expect(result.nextState.foundry.lastSuccessfulExport?.filename).toBe("20260424T130000000Z-foundry-export.ndjson");
+    expect(readRows(config, "SELECT source_type, source_key, title FROM sources ORDER BY source_type, source_key")).toEqual([
+      {
+        source_type: "foundry",
+        source_key: "actor-2",
+        title: "Bryn"
+      },
+      {
+        source_type: "foundry",
+        source_key: "actor-3",
+        title: "Cazha"
+      },
+      {
+        source_type: "pdf",
+        source_key: "existing.pdf",
+        title: "Existing PDF"
+      }
+    ]);
   });
 
   it("ingests added PDFs and removes deleted PDFs using page metadata", async () => {
@@ -558,7 +807,9 @@ describe("Phase 3 ingestion", () => {
   });
 });
 
-const createService = (options: { articleFetcher?: ArticleFetcher; articleRawCache?: ArticleRawCache; pdfParser?: PdfParser } = {}) => {
+const createService = (
+  options: { articleFetcher?: ArticleFetcher; articleRawCache?: ArticleRawCache; pdfParser?: PdfParser; stateStore?: StateStore } = {}
+) => {
   const corpusStore = createSqliteCorpusStore();
   stores.push(corpusStore);
   const dependencies = {
@@ -577,6 +828,7 @@ const createService = (options: { articleFetcher?: ArticleFetcher; articleRawCac
       info: () => undefined,
       warn: () => undefined
     },
+    ...(options.stateStore ? { stateStore: options.stateStore } : {}),
     ...(options.articleRawCache ? { articleRawCache: options.articleRawCache } : {}),
     ...(options.articleFetcher ? { articleFetcher: options.articleFetcher } : {})
   };
@@ -585,10 +837,19 @@ const createService = (options: { articleFetcher?: ArticleFetcher; articleRawCac
   });
 };
 
-const scheduledDiscovery = (state: RuntimeState, scheduled: Array<"foundry" | "pdf" | "article">): SourceDiscoverySummary => {
+const scheduledDiscovery = (
+  state: RuntimeState,
+  scheduled: Array<"foundry" | "pdf" | "article">,
+  options: {
+    foundryAppliedFilenames?: string[];
+    foundryLastSuccessfulExport?: RuntimeState["foundry"]["lastSuccessfulExport"];
+    foundryScheduledFilenames?: string[];
+  } = {}
+): SourceDiscoverySummary => {
   const nextState = createDefaultRuntimeState();
-  nextState.foundry.appliedExportFilenames = ["20260424T100000000Z-foundry-export.ndjson"];
-  nextState.foundry.lastSuccessfulExport = createFoundryMarker();
+  const foundryScheduledFilenames = options.foundryScheduledFilenames ?? ["20260424T100000000Z-foundry-export.ndjson"];
+  nextState.foundry.appliedExportFilenames = options.foundryAppliedFilenames ?? foundryScheduledFilenames;
+  nextState.foundry.lastSuccessfulExport = options.foundryLastSuccessfulExport ?? createFoundryMarker(foundryScheduledFilenames.at(-1));
   nextState.pdf.knownFilenames = ["new.pdf"];
   nextState.article.knownArticles = [...state.article.knownArticles];
 
@@ -605,7 +866,7 @@ const scheduledDiscovery = (state: RuntimeState, scheduled: Array<"foundry" | "p
         failed: 0,
         status: scheduled.includes("foundry") ? "scheduled" : "skipped",
         message: "foundry",
-        details: scheduled.includes("foundry") ? ["scheduled:20260424T100000000Z-foundry-export.ndjson"] : []
+        details: scheduled.includes("foundry") ? foundryScheduledFilenames.map((filename) => `scheduled:${filename}`) : []
       },
       {
         sourceType: "pdf",
@@ -633,12 +894,12 @@ const scheduledDiscovery = (state: RuntimeState, scheduled: Array<"foundry" | "p
   };
 };
 
-const createFoundryMarker = () => ({
+const createFoundryMarker = (filename = "20260424T100000000Z-foundry-export.ndjson") => ({
   deleteCount: 0,
-  filename: "20260424T100000000Z-foundry-export.ndjson",
+  filename,
   generatedAt: "2026-04-24T10:00:00.000Z",
   recordCount: 1,
-  runId: "run-3",
+  runId: filename,
   schemaVersion: "2.0.0",
   upsertCount: 1
 });
@@ -675,6 +936,82 @@ const createMapArticleFetcher = (responses: Map<string, string>, statuses: Map<s
   };
 };
 
+const writeDeltaExport = async (
+  config: ReturnType<typeof loadDefaultConfig>,
+  filename: string,
+  runId: string,
+  operations: Array<{ kind: "delete" | "upsert"; record: Record<string, unknown> }>,
+  manifestOverrides: Partial<ReturnType<typeof validManifest>["run"]> = {}
+) => {
+  await mkdir(config.foundryExportDir, { recursive: true });
+  const upsertCount = operations.filter((operation) => operation.kind === "upsert").length;
+  const deleteCount = operations.filter((operation) => operation.kind === "delete").length;
+  await writeFile(
+    path.join(config.foundryExportDir, filename),
+    [
+      JSON.stringify({
+        kind: "manifest",
+        manifest: validManifest(runId, upsertCount, deleteCount, {
+          recordCount: upsertCount,
+          ...manifestOverrides
+        })
+      }),
+      ...operations.map((operation) => JSON.stringify(operation))
+    ].join("\n") + "\n",
+    "utf8"
+  );
+};
+
+const validManifest = (
+  runId: string,
+  upsertCount: number,
+  deleteCount: number,
+  runOverrides: Partial<{
+    deleteCount: number;
+    generatedAt: string;
+    recordCount: number;
+    runId: string;
+    upsertCount: number;
+  }> = {}
+) => ({
+  schemaVersion: "2.0.0",
+  run: {
+    deleteCount,
+    generatedAt: "2026-04-24T10:00:00.000Z",
+    recordCount: upsertCount,
+    runId,
+    upsertCount,
+    ...runOverrides
+  }
+});
+
+const upsertRecord = (record: Record<string, unknown>) => ({
+  kind: "upsert" as const,
+  record
+});
+
+const deleteRecord = (recordId: string) => ({
+  kind: "delete" as const,
+  record: {
+    recordId
+  }
+});
+
+const cloneRuntimeState = (state: RuntimeState): RuntimeState => ({
+  appVersion: state.appVersion,
+  foundry: {
+    appliedExportFilenames: [...state.foundry.appliedExportFilenames],
+    lastSuccessfulExport: state.foundry.lastSuccessfulExport ? { ...state.foundry.lastSuccessfulExport } : null
+  },
+  pdf: {
+    knownFilenames: [...state.pdf.knownFilenames]
+  },
+  article: {
+    lastSuccessfulIndexScrapeAt: state.article.lastSuccessfulIndexScrapeAt,
+    knownArticles: state.article.knownArticles.map((article) => ({ ...article }))
+  }
+});
+
 const createMockCorpusStore = (): {
   clear: ReturnType<typeof vi.fn<CorpusStore["clear"]>>;
   corpusStore: CorpusStore;
@@ -687,6 +1024,7 @@ const createMockCorpusStore = (): {
     clear,
     corpusStore: {
       initialize,
+      applySourceChanges: vi.fn<CorpusStore["applySourceChanges"]>().mockResolvedValue(undefined),
       clear,
       replaceSource: vi.fn<CorpusStore["replaceSource"]>().mockResolvedValue(undefined),
       replaceSourcesByType: vi.fn<CorpusStore["replaceSourcesByType"]>().mockResolvedValue(undefined),

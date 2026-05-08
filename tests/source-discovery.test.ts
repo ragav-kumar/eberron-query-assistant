@@ -125,6 +125,7 @@ describe("FilesystemSourceDiscoveryService", () => {
       "20260424T120000000Z-foundry-export.ndjson",
       "20260424T130000000Z-foundry-export.ndjson"
     ]);
+    expect(summary.nextState.foundry.lastSuccessfulExport?.filename).toBe("20260424T130000000Z-foundry-export.ndjson");
   });
 
   it("skips already-applied foundry delta export files", async () => {

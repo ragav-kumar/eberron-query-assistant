@@ -4,6 +4,7 @@ import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { loadDefaultConfig } from "../src/config/index.js";
+import type { IngestionService } from "../src/ingestion/index.js";
 import type { ChatCompletionOptions, ChatMessage } from "../src/provider/index.js";
 import { createWebApp, isBusyError, isWebOperationError } from "../src/server/app.js";
 import type { AssistantSessionAnswer } from "../src/runtime/assistant-session.js";
@@ -274,8 +275,8 @@ describe("web app API model", () => {
 
     expect(inspectSources.mock.calls[0]?.[1]).toMatchObject({ forceReingest: false });
     expect(inspectSources.mock.calls[1]?.[1]).toMatchObject({ forceReingest: true });
-    expect(refresh.mock.calls[0]?.[1]).toEqual({ forceRebuild: false });
-    expect(refresh.mock.calls[1]?.[1]).toEqual({ forceRebuild: true });
+    expect(refresh.mock.calls[0]?.[1]).toMatchObject({ forceRebuild: false });
+    expect(refresh.mock.calls[1]?.[1]).toMatchObject({ forceRebuild: true });
     expect(firstResponse.log).toEqual(emptyLogResponse());
     expect(secondResponse.console.entries.map((entry) => entry.message).join("\n")).toContain("Refresh complete.");
     await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
@@ -404,6 +405,71 @@ describe("web app API model", () => {
     await vi.waitFor(async () => {
       expect((await app.getStatus()).activeOperation).toBeNull();
     });
+  });
+
+  it("cancels startup refresh before starting force reingest", async () => {
+    const config = await writeConfig("startup-refresh-cancel-force");
+    const state = createDefaultRuntimeState();
+    const nextState = createDefaultRuntimeState();
+    const inspectSources = vi.fn().mockResolvedValue({
+      degraded: false,
+      nextState,
+      inventories: []
+    });
+    const startupSignal: { current: AbortSignal | null } = { current: null };
+    const forceReingestOptions: boolean[] = [];
+    const ingest = vi.fn<IngestionService["ingest"]>().mockImplementation((_config, options) => {
+      forceReingestOptions.push(options.forceReingest);
+      if (options.forceReingest) {
+        return Promise.resolve({
+          nextState,
+          summary: {
+            corpusSourceCount: 1,
+            degraded: false,
+            sourceSummaries: []
+          }
+        });
+      }
+
+      startupSignal.current = options.abortSignal ?? null;
+      return new Promise((_resolve, reject) => {
+        options.abortSignal?.addEventListener(
+          "abort",
+          () => reject(Object.assign(new Error("Operation was canceled."), { kind: "operation-aborted" })),
+          { once: true }
+        );
+      });
+    });
+    const app = createWebApp({
+      config,
+      discovery: { inspectSources },
+      ingestion: { ingest },
+      retrieval: mockRetrieval([]).retrieval,
+      stateStore: {
+        load: vi.fn().mockResolvedValue({ state }),
+        save: vi.fn().mockResolvedValue(undefined)
+      },
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+
+    app.startStartupRefresh();
+    await vi.waitFor(() => {
+      expect(startupSignal.current).not.toBeNull();
+    });
+
+    const response = await app.refresh(true);
+    const status = await app.getStatus();
+    const signal = startupSignal.current;
+    if (!signal) {
+      throw new Error("Expected startup refresh to receive an abort signal.");
+    }
+
+    expect(signal.aborted).toBe(true);
+    expect(forceReingestOptions).toEqual([false, true]);
+    expect(status.activeOperation).toBeNull();
+    expect(response.console.entries.map((entry) => entry.message).join("\n")).toContain(
+      "Canceling startup refresh before force reingest."
+    );
   });
 
   it("does not run routine refresh again on the first prompt after startup refresh completes", async () => {

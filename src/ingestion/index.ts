@@ -3,7 +3,7 @@ export { createPlaceholderIngestionService } from "./placeholder-ingestion.js";
 export { createSqliteCorpusStore, getCorpusDatabasePath } from "./corpus-store.js";
 export { createFilesystemArticleRawCache } from "./article-raw-cache.js";
 export { createFetchArticleFetcher, discoverArticleLinks, normalizeArticle } from "./article-ingestion.js";
-export { parseFoundryRecords } from "./foundry-ingestion.js";
+export { parseFoundryDeltaFile } from "./foundry-ingestion.js";
 export { createPdfDataExtractParser, normalizePdf } from "./pdf-ingestion.js";
 export type { CorpusStore } from "./corpus-store.js";
 export type { ArticleRawCache } from "./article-raw-cache.js";

@@ -7,42 +7,184 @@ import type { FoundryExportMarker } from "../state/index.js";
 import type { CorpusChunk, CorpusSource, RuntimeConfig } from "../types.js";
 import { chunkText } from "./chunking.js";
 
-export interface FoundryIngestionResult {
-  sources: Array<{
-    source: CorpusSource;
-    chunks: CorpusChunk[];
-  }>;
+const SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION = "2.0.0";
+
+export type FoundryDeltaOperation =
+  | {
+      kind: "upsert";
+      recordId: string;
+      source: CorpusSource;
+      chunks: CorpusChunk[];
+    }
+  | {
+      kind: "delete";
+      recordId: string;
+    };
+
+export interface FoundryDeltaFile {
+  marker: FoundryExportMarker;
+  operations: FoundryDeltaOperation[];
 }
 
-export const parseFoundryRecords = async (
+export const parseFoundryDeltaFile = async (
   config: RuntimeConfig,
-  exportMarker: FoundryExportMarker
-): Promise<FoundryIngestionResult> => {
-  const recordsPath = path.join(config.foundryExportDir, "records.ndjson");
+  filename: string
+): Promise<FoundryDeltaFile> => {
+  const recordsPath = path.join(config.foundryExportDir, filename);
   const raw = await readFile(recordsPath, "utf8");
   const lines = raw.split(/\r?\n/).filter((line) => line.trim().length > 0);
+  if (lines.length === 0) {
+    throw createTaggedError("invalid-foundry-ndjson", `${filename}: first line must contain a manifest envelope.`);
+  }
 
-  const sources = lines.map((line, index) => normalizeFoundryLine(line, index, exportMarker));
-  return { sources };
+  const marker = parseManifestEnvelope(filename, parseJsonLine(filename, lines[0] ?? "", 1));
+  const operations = lines.slice(1).map((line, index) => parseOperationEnvelope(filename, line, index + 2, marker));
+  const upsertCount = operations.filter((operation) => operation.kind === "upsert").length;
+  const deleteCount = operations.filter((operation) => operation.kind === "delete").length;
+
+  if (upsertCount !== marker.upsertCount) {
+    throw createTaggedError(
+      "invalid-foundry-ndjson",
+      `${filename}: manifest.run.upsertCount expected ${marker.upsertCount} operation(s), found ${upsertCount}.`
+    );
+  }
+
+  if (deleteCount !== marker.deleteCount) {
+    throw createTaggedError(
+      "invalid-foundry-ndjson",
+      `${filename}: manifest.run.deleteCount expected ${marker.deleteCount} operation(s), found ${deleteCount}.`
+    );
+  }
+
+  return {
+    marker,
+    operations
+  };
 };
 
-const normalizeFoundryLine = (
-  line: string,
-  index: number,
-  exportMarker: FoundryExportMarker
-): { source: CorpusSource; chunks: CorpusChunk[] } => {
-  let parsed: unknown;
+const parseJsonLine = (filename: string, line: string, lineNumber: number): unknown => {
   try {
-    parsed = JSON.parse(line) as unknown;
+    return JSON.parse(line) as unknown;
   } catch (error) {
-    throw createTaggedError("invalid-foundry-ndjson", `Invalid foundry NDJSON on line ${index + 1}: ${formatThrownValue(error)}`);
+    throw createTaggedError(
+      "invalid-foundry-ndjson",
+      `${filename}: invalid JSON on line ${lineNumber}: ${formatThrownValue(error)}.`
+    );
   }
+};
+
+const parseManifestEnvelope = (filename: string, value: unknown): FoundryExportMarker => {
+  if (!isRecord(value)) {
+    throw createTaggedError("invalid-foundry-ndjson", `${filename}: first line must contain a manifest envelope object.`);
+  }
+
+  if (value.kind !== "manifest") {
+    throw createTaggedError("invalid-foundry-ndjson", `${filename}: first line kind must be manifest.`);
+  }
+
+  return parseManifest(filename, value.manifest);
+};
+
+const parseManifest = (filename: string, value: unknown): FoundryExportMarker => {
+  if (!isRecord(value)) {
+    throw createTaggedError("invalid-foundry-ndjson", `${filename}: manifest must contain an object.`);
+  }
+
+  if (value.schemaVersion !== SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION) {
+    throw createTaggedError(
+      "invalid-foundry-ndjson",
+      `${filename}: manifest.schemaVersion must be ${SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION}.`
+    );
+  }
+
+  const run = value.run;
+  if (!isRecord(run)) {
+    throw createTaggedError("invalid-foundry-ndjson", `${filename}: manifest.run must contain an object.`);
+  }
+
+  const runId = run.runId;
+  const generatedAt = run.generatedAt;
+  const recordCount = run.recordCount;
+  const upsertCount = run.upsertCount;
+  const deleteCount = run.deleteCount;
+
+  if (typeof runId !== "string" || runId.length === 0) {
+    throw createTaggedError("invalid-foundry-ndjson", `${filename}: manifest.run.runId must be a non-empty string.`);
+  }
+
+  if (typeof generatedAt !== "string" || generatedAt.length === 0) {
+    throw createTaggedError("invalid-foundry-ndjson", `${filename}: manifest.run.generatedAt must be a non-empty string.`);
+  }
+
+  if (typeof recordCount !== "number" || !Number.isInteger(recordCount) || recordCount < 0) {
+    throw createTaggedError("invalid-foundry-ndjson", `${filename}: manifest.run.recordCount must be a non-negative integer.`);
+  }
+
+  if (typeof upsertCount !== "number" || !Number.isInteger(upsertCount) || upsertCount < 0) {
+    throw createTaggedError("invalid-foundry-ndjson", `${filename}: manifest.run.upsertCount must be a non-negative integer.`);
+  }
+
+  if (typeof deleteCount !== "number" || !Number.isInteger(deleteCount) || deleteCount < 0) {
+    throw createTaggedError("invalid-foundry-ndjson", `${filename}: manifest.run.deleteCount must be a non-negative integer.`);
+  }
+
+  return {
+    deleteCount,
+    filename,
+    generatedAt,
+    recordCount,
+    runId,
+    schemaVersion: SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION,
+    upsertCount
+  };
+};
+
+const parseOperationEnvelope = (
+  filename: string,
+  line: string,
+  lineNumber: number,
+  exportMarker: FoundryExportMarker
+): FoundryDeltaOperation => {
+  const parsed = parseJsonLine(filename, line, lineNumber);
 
   if (!isRecord(parsed)) {
-    throw createTaggedError("invalid-foundry-ndjson", `Invalid foundry NDJSON on line ${index + 1}: record must be an object.`);
+    throw createTaggedError("invalid-foundry-ndjson", `${filename}: operation on line ${lineNumber} must be an object.`);
   }
 
-  const recordId = firstString(parsed, ["recordId", "id", "_id", "uuid", "key"]) ?? hashText(line);
+  if (parsed.kind === "upsert") {
+    if (!isRecord(parsed.record)) {
+      throw createTaggedError("invalid-foundry-ndjson", `${filename}: upsert on line ${lineNumber} must contain record object.`);
+    }
+    const normalized = normalizeFoundryRecord(parsed.record, exportMarker);
+    return {
+      kind: "upsert",
+      recordId: normalized.source.sourceKey,
+      ...normalized
+    };
+  }
+
+  if (parsed.kind === "delete") {
+    if (!isRecord(parsed.record)) {
+      throw createTaggedError("invalid-foundry-ndjson", `${filename}: delete on line ${lineNumber} must contain record object.`);
+    }
+    const recordId = readRecordId(parsed.record);
+    if (!recordId) {
+      throw createTaggedError("invalid-foundry-ndjson", `${filename}: delete on line ${lineNumber} must contain record.recordId.`);
+    }
+    return {
+      kind: "delete",
+      recordId
+    };
+  }
+
+  throw createTaggedError("invalid-foundry-ndjson", `${filename}: operation on line ${lineNumber} kind must be upsert or delete.`);
+};
+
+const normalizeFoundryRecord = (
+  parsed: Record<string, unknown>,
+  exportMarker: FoundryExportMarker
+): { source: CorpusSource; chunks: CorpusChunk[] } => {
+  const recordId = readRecordId(parsed) ?? hashText(JSON.stringify(parsed));
   const entityKind =
     firstString(parsed, ["sourceType", "type", "kind", "entityType", "documentType"]) ??
     readNestedString(parsed, ["metadata", "classification", "documentType"]) ??
@@ -107,6 +249,10 @@ const normalizeFoundryLine = (
   }));
 
   return { source, chunks };
+};
+
+const readRecordId = (record: Record<string, unknown>): string | null => {
+  return firstString(record, ["recordId", "id", "_id", "uuid", "key"]);
 };
 
 const extractText = (value: unknown): string => {

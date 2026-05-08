@@ -1,7 +1,7 @@
-import { formatThrownValue } from "../errors.js";
+import { formatThrownValue, isOperationAbortedError, throwIfAborted } from "../errors.js";
 import type { ProgressReporter } from "../progress/reporter.js";
 import type { SourceDiscoverySummary } from "../source-discovery/index.js";
-import type { ArticleStateRecord, RuntimeState } from "../state/index.js";
+import type { ArticleStateRecord, RuntimeState, StateStore } from "../state/index.js";
 import type { IngestionSummary, RuntimeConfig, RuntimeOptions, SourceIngestionSummary } from "../types.js";
 import {
   createFetchArticleFetcher,
@@ -13,6 +13,7 @@ import {
 } from "./article-ingestion.js";
 import { createFilesystemArticleRawCache, type ArticleRawCache } from "./article-raw-cache.js";
 import type { CorpusStore } from "./corpus-store.js";
+import { parseFoundryDeltaFile, type FoundryDeltaFile } from "./foundry-ingestion.js";
 import { createPdfDataExtractParser, type PdfParser, normalizePdf } from "./pdf-ingestion.js";
 
 export interface IngestionServiceDependencies {
@@ -22,6 +23,7 @@ export interface IngestionServiceDependencies {
   now?: () => Date;
   pdfParser?: PdfParser;
   reporter: ProgressReporter;
+  stateStore?: StateStore;
 }
 
 export interface IngestionService {
@@ -43,36 +45,98 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
   const now = dependencies.now ?? (() => new Date());
   const pdfParser = dependencies.pdfParser ?? createPdfDataExtractParser();
 
-  const ingestFoundry = (
+  const ingestFoundry = async (
     config: RuntimeConfig,
+    options: RuntimeOptions,
+    state: RuntimeState,
     discovery: SourceDiscoverySummary,
     nextState: RuntimeState
-  ): SourceIngestionSummary => {
+  ): Promise<SourceIngestionSummary> => {
     const inventory = discovery.inventories.find((candidate) => candidate.sourceType === "foundry");
+    throwIfAborted(options.abortSignal);
     if (!inventory || inventory.status !== "scheduled") {
       return skippedSummary("foundry", "foundry: ingestion skipped.");
     }
 
-    const marker = discovery.nextState.foundry.lastSuccessfulExport;
-    if (!marker) {
-      return failedSummary("foundry", "foundry: scheduled without a manifest marker.");
+    const scheduledFilenames = readScheduledFilenames(inventory.details);
+    const allAppliedFilenames = [...discovery.nextState.foundry.appliedExportFilenames];
+    const isBackfill = scheduledFilenames.some(
+      (filename) => state.foundry.lastSuccessfulExport && filename.localeCompare(state.foundry.lastSuccessfulExport.filename) < 0
+    );
+    const filenames = isBackfill ? allAppliedFilenames : scheduledFilenames;
+    if (filenames.length === 0) {
+      return failedSummary("foundry", "foundry: scheduled without delta export filenames.");
     }
 
-    const scheduledFiles = inventory.details.filter((detail) => detail.startsWith("scheduled:")).length;
-    void config;
-    void nextState;
-    dependencies.reporter.warn(
-      `foundry: delta export application is deferred to phase 2; ${scheduledFiles} scheduled file(s) were not applied.`
-    );
-    return failedSummary("foundry", "foundry: delta export application is deferred to phase 2.");
+    let ingested = 0;
+    let removed = 0;
+
+    try {
+      const parsedFiles = isBackfill
+        ? await Promise.all(filenames.map((filename) => parseFoundryDeltaFile(config, filename)))
+        : [];
+      let clearFoundryBeforeNextFile = isBackfill;
+
+      if (isBackfill) {
+        dependencies.reporter.warn(
+          `foundry: late backfilled delta export detected; replaying ${filenames.length} foundry export file(s).`
+        );
+        resetFoundryState(nextState);
+      }
+
+      for (const [index, filename] of filenames.entries()) {
+        throwIfAborted(options.abortSignal);
+        const parsed = isBackfill ? parsedFiles[index] : await parseFoundryDeltaFile(config, filename);
+        if (!parsed) {
+          throw new Error(`Missing parsed delta export ${filename}.`);
+        }
+
+        dependencies.reporter.info(`foundry: applying ${filename} (${index + 1}/${filenames.length}).`);
+        const applied = await applyFoundryDeltaFile(corpusStore, config, parsed, clearFoundryBeforeNextFile);
+        clearFoundryBeforeNextFile = false;
+        ingested += applied.upsertCount;
+        removed += applied.deleteCount;
+        applyFoundryMarker(nextState, parsed.marker);
+        await dependencies.stateStore?.save(config, nextState);
+        throwIfAborted(options.abortSignal);
+        dependencies.reporter.info(
+          `foundry: applied ${filename}; upserts=${applied.upsertCount}, deletes=${applied.deleteCount}.`
+        );
+      }
+
+      return succeededSummary(
+        "foundry",
+        inventory.discovered,
+        ingested,
+        removed,
+        isBackfill ? "foundry: replayed delta export history after backfill." : "foundry: applied delta export files.",
+        filenames.map((filename) => `applied:${filename}`)
+      );
+    } catch (error) {
+      if (isOperationAbortedError(error)) {
+        throw error;
+      }
+      return {
+        sourceType: "foundry",
+        status: "failed",
+        discovered: inventory.discovered,
+        ingested,
+        removed,
+        failed: 1,
+        message: `foundry: ingestion failed: ${formatThrownValue(error)}.`,
+        details: [formatThrownValue(error)]
+      };
+    }
   };
 
   const ingestPdf = async (
     config: RuntimeConfig,
+    options: RuntimeOptions,
     discovery: SourceDiscoverySummary,
     nextState: RuntimeState
   ): Promise<SourceIngestionSummary> => {
     const inventory = discovery.inventories.find((candidate) => candidate.sourceType === "pdf");
+    throwIfAborted(options.abortSignal);
     if (!inventory || inventory.status !== "scheduled") {
       return skippedSummary("pdf", "pdf: ingestion skipped.");
     }
@@ -90,18 +154,24 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     const details: string[] = [];
 
     for (const filename of removed) {
+      throwIfAborted(options.abortSignal);
       dependencies.reporter.info(`pdf: removing stale source ${filename}.`);
       await corpusStore.removeSource(config, "pdf", filename);
     }
 
     for (const [index, filename] of filenames.entries()) {
+      throwIfAborted(options.abortSignal);
       try {
         dependencies.reporter.info(`pdf: parsing ${filename} (${index + 1}/${filenames.length}).`);
         const normalized = await normalizePdf(config, filename, pdfParser);
         await corpusStore.replaceSource(config, normalized.source, normalized.chunks);
         dependencies.reporter.info(`pdf: indexed ${filename} with ${normalized.chunks.length} chunks.`);
         ingested += 1;
+        throwIfAborted(options.abortSignal);
       } catch (error) {
+        if (isOperationAbortedError(error)) {
+          throw error;
+        }
         failed += 1;
         dependencies.reporter.warn(`pdf: failed ${filename}: ${formatThrownValue(error)}.`);
         details.push(`${filename}: ${formatThrownValue(error)}`);
@@ -136,6 +206,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     nextState: RuntimeState
   ): Promise<SourceIngestionSummary> => {
     const inventory = discovery.inventories.find((candidate) => candidate.sourceType === "article");
+    throwIfAborted(options.abortSignal);
     if (!inventory || inventory.status !== "scheduled") {
       return skippedSummary("article", "article: ingestion skipped.");
     }
@@ -143,6 +214,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     const nowIso = now().toISOString();
     try {
       const indexHtml = await readArticleIndexHtml({
+        abortSignal: options.abortSignal,
         articleFetcher,
         articleRawCache,
         config,
@@ -165,8 +237,10 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
       );
 
       for (const [index, article] of ingestCandidates.entries()) {
+        throwIfAborted(options.abortSignal);
         try {
           const html = await readArticleHtml({
+            abortSignal: options.abortSignal,
             article,
             articleFetcher,
             articleRawCache,
@@ -183,6 +257,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
             `article: indexed ${normalized.article.title ?? article.canonicalUrl} with ${normalized.chunks.length} chunks.`
           );
           ingested += 1;
+          throwIfAborted(options.abortSignal);
         } catch (error) {
           const permanentlyInaccessible = isPermanentlyInaccessibleArticleFetch(error);
           if (permanentlyInaccessible) {
@@ -219,6 +294,9 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
         details
       };
     } catch (error) {
+      if (isOperationAbortedError(error)) {
+        throw error;
+      }
       return failedSummary("article", `article: ingestion failed: ${formatThrownValue(error)}.`);
     }
   };
@@ -231,15 +309,17 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     discovery: SourceDiscoverySummary
     ) {
       await corpusStore.initialize(config, { allowIncompatibleReset: options.forceReingest });
+      throwIfAborted(options.abortSignal);
       if (options.forceReingest) {
         await corpusStore.clear(config);
       }
+      throwIfAborted(options.abortSignal);
 
       const nextState = cloneRuntimeState(state);
       const summaries: SourceIngestionSummary[] = [];
 
-      summaries.push(ingestFoundry(config, discovery, nextState));
-      summaries.push(await ingestPdf(config, discovery, nextState));
+      summaries.push(await ingestFoundry(config, options, state, discovery, nextState));
+      summaries.push(await ingestPdf(config, options, discovery, nextState));
       summaries.push(await ingestArticles(config, options, state, discovery, nextState));
 
       const sourceCount = await corpusStore.countSources(config);
@@ -258,16 +338,19 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
 };
 
 const readArticleIndexHtml = async (options: {
+  abortSignal?: AbortSignal | undefined;
   articleFetcher: ArticleFetcher;
   articleRawCache: ArticleRawCache;
   config: RuntimeConfig;
   forceReingest: boolean;
   reporter: ProgressReporter;
 }): Promise<string> => {
-  const { articleFetcher, articleRawCache, config, forceReingest, reporter } = options;
+  const { abortSignal, articleFetcher, articleRawCache, config, forceReingest, reporter } = options;
+  throwIfAborted(abortSignal);
   try {
     reporter.info(`article: fetching Keith Baker index ${KEITH_BAKER_INDEX_URL}.`);
-    const indexHtml = await articleFetcher.fetchText(KEITH_BAKER_INDEX_URL);
+    const indexHtml = await articleFetcher.fetchText(KEITH_BAKER_INDEX_URL, { signal: abortSignal });
+    throwIfAborted(abortSignal);
     await articleRawCache.write(config, KEITH_BAKER_INDEX_URL, indexHtml);
     return indexHtml;
   } catch (error) {
@@ -288,6 +371,7 @@ const readArticleIndexHtml = async (options: {
 };
 
 const readArticleHtml = async (options: {
+  abortSignal?: AbortSignal | undefined;
   article: ArticleStateRecord;
   articleFetcher: ArticleFetcher;
   articleRawCache: ArticleRawCache;
@@ -297,7 +381,8 @@ const readArticleHtml = async (options: {
   reporter: ProgressReporter;
   total: number;
 }): Promise<string> => {
-  const { article, articleFetcher, articleRawCache, config, forceReingest, index, reporter, total } = options;
+  const { abortSignal, article, articleFetcher, articleRawCache, config, forceReingest, index, reporter, total } = options;
+  throwIfAborted(abortSignal);
   if (forceReingest && article.scrapeStatus === "succeeded" && article.lastIngestedAt) {
     const cached = await articleRawCache.read(config, article.canonicalUrl);
     if (cached !== null) {
@@ -309,9 +394,60 @@ const readArticleHtml = async (options: {
     reporter.info(`article: fetching ${article.canonicalUrl} (${index + 1}/${total}).`);
   }
 
-  const html = await articleFetcher.fetchText(article.canonicalUrl);
+  const html = await articleFetcher.fetchText(article.canonicalUrl, { signal: abortSignal });
+  throwIfAborted(abortSignal);
   await articleRawCache.write(config, article.canonicalUrl, html);
   return html;
+};
+
+const readScheduledFilenames = (details: string[]): string[] => {
+  return details
+    .filter((detail) => detail.startsWith("scheduled:"))
+    .map((detail) => detail.slice("scheduled:".length))
+    .sort((a, b) => a.localeCompare(b));
+};
+
+const applyFoundryDeltaFile = async (
+  corpusStore: CorpusStore,
+  config: RuntimeConfig,
+  deltaFile: FoundryDeltaFile,
+  clearFoundry: boolean
+): Promise<{ deleteCount: number; upsertCount: number }> => {
+  const changes = deltaFile.operations.map((operation) =>
+    operation.kind === "delete"
+      ? {
+          kind: "delete" as const,
+          sourceKey: operation.recordId,
+          sourceType: "foundry" as const
+        }
+      : {
+          kind: "upsert" as const,
+          chunks: operation.chunks,
+          source: operation.source
+        }
+  );
+  await corpusStore.applySourceChanges(config, {
+    changes,
+    ...(clearFoundry ? { clearSourceType: "foundry" } : {})
+  });
+  return {
+    deleteCount: deltaFile.operations.filter((operation) => operation.kind === "delete").length,
+    upsertCount: deltaFile.operations.filter((operation) => operation.kind === "upsert").length
+  };
+};
+
+const resetFoundryState = (state: RuntimeState): void => {
+  state.foundry.appliedExportFilenames = [];
+  state.foundry.lastSuccessfulExport = null;
+};
+
+const applyFoundryMarker = (state: RuntimeState, marker: FoundryDeltaFile["marker"]): void => {
+  state.foundry.appliedExportFilenames = [...new Set([...state.foundry.appliedExportFilenames, marker.filename])].sort((a, b) =>
+    a.localeCompare(b)
+  );
+  if (!state.foundry.lastSuccessfulExport || marker.filename.localeCompare(state.foundry.lastSuccessfulExport.filename) >= 0) {
+    state.foundry.lastSuccessfulExport = { ...marker };
+  }
 };
 
 const skippedSummary = (sourceType: SourceIngestionSummary["sourceType"], message: string): SourceIngestionSummary => {

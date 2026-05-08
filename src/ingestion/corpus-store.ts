@@ -10,6 +10,16 @@ const DATABASE_FILENAME = "corpus.sqlite";
 
 export interface CorpusStore {
   initialize(config: RuntimeConfig, options?: { allowIncompatibleReset?: boolean }): Promise<void>;
+  applySourceChanges(
+    config: RuntimeConfig,
+    options: {
+      clearSourceType?: SourceType;
+      changes: Array<
+        | { kind: "delete"; sourceKey: string; sourceType: SourceType }
+        | { kind: "upsert"; source: CorpusSource; chunks: CorpusChunk[] }
+      >;
+    }
+  ): Promise<void>;
   clear(config: RuntimeConfig): Promise<void>;
   replaceSource(config: RuntimeConfig, source: CorpusSource, chunks: CorpusChunk[]): Promise<void>;
   replaceSourcesByType(
@@ -64,6 +74,30 @@ export const createSqliteCorpusStore = (): CorpusStore => {
       }
 
       createSchema(openedDatabase);
+    },
+
+    async applySourceChanges(config, options) {
+      const openedDatabase = await open(config);
+      openedDatabase.transaction(() => {
+        if (options.clearSourceType) {
+          openedDatabase.prepare("DELETE FROM sources WHERE source_type = ?").run(options.clearSourceType);
+        }
+        for (const change of options.changes) {
+          if (change.kind === "delete") {
+            openedDatabase.prepare("DELETE FROM sources WHERE source_type = ? AND source_key = ?").run(
+              change.sourceType,
+              change.sourceKey
+            );
+          } else {
+            openedDatabase.prepare("DELETE FROM sources WHERE source_type = ? AND source_key = ?").run(
+              change.source.sourceType,
+              change.source.sourceKey
+            );
+            insertSource(openedDatabase, change.source, change.chunks);
+          }
+        }
+        rebuildFts(openedDatabase);
+      })();
     },
 
     async clear(config) {

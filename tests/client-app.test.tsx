@@ -619,8 +619,36 @@ describe("App", () => {
 
     expect(await screen.findByText("Running startup-refresh")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("button", { name: "Force reingest" })).toHaveProperty("disabled", false);
     fireEvent.click(screen.getByRole("tab", { name: "Console" }));
     expect(await screen.findByText(/Starting source inventory checks/)).toBeTruthy();
+  });
+
+  it("allows force reingest to replace a recovered startup refresh", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
+      activeOperation: "startup-refresh",
+      console: {
+        entries: [
+          {
+            id: "startup-1",
+            level: "info",
+            message: "Starting source inventory checks.",
+            timestamp: "2026-05-02T12:00:04.000Z"
+          }
+        ]
+      }
+    }));
+
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: "Force reingest" }));
+
+    await waitFor(() => {
+      expect(confirm).toHaveBeenCalledWith(
+        "Force reingest will cancel startup refresh, then clear and rebuild app-owned corpus and retrieval artifacts. Continue?"
+      );
+      expect(api.refresh).toHaveBeenCalledWith(true);
+    });
   });
 
   it("polls recovered operations until final output is available", async () => {

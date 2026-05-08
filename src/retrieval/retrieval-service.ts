@@ -7,6 +7,7 @@ import Database from "better-sqlite3";
 import type { EmbeddingAdapter } from "../provider/index.js";
 import type { ProgressReporter } from "../progress/reporter.js";
 import { createNoopTimingReporter } from "../timing.js";
+import { throwIfAborted } from "../errors.js";
 import type {
   CitationMetadata,
   RetrievalResult,
@@ -29,7 +30,7 @@ export interface RetrievalSyncSummary {
 }
 
 export interface RetrievalService {
-  refresh(config: RuntimeConfig, options?: { forceRebuild?: boolean }): Promise<RetrievalSyncSummary>;
+  refresh(config: RuntimeConfig, options?: { abortSignal?: AbortSignal; forceRebuild?: boolean }): Promise<RetrievalSyncSummary>;
   search(request: RetrievalSearchRequest): Promise<RetrievalResult[]>;
 }
 
@@ -86,9 +87,10 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
 
   const refresh = async (
     nextConfig: RuntimeConfig,
-    options: { forceRebuild?: boolean } = {}
+    options: { abortSignal?: AbortSignal; forceRebuild?: boolean } = {}
   ): Promise<RetrievalSyncSummary> => {
     config = nextConfig;
+    throwIfAborted(options.abortSignal);
     await mkdir(nextConfig.retrievalDir, { recursive: true });
     vectorCache = null;
     if (options.forceRebuild) {
@@ -98,6 +100,7 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
     const database = new Database(getCorpusDatabasePath(nextConfig));
     try {
       database.pragma("foreign_keys = ON");
+      throwIfAborted(options.abortSignal);
       rebuildFts(database);
       initializeVectorStore(database);
 
@@ -107,7 +110,13 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
 
       const chunks = readAllChunks(database);
       deleteStaleVectorRows(database);
-      const syncResult = await syncVectorStore(chunks, database, dependencies.embeddingAdapter, dependencies.reporter);
+      const syncResult = await syncVectorStore(
+        chunks,
+        database,
+        dependencies.embeddingAdapter,
+        dependencies.reporter,
+        options.abortSignal
+      );
       const summary = {
         chunkCount: syncResult.chunkCount,
         regeneratedEmbeddings: syncResult.regeneratedEmbeddings,
@@ -409,8 +418,10 @@ const syncVectorStore = async (
   chunks: StoredChunk[],
   database: Database.Database,
   embeddingAdapter: EmbeddingAdapter,
-  reporter: ProgressReporter
+  reporter: ProgressReporter,
+  abortSignal?: AbortSignal
 ): Promise<VectorSyncResult> => {
+  throwIfAborted(abortSignal);
   const compatibleEntries = new Map(
     readCompatibleVectorRows(database, embeddingAdapter).map((entry) => [entry.chunkId, entry])
   );
@@ -421,6 +432,7 @@ const syncVectorStore = async (
   const missingChunks: StoredChunk[] = [];
 
   for (const chunk of chunks) {
+    throwIfAborted(abortSignal);
     const existingEntry = compatibleEntries.get(chunk.chunkId);
     if (existingEntry?.contentHash === chunk.contentHash) {
       reusedEmbeddings += 1;
@@ -436,8 +448,10 @@ const syncVectorStore = async (
   );
 
   for (let offset = 0; offset < missingChunks.length; offset += EMBEDDING_BATCH_SIZE) {
+    throwIfAborted(abortSignal);
     const batch = missingChunks.slice(offset, offset + EMBEDDING_BATCH_SIZE);
     const embeddings = await embeddingAdapter.embedBatch(batch.map((chunk) => toEmbeddingInput(chunk.content)));
+    throwIfAborted(abortSignal);
 
     if (embeddings.length !== batch.length) {
       throw new Error(`Embedding adapter returned ${embeddings.length} vectors for ${batch.length} chunks.`);

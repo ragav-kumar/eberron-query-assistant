@@ -9,7 +9,7 @@ import { chunkText, normalizeText } from "./chunking.js";
 export const KEITH_BAKER_INDEX_URL = "https://keith-baker.com/eberron-index/";
 
 export interface ArticleFetcher {
-  fetchText(url: string): Promise<string>;
+  fetchText(url: string, options?: { signal?: AbortSignal | undefined }): Promise<string>;
 }
 
 const FETCH_TIMEOUT_MS = 30_000;
@@ -26,14 +26,22 @@ export interface HttpFetchFailedError {
 
 export const createFetchArticleFetcher = (): ArticleFetcher => {
   return {
-    async fetchText(url) {
+    async fetchText(url, options = {}) {
       const abortController = new AbortController();
+      const abortFromCaller = (): void => {
+        abortController.abort();
+      };
+      options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+      if (options.signal?.aborted) {
+        abortController.abort();
+      }
       const timeout = setTimeout(() => abortController.abort(), FETCH_TIMEOUT_MS);
 
       let response: Response;
       try {
         response = await fetch(url, { signal: abortController.signal });
       } finally {
+        options.signal?.removeEventListener("abort", abortFromCaller);
         clearTimeout(timeout);
       }
 

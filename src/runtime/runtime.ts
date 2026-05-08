@@ -37,13 +37,14 @@ export const runRuntime = async (
   const reporter = dependencies.reporter ?? createConsoleProgressReporter();
   const serviceReporter = options.retrievalQuery && !dependencies.reporter ? createMemoryProgressReporter() : reporter;
   const discovery = dependencies.discovery ?? createFilesystemSourceDiscoveryService();
+  const stateStore = dependencies.stateStore ?? createFilesystemStateStore();
   const ingestion =
     dependencies.ingestion ??
     createFilesystemIngestionService({
       corpusStore: createSqliteCorpusStore(),
-      reporter: serviceReporter
+      reporter: serviceReporter,
+      stateStore
     });
-  const stateStore = dependencies.stateStore ?? createFilesystemStateStore();
   const retrieval =
     dependencies.retrieval ??
     createSqliteRetrievalService({

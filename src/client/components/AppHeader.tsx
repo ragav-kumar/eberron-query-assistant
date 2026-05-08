@@ -24,8 +24,12 @@ export const AppHeader = ({ isBusy, operation, onRefresh }: AppHeaderProps) => (
         type="button"
         className="danger"
         onClick={() => onRefresh(true)}
-        disabled={isBusy}
-        title="Clear and rebuild app-owned corpus and retrieval artifacts."
+        disabled={isBusy && operation !== "startup-refresh"}
+        title={
+          isBusy && operation === "startup-refresh"
+            ? "Cancel startup refresh and rebuild app-owned corpus and retrieval artifacts."
+            : "Clear and rebuild app-owned corpus and retrieval artifacts."
+        }
       >
         Force reingest
       </button>

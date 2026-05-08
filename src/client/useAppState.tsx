@@ -241,9 +241,10 @@ const useCreateAppState = (): AppState => {
     async (
       operationName: string,
       operation: () => Promise<ApiOperationResult>,
-      applyResult: (result: ApiOperationResult) => void
+      applyResult: (result: ApiOperationResult) => void,
+      options: { allowWhileBusy?: boolean } = {}
     ) => {
-      if (status.busy) {
+      if (status.busy && options.allowWhileBusy !== true) {
         return;
       }
       setError(null);
@@ -306,18 +307,32 @@ const useCreateAppState = (): AppState => {
   const runRefresh = useCallback(
     (forceReingest: boolean) => {
       if (status.busy) {
-        return;
+        if (!(forceReingest && status.operation === "startup-refresh")) {
+          return;
+        }
+      }
+      if (status.busy && forceReingest && status.operation === "startup-refresh") {
+        setError(null);
       }
       if (
         forceReingest &&
-        !window.confirm("Force reingest clears and rebuilds app-owned corpus and retrieval artifacts. Continue?")
+        !window.confirm(
+          status.operation === "startup-refresh"
+            ? "Force reingest will cancel startup refresh, then clear and rebuild app-owned corpus and retrieval artifacts. Continue?"
+            : "Force reingest clears and rebuilds app-owned corpus and retrieval artifacts. Continue?"
+        )
       ) {
         return;
       }
       setOutputTab("console");
-      void runOperation(forceReingest ? "force-reingest" : "refresh", () => refresh(forceReingest), () => undefined);
+      void runOperation(
+        forceReingest ? "force-reingest" : "refresh",
+        () => refresh(forceReingest),
+        () => undefined,
+        { allowWhileBusy: forceReingest && status.operation === "startup-refresh" }
+      );
     },
-    [runOperation, status.busy]
+    [runOperation, status.busy, status.operation]
   );
 
   const selectLog = useCallback(
