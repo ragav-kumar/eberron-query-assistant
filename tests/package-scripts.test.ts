@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -31,4 +32,42 @@ describe("package scripts", () => {
     expect(viteConfig).toContain("**/foundry-export/**");
     expect(viteConfig).toContain("**/pdf/**");
   });
+
+  it("does not retain terminal CLI runtime sources", () => {
+    const sourceText = readProjectFiles(["src", "tests"])
+      .filter(({ filePath }) => !filePath.endsWith(path.join("tests", "package-scripts.test.ts")))
+      .map(({ text }) => text)
+      .join("\n");
+
+    expect(sourceText).not.toContain("node:readline/promises");
+    expect(sourceText).not.toContain("createAssistantPromptShell");
+    expect(sourceText).not.toContain("PromptShell");
+    expect(sourceText).not.toContain("runRuntime");
+    expect(sourceText).not.toContain("retrievalQuery");
+  });
 });
+
+const readProjectFiles = (roots: string[]): Array<{ filePath: string; text: string }> => {
+  const files: Array<{ filePath: string; text: string }> = [];
+  const visit = (entryPath: string): void => {
+    const stats = statSync(entryPath);
+    if (stats.isDirectory()) {
+      for (const child of readdirSync(entryPath)) {
+        visit(path.join(entryPath, child));
+      }
+      return;
+    }
+    if (/\.(?:ts|tsx)$/.test(entryPath)) {
+      files.push({
+        filePath: entryPath,
+        text: readFileSync(entryPath, "utf8")
+      });
+    }
+  };
+
+  for (const root of roots) {
+    visit(root);
+  }
+
+  return files;
+};

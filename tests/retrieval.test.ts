@@ -121,7 +121,9 @@ describe("Phase 4 retrieval", () => {
       },
       (error: unknown) => {
         expect(error).toMatchObject({ kind: "incompatible-corpus-schema" });
-        expect(isRecord(error) && typeof error.message === "string" ? error.message : "").toContain("npm run reingest");
+        expect(isRecord(error) && typeof error.message === "string" ? error.message : "").toContain(
+          "browser force-reingest control"
+        );
       }
     );
   });

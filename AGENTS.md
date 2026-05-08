@@ -25,7 +25,7 @@ These are the highest-priority repo rules. Check them before making edits, runni
 - Request escalation directly for commands known to need network access, external write permissions, or esbuild process spawning, including `npm install`, `git push`, `npm test`, targeted Vitest runs, and `npm run start`.
 - Use `npm run prestart` for the TypeScript no-emit check. There is no `npm run build` script.
 - Do not add project-authored classes or constructors unless later active enhancement documentation explicitly requires them.
-- Preserve app-owned corpus and retrieval artifacts across routine startup. Only explicit force re-ingest through `--force-reingest` or `npm run reingest` may intentionally discard, clear, or force-rebuild them.
+- Preserve app-owned corpus and retrieval artifacts across routine startup. Only explicit force reingest through the browser UI/API may intentionally discard, clear, or force-rebuild them.
 
 ## Branch Policy
 Work against the current branch unless later instructions or active enhancement documentation explicitly say otherwise.
@@ -88,10 +88,10 @@ New enhancement documentation must:
 ## Implementation Guardrails
 Use the historical baseline documents as context for the Phase 6 product state. For enhancement work, document new intended behavior in `docs/enhancements.md` rather than editing the frozen specification or frozen phase documents.
 
-Each implementation phase increments the application minor version to match the phase number. Phase 1 is `0.1.0`, Phase 2 is `0.2.0`, Phase 3 is `0.3.0`, and later phases continue that pattern. Patch revisions may be used for migration or hardening work inside a phase. The stored `appVersion` is diagnostic metadata only and must not drive compatibility decisions. Startup should validate and normalize persisted state by shape, preserving usable source and retrieval state across version bumps. The only application behavior that may intentionally discard, clear, or force-rebuild app-owned corpus or retrieval artifacts is explicit force re-ingest through `--force-reingest` or `npm run reingest`.
+Each implementation phase increments the application minor version to match the phase number. Phase 1 is `0.1.0`, Phase 2 is `0.2.0`, Phase 3 is `0.3.0`, and later phases continue that pattern. Patch revisions may be used for migration or hardening work inside a phase. The stored `appVersion` is diagnostic metadata only and must not drive compatibility decisions. Startup should validate and normalize persisted state by shape, preserving usable source and retrieval state across version bumps. The only application behavior that may intentionally discard, clear, or force-rebuild app-owned corpus or retrieval artifacts is explicit force reingest through the browser UI/API.
 
 Keep the system modular. Maintain clear separation between:
-- CLI/runtime flow
+- local browser/API runtime flow
 - configuration
 - source discovery
 - persisted state
@@ -105,13 +105,13 @@ Keep durable model prompt instructions in tracked Markdown files under `assistan
 
 Prefer small, testable units and explicit interfaces over hidden coupling or cross-cutting implicit behavior.
 
-Keep persistent-state changes versioned and migration-safe. Do not make silent breaking changes to stored state or retrieval artifacts without documenting the new version and the expected upgrade path. Incompatible persisted artifacts should fail clearly and instruct the user to run `npm run reingest`; they should not be silently deleted or rebuilt during routine startup.
+Keep persistent-state changes versioned and migration-safe. Do not make silent breaking changes to stored state or retrieval artifacts without documenting the new version and the expected upgrade path. Incompatible persisted artifacts should fail clearly and instruct the user to use the browser force-reingest control; they should not be silently deleted or rebuilt during routine startup.
 
 Handle partial failures in a source-scoped way. Do not mark incomplete ingest or index work as current, and do not let one failed source silently invalidate successful work from another source.
 
 Add or update automated tests alongside behavior changes. If a change is intentionally left without automated coverage, document the risk and provide manual verification steps.
 
-For startup, source-discovery, state, CLI, and user-visible runtime behavior changes, do not stop at unit tests. Attempt to run the start command and inspect the terminal output for the expected behavior. When the prompt would otherwise remain interactive, pipe or provide an immediate `exit` input so the verification exercises startup without hanging.
+For startup, source-discovery, state, API bridge, and user-visible runtime behavior changes, do not stop at unit tests. Attempt to run the start command and inspect the terminal output for the expected Vite startup behavior. Use browser/API smoke coverage when the change affects the local web app.
 
 Document assumptions, invariants, and unresolved decisions explicitly in the governing docs rather than leaving them implied in code structure or commit history.
 

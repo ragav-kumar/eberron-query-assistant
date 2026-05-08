@@ -6,7 +6,7 @@ import {
   buildAssistantMessages,
   loadAssistantPromptAssets,
   type AssistantPromptAssets
-} from "./prompt.js";
+} from "./assistant-prompts.js";
 import { createSqlitePartyContextService, type PartyContextService } from "./party-context.js";
 import type { SessionLogExchange } from "./session-log.js";
 

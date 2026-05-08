@@ -65,7 +65,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
         if (options.allowIncompatibleReset !== true) {
           throw createTaggedError(
             "incompatible-corpus-schema",
-            "Existing corpus.sqlite is not compatible with the current corpus schema. Run npm run reingest to rebuild retrieval artifacts explicitly."
+            "Existing corpus.sqlite is not compatible with the current corpus schema. Use the browser force-reingest control to rebuild retrieval artifacts explicitly."
           );
         }
         close();

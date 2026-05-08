@@ -7,7 +7,7 @@ import {
   formatCitation,
   loadAssistantPromptAssets,
   type AssistantPromptAssets
-} from "./prompt.js";
+} from "./assistant-prompts.js";
 import { createSqlitePartyContextService, type PartyContextService } from "./party-context.js";
 
 export interface GeneratedNpc {

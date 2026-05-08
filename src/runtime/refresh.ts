@@ -78,10 +78,10 @@ export const runStartupRefresh = async (
   const degradation = summarizeDegradation(discovery.inventories, ingestion.summary.sourceSummaries);
   if (degradation.degradedSources.length > 0) {
     dependencies.reporter.warn(
-      `Startup refresh complete in degraded mode; entering assistant prompt. degradedSources=${degradation.degradedSources.join(", ")}; ${degradation.details.join(" ")}`
+      `Startup refresh complete in degraded mode. degradedSources=${degradation.degradedSources.join(", ")}; ${degradation.details.join(" ")}`
     );
   } else {
-    dependencies.reporter.info("Startup refresh complete; entering assistant prompt.");
+    dependencies.reporter.info("Startup refresh complete.");
   }
 
   return {

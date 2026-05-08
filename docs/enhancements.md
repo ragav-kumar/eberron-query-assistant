@@ -84,7 +84,7 @@ Durable repo guidance now requires reusable model prompt instructions to live in
 
 The user-facing assistant workflow is now a local React 19 and Vite browser UI launched with `npm run start`. The GUI supports assistant prompts, normal refresh, force reingest, active session log rendering, and editing `assistant/additional-context.md`.
 
-This intentionally replaces the old interactive terminal assistant workflow for normal use. The app remains local-only; `logs/` and `assistant/additional-context.md` remain gitignored and are not loaded as future assistant memory.
+This intentionally removes the old interactive terminal assistant workflow. The app remains local-only; `logs/` and `assistant/additional-context.md` remain gitignored and are not loaded as future assistant memory.
 
 Verification added or preserved for this change covers package metadata and scripts, server API behavior, React UI behavior, operation busy states, log rendering, and the existing ingestion, retrieval, provider, state, prompt, and runtime boundaries.
 
@@ -106,9 +106,9 @@ The app initially shows an empty Log pane instead of loading an existing transcr
 
 ## GUI Debug Query Removal
 
-The browser UI no longer includes the Debug Query retrieval-inspection mode or its local web API route. Retrieval inspection remains available only through historical developer/runtime paths rather than the normal user-facing GUI.
+The browser UI no longer includes the Debug Query retrieval-inspection mode or its local web API route. The leftover terminal retrieval-debug runtime path has also been removed, so retrieval inspection is no longer exposed as a user-facing or npm-script workflow.
 
-Verification updated for this change removes GUI debug-query assertions while preserving Standard assistant, NPC Generator, refresh, Console, and log-browser coverage.
+Verification updated for this change removes GUI debug-query and terminal runtime assertions while preserving Standard assistant, NPC Generator, refresh, Console, and log-browser coverage.
 
 Verification added for this change covers safe log-file listing and selection, read-only historical browsing, active-session writes while viewing history, lazy new-session behavior, and React controls for selecting logs and starting sessions.
 

@@ -55,7 +55,7 @@ describe("Phase 3 ingestion", () => {
 
     const service = createService();
     const state = createDefaultRuntimeState();
-    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["foundry"]));
+    const result = await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, ["foundry"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
       status: "succeeded",
@@ -111,7 +111,7 @@ describe("Phase 3 ingestion", () => {
 
     const service = createService();
     const state = createDefaultRuntimeState();
-    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["foundry"]));
+    const result = await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, ["foundry"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
       status: "succeeded",
@@ -136,7 +136,7 @@ describe("Phase 3 ingestion", () => {
 
     const service = createService();
     const state = createDefaultRuntimeState();
-    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["foundry"]));
+    const result = await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, ["foundry"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
       status: "failed",
@@ -160,7 +160,7 @@ describe("Phase 3 ingestion", () => {
     const state = createDefaultRuntimeState();
     const result = await service.ingest(
       config,
-      { forceReingest: false, retrievalQuery: null },
+      { forceReingest: false },
       state,
       scheduledDiscovery(state, ["foundry"], {
         foundryAppliedFilenames: [
@@ -232,7 +232,7 @@ describe("Phase 3 ingestion", () => {
       const state = createDefaultRuntimeState();
       const result = await createService().ingest(
         config,
-        { forceReingest: false, retrievalQuery: null },
+        { forceReingest: false },
         state,
         scheduledDiscovery(state, ["foundry"], {
           foundryAppliedFilenames: [testCase.filename],
@@ -272,7 +272,7 @@ describe("Phase 3 ingestion", () => {
     const state = createDefaultRuntimeState();
     const result = await createService({ stateStore }).ingest(
       config,
-      { forceReingest: false, retrievalQuery: null },
+      { forceReingest: false },
       state,
       scheduledDiscovery(state, ["foundry"], {
         foundryAppliedFilenames: [
@@ -344,7 +344,7 @@ describe("Phase 3 ingestion", () => {
 
     const result = await createService().ingest(
       config,
-      { forceReingest: false, retrievalQuery: null },
+      { forceReingest: false },
       state,
       scheduledDiscovery(state, ["foundry"], {
         foundryAppliedFilenames: [
@@ -402,7 +402,7 @@ describe("Phase 3 ingestion", () => {
       }
     });
 
-    await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["pdf"]));
+    await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, ["pdf"]));
 
     const chunks = readRows(config, "SELECT text, citation_json, metadata_json FROM chunks");
     expect(chunks).toHaveLength(1);
@@ -434,7 +434,7 @@ describe("Phase 3 ingestion", () => {
     );
 
     const service = createService({ articleFetcher: fetcher });
-    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+    const result = await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, ["article"]));
 
     expect(result.nextState.article.lastSuccessfulIndexScrapeAt).toBe(NOW.toISOString());
     expect(result.nextState.article.knownArticles).toMatchObject([
@@ -470,7 +470,7 @@ describe("Phase 3 ingestion", () => {
     );
 
     const service = createService({ articleFetcher: fetcher });
-    await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+    await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, ["article"]));
 
     const cache = createFilesystemArticleRawCache();
     await expect(cache.read(config, indexUrl)).resolves.toBe(indexHtml);
@@ -510,7 +510,7 @@ describe("Phase 3 ingestion", () => {
     };
 
     const service = createService({ articleFetcher: fetcher });
-    const result = await service.ingest(config, { forceReingest: true, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+    const result = await service.ingest(config, { forceReingest: true }, state, scheduledDiscovery(state, ["article"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "article")).toMatchObject({
       ingested: 1,
@@ -547,7 +547,7 @@ describe("Phase 3 ingestion", () => {
     );
 
     const service = createService({ articleFetcher: fetcher });
-    await service.ingest(config, { forceReingest: true, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+    await service.ingest(config, { forceReingest: true }, state, scheduledDiscovery(state, ["article"]));
 
     await expect(createFilesystemArticleRawCache().read(config, articleUrl)).resolves.toBe(articleHtml);
   });
@@ -580,7 +580,7 @@ describe("Phase 3 ingestion", () => {
         }
       }
     });
-    const result = await service.ingest(config, { forceReingest: true, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+    const result = await service.ingest(config, { forceReingest: true }, state, scheduledDiscovery(state, ["article"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "article")).toMatchObject({
       ingested: 1,
@@ -665,7 +665,7 @@ describe("Phase 3 ingestion", () => {
         : inventory
     );
     discovery.nextState.pdf.knownFilenames = ["broken.pdf"];
-    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, discovery);
+    const result = await service.ingest(config, { forceReingest: false }, state, discovery);
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "pdf")).toMatchObject({
       failed: 1,
@@ -694,7 +694,7 @@ describe("Phase 3 ingestion", () => {
     );
 
     const service = createService({ articleFetcher: fetcher });
-    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+    const result = await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, ["article"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "article")).toMatchObject({
       failed: 1,
@@ -750,7 +750,7 @@ describe("Phase 3 ingestion", () => {
     );
 
     const service = createService({ articleFetcher: fetcher });
-    const result = await service.ingest(config, { forceReingest: true, retrievalQuery: null }, state, scheduledDiscovery(state, ["article"]));
+    const result = await service.ingest(config, { forceReingest: true }, state, scheduledDiscovery(state, ["article"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "article")).toMatchObject({
       failed: 0,
@@ -797,8 +797,8 @@ describe("Phase 3 ingestion", () => {
       }
     });
 
-    await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, []));
-    await service.ingest(config, { forceReingest: true, retrievalQuery: null }, state, scheduledDiscovery(state, []));
+    await service.ingest(config, { forceReingest: false }, state, scheduledDiscovery(state, []));
+    await service.ingest(config, { forceReingest: true }, state, scheduledDiscovery(state, []));
 
     expect(corpusStoreFixture.initialize).toHaveBeenNthCalledWith(1, config, { allowIncompatibleReset: false });
     expect(corpusStoreFixture.initialize).toHaveBeenNthCalledWith(2, config, { allowIncompatibleReset: true });

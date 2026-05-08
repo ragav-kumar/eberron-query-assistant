@@ -6,7 +6,6 @@ import { describe, expect, it, vi } from "vitest";
 import { loadDefaultConfig } from "../src/config/index.js";
 import { createPlaceholderIngestionService } from "../src/ingestion/index.js";
 import { createMemoryProgressReporter } from "../src/progress/reporter.js";
-import { runRuntime } from "../src/runtime/index.js";
 import { runStartupRefresh } from "../src/runtime/refresh.js";
 import { createFilesystemSourceDiscoveryService, createPlaceholderSourceDiscoveryService } from "../src/source-discovery/index.js";
 import { createFilesystemStateStore, createPlaceholderStateStore } from "../src/state/index.js";
@@ -19,7 +18,7 @@ describe("startup refresh skeleton", () => {
   it("emits readable source inventory progress", async () => {
     const reporter = createMemoryProgressReporter();
 
-    await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: true, retrievalQuery: null }, {
+    await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: true }, {
       discovery: createPlaceholderSourceDiscoveryService(),
       ingestion: createPlaceholderIngestionService(),
       reporter,
@@ -29,85 +28,10 @@ describe("startup refresh skeleton", () => {
     expect(reporter.messages).toContain("Starting source inventory checks.");
     expect(reporter.messages).toContain("Force re-ingest requested; source inventory will schedule all available sources.");
     expect(reporter.messages).toContain("Ingestion refresh complete.");
-    expect(reporter.messages).toContain("Startup refresh complete; entering assistant prompt.");
+    expect(reporter.messages).toContain("Startup refresh complete.");
     expect(reporter.messages.some((message) => message.startsWith("foundry: placeholder inventory skipped."))).toBe(
       true
     );
-  });
-
-  it("reaches the prompt boundary after startup", async () => {
-    const prompt = {
-      start: vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
-    };
-
-    const summary = await runRuntime(
-      { forceReingest: false, retrievalQuery: null },
-      {
-        config: loadDefaultConfig(PLACEHOLDER_ROOT),
-        discovery: createPlaceholderSourceDiscoveryService(),
-        ingestion: createPlaceholderIngestionService(),
-        prompt,
-        retrieval: {
-          refresh: vi.fn().mockResolvedValue({ chunkCount: 0, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
-          search: vi.fn().mockResolvedValue([])
-        },
-        reporter: createMemoryProgressReporter(),
-        stateStore: createPlaceholderStateStore()
-      }
-    );
-
-    expect(prompt.start).toHaveBeenCalledOnce();
-    expect(summary.degraded).toBe(false);
-    expect(summary.degradedSources).toEqual([]);
-    expect(summary.inventories).toHaveLength(3);
-  });
-
-  it("prints retrieval debug results and skips the prompt", async () => {
-    const prompt = {
-      start: vi.fn<() => Promise<void>>().mockResolvedValue(undefined)
-    };
-    const retrieval = {
-      refresh: vi.fn().mockResolvedValue({ chunkCount: 1, reusedEmbeddings: 0, regeneratedEmbeddings: 1 }),
-      search: vi.fn().mockResolvedValue([
-        {
-          chunkId: "pdf:eberron.pdf:0",
-          sourceId: "pdf:eberron.pdf",
-          sourceType: "pdf" as const,
-          sourceKey: "eberron.pdf",
-          sourceTitle: "Eberron Rising",
-          content: "Aerenal keeps deathless counselors.",
-          citation: {
-            sourceType: "pdf" as const,
-            label: "Eberron Rising",
-            locator: "page 4",
-            url: null
-          },
-          score: 0.9,
-          matchKind: "hybrid" as const
-        }
-      ])
-    };
-    const reporter = createMemoryProgressReporter();
-
-    await runRuntime(
-      { forceReingest: false, retrievalQuery: "aerenal deathless" },
-      {
-        config: loadDefaultConfig(PLACEHOLDER_ROOT),
-        discovery: createPlaceholderSourceDiscoveryService(),
-        ingestion: createPlaceholderIngestionService(),
-        prompt,
-        retrieval,
-        reporter,
-        stateStore: createPlaceholderStateStore()
-      }
-    );
-
-    expect(retrieval.search).toHaveBeenCalledWith({
-      query: "aerenal deathless",
-      limit: 8
-    });
-    expect(prompt.start).not.toHaveBeenCalled();
-    expect(reporter.messages.some((message) => message.startsWith("Results for"))).toBe(true);
   });
 
   it("commits successful source inventory state during startup refresh", async () => {
@@ -124,7 +48,7 @@ describe("startup refresh skeleton", () => {
       await mkdir(config.pdfDir, { recursive: true });
       await writeFile(path.join(config.pdfDir, "rising.pdf"), "", "utf8");
 
-      const summary = await runStartupRefresh(config, { forceReingest: false, retrievalQuery: null }, {
+      const summary = await runStartupRefresh(config, { forceReingest: false }, {
         discovery: createFilesystemSourceDiscoveryService({ now: () => new Date("2026-04-24T12:00:00.000Z") }),
         ingestion: createPlaceholderIngestionService(),
         reporter: createMemoryProgressReporter(),
@@ -159,7 +83,7 @@ describe("startup refresh skeleton", () => {
     const save = vi.fn<(_config: ReturnType<typeof loadDefaultConfig>, _state: RuntimeState) => Promise<void>>().mockResolvedValue(undefined);
 
     await expect(
-      runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false, retrievalQuery: null }, {
+      runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false }, {
         discovery: {
           inspectSources: vi.fn().mockResolvedValue({
             degraded: false,
@@ -201,7 +125,7 @@ describe("startup refresh skeleton", () => {
     };
 
     await expect(
-      runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false, retrievalQuery: null }, {
+      runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false }, {
         discovery: {
           inspectSources: vi.fn().mockResolvedValue({
             degraded: false,
@@ -236,7 +160,7 @@ describe("startup refresh skeleton", () => {
     const state = createDefaultRuntimeState();
     const reporter = createMemoryProgressReporter();
 
-    const summary = await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false, retrievalQuery: null }, {
+    const summary = await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false }, {
       discovery: {
         inspectSources: vi.fn().mockResolvedValue({
           degraded: true,
@@ -342,8 +266,8 @@ describe("startup refresh skeleton", () => {
       }
     };
 
-    await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false, retrievalQuery: null }, dependencies);
-    await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: true, retrievalQuery: null }, dependencies);
+    await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: false }, dependencies);
+    await runStartupRefresh(loadDefaultConfig(PLACEHOLDER_ROOT), { forceReingest: true }, dependencies);
 
     expect(retrieval.refresh).toHaveBeenNthCalledWith(1, loadDefaultConfig(PLACEHOLDER_ROOT), {
       forceRebuild: false

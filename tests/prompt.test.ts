@@ -1,25 +1,21 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { setTimeout as delay } from "node:timers/promises";
-import { PassThrough, Readable, Writable } from "node:stream";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ChatAdapter } from "../src/provider/index.js";
-import { createMemoryProgressReporter } from "../src/progress/reporter.js";
-import { type RetrievalService } from "../src/retrieval/index.js";
 import { loadDefaultConfig } from "../src/config/index.js";
-import { buildNpcGenerationMessages } from "../src/runtime/npc-session.js";
+import type { ChatAdapter } from "../src/provider/index.js";
+import { type RetrievalService } from "../src/retrieval/index.js";
 import {
   buildAssistantMessages,
-  createAssistantPromptShell,
   formatCitation,
   loadAssistantPromptAssets,
   type AssistantPromptAssets
-} from "../src/runtime/prompt.js";
-import { sanitizeSessionTitle } from "../src/runtime/session-log.js";
-import type { AssistantConfig, RuntimeConfig } from "../src/types.js";
-import type { RetrievalResult } from "../src/types.js";
+} from "../src/runtime/assistant-prompts.js";
+import { createAssistantSession } from "../src/runtime/assistant-session.js";
+import { buildNpcGenerationMessages } from "../src/runtime/npc-session.js";
+import { createSessionLog, sanitizeSessionTitle, type SessionLog } from "../src/runtime/session-log.js";
+import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "../src/types.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "prompt");
 const PROMPT_ASSETS: AssistantPromptAssets = {
@@ -38,7 +34,7 @@ const PROMPT_ASSETS: AssistantPromptAssets = {
     "</answer>"
   ].join("\n"),
   systemPrompt: [
-    "You are Eberron Query Assistant, a terminal-only assistant for Eberron lore and campaign notes.",
+    "You are Eberron Query Assistant, a local browser-based assistant for Eberron lore and campaign notes.",
     "Answer using the retrieved evidence when it is relevant.",
     "Distinguish direct support from inference. Do not describe synthesized conclusions as quoted facts.",
     "Include concise references when evidence is available.",
@@ -232,11 +228,11 @@ describe("NPC generator prompt assembly", () => {
   });
 });
 
-describe("assistant prompt shell", () => {
-  it("retrieves evidence and calls chat for user questions", async () => {
+describe("assistant session", () => {
+  it("retrieves evidence, repairs metadata, and appends a transcript exchange", async () => {
     const retrievalFixture = mockRetrieval([result("pdf", "eberron.pdf", "Eberron Rising", "page 4")]);
     const complete = vi
-      .fn()
+      .fn<ChatAdapter["complete"]>()
       .mockResolvedValueOnce("Aerenal answer.\nReferences: Eberron Rising, page 4")
       .mockResolvedValueOnce([
         "<session-title>Aerenal</session-title>",
@@ -246,30 +242,30 @@ describe("assistant prompt shell", () => {
         "References: Eberron Rising, page 4",
         "</answer>"
       ].join("\n"));
-    const chat: ChatAdapter = {
-      complete
-    };
-    const output = createWritableCapture();
+    const appendExchange = vi.fn();
 
-    await createAssistantPromptShell({
-      ...promptShellConfig(await writeAssistantFiles("retrieves-evidence")),
-      chat,
-      input: Readable.from(["What about Aerenal?\nexit\n"]),
-      output,
-      reporter: createMemoryProgressReporter(),
+    const answer = await createAssistantSession({
+      ...assistantSessionConfig(await writeAssistantFiles("retrieves-evidence")),
+      appendExchange,
+      chat: { complete },
       retrieval: retrievalFixture.retrieval
-    }).start();
+    }).ask("What about Aerenal?");
 
-    expect(retrievalFixture.search).toHaveBeenCalledWith({
+    expect(retrievalFixture.search).toHaveBeenCalledWith(expect.objectContaining({
       query: "What about Aerenal?",
       limit: 8
-    });
+    }));
     expect(complete).toHaveBeenCalledTimes(2);
-    expect(output.text()).toContain("Aerenal answer.");
-    expect(output.text()).toContain("\nAerenal answer.\nReferences: Eberron Rising, page 4\n\n");
+    expect(answer.answer).toBe("Aerenal answer.\nReferences: Eberron Rising, page 4");
+    expect(appendExchange).toHaveBeenCalledWith({
+      assistant: "Aerenal answer.\nReferences: Eberron Rising, page 4",
+      sessionTitle: "Aerenal",
+      title: "Aerenal Answer",
+      user: "What about Aerenal?"
+    });
   });
 
-  it("creates a session transcript from first response title metadata without printing the metadata", async () => {
+  it("creates a session transcript from first response title metadata", async () => {
     const logDir = path.join(TEST_ROOT, "logs-title");
     const complete = vi.fn<ChatAdapter["complete"]>().mockResolvedValue(
       [
@@ -281,23 +277,17 @@ describe("assistant prompt shell", () => {
         "</answer>"
       ].join("\n")
     );
-    const output = createWritableCapture();
 
-    await createAssistantPromptShell({
-      ...promptShellConfig(await writeAssistantFiles("logs-title")),
+    await createAssistantSession({
+      ...assistantSessionConfig(await writeAssistantFiles("logs-title")),
+      appendExchange: createTranscriptAppender(logDir),
       chat: { complete },
-      input: Readable.from(["What about Aerenal?\nexit\n"]),
-      logDir,
-      output,
-      reporter: createMemoryProgressReporter(),
       retrieval: mockRetrieval([result("pdf", "eberron.pdf", "Eberron Rising", "page 4")]).retrieval
-    }).start();
+    }).ask("What about Aerenal?");
 
     const filenames = await readdir(logDir);
     expect(filenames).toHaveLength(1);
     expect(filenames[0]).toMatch(/^\d{14} Aerenal Ancestors\.json$/);
-    expect(output.text()).toContain("Aerenal answer.");
-    expect(output.text()).not.toContain("<session-title>");
 
     const log = JSON.parse(await readFile(path.join(logDir, filenames[0] ?? ""), "utf8")) as unknown;
     expect(log).toEqual([
@@ -311,31 +301,19 @@ describe("assistant prompt shell", () => {
 
   it("appends later successful responses to the same session transcript", async () => {
     const logDir = path.join(TEST_ROOT, "logs-append");
-    const input = new PassThrough();
     const complete = vi
       .fn<ChatAdapter["complete"]>()
       .mockResolvedValueOnce("<session-title>Dragonmark Notes</session-title>\n<response-title>First Question</response-title>\n<answer>\nFirst answer.\n</answer>")
       .mockResolvedValueOnce("<response-title>Second Question</response-title>\n<answer>\nSecond answer.\n</answer>");
-    const output = createWritableCapture();
-
-    const prompt = createAssistantPromptShell({
-      ...promptShellConfig(await writeAssistantFiles("logs-append")),
+    const session = createAssistantSession({
+      ...assistantSessionConfig(await writeAssistantFiles("logs-append")),
+      appendExchange: createTranscriptAppender(logDir),
       chat: { complete },
-      input,
-      logDir,
-      output,
-      reporter: createMemoryProgressReporter(),
       retrieval: mockRetrieval([]).retrieval
-    }).start();
+    });
 
-    input.write("First question\n");
-    await waitForCallCount(complete, 1);
-    await waitForPromptCount(output, 2);
-    input.write("Second question\n");
-    await waitForCallCount(complete, 2);
-    await waitForPromptCount(output, 3);
-    input.write("exit\n");
-    await prompt;
+    await session.ask("First question");
+    await session.ask("Second question");
 
     const filenames = await readdir(logDir);
     expect(filenames).toHaveLength(1);
@@ -353,52 +331,33 @@ describe("assistant prompt shell", () => {
 
   it("does not create a session transcript when title metadata is missing", async () => {
     const logDir = path.join(TEST_ROOT, "logs-missing-title");
-    const reporter = createMemoryProgressReporter();
 
-    await createAssistantPromptShell({
-      ...promptShellConfig(await writeAssistantFiles("logs-missing-title")),
+    await expect(createAssistantSession({
+      ...assistantSessionConfig(await writeAssistantFiles("logs-missing-title")),
+      appendExchange: createTranscriptAppender(logDir),
       chat: { complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("Plain answer.") },
-      input: Readable.from(["What/about:Aerenal?\nexit\n"]),
-      logDir,
-      output: createWritableCapture(),
-      reporter,
       retrieval: mockRetrieval([]).retrieval
-    }).start();
+    }).ask("What/about:Aerenal?")).rejects.toThrow("Assistant response did not include required title metadata.");
 
     await expect(readdir(logDir)).rejects.toMatchObject({ code: "ENOENT" });
-    expect(reporter.warnings).toContain(
-      "Session log update failed: Assistant response did not include required title metadata."
-    );
   });
 
   it("repairs missing title metadata before appending a later transcript exchange", async () => {
     const logDir = path.join(TEST_ROOT, "logs-title-repair");
-    const input = new PassThrough();
     const complete = vi
       .fn<ChatAdapter["complete"]>()
       .mockResolvedValueOnce("<session-title>Crafting</session-title>\n<response-title>Setup</response-title>\n<answer>\nFirst answer.\n</answer>")
       .mockResolvedValueOnce("Second answer without tags.")
       .mockResolvedValueOnce("<response-title>Materials</response-title>\n<answer>\nSecond answer without tags.\n</answer>");
-    const output = createWritableCapture();
-
-    const prompt = createAssistantPromptShell({
-      ...promptShellConfig(await writeAssistantFiles("logs-title-repair")),
+    const session = createAssistantSession({
+      ...assistantSessionConfig(await writeAssistantFiles("logs-title-repair")),
+      appendExchange: createTranscriptAppender(logDir),
       chat: { complete },
-      input,
-      logDir,
-      output,
-      reporter: createMemoryProgressReporter(),
       retrieval: mockRetrieval([]).retrieval
-    }).start();
+    });
 
-    input.write("First question\n");
-    await waitForCallCount(complete, 1);
-    await waitForPromptCount(output, 2);
-    input.write("Second question\n");
-    await waitForCallCount(complete, 3);
-    await waitForPromptCount(output, 3);
-    input.write("exit\n");
-    await prompt;
+    await session.ask("First question");
+    await session.ask("Second question");
 
     const filenames = await readdir(logDir);
     const log = JSON.parse(await readFile(path.join(logDir, filenames[0] ?? ""), "utf8")) as Array<{
@@ -413,47 +372,25 @@ describe("assistant prompt shell", () => {
     });
   });
 
-  it("does not create an empty session transcript when the user exits before a response", async () => {
-    const logDir = path.join(TEST_ROOT, "logs-empty");
-
-    await createAssistantPromptShell({
-      ...promptShellConfig(await writeAssistantFiles("logs-empty")),
-      chat: mockChat().chat,
-      input: Readable.from(["exit\n"]),
-      logDir,
-      output: createWritableCapture(),
-      reporter: createMemoryProgressReporter(),
-      retrieval: mockRetrieval([]).retrieval
-    }).start();
-
-    await expect(readdir(logDir)).rejects.toMatchObject({ code: "ENOENT" });
-  });
-
-  it("starts each shell with empty in-memory history", async () => {
+  it("starts each session with empty in-memory history", async () => {
     const firstChat = mockChat();
     const secondChat = mockChat();
     const logDir = path.join(TEST_ROOT, "logs-history");
     await mkdir(logDir, { recursive: true });
     await writeFile(path.join(logDir, "20260102030405 Old Session.json"), JSON.stringify([{ user: "Old logged question", title: "Old", assistant: "Old answer" }]), "utf8");
 
-    await createAssistantPromptShell({
-      ...promptShellConfig(await writeAssistantFiles("logs-history-first")),
+    await createAssistantSession({
+      ...assistantSessionConfig(await writeAssistantFiles("logs-history-first")),
+      appendExchange: vi.fn(),
       chat: firstChat.chat,
-      input: Readable.from(["First question\nexit\n"]),
-      logDir,
-      output: createWritableCapture(),
-      reporter: createMemoryProgressReporter(),
       retrieval: mockRetrieval([]).retrieval
-    }).start();
-    await createAssistantPromptShell({
-      ...promptShellConfig(await writeAssistantFiles("logs-history-second")),
+    }).ask("First question");
+    await createAssistantSession({
+      ...assistantSessionConfig(await writeAssistantFiles("logs-history-second")),
+      appendExchange: vi.fn(),
       chat: secondChat.chat,
-      input: Readable.from(["Second question\nexit\n"]),
-      logDir,
-      output: createWritableCapture(),
-      reporter: createMemoryProgressReporter(),
       retrieval: mockRetrieval([]).retrieval
-    }).start();
+    }).ask("Second question");
 
     const firstMessages = firstChat.complete.mock.calls[0]?.[0] ?? [];
     const secondMessages = secondChat.complete.mock.calls[0]?.[0] ?? [];
@@ -514,47 +451,16 @@ const mockRetrieval = (
   };
 };
 
-const waitForCallCount = async (fn: { mock: { calls: unknown[] } }, count: number): Promise<void> => {
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    if (fn.mock.calls.length >= count) {
-      return;
-    }
-    await delay(1);
-  }
-  throw new Error(`Expected mock to be called ${count} time(s), but it was called ${fn.mock.calls.length} time(s).`);
-};
-
-const waitForPromptCount = async (output: { text(): string }, count: number): Promise<void> => {
-  for (let attempt = 0; attempt < 50; attempt += 1) {
-    const prompts = output.text().match(/> /g) ?? [];
-    if (prompts.length >= count) {
-      return;
-    }
-    await delay(1);
-  }
-  throw new Error(`Expected ${count} prompt marker(s), but saw ${output.text()}.`);
-};
-
 const mockChat = (): { chat: ChatAdapter; complete: ReturnType<typeof vi.fn<ChatAdapter["complete"]>> } => {
-  const complete = vi.fn<ChatAdapter["complete"]>().mockResolvedValue("answer");
+  const complete = vi.fn<ChatAdapter["complete"]>().mockResolvedValue(
+    "<session-title>Answer Session</session-title>\n<response-title>Answer</response-title>\n<answer>\nanswer\n</answer>"
+  );
   return {
     chat: {
       complete
     },
     complete
   };
-};
-
-const createWritableCapture = (): Writable & { text(): string } => {
-  const chunks: string[] = [];
-  const writable = new Writable({
-    write(chunk, _encoding, callback) {
-      chunks.push(String(chunk));
-      callback();
-    }
-  }) as Writable & { text(): string };
-  writable.text = () => chunks.join("");
-  return writable;
 };
 
 const writeAssistantFiles = async (
@@ -589,7 +495,7 @@ const writeAssistantFiles = async (
   return config;
 };
 
-const promptShellConfig = (assistant: AssistantConfig): { assistant: AssistantConfig; config: RuntimeConfig } => {
+const assistantSessionConfig = (assistant: AssistantConfig): { assistant: AssistantConfig; config: RuntimeConfig } => {
   const config = loadDefaultConfig(path.join(TEST_ROOT, "runtime", path.basename(assistant.assistantDir)));
   return {
     assistant,
@@ -597,5 +503,26 @@ const promptShellConfig = (assistant: AssistantConfig): { assistant: AssistantCo
       ...config,
       assistant
     }
+  };
+};
+
+const createTranscriptAppender = (logDir: string): (exchange: {
+  assistant: string;
+  sessionTitle: string;
+  title: string;
+  user: string;
+}) => Promise<void> => {
+  let log: SessionLog | null = null;
+
+  return async (exchange) => {
+    log ??= await createSessionLog({
+      logDir,
+      title: exchange.sessionTitle
+    });
+    await log.append({
+      assistant: exchange.assistant,
+      title: exchange.title,
+      user: exchange.user
+    });
   };
 };

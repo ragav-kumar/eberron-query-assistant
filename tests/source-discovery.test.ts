@@ -321,7 +321,7 @@ const inspect = async (
   const service = createFilesystemSourceDiscoveryService({ now: () => NOW });
   return service.inspectSources(
     config,
-    { forceReingest: options.forceReingest ?? false, retrievalQuery: null },
+    { forceReingest: options.forceReingest ?? false },
     options.state ?? createDefaultRuntimeState()
   );
 };

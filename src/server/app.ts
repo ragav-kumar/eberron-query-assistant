@@ -322,8 +322,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     const stateStore = dependencies.stateStore ?? createFilesystemStateStore();
     const options: RuntimeOptions = {
       abortSignal,
-      forceReingest,
-      retrievalQuery: null
+      forceReingest
     };
     const summary = await runStartupRefresh(config, options, {
       discovery: dependencies.discovery ?? createFilesystemSourceDiscoveryService(),
