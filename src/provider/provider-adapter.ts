@@ -6,9 +6,37 @@ const DEFAULT_PROVIDER_MAX_RETRIES = 3;
 const DEFAULT_PROVIDER_RETRY_DELAY_MS = 500;
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  name?: string;
+  toolCallId?: string;
+  toolCalls?: ChatToolCall[];
 }
+
+export interface ChatToolDefinition {
+  description: string;
+  name: string;
+  parameters: Record<string, unknown>;
+}
+
+export interface ChatToolCall {
+  arguments: string;
+  id: string;
+  name: string;
+}
+
+export interface ChatStructuredTextResult {
+  content: string;
+  kind: "text";
+}
+
+export interface ChatStructuredToolCallResult {
+  content: string;
+  kind: "tool-calls";
+  toolCalls: ChatToolCall[];
+}
+
+export type ChatStructuredResult = ChatStructuredTextResult | ChatStructuredToolCallResult;
 
 export interface ChatCompletionDebugContext {
   operation: string;
@@ -25,8 +53,9 @@ export interface ChatCompletionDiagnostic {
   operationId: string;
   purpose: string;
   requestBody: {
-    messages: ChatMessage[];
+    messages: unknown[];
     model: string;
+    tools?: unknown[];
   };
   responseBody?: unknown;
   status?: number;
@@ -36,10 +65,12 @@ export interface ChatCompletionDiagnostic {
 export interface ChatCompletionOptions {
   debug?: ChatCompletionDebugContext;
   onDiagnostic?: ((diagnostic: ChatCompletionDiagnostic) => void) | undefined;
+  tools?: ChatToolDefinition[] | undefined;
 }
 
 export interface ChatAdapter {
   complete(messages: ChatMessage[], options?: ChatCompletionOptions): Promise<string>;
+  completeStructured?(messages: ChatMessage[], options?: ChatCompletionOptions): Promise<ChatStructuredResult>;
 }
 
 export interface EmbeddingAdapter {
@@ -64,64 +95,79 @@ export const createOpenAiChatAdapter = (
   const provider = createOpenAiRequestConfig(config);
   const fetchImpl = options.fetchImpl ?? fetch;
 
-  return {
-    async complete(messages, completionOptions = {}) {
-      const endpoint = `${provider.baseUrl}/chat/completions`;
-      const requestBody = {
-        model: config.chatModel,
-        messages
-      };
-      const emitDiagnostic = (diagnostic: Omit<ChatCompletionDiagnostic, "endpoint" | "operation" | "operationId" | "purpose" | "requestBody" | "timestamp">): void => {
-        if (!config.debug || !completionOptions.debug || !completionOptions.onDiagnostic) {
-          return;
-        }
+  const completeStructured = async (
+    messages: ChatMessage[],
+    completionOptions: ChatCompletionOptions = {}
+  ): Promise<ChatStructuredResult> => {
+    const endpoint = `${provider.baseUrl}/chat/completions`;
+    const requestBody = {
+      model: config.chatModel,
+      messages: messages.map(serializeChatMessage),
+      ...(completionOptions.tools && completionOptions.tools.length > 0
+        ? { tools: completionOptions.tools.map(serializeToolDefinition) }
+        : {})
+    };
+    const emitDiagnostic = (diagnostic: Omit<ChatCompletionDiagnostic, "endpoint" | "operation" | "operationId" | "purpose" | "requestBody" | "timestamp">): void => {
+      if (!config.debug || !completionOptions.debug || !completionOptions.onDiagnostic) {
+        return;
+      }
 
-        completionOptions.onDiagnostic({
-          ...completionOptions.debug,
-          ...diagnostic,
-          endpoint,
-          requestBody,
-          timestamp: new Date().toISOString()
-        });
-      };
-
-      const response = await fetchImpl(endpoint, {
-        method: "POST",
-        headers: provider.headers,
-        body: JSON.stringify(requestBody)
+      completionOptions.onDiagnostic({
+        ...completionOptions.debug,
+        ...diagnostic,
+        endpoint,
+        requestBody,
+        timestamp: new Date().toISOString()
       });
+    };
 
-      const body = await readJsonResponse(response);
-      if (!response.ok) {
-        const message = formatProviderError("Chat completion failed", body);
-        emitDiagnostic({
-          error: message,
-          ok: false,
-          responseBody: body,
-          status: response.status
-        });
-        throw createTaggedError("provider-chat-failed", message);
-      }
+    const response = await fetchImpl(endpoint, {
+      method: "POST",
+      headers: provider.headers,
+      body: JSON.stringify(requestBody)
+    });
 
-      const content = readChatCompletionContent(body);
-      if (!content) {
-        emitDiagnostic({
-          error: "Chat completion response did not include assistant content.",
-          ok: false,
-          responseBody: body,
-          status: response.status
-        });
-        throw createTaggedError("provider-chat-empty", "Chat completion response did not include assistant content.");
-      }
-
+    const body = await readJsonResponse(response);
+    if (!response.ok) {
+      const message = formatProviderError("Chat completion failed", body);
       emitDiagnostic({
-        assistantContent: content,
-        ok: true,
+        error: message,
+        ok: false,
         responseBody: body,
         status: response.status
       });
-      return content;
+      throw createTaggedError("provider-chat-failed", message);
     }
+
+    const result = readChatCompletionResult(body);
+    if (!result) {
+      emitDiagnostic({
+        error: "Chat completion response did not include assistant content.",
+        ok: false,
+        responseBody: body,
+        status: response.status
+      });
+      throw createTaggedError("provider-chat-empty", "Chat completion response did not include assistant content.");
+    }
+
+    emitDiagnostic({
+      ...(result.kind === "text" ? { assistantContent: result.content } : {}),
+      ok: true,
+      responseBody: body,
+      status: response.status
+    });
+    return result;
+  };
+
+  return {
+    async complete(messages, completionOptions = {}) {
+      const response = await completeStructured(messages, completionOptions);
+      if (response.kind !== "text") {
+        throw createTaggedError("provider-chat-tool-calls-unexpected", "Chat completion returned tool calls unexpectedly.");
+      }
+      return response.content;
+    },
+    completeStructured
   };
 };
 
@@ -247,19 +293,92 @@ const readJsonResponse = async (response: Response): Promise<unknown> => {
   }
 };
 
-const readChatCompletionContent = (body: unknown): string | null => {
+const readChatCompletionResult = (body: unknown): ChatStructuredResult | null => {
   if (!isRecord(body) || !Array.isArray(body.choices)) {
     return null;
   }
 
   const first = body.choices[0] as unknown;
-  if (!isRecord(first) || !isRecord(first.message) || typeof first.message.content !== "string") {
+  if (!isRecord(first) || !isRecord(first.message)) {
     return null;
   }
 
-  const content = first.message.content.trim();
-  return content.length > 0 ? content : null;
+  const content = typeof first.message.content === "string" ? first.message.content.trim() : "";
+  const toolCalls = readToolCalls(first.message.tool_calls);
+
+  if (toolCalls.length > 0) {
+    return {
+      content,
+      kind: "tool-calls",
+      toolCalls
+    };
+  }
+
+  return content.length > 0
+    ? {
+      content,
+      kind: "text"
+    }
+    : null;
 };
+
+const readToolCalls = (value: unknown): ChatToolCall[] => {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.flatMap((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.id !== "string" ||
+      !isRecord(entry.function) ||
+      typeof entry.function.name !== "string" ||
+      typeof entry.function.arguments !== "string"
+    ) {
+      return [];
+    }
+
+    return [{
+      arguments: entry.function.arguments,
+      id: entry.id,
+      name: entry.function.name
+    }];
+  });
+};
+
+const serializeChatMessage = (message: ChatMessage): Record<string, unknown> => {
+  const serialized: Record<string, unknown> = {
+    content: message.content,
+    role: message.role
+  };
+
+  if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
+    serialized.tool_calls = message.toolCalls.map((toolCall) => ({
+      function: {
+        arguments: toolCall.arguments,
+        name: toolCall.name
+      },
+      id: toolCall.id,
+      type: "function"
+    }));
+  }
+
+  if (message.role === "tool") {
+    serialized.name = message.name;
+    serialized.tool_call_id = message.toolCallId;
+  }
+
+  return serialized;
+};
+
+const serializeToolDefinition = (tool: ChatToolDefinition): Record<string, unknown> => ({
+  function: {
+    description: tool.description,
+    name: tool.name,
+    parameters: tool.parameters
+  },
+  type: "function"
+});
 
 const readEmbeddings = (body: unknown): number[][] => {
   if (!isRecord(body) || !Array.isArray(body.data)) {

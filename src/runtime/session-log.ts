@@ -1,12 +1,27 @@
-import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export interface SessionLog {
-  append(exchange: SessionLogExchange): Promise<void>;
+  append(entry: SessionLogEntry): Promise<void>;
   readonly filePath: string;
+  rename(title: string): Promise<void>;
 }
 
 export interface SessionLogExchange {
+  assistant: string;
+  kind: "exchange";
+  title: string;
+  user: string;
+}
+
+export interface SessionLogProgress {
+  kind: "progress";
+  message: string;
+}
+
+export type SessionLogEntry = SessionLogExchange | SessionLogProgress;
+
+interface LegacySessionLogExchange {
   assistant: string;
   title: string;
   user: string;
@@ -34,35 +49,63 @@ export const createSessionLog = async (request: SessionLogCreateRequest): Promis
   const title = sanitizeSessionTitle(request.title);
 
   await mkdir(request.logDir, { recursive: true });
-  const filePath = await createUniqueSessionLogFile(request.logDir, startedAt, title);
+  let filePath = await createUniqueSessionLogFile(request.logDir, startedAt, title);
 
   return {
-    filePath,
-    async append(exchange) {
-      const exchanges = await readSessionLogFile(path.dirname(filePath), filePath);
-      exchanges.push(normalizeExchange(exchange));
-      await writeFile(filePath, `${JSON.stringify(exchanges, null, 2)}\n`, "utf8");
+    get filePath() {
+      return filePath;
+    },
+    async append(entry) {
+      const entries = await readSessionLogFile(path.dirname(filePath), filePath);
+      entries.push(normalizeEntry(entry));
+      await writeFile(filePath, `${JSON.stringify(entries, null, 2)}\n`, "utf8");
+    },
+    async rename(title) {
+      const nextPath = await createUniqueSessionLogPath(
+        path.dirname(filePath),
+        startedAt,
+        sanitizeSessionTitle(title),
+        filePath
+      );
+      if (path.resolve(nextPath) === path.resolve(filePath)) {
+        return;
+      }
+      await rename(filePath, nextPath);
+      filePath = nextPath;
     }
   };
 };
 
 const createUniqueSessionLogFile = async (logDir: string, startedAt: Date, title: string): Promise<string> => {
+  const filePath = await createUniqueSessionLogPath(logDir, startedAt, title);
+  await writeFile(filePath, "[]\n", {
+    flag: "wx",
+    encoding: "utf8"
+  });
+  return filePath;
+};
+
+const createUniqueSessionLogPath = async (
+  logDir: string,
+  startedAt: Date,
+  title: string,
+  currentFilePath?: string
+): Promise<string> => {
   const timestamp = formatTimestamp(startedAt);
-  const content = "[]\n";
 
   for (let attempt = 1; attempt <= 100; attempt += 1) {
     const suffix = attempt === 1 ? "" : ` ${attempt}`;
     const filePath = path.join(logDir, `${timestamp} ${title}${suffix}.json`);
-    try {
-      await writeFile(filePath, content, {
-        flag: "wx",
-        encoding: "utf8"
-      });
+    if (currentFilePath && path.resolve(filePath) === path.resolve(currentFilePath)) {
       return filePath;
+    }
+    try {
+      await readFile(filePath, "utf8");
     } catch (error) {
-      if (!hasNodeErrorCode(error, "EEXIST")) {
-        throw error;
+      if (hasNodeErrorCode(error, "ENOENT")) {
+        return filePath;
       }
+      throw error;
     }
   }
 
@@ -150,7 +193,7 @@ export const listSessionLogFiles = async (
     .sort((left, right) => path.basename(right.filePath).localeCompare(path.basename(left.filePath)));
 };
 
-export const readSessionLogFile = async (logDir: string, filePath: string): Promise<SessionLogExchange[]> => {
+export const readSessionLogFile = async (logDir: string, filePath: string): Promise<SessionLogEntry[]> => {
   const root = path.resolve(logDir);
   const candidate = path.resolve(root, filePath);
 
@@ -163,13 +206,17 @@ export const readSessionLogFile = async (logDir: string, filePath: string): Prom
     throw new Error("Session log file must contain a JSON array.");
   }
 
-  return parsed.map((exchange): SessionLogExchange => {
-    if (isSessionLogExchangeRecord(exchange)) {
-      return normalizeExchange({
-        assistant: exchange.assistant,
-        title: exchange.title,
-        user: exchange.user
+  return parsed.map((entry): SessionLogEntry => {
+    if (isSessionLogExchangeRecord(entry)) {
+      return normalizeEntry({
+        assistant: entry.assistant,
+        kind: "exchange",
+        title: entry.title,
+        user: entry.user
       });
+    }
+    if (isSessionLogProgressRecord(entry)) {
+      return normalizeEntry(entry);
     }
     throw new Error("Session log file contains an invalid exchange record.");
   });
@@ -219,15 +266,19 @@ const formatSessionLogFileLabel = (filename: string): string => {
   return `${monthLabel} ${Number(day)}, ${year} ${hour12}:${minute} ${period} - ${title}`;
 };
 
-const normalizeExchange = (exchange: SessionLogExchange): SessionLogExchange => {
-  return {
-    assistant: exchange.assistant.trim(),
-    title: exchange.title.trim() || "Untitled Response",
-    user: exchange.user.trim()
+const normalizeEntry = (entry: SessionLogEntry): SessionLogEntry => entry.kind === "exchange"
+  ? {
+    assistant: entry.assistant.trim(),
+    kind: "exchange",
+    title: entry.title.trim() || "Untitled Response",
+    user: entry.user.trim()
+  }
+  : {
+    kind: "progress",
+    message: entry.message.trim()
   };
-};
 
-const isSessionLogExchangeRecord = (value: unknown): value is SessionLogExchange => {
+const isSessionLogExchangeRecord = (value: unknown): value is LegacySessionLogExchange => {
   return (
     typeof value === "object" &&
     value !== null &&
@@ -237,5 +288,16 @@ const isSessionLogExchangeRecord = (value: unknown): value is SessionLogExchange
     typeof value.assistant === "string" &&
     "title" in value &&
     typeof value.title === "string"
+  );
+};
+
+const isSessionLogProgressRecord = (value: unknown): value is SessionLogProgress => {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "kind" in value &&
+    value.kind === "progress" &&
+    "message" in value &&
+    typeof value.message === "string"
   );
 };

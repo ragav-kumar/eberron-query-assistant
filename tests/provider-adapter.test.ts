@@ -3,7 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createOpenAiChatAdapter,
   createOpenAiEmbeddingAdapter,
-  type ChatMessage
+  type ChatMessage,
+  type ChatToolDefinition
 } from "../src/provider/index.js";
 import type { ProviderConfig } from "../src/types.js";
 
@@ -42,12 +43,10 @@ describe("OpenAI-compatible provider adapters", () => {
       Authorization: "Bearer sk-test-secret",
       "Content-Type": "application/json"
     });
-    expect(request?.body).toBe(
-      JSON.stringify({
-        model: "gpt-test-chat",
-        messages
-      })
-    );
+    expect(readRequestBody(fetchImpl)).toEqual({
+      model: "gpt-test-chat",
+      messages
+    });
   });
 
   it("captures successful chat diagnostics only when provider debug is enabled", async () => {
@@ -88,6 +87,74 @@ describe("OpenAI-compatible provider adapters", () => {
       status: 200
     }));
     expect(JSON.stringify(onDiagnostic.mock.calls[0]?.[0])).not.toContain("sk-test-secret");
+  });
+
+  it("sends tool definitions and parses tool calls from structured chat completions", async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      jsonResponse({
+        choices: [
+          {
+            message: {
+              content: "",
+              tool_calls: [
+                {
+                  id: "tool-call-1",
+                  type: "function",
+                  function: {
+                    name: "search_corpus",
+                    arguments: "{\"query\":\"aerenal rites\",\"userMessage\":\"Checking article evidence.\"}"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      })
+    );
+    const messages: ChatMessage[] = [{ role: "user", content: "Find more on Aerenal rites." }];
+    const tools: ChatToolDefinition[] = [{
+      description: "Search the local corpus.",
+      name: "search_corpus",
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string" },
+          userMessage: { type: "string" }
+        },
+        required: ["query", "userMessage"]
+      }
+    }];
+
+    const adapter = createOpenAiChatAdapter(config, { fetchImpl });
+    if (!adapter.completeStructured) {
+      throw new Error("Expected structured chat support.");
+    }
+
+    await expect(adapter.completeStructured(messages, { tools })).resolves.toEqual({
+      content: "",
+      kind: "tool-calls",
+      toolCalls: [
+        {
+          arguments: "{\"query\":\"aerenal rites\",\"userMessage\":\"Checking article evidence.\"}",
+          id: "tool-call-1",
+          name: "search_corpus"
+        }
+      ]
+    });
+
+    expect(readRequestBody(fetchImpl)).toMatchObject({
+      model: "gpt-test-chat",
+      messages,
+      tools: [
+        {
+          type: "function",
+          function: {
+            description: "Search the local corpus.",
+            name: "search_corpus"
+          }
+        }
+      ]
+    });
   });
 
   it("does not capture chat diagnostics when provider debug is disabled", async () => {

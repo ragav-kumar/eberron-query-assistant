@@ -20,8 +20,10 @@ interface LeftInputColumnProps {
   onInputModeChange: (mode: InputMode) => void;
   onLeftTabChange: (tab: LeftTab) => void;
   onNameGeneratorPromptChange: (prompt: string) => void;
+  onRetrievalTurnLimitChange: (retrievalTurnLimit: number) => void;
   onSubmitAssistant: () => void;
   onSubmitNameGenerator: () => void;
+  retrievalTurnLimit: number;
 }
 
 /** Owns the left-side input tabs and renders the active input or context editor surface. */
@@ -41,8 +43,10 @@ export const LeftInputColumn = ({
   onInputModeChange,
   onLeftTabChange,
   onNameGeneratorPromptChange,
+  onRetrievalTurnLimitChange,
   onSubmitAssistant,
-  onSubmitNameGenerator
+  onSubmitNameGenerator,
+  retrievalTurnLimit
 }: LeftInputColumnProps) => (
   <>
     <div className="tab-list" role="tablist" aria-label="Left column tabs">
@@ -78,6 +82,18 @@ export const LeftInputColumn = ({
             onChange={(event) => onIncludePartyContextChange(event.currentTarget.checked)}
           />
           Include party info
+        </label>
+        <label className="range-row">
+          <span>Extra retrieval turns: {retrievalTurnLimit}</span>
+          <input
+            type="range"
+            min={0}
+            max={3}
+            step={1}
+            value={retrievalTurnLimit}
+            disabled={isBusy}
+            onChange={(event) => onRetrievalTurnLimitChange(Number(event.currentTarget.value))}
+          />
         </label>
         <InputModeSelector mode={inputMode} onModeChange={onInputModeChange} />
         {inputMode === "standard" ? (

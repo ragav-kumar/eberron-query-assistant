@@ -91,7 +91,8 @@ const handleApiRequest = async (
     writeJson(response, 200, await app.askAssistant(
       readStringField(body, "prompt"),
       readOptionalStringField(body, "sessionId"),
-      readOptionalBooleanField(body, "includePartyContext", true)
+      readOptionalBooleanField(body, "includePartyContext", true),
+      readOptionalNumberField(body, "retrievalTurnLimit", 1)
     ));
     return;
   }
@@ -164,6 +165,17 @@ const readOptionalBooleanField = (body: unknown, field: string, defaultValue: bo
   }
 
   throw new Error(`Expected JSON boolean field: ${field}.`);
+};
+
+const readOptionalNumberField = (body: unknown, field: string, defaultValue: number): number => {
+  if (!isRecord(body) || body[field] === undefined) {
+    return defaultValue;
+  }
+  if (typeof body[field] === "number" && Number.isFinite(body[field])) {
+    return body[field];
+  }
+
+  throw new Error(`Expected JSON number field: ${field}.`);
 };
 
 const writeJson = (response: ServerResponse, statusCode: number, body: unknown): void => {

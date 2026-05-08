@@ -36,8 +36,10 @@ const AppContent = () => {
           onInputModeChange={state.changeInputMode}
           onLeftTabChange={state.setLeftTab}
           onNameGeneratorPromptChange={state.setNameGeneratorPrompt}
+          onRetrievalTurnLimitChange={state.setRetrievalTurnLimit}
           onSubmitAssistant={state.submitAssistantPrompt}
           onSubmitNameGenerator={state.submitNameGeneratorPrompt}
+          retrievalTurnLimit={state.retrievalTurnLimit}
         />
       </section>
 

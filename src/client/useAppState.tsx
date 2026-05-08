@@ -68,6 +68,7 @@ export interface AppState {
   npcs: ApiNpcResponse;
   outputTab: OutputTab;
   runRefresh: (forceReingest: boolean) => void;
+  retrievalTurnLimit: number;
   selectLog: (filePath: string) => void;
   setAssistantPrompt: (prompt: string) => void;
   setContextMarkdown: (markdown: string) => void;
@@ -75,6 +76,7 @@ export interface AppState {
   setLeftTab: (tab: LeftTab) => void;
   setNameGeneratorPrompt: (prompt: string) => void;
   setOutputTab: (tab: OutputTab) => void;
+  setRetrievalTurnLimit: (retrievalTurnLimit: number) => void;
   startSession: (mode: SessionMode) => void;
   status: BusyState;
   submitAssistantPrompt: () => void;
@@ -116,6 +118,7 @@ const useCreateAppState = (): AppState => {
   const [leftTab, setLeftTab] = useState<LeftTab>("input");
   const [inputMode, setInputMode] = useState<InputMode>("standard");
   const [includePartyContext, setIncludePartyContext] = useState(true);
+  const [retrievalTurnLimit, setRetrievalTurnLimit] = useState(1);
   const [outputTab, setOutputTab] = useState<OutputTab>("log");
 
   const nextSessionId = useCallback((mode: SessionMode): string => {
@@ -279,13 +282,13 @@ const useCreateAppState = (): AppState => {
     setOutputTab("log");
     void runOperation(
       "assistant",
-      () => askAssistant(prompt, standardSessionId, includePartyContext),
+      () => askAssistant(prompt, standardSessionId, includePartyContext, retrievalTurnLimit),
       (result) => {
         setAssistantPrompt("");
         setLog(result.log);
       }
     );
-  }, [assistantPrompt, includePartyContext, runOperation, standardSessionId, status.busy]);
+  }, [assistantPrompt, includePartyContext, retrievalTurnLimit, runOperation, standardSessionId, status.busy]);
 
   const submitNameGeneratorPrompt = useCallback(() => {
     const prompt = nameGeneratorPrompt.trim();
@@ -295,14 +298,14 @@ const useCreateAppState = (): AppState => {
     setOutputTab("npcs");
     void runOperation(
       "npcs",
-      () => generateNpcs(prompt, npcSessionId, includePartyContext),
+      () => generateNpcs(prompt, npcSessionId, includePartyContext, retrievalTurnLimit),
       (result) => {
         setNameGeneratorPrompt("");
         clearLogSelection();
         setNpcs(result.npcs);
       }
     );
-  }, [clearLogSelection, includePartyContext, nameGeneratorPrompt, npcSessionId, runOperation, status.busy]);
+  }, [clearLogSelection, includePartyContext, nameGeneratorPrompt, npcSessionId, retrievalTurnLimit, runOperation, status.busy]);
 
   const runRefresh = useCallback(
     (forceReingest: boolean) => {
@@ -401,6 +404,7 @@ const useCreateAppState = (): AppState => {
     npcs,
     outputTab,
     runRefresh,
+    retrievalTurnLimit,
     selectLog,
     setAssistantPrompt,
     setContextMarkdown,
@@ -408,6 +412,7 @@ const useCreateAppState = (): AppState => {
     setLeftTab,
     setNameGeneratorPrompt,
     setOutputTab,
+    setRetrievalTurnLimit,
     startSession,
     status,
     submitAssistantPrompt,

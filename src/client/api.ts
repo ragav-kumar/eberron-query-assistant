@@ -1,6 +1,6 @@
 export interface ApiLog {
   activeFilePath: string | null;
-  exchanges: ApiLogExchange[];
+  exchanges: ApiLogEntry[];
   files: ApiLogFile[];
   filePath: string | null;
   readOnly: boolean;
@@ -8,9 +8,17 @@ export interface ApiLog {
 
 export interface ApiLogExchange {
   assistant: string;
+  kind: "exchange";
   title: string;
   user: string;
 }
+
+export interface ApiLogProgress {
+  kind: "progress";
+  message: string;
+}
+
+export type ApiLogEntry = ApiLogExchange | ApiLogProgress;
 
 export interface ApiLogFile {
   active: boolean;
@@ -58,11 +66,9 @@ export interface ApiProviderDebugEntry {
   operationId: string;
   purpose: string;
   requestBody: {
-    messages: Array<{
-      content: string;
-      role: "assistant" | "system" | "user";
-    }>;
+    messages: unknown[];
     model: string;
+    tools?: unknown[];
   };
   responseBody?: unknown;
   status?: number;
@@ -117,22 +123,24 @@ export const writeContext = async (markdown: string): Promise<void> => {
 export const askAssistant = async (
   prompt: string,
   sessionId: string,
-  includePartyContext: boolean
+  includePartyContext: boolean,
+  retrievalTurnLimit: number
 ): Promise<ApiOperationResult> => {
   return requestJson<ApiOperationResult>("/api/assistant", {
     method: "POST",
-    body: JSON.stringify({ prompt, sessionId, includePartyContext })
+    body: JSON.stringify({ prompt, sessionId, includePartyContext, retrievalTurnLimit })
   });
 };
 
 export const generateNpcs = async (
   prompt: string,
   sessionId: string,
-  includePartyContext: boolean
+  includePartyContext: boolean,
+  retrievalTurnLimit: number
 ): Promise<ApiOperationResult> => {
   return requestJson<ApiOperationResult>("/api/npcs", {
     method: "POST",
-    body: JSON.stringify({ prompt, sessionId, includePartyContext })
+    body: JSON.stringify({ prompt, sessionId, includePartyContext, retrievalTurnLimit })
   });
 };
 

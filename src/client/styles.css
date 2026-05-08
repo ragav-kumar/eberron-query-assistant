@@ -236,6 +236,20 @@ p {
   width: auto;
 }
 
+.range-row {
+  color: #52616f;
+  display: flex;
+  flex-direction: column;
+  font-size: 0.9rem;
+  gap: 0.35rem;
+  max-width: 18rem;
+}
+
+.range-row input {
+  min-height: auto;
+  padding: 0;
+}
+
 .panel {
   background: transparent;
   border: 0;
@@ -404,6 +418,22 @@ p {
   border-bottom: 1px solid #e5e7eb;
   margin-bottom: 0.8rem;
   padding-bottom: 0.55rem;
+}
+
+.log-progress {
+  background: #f8fafc;
+  border: 1px solid #d8dee4;
+  border-left: 4px solid #1f6feb;
+  border-radius: 8px;
+  padding: 0.8rem 0.9rem;
+}
+
+.log-progress h2 {
+  color: #52616f;
+  font-size: 0.8rem;
+  letter-spacing: 0.02em;
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
 }
 
 .log-question {

@@ -11,6 +11,7 @@ export interface AssistantMessageBuildRequest {
   partyContext?: string;
   promptAssets: AssistantPromptAssets;
   question: string;
+  retrievalToolInstructions?: string;
   requestSessionTitle?: boolean;
 }
 
@@ -42,6 +43,7 @@ export const buildAssistantMessages = (request: AssistantMessageBuildRequest): C
       : "",
     includePartyContext ? "" : request.promptAssets.worldQueryingModePrompt,
     request.promptAssets.sessionTitlePrompt,
+    request.retrievalToolInstructions?.trim() ?? "",
     request.requestSessionTitle === true
       ? "This response starts a new transcript session; include <session-title>."
       : "This response continues an existing transcript session; omit <session-title>."
@@ -111,7 +113,7 @@ const readRequiredPromptFile = async (filePath: string, label: string): Promise<
   }
 };
 
-const formatEvidence = (results: RetrievalResult[]): string => {
+export const formatEvidence = (results: RetrievalResult[]): string => {
   if (results.length === 0) {
     return "No relevant retrieval results were found. Say when the answer is not supported by the local corpus.";
   }

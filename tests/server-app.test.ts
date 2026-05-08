@@ -61,10 +61,58 @@ describe("web app API model", () => {
     expect(path.basename(response.log.filePath ?? "")).not.toContain("GUI Session");
     expect(response.log.exchanges).toEqual([
       {
+        kind: "exchange",
         user: "What about Aerenal?",
         title: "Aerenal Overview",
         assistant: "Aerenal answer."
       }
+    ]);
+  });
+
+  it("persists retrieval-tool progress before the final assistant exchange", async () => {
+    const search = vi
+      .fn()
+      .mockResolvedValueOnce([result()])
+      .mockResolvedValueOnce([result()]);
+    const completeStructured = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: "",
+        kind: "tool-calls",
+        toolCalls: [
+          {
+            arguments: JSON.stringify({
+              query: "aerenal article follow-up",
+              userMessage: "Checking article evidence about Aerenal."
+            }),
+            id: "tool-1",
+            name: "search_corpus"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        content: firstAnswer("Aerenal Follow Up", "Aerenal Follow Up", "Aerenal answer with follow-up."),
+        kind: "text"
+      });
+    const app = createWebApp({
+      config: await writeConfig("assistant-tool-progress"),
+      ...mockRefreshDependencies(),
+      retrieval: {
+        refresh: vi.fn().mockResolvedValue({ chunkCount: 1, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
+        search
+      },
+      chat: {
+        complete: vi.fn().mockResolvedValue("unused"),
+        completeStructured
+      }
+    });
+
+    const response = await app.askAssistant("What about Aerenal?", undefined, true, 1);
+
+    expect(path.basename(response.log.filePath ?? "")).toContain("Aerenal Follow Up");
+    expect(response.log.exchanges).toEqual([
+      { kind: "progress", message: "Checking article evidence about Aerenal." },
+      logExchange("What about Aerenal?", "Aerenal Follow Up", "Aerenal answer with follow-up.")
     ]);
   });
 
@@ -93,6 +141,24 @@ describe("web app API model", () => {
       "assistant.log.append_exchange"
     ]));
     expect(entries.every((entry) => entry.ok)).toBe(true);
+  });
+
+  it("passes retrieval turn limits into assistant requests", async () => {
+    const ask = vi.fn().mockResolvedValue({ answer: "answer", evidence: [] });
+    const app = createWebApp({
+      config: await writeConfig("assistant-turn-limit"),
+      ...mockRefreshDependencies(),
+      assistant: { ask },
+      retrieval: mockRetrieval([result()]).retrieval,
+      chat: { complete: vi.fn().mockResolvedValue("answer") }
+    });
+
+    await app.askAssistant("What about Aerenal?", undefined, true, 3);
+
+    expect(ask).toHaveBeenCalledWith("What about Aerenal?", expect.objectContaining({
+      includePartyContext: true,
+      retrievalTurnLimit: 3
+    }));
   });
 
   it("omits provider debug entries by default", async () => {
@@ -515,7 +581,7 @@ describe("web app API model", () => {
     const response = await app.askAssistant("What about Aerenal?");
 
     expect(refresh).toHaveBeenCalledTimes(1);
-    expect(response.log.exchanges[0]?.assistant).toBe("Aerenal answer.");
+    expect(readExchange(response.log.exchanges[0])?.assistant).toBe("Aerenal answer.");
   });
 
   it("logs startup refresh failures and lets later prompts retry refresh", async () => {
@@ -560,7 +626,7 @@ describe("web app API model", () => {
     const response = await app.askAssistant("Can this retry?");
 
     expect(inspectSources).toHaveBeenCalledTimes(2);
-    expect(response.log.exchanges[0]?.assistant).toBe("Retry answer.");
+    expect(readExchange(response.log.exchanges[0])?.assistant).toBe("Retry answer.");
   });
 
   it("replays existing console entries to new subscribers before streaming new ones", async () => {
@@ -601,7 +667,7 @@ describe("web app API model", () => {
 
     const response = await app.getLog(path.join(config.logDir, "20260101000000 Old.json"));
 
-    expect(response.exchanges).toEqual([{ user: "Old?", title: "Old", assistant: "Old." }]);
+    expect(response.exchanges).toEqual([logExchange("Old?", "Old", "Old.")]);
     expect(response.readOnly).toBe(true);
     expect(response.files.map((file) => file.label)).toEqual([
       "Feb 1, 2026 12:00 AM - New",
@@ -824,11 +890,7 @@ describe("web app API model", () => {
     expect(response.log.filePath).not.toBe(oldPath);
     expect(response.log.activeFilePath).toBe(response.log.filePath);
     expect(response.log.readOnly).toBe(false);
-    expect(response.log.exchanges[0]).toEqual({
-      user: "New question",
-      title: "Current Question",
-      assistant: "Current answer."
-    });
+    expect(response.log.exchanges[0]).toEqual(logExchange("New question", "Current Question", "Current answer."));
   });
 
   it("starts a lazy new session without creating an empty transcript", async () => {
@@ -856,7 +918,7 @@ describe("web app API model", () => {
     expect(second.log.filePath).not.toBe(first.log.filePath);
     expect(path.basename(first.log.filePath ?? "")).toContain("First");
     expect(path.basename(second.log.filePath ?? "")).toContain("Second");
-    expect(second.log.exchanges[0]?.user).toBe("Second question");
+    expect(readExchange(second.log.exchanges[0])?.user).toBe("Second question");
     const secondMessages = chat.mock.calls[1]?.[0] as Array<{ content: string }> | undefined;
     expect(secondMessages?.[0]?.content).toContain("<session-title>");
     expect(secondMessages?.[0]?.content).toContain("<response-title>");
@@ -882,11 +944,7 @@ describe("web app API model", () => {
     expect(path.basename(response.log.filePath ?? "")).toContain("Mournland Overview");
     expect(path.basename(response.log.filePath ?? "")).not.toContain("What about the Mournland");
     expect(path.basename(response.log.filePath ?? "")).not.toContain("GUI Session");
-    expect(response.log.exchanges[0]).toEqual({
-      user: "What about the Mournland?",
-      title: "Mournland Overview",
-      assistant: "Plain answer."
-    });
+    expect(response.log.exchanges[0]).toEqual(logExchange("What about the Mournland?", "Mournland Overview", "Plain answer."));
   });
 
   it("rejects assistant responses without title metadata instead of using the prompt as a filename", async () => {
@@ -928,11 +986,9 @@ describe("web app API model", () => {
     const response = await app.askAssistant("What materials should be available?");
 
     expect(chat).toHaveBeenCalledTimes(3);
-    expect(response.log.exchanges[1]).toEqual({
-      user: "What materials should be available?",
-      title: "Crafting Materials",
-      assistant: "Second answer without tags."
-    });
+    expect(response.log.exchanges[1]).toEqual(
+      logExchange("What materials should be available?", "Crafting Materials", "Second answer without tags.")
+    );
   });
 
   it("caps long assistant-provided transcript filenames", async () => {
@@ -1203,7 +1259,7 @@ describe("web app API model", () => {
     expect(npcResponse.npcs.npcs).toHaveLength(1);
     expect(assistantResponse.npcs.npcs).toHaveLength(1);
     expect(assistantResponse.npcs.npcs[0]?.name).toBe("Jala ir'Wynarn");
-    expect(assistantResponse.log.exchanges[0]?.assistant).toBe("Standard answer.");
+    expect(readExchange(assistantResponse.log.exchanges[0])?.assistant).toBe("Standard answer.");
   });
 
   it("rejects empty NPC prompts", async () => {
@@ -1463,3 +1519,14 @@ const emptyLogResponse = () => ({
   filePath: null,
   readOnly: false
 });
+
+const logExchange = (user: string, title: string, assistant: string) => ({
+  assistant,
+  kind: "exchange" as const,
+  title,
+  user
+});
+
+const readExchange = (
+  entry: { kind: "exchange"; assistant: string; title: string; user: string } | { kind: "progress"; message: string } | undefined
+) => entry?.kind === "exchange" ? entry : undefined;

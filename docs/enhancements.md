@@ -10,6 +10,14 @@ Assistant, NPC generation, refresh, retrieval, chat, party-context, state, and t
 
 Verification added for this change covers the model default and structured timing output for assistant operations.
 
+## Standard Assistant Retrieval Tool
+
+Standard assistant mode now keeps the existing first retrieval pass and can optionally make a bounded number of additional local corpus searches through a native `search_corpus` provider tool. The browser Input tab exposes a shared `Extra retrieval turns` slider with range `0` to `3` and default `1`; in this phase the slider is shown for both Standard and NPC Generator workflows, but only Standard assistant requests use it.
+
+When Standard mode uses follow-up retrieval, concise progress text is written into the active transcript log before the final answer. Transcript JSON now stores a mixed ordered list of final Q&A exchanges and persisted progress entries, while historical exchange-only logs remain readable without migration.
+
+Verification added for this change covers provider tool-call payloads, Standard assistant tool-loop behavior, persisted progress log ordering, assistant request payloads carrying the selected turn limit, and Log-tab rendering of mixed progress and final-answer entries.
+
 ## Readable Session Titles
 
 Assistant transcript session titles are requested as normal human-readable phrases with spaces instead of machine-style kebab-case, snake_case, PascalCase, or camelCase. Transcript filename sanitization also repairs those common machine-case forms before creating the JSON log file.

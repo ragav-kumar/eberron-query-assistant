@@ -246,6 +246,7 @@ describe("assistant session", () => {
 
     const answer = await createAssistantSession({
       ...assistantSessionConfig(await writeAssistantFiles("retrieves-evidence")),
+      appendProgress: vi.fn(),
       appendExchange,
       chat: { complete },
       retrieval: retrievalFixture.retrieval
@@ -280,6 +281,7 @@ describe("assistant session", () => {
 
     await createAssistantSession({
       ...assistantSessionConfig(await writeAssistantFiles("logs-title")),
+      appendProgress: vi.fn(),
       appendExchange: createTranscriptAppender(logDir),
       chat: { complete },
       retrieval: mockRetrieval([result("pdf", "eberron.pdf", "Eberron Rising", "page 4")]).retrieval
@@ -292,6 +294,7 @@ describe("assistant session", () => {
     const log = JSON.parse(await readFile(path.join(logDir, filenames[0] ?? ""), "utf8")) as unknown;
     expect(log).toEqual([
       {
+        kind: "exchange",
         user: "What about Aerenal?",
         title: "Aerenal Ancestors",
         assistant: "Aerenal answer.\nReferences: Eberron Rising, page 4"
@@ -307,6 +310,7 @@ describe("assistant session", () => {
       .mockResolvedValueOnce("<response-title>Second Question</response-title>\n<answer>\nSecond answer.\n</answer>");
     const session = createAssistantSession({
       ...assistantSessionConfig(await writeAssistantFiles("logs-append")),
+      appendProgress: vi.fn(),
       appendExchange: createTranscriptAppender(logDir),
       chat: { complete },
       retrieval: mockRetrieval([]).retrieval
@@ -324,8 +328,8 @@ describe("assistant session", () => {
       user: string;
     }>;
     expect(log).toEqual([
-      { user: "First question", title: "First Question", assistant: "First answer." },
-      { user: "Second question", title: "Second Question", assistant: "Second answer." }
+      { kind: "exchange", user: "First question", title: "First Question", assistant: "First answer." },
+      { kind: "exchange", user: "Second question", title: "Second Question", assistant: "Second answer." }
     ]);
   });
 
@@ -334,6 +338,7 @@ describe("assistant session", () => {
 
     await expect(createAssistantSession({
       ...assistantSessionConfig(await writeAssistantFiles("logs-missing-title")),
+      appendProgress: vi.fn(),
       appendExchange: createTranscriptAppender(logDir),
       chat: { complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("Plain answer.") },
       retrieval: mockRetrieval([]).retrieval
@@ -351,6 +356,7 @@ describe("assistant session", () => {
       .mockResolvedValueOnce("<response-title>Materials</response-title>\n<answer>\nSecond answer without tags.\n</answer>");
     const session = createAssistantSession({
       ...assistantSessionConfig(await writeAssistantFiles("logs-title-repair")),
+      appendProgress: vi.fn(),
       appendExchange: createTranscriptAppender(logDir),
       chat: { complete },
       retrieval: mockRetrieval([]).retrieval
@@ -366,6 +372,7 @@ describe("assistant session", () => {
       user: string;
     }>;
     expect(log[1]).toEqual({
+      kind: "exchange",
       user: "Second question",
       title: "Materials",
       assistant: "Second answer without tags."
@@ -381,12 +388,14 @@ describe("assistant session", () => {
 
     await createAssistantSession({
       ...assistantSessionConfig(await writeAssistantFiles("logs-history-first")),
+      appendProgress: vi.fn(),
       appendExchange: vi.fn(),
       chat: firstChat.chat,
       retrieval: mockRetrieval([]).retrieval
     }).ask("First question");
     await createAssistantSession({
       ...assistantSessionConfig(await writeAssistantFiles("logs-history-second")),
+      appendProgress: vi.fn(),
       appendExchange: vi.fn(),
       chat: secondChat.chat,
       retrieval: mockRetrieval([]).retrieval
@@ -397,6 +406,99 @@ describe("assistant session", () => {
     expect(firstMessages.some((message) => message.content.includes("First question"))).toBe(true);
     expect(secondMessages.some((message) => message.content.includes("First question"))).toBe(false);
     expect(secondMessages.some((message) => message.content.includes("Old logged question"))).toBe(false);
+  });
+
+  it("handles one retrieval tool call before the final assistant answer", async () => {
+    const search = vi
+      .fn<RetrievalService["search"]>()
+      .mockResolvedValueOnce([result("pdf", "eberron.pdf", "Eberron Rising", "page 4")])
+      .mockResolvedValueOnce([result("article", "aerenal-rites", "Aerenal Rites", null, "https://example.test/aerenal")]);
+    const appendExchange = vi.fn();
+    const appendProgress = vi.fn();
+    const completeStructured = vi
+      .fn<NonNullable<ChatAdapter["completeStructured"]>>()
+      .mockResolvedValueOnce({
+        content: "",
+        kind: "tool-calls",
+        toolCalls: [
+          {
+            arguments: JSON.stringify({
+              limit: 2,
+              query: "aerenal death rites",
+              sourceTypes: ["article"],
+              userMessage: "Checking article evidence about Aerenal rites."
+            }),
+            id: "tool-1",
+            name: "search_corpus"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        content: [
+          "<session-title>Aerenal Rites</session-title>",
+          "<response-title>Aerenal Rites</response-title>",
+          "<answer>",
+          "Aerenal answer with article support.",
+          "</answer>"
+        ].join("\n"),
+        kind: "text"
+      });
+
+    const answer = await createAssistantSession({
+      ...assistantSessionConfig(await writeAssistantFiles("tool-loop")),
+      appendProgress,
+      appendExchange,
+      chat: {
+        complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("unused"),
+        completeStructured
+      },
+      retrieval: {
+        refresh: vi.fn().mockResolvedValue({ chunkCount: 0, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
+        search
+      }
+    }).ask("What rites do the Aereni use?", { retrievalTurnLimit: 1 });
+
+    expect(search).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      limit: 8,
+      query: "What rites do the Aereni use?"
+    }));
+    expect(search).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      limit: 2,
+      query: "aerenal death rites",
+      sourceTypes: ["article"]
+    }));
+    expect(appendProgress).toHaveBeenCalledWith({
+      kind: "progress",
+      message: "Checking article evidence about Aerenal rites."
+    });
+    expect(answer.answer).toBe("Aerenal answer with article support.");
+    expect(appendExchange).toHaveBeenCalledWith({
+      assistant: "Aerenal answer with article support.",
+      sessionTitle: "Aerenal Rites",
+      title: "Aerenal Rites",
+      user: "What rites do the Aereni use?"
+    });
+    expect(completeStructured.mock.calls[0]?.[1]?.tools).toHaveLength(1);
+  });
+
+  it("preserves single-pass behavior when retrieval turn limit is zero", async () => {
+    const completeStructured = vi.fn<NonNullable<ChatAdapter["completeStructured"]>>().mockResolvedValue({
+      content: "<session-title>Single Pass</session-title>\n<response-title>Single Pass</response-title>\n<answer>\nAnswer.\n</answer>",
+      kind: "text"
+    });
+
+    await createAssistantSession({
+      ...assistantSessionConfig(await writeAssistantFiles("tool-limit-zero")),
+      appendProgress: vi.fn(),
+      appendExchange: vi.fn(),
+      chat: {
+        complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("unused"),
+        completeStructured
+      },
+      retrieval: mockRetrieval([]).retrieval
+    }).ask("Answer in one pass.", { retrievalTurnLimit: 0 });
+
+    expect(completeStructured.mock.calls[0]?.[1]?.tools).toBeUndefined();
   });
 });
 
@@ -521,6 +623,7 @@ const createTranscriptAppender = (logDir: string): (exchange: {
     });
     await log.append({
       assistant: exchange.assistant,
+      kind: "exchange",
       title: exchange.title,
       user: exchange.user
     });

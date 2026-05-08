@@ -8,6 +8,9 @@ export type {
   ChatCompletionDiagnostic,
   ChatCompletionOptions,
   ChatMessage,
+  ChatStructuredResult,
+  ChatToolCall,
+  ChatToolDefinition,
   EmbeddingAdapter,
   OpenAiProviderOptions
 } from "./provider-adapter.js";

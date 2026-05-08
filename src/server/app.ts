@@ -24,8 +24,8 @@ import {
   createSessionLog,
   listSessionLogFiles,
   readSessionLogFile,
+  type SessionLogEntry,
   type SessionLog,
-  type SessionLogExchange,
   type SessionLogFile
 } from "../runtime/session-log.js";
 import { createFilesystemSourceDiscoveryService, type SourceDiscoveryService } from "../source-discovery/index.js";
@@ -34,7 +34,12 @@ import { createJsonlTimingReporter, type TimingContext, type TimingReporter } fr
 import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
 
 export interface WebApp {
-  askAssistant(prompt: string, sessionId?: string, includePartyContext?: boolean): Promise<WebOperationResult>;
+  askAssistant(
+    prompt: string,
+    sessionId?: string,
+    includePartyContext?: boolean,
+    retrievalTurnLimit?: number
+  ): Promise<WebOperationResult>;
   generateNpcs(prompt: string, sessionId?: string, includePartyContext?: boolean): Promise<WebOperationResult>;
   getContext(): Promise<string>;
   getLog(options?: string | { filePath?: string; sessionId?: string }): Promise<WebLogResponse>;
@@ -62,7 +67,7 @@ export interface WebAppDependencies {
 
 export interface WebLogResponse {
   activeFilePath: string | null;
-  exchanges: SessionLogExchange[];
+  exchanges: SessionLogEntry[];
   files: SessionLogFile[];
   filePath: string | null;
   readOnly: boolean;
@@ -108,6 +113,7 @@ const DEFAULT_SESSION_ID = "default";
 interface StandardSessionState {
   assistant: AssistantSession | null;
   log: SessionLog | null;
+  logNeedsSessionTitle: boolean;
 }
 
 interface NpcSessionState {
@@ -133,7 +139,8 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   if (dependencies.log || dependencies.assistant) {
     standardSessions.set(DEFAULT_SESSION_ID, {
       assistant: dependencies.assistant ?? null,
-      log: dependencies.log ?? null
+      log: dependencies.log ?? null,
+      logNeedsSessionTitle: false
     });
   }
 
@@ -149,7 +156,8 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     if (!session) {
       session = {
         assistant: null,
-        log: null
+        log: null,
+        logNeedsSessionTitle: false
       };
       standardSessions.set(normalizedSessionId, session);
     }
@@ -189,8 +197,13 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     exchange: AssistantSessionLogExchange
   ): Promise<void> => {
     const log = await ensureLog(session, exchange.sessionTitle);
+    if (session.logNeedsSessionTitle) {
+      await log.rename(exchange.sessionTitle);
+      session.logNeedsSessionTitle = false;
+    }
     await log.append({
       assistant: exchange.assistant,
+      kind: "exchange",
       title: exchange.title,
       user: exchange.user
     });
@@ -198,6 +211,14 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   const ensureAssistant = (session: StandardSessionState): AssistantSession => {
     session.assistant ??= createAssistantSession({
       assistant: config.assistant,
+      appendProgress: async (entry) => {
+        const shouldCreateProvisionalLog = session.log === null;
+        const log = await ensureLog(session, "Retrieval Session");
+        if (shouldCreateProvisionalLog) {
+          session.logNeedsSessionTitle = true;
+        }
+        await log.append(entry);
+      },
       appendExchange: async (exchange) => {
         await appendStandardSessionExchange(session, exchange);
       },
@@ -357,7 +378,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   };
 
   return {
-    async askAssistant(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true) {
+    async askAssistant(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true, retrievalTurnLimit = 1) {
       return runExclusive("assistant", async (timing) => {
         const standardSession = readStandardSession(sessionId);
         const providerDebug = createProviderDebugCollector(config);
@@ -367,6 +388,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
             ensureAssistant(standardSession).ask(prompt, {
               includePartyContext,
               onProviderDiagnostic: providerDebug.collect,
+              retrievalTurnLimit,
               timing
             })
           );

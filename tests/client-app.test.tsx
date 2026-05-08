@@ -41,13 +41,7 @@ vi.mock("../src/client/api.js", () => ({
 
 const initialLog = {
   activeFilePath: "logs/session.json" as string | null,
-  exchanges: [
-    {
-      user: "Initial prompt",
-      title: "GUI Session",
-      assistant: "Ready."
-    }
-  ],
+  exchanges: [logExchange("Initial prompt", "GUI Session", "Ready.")],
   files: [
     {
       active: true,
@@ -98,7 +92,7 @@ beforeEach(() => {
   vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
     log: {
       ...initialLog,
-      exchanges: [{ user: "What about Aerenal?", title: "Aerenal Overview", assistant: "Answer" }]
+      exchanges: [logExchange("What about Aerenal?", "Aerenal Overview", "Answer")]
     }
   }));
   vi.mocked(api.generateNpcs).mockResolvedValue(operationResult({
@@ -148,6 +142,32 @@ describe("App", () => {
     expect(screen.getByRole("tab", { name: "Log" }).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("tab", { name: "NPCs" }).getAttribute("aria-selected")).toBe("false");
     expect(screen.getByRole("checkbox", { name: "Include party info" })).toHaveProperty("checked", true);
+    expect(screen.getByText("Extra retrieval turns: 1")).toBeTruthy();
+    expect(screen.getByRole("slider")).toHaveProperty("value", "1");
+  });
+
+  it("submits the selected retrieval turn limit for standard and NPC requests", async () => {
+    render(<App />);
+
+    fireEvent.change(await screen.findByRole("slider"), { target: { value: "3" } });
+    expect(screen.getByText("Extra retrieval turns: 3")).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText(/Ask about Eberron/i), {
+      target: { value: "What about Aerenal?" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    await waitFor(() => {
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String), true, 3);
+    });
+
+    fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
+    fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
+      target: { value: "Generate one envoy" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    await waitFor(() => {
+      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one envoy", expect.any(String), true, 3);
+    });
   });
 
   it("uses one shared party info checkbox for standard and NPC submissions", async () => {
@@ -162,7 +182,7 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Aundair?", expect.any(String), false);
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Aundair?", expect.any(String), false, 1);
     });
 
     fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
@@ -173,7 +193,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate" }));
 
     await waitFor(() => {
-      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one envoy", expect.any(String), false);
+      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one envoy", expect.any(String), false, 1);
     });
   });
 
@@ -200,7 +220,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String), true);
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String), true, 1);
     });
     expect(await screen.findByText("Answer")).toBeTruthy();
   });
@@ -265,7 +285,7 @@ describe("App", () => {
     vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
       log: {
         ...initialLog,
-        exchanges: [{ user: "What about Aerenal?", title: "Aerenal Overview", assistant: "Answer" }]
+        exchanges: [logExchange("What about Aerenal?", "Aerenal Overview", "Answer")]
       },
       npcs: {
         npcs: [
@@ -286,7 +306,7 @@ describe("App", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String), true);
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String), true, 1);
     });
     fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
     fireEvent.click(screen.getByRole("radio", { name: "Standard" }));
@@ -305,7 +325,7 @@ describe("App", () => {
     fireEvent.keyDown(prompt, { key: "Enter" });
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Sharn?", expect.any(String), true);
+      expect(api.askAssistant).toHaveBeenCalledWith("What about Sharn?", expect.any(String), true, 1);
     });
   });
 
@@ -319,7 +339,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Generate" }));
 
     await waitFor(() => {
-      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one Aundairian envoy", expect.any(String), true);
+      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one Aundairian envoy", expect.any(String), true, 1);
     });
     expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
     expect(screen.getByText("Species")).toBeTruthy();
@@ -378,7 +398,7 @@ describe("App", () => {
     fireEvent.keyDown(prompt, { key: "Enter" });
 
     await waitFor(() => {
-      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one goblin", expect.any(String), true);
+      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one goblin", expect.any(String), true, 1);
     });
   });
 
@@ -703,6 +723,24 @@ describe("App", () => {
     expect(await screen.findByText("Ready.")).toBeTruthy();
   });
 
+  it("renders persisted progress entries inline in the log", async () => {
+    vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
+      log: {
+        ...initialLog,
+        exchanges: [
+          { kind: "progress", message: "Checking article evidence about Aerenal." },
+          logExchange("What about Aerenal?", "Aerenal Overview", "Answer")
+        ]
+      }
+    }));
+
+    render(<App />);
+
+    expect(await screen.findByText("Progress")).toBeTruthy();
+    expect(await screen.findByText("Checking article evidence about Aerenal.")).toBeTruthy();
+    expect(await screen.findAllByText("Aerenal Overview")).toHaveLength(2);
+  });
+
   it("renders an empty log state before a log exists", async () => {
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({ log: emptyLog() }));
 
@@ -716,7 +754,7 @@ describe("App", () => {
     const historicalLog = {
       ...initialLog,
       filePath: "logs/old.json",
-      exchanges: [{ user: "Past question", title: "Old Session", assistant: "Past answer." }],
+      exchanges: [logExchange("Past question", "Old Session", "Past answer.")],
       readOnly: true
     };
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({ log: {
@@ -775,13 +813,13 @@ describe("App", () => {
     vi.mocked(api.getLog).mockResolvedValueOnce({
       ...initialLog,
       filePath: "logs/old.json",
-      exchanges: [{ user: "Old prompt", title: "Old Session", assistant: "Old answer." }],
+      exchanges: [logExchange("Old prompt", "Old Session", "Old answer.")],
       readOnly: true
     });
     vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
       log: {
         ...initialLog,
-        exchanges: [{ user: "Write to active session", title: "New Session Answer", assistant: "New answer." }]
+        exchanges: [logExchange("Write to active session", "New Session Answer", "New answer.")]
       }
     }));
 
@@ -797,7 +835,7 @@ describe("App", () => {
     fireEvent.click(screen.getByRole("button", { name: "Ask" }));
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("Write to active session", expect.any(String), true);
+      expect(api.askAssistant).toHaveBeenCalledWith("Write to active session", expect.any(String), true, 1);
     });
     expect(await screen.findByText("Current session: logs/session.json")).toBeTruthy();
     expect(await screen.findAllByText("New Session Answer")).toHaveLength(2);
@@ -871,6 +909,15 @@ const emptyLog = (): api.ApiLog => ({
   filePath: null,
   readOnly: false
 });
+
+function logExchange(user: string, title: string, assistant: string): api.ApiLogExchange {
+  return {
+    assistant,
+    kind: "exchange",
+    title,
+    user
+  };
+}
 
 const statusResponse = (overrides: Partial<api.ApiStatus> = {}): api.ApiStatus => ({
   activeOperation: null,

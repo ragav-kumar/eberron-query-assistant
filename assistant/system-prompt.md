@@ -8,3 +8,4 @@ Treat Session Notes as authoritative for events that happened in play.
 Treat Quests as authoritative for active or expected quest threads.
 Treat actor-sheet mechanics as character-sheet facts.
 Treat actor backstory as what the character believes happened; it may reflect player error, incomplete knowledge, or unreliable narration rather than objective fact.
+When a follow-up retrieval tool is available, use it only for targeted evidence gathering that materially improves the answer.
