@@ -3,13 +3,13 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { loadDefaultConfig } from "../src/config/index.js";
-import type { IngestionService } from "../src/ingestion/index.js";
-import type { ChatCompletionOptions, ChatMessage } from "../src/provider/index.js";
+import { loadDefaultConfig } from "../src/server/config/index.js";
+import type { IngestionService } from "../src/server/ingestion/index.js";
+import type { ChatCompletionOptions, ChatMessage } from "../src/server/provider/index.js";
 import { createWebApp, isBusyError, isWebOperationError } from "../src/server/app.js";
 import { getProviderDebugLogPath } from "../src/server/provider-debug-log.js";
-import type { AssistantSessionAnswer } from "../src/runtime/assistant-session.js";
-import { createDefaultRuntimeState } from "../src/state/state-store.js";
+import type { AssistantSessionAnswer } from "../src/server/runtime/assistant-session.js";
+import { createDefaultRuntimeState } from "../src/server/state/state-store.js";
 import type { RuntimeConfig, RetrievalResult } from "../src/types.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "server-app");

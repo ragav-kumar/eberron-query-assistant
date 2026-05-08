@@ -1,25 +1,25 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { loadDefaultConfig } from "../config/index.js";
+import { loadDefaultConfig } from "./config/index.js";
 import { formatThrownValue, hasErrorCode, isOperationAbortedError } from "../errors.js";
-import { createFilesystemIngestionService, createSqliteCorpusStore, type IngestionService } from "../ingestion/index.js";
+import { createFilesystemIngestionService, createSqliteCorpusStore, type IngestionService } from "./ingestion/index.js";
 import {
   createOpenAiChatAdapter,
   createOpenAiEmbeddingAdapter,
   type ChatAdapter,
   type ChatCompletionDiagnostic
-} from "../provider/index.js";
-import type { ProgressReporter } from "../progress/reporter.js";
-import { createSqliteRetrievalService, type RetrievalService } from "../retrieval/index.js";
-import { createAssistantSession, type AssistantSession, type AssistantSessionLogExchange } from "../runtime/assistant-session.js";
+} from "./provider/index.js";
+import type { ProgressReporter } from "./progress/reporter.js";
+import { createSqliteRetrievalService, type RetrievalService } from "./retrieval/index.js";
+import { createAssistantSession, type AssistantSession, type AssistantSessionLogExchange } from "./runtime/assistant-session.js";
 import {
   createNpcGenerationSession,
   type GeneratedNpc,
   type NpcGenerationSession
-} from "../runtime/npc-session.js";
-import { createSqlitePartyContextService, type PartyContextService } from "../runtime/party-context.js";
-import { runStartupRefresh } from "../runtime/refresh.js";
+} from "./runtime/npc-session.js";
+import { createSqlitePartyContextService, type PartyContextService } from "./runtime/party-context.js";
+import { runStartupRefresh } from "./runtime/refresh.js";
 import {
   createSessionLog,
   listSessionLogFiles,
@@ -27,10 +27,10 @@ import {
   type SessionLogEntry,
   type SessionLog,
   type SessionLogFile
-} from "../runtime/session-log.js";
+} from "./runtime/session-log.js";
 import { createProviderDebugLog } from "./provider-debug-log.js";
-import { createFilesystemSourceDiscoveryService, type SourceDiscoveryService } from "../source-discovery/index.js";
-import { createFilesystemStateStore, type StateStore } from "../state/index.js";
+import { createFilesystemSourceDiscoveryService, type SourceDiscoveryService } from "./source-discovery/index.js";
+import { createFilesystemStateStore, type StateStore } from "./state/index.js";
 import { createJsonlTimingReporter, type TimingContext, type TimingReporter } from "../timing.js";
 import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "../types.js";
 
@@ -135,6 +135,8 @@ interface ActiveOperation {
 }
 
 export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
+  // TODO: This module still couples transport, composition, and operation orchestration.
+  // Keep it intact for the shell move; split it after the client/server layout settles.
   const config = dependencies.config ?? loadDefaultConfig();
   let hasRoutineRefresh = false;
   let nextOperationId = 1;

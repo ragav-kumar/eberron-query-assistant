@@ -5,7 +5,7 @@ import {
   createOpenAiEmbeddingAdapter,
   type ChatMessage,
   type ChatToolDefinition
-} from "../src/provider/index.js";
+} from "../src/server/provider/index.js";
 import type { ProviderConfig } from "../src/types.js";
 
 const config: ProviderConfig = {

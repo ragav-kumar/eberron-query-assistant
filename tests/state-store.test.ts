@@ -3,9 +3,9 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { loadDefaultConfig } from "../src/config/index.js";
-import { createFilesystemStateStore, getStatePath } from "../src/state/index.js";
-import type { RuntimeState } from "../src/state/index.js";
+import { loadDefaultConfig } from "../src/server/config/index.js";
+import { createFilesystemStateStore, getStatePath } from "../src/server/state/index.js";
+import type { RuntimeState } from "../src/server/state/index.js";
 import { getAppVersion } from "../src/app-version.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "state-store");

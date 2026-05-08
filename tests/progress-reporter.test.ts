@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createConsoleProgressReporter } from "../src/progress/reporter.js";
+import { createConsoleProgressReporter } from "../src/server/progress/reporter.js";
 
 describe("console progress reporter", () => {
   const originalDescriptors = new Map<PropertyKey, PropertyDescriptor | undefined>();

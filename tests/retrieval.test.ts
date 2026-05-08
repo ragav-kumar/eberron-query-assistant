@@ -4,12 +4,12 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { loadDefaultConfig } from "../src/config/index.js";
+import { loadDefaultConfig } from "../src/server/config/index.js";
 import { isRecord } from "../src/errors.js";
-import { createSqliteCorpusStore, getCorpusDatabasePath, type CorpusStore } from "../src/ingestion/index.js";
-import { createDeterministicEmbeddingAdapter, type EmbeddingAdapter } from "../src/provider/index.js";
-import { createMemoryProgressReporter, type ProgressReporter } from "../src/progress/reporter.js";
-import { createSqliteRetrievalService, getVectorIndexPath } from "../src/retrieval/index.js";
+import { createSqliteCorpusStore, getCorpusDatabasePath, type CorpusStore } from "../src/server/ingestion/index.js";
+import { createDeterministicEmbeddingAdapter, type EmbeddingAdapter } from "../src/server/provider/index.js";
+import { createMemoryProgressReporter, type ProgressReporter } from "../src/server/progress/reporter.js";
+import { createSqliteRetrievalService, getVectorIndexPath } from "../src/server/retrieval/index.js";
 import type { TimingContext } from "../src/timing.js";
 import type { CorpusChunk, CorpusSource, RuntimeConfig, SourceType } from "../src/types.js";
 
