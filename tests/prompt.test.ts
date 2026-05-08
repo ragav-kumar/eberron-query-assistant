@@ -415,6 +415,7 @@ describe("assistant session", () => {
       .mockResolvedValueOnce([result("article", "aerenal-rites", "Aerenal Rites", null, "https://example.test/aerenal")]);
     const appendExchange = vi.fn();
     const appendProgress = vi.fn();
+    const reportStatus = vi.fn();
     const completeStructured = vi
       .fn<NonNullable<ChatAdapter["completeStructured"]>>()
       .mockResolvedValueOnce({
@@ -452,6 +453,7 @@ describe("assistant session", () => {
         complete: vi.fn<ChatAdapter["complete"]>().mockResolvedValue("unused"),
         completeStructured
       },
+      reportStatus,
       retrieval: {
         prepare: vi.fn().mockResolvedValue(undefined),
         refresh: vi.fn().mockResolvedValue({ chunkCount: 0, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
@@ -472,6 +474,9 @@ describe("assistant session", () => {
       kind: "progress",
       message: "Checking article evidence about Aerenal rites."
     });
+    expect(reportStatus).toHaveBeenCalledWith(
+      "Assistant called search_corpus (turn 1/1): Checking article evidence about Aerenal rites."
+    );
     expect(answer.answer).toBe("Aerenal answer with article support.");
     expect(appendExchange).toHaveBeenCalledWith({
       assistant: "Aerenal answer with article support.",

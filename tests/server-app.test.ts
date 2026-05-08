@@ -118,6 +118,52 @@ describe("web app API model", () => {
     ]);
   });
 
+  it("writes a plain console line when the assistant calls the retrieval tool", async () => {
+    const search = vi
+      .fn()
+      .mockResolvedValueOnce([result()])
+      .mockResolvedValueOnce([result()]);
+    const completeStructured = vi
+      .fn()
+      .mockResolvedValueOnce({
+        content: "",
+        kind: "tool-calls",
+        toolCalls: [
+          {
+            arguments: JSON.stringify({
+              query: "house orien courier role",
+              userMessage: "Searching for concise House Orien lore."
+            }),
+            id: "tool-1",
+            name: "search_corpus"
+          }
+        ]
+      })
+      .mockResolvedValueOnce({
+        content: firstAnswer("House Orien", "House Orien", "House Orien answer."),
+        kind: "text"
+      });
+    const app = createWebApp({
+      config: await writeConfig("assistant-tool-console"),
+      ...mockRefreshDependencies(),
+      retrieval: {
+        prepare: vi.fn().mockResolvedValue(undefined),
+        refresh: vi.fn().mockResolvedValue({ chunkCount: 1, reusedEmbeddings: 0, regeneratedEmbeddings: 0 }),
+        search
+      },
+      chat: {
+        complete: vi.fn().mockResolvedValue("unused"),
+        completeStructured
+      }
+    });
+
+    const response = await app.askAssistant("What does House Orien do?", undefined, true, 1);
+
+    expect(response.console.entries.some((entry) =>
+      entry.message === "Assistant called search_corpus (turn 1/1): Searching for concise House Orien lore."
+    )).toBe(true);
+  });
+
   it("writes structured timing spans for assistant operations", async () => {
     const config = await writeConfig("assistant-timing");
     const app = createWebApp({

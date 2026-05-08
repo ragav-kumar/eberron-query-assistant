@@ -228,6 +228,9 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       chat: dependencies.chat ?? createOpenAiChatAdapter(config.provider),
       config,
       partyContext,
+      reportStatus: (message) => {
+        consoleFeed.info(message);
+      },
       retrieval
     });
     return session.assistant;

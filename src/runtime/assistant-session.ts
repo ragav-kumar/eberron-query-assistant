@@ -46,6 +46,7 @@ export interface AssistantSessionOptions {
   appendExchange(exchange: AssistantSessionLogExchange): Promise<void>;
   config: RuntimeConfig;
   partyContext?: PartyContextService;
+  reportStatus?(message: string): Promise<void> | void;
   retrieval: RetrievalService;
 }
 
@@ -149,6 +150,7 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
         initialMessages: messages,
         initialResponse: response,
         onProviderDiagnostic: askOptions.onProviderDiagnostic,
+        reportStatus: options.reportStatus,
         remainingTurns: retrievalTurnLimit,
         retrieval: options.retrieval,
         shouldRequestSessionTitle,
@@ -199,6 +201,7 @@ interface RetrievalToolLoopRequest {
   initialMessages: ChatMessage[];
   initialResponse: ChatStructuredResult;
   onProviderDiagnostic: ((diagnostic: ChatCompletionDiagnostic) => void) | undefined;
+  reportStatus: AssistantSessionOptions["reportStatus"];
   remainingTurns: number;
   retrieval: RetrievalService;
   shouldRequestSessionTitle: boolean;
@@ -234,8 +237,10 @@ const runRetrievalToolLoop = async (request: RetrievalToolLoopRequest): Promise<
       const toolResult = await executeToolCall({
         appendProgress: request.appendProgress,
         remainingTurns,
+        reportStatus: request.reportStatus,
         retrieval: request.retrieval,
         timing: request.timing,
+        totalTurns: request.remainingTurns,
         toolCall
       });
       if (toolResult.consumeTurn) {
@@ -274,8 +279,10 @@ const executeToolCall = async (
   request: {
     appendProgress: AssistantSessionOptions["appendProgress"];
     remainingTurns: number;
+    reportStatus: AssistantSessionOptions["reportStatus"];
     retrieval: RetrievalService;
     timing: TimingContext;
+    totalTurns: number;
     toolCall: ChatToolCall;
   }
 ): Promise<{ consumeTurn: boolean; content: string }> => {
@@ -301,6 +308,10 @@ const executeToolCall = async (
     };
   }
 
+  const turnNumber = request.totalTurns - request.remainingTurns + 1;
+  await request.reportStatus?.(
+    `Assistant called ${SEARCH_CORPUS_TOOL_NAME} (turn ${turnNumber}/${request.totalTurns}): ${parsedArgs.value.userMessage}`
+  );
   await request.timing.reporter.time(request.timing, "assistant.log.append_progress", () => request.appendProgress({
     kind: "progress",
     message: parsedArgs.value.userMessage
