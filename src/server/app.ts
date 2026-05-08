@@ -109,6 +109,7 @@ export interface WebStatusResponse {
 }
 
 const DEFAULT_SESSION_ID = "default";
+const MAX_CONSOLE_ENTRIES = 2_000;
 
 interface StandardSessionState {
   assistant: AssistantSession | null;
@@ -604,6 +605,7 @@ const createMemoryConsoleFeed = (): MemoryConsoleFeed => {
   const entries: WebConsoleEntry[] = [];
   const listeners = new Set<WebConsoleListener>();
   let nextId = 1;
+  let hasDroppedEntriesNotice = false;
 
   const append = (level: WebConsoleLevel, message: string): void => {
     const entry = {
@@ -614,6 +616,24 @@ const createMemoryConsoleFeed = (): MemoryConsoleFeed => {
     };
     entries.push(entry);
     nextId += 1;
+    if (entries.length > MAX_CONSOLE_ENTRIES) {
+      const overflow = entries.length - MAX_CONSOLE_ENTRIES;
+      entries.splice(0, overflow);
+      if (!hasDroppedEntriesNotice) {
+        hasDroppedEntriesNotice = true;
+        const notice = {
+          id: String(nextId),
+          level: "warn" as const,
+          message: `Console history is capped at ${MAX_CONSOLE_ENTRIES} entries; older output was discarded.`,
+          timestamp: new Date().toISOString()
+        };
+        entries.unshift(notice);
+        nextId += 1;
+        if (entries.length > MAX_CONSOLE_ENTRIES) {
+          entries.splice(MAX_CONSOLE_ENTRIES);
+        }
+      }
+    }
     for (const listener of listeners) {
       listener({ ...entry });
     }

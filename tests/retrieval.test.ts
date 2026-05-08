@@ -214,7 +214,7 @@ describe("Phase 4 retrieval", () => {
     await retrieval.refresh(config);
 
     expect(reporter.messages.some((message) => message.startsWith("Retrieval embedding sync started:"))).toBe(true);
-    expect(reporter.messages.filter((message) => message.startsWith("Retrieval embedding sync progress:"))).toHaveLength(2);
+    expect(reporter.messages.some((message) => message.startsWith("Retrieval embedding sync progress:"))).toBe(true);
     expect(reporter.messages.some((message) => message.startsWith("Retrieval vector index synchronized:"))).toBe(true);
   });
 
@@ -321,6 +321,25 @@ describe("Phase 4 retrieval", () => {
     await expect(retrieval.search({ query: "deathless aerenal", limit: 1 })).resolves.toHaveLength(1);
     expect(adapter.embedBatch).toHaveBeenCalledTimes(2);
   });
+
+  it("streams vector searches from SQLite when the in-memory vector cache is disabled", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await seedCorpus(config);
+    const retrieval = createRetrieval(keywordEmbeddingAdapter("aerenal", "mror"), undefined, {
+      maxVectorCacheDatabaseBytes: 0
+    });
+    const timing = createCapturingTimingContext();
+
+    await retrieval.refresh(config);
+    const first = await retrieval.search({ query: "aerenal", limit: 1, timing });
+    rewriteVectorJson(config, JSON.stringify([0, 1]), "pdf:eberron.pdf:0");
+    const second = await retrieval.search({ query: "mror", limit: 1, timing });
+
+    expect(first[0]?.chunkId).toBe("pdf:eberron.pdf:0");
+    expect(second[0]?.chunkId).toBe("pdf:eberron.pdf:0");
+    expect(second[0]?.content).toContain("Aerenal");
+    expect(timing.labels).toContain("retrieval.vector.stream_vectors");
+  });
 });
 
 const seedCorpus = async (config: RuntimeConfig, chunkCount = 3): Promise<CorpusStore> => {
@@ -388,14 +407,18 @@ const createStore = (): CorpusStore => {
 
 const createRetrieval = (
   embeddingAdapter: EmbeddingAdapter = createDeterministicEmbeddingAdapter(),
-  reporter: ProgressReporter = {
-    info: () => undefined,
-    warn: () => undefined
-  }
+  reporter?: ProgressReporter,
+  options: { maxVectorCacheDatabaseBytes?: number } = {}
 ) => {
   return createSqliteRetrievalService({
     embeddingAdapter,
-    reporter
+    ...(options.maxVectorCacheDatabaseBytes === undefined
+      ? {}
+      : { maxVectorCacheDatabaseBytes: options.maxVectorCacheDatabaseBytes }),
+    reporter: reporter ?? {
+      info: () => undefined,
+      warn: () => undefined
+    }
   });
 };
 

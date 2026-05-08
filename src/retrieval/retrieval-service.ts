@@ -1,13 +1,14 @@
 import { createHash } from "node:crypto";
-import { access, mkdir, rm } from "node:fs/promises";
+import { access, mkdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
 
 import Database from "better-sqlite3";
 
+import { throwIfAborted } from "../errors.js";
+import { getCorpusDatabasePath } from "../ingestion/index.js";
 import type { EmbeddingAdapter } from "../provider/index.js";
 import type { ProgressReporter } from "../progress/reporter.js";
 import { createNoopTimingReporter } from "../timing.js";
-import { throwIfAborted } from "../errors.js";
 import type {
   CitationMetadata,
   RetrievalResult,
@@ -15,11 +16,13 @@ import type {
   RuntimeConfig,
   SourceType
 } from "../types.js";
-import { getCorpusDatabasePath } from "../ingestion/index.js";
 
 const VECTOR_INDEX_FILENAME = "vector-index.json";
 const DEFAULT_LIMIT = 8;
 const EMBEDDING_BATCH_SIZE = 64;
+const REFRESH_CHUNK_BATCH_SIZE = 256;
+const VECTOR_SCAN_BATCH_SIZE = 256;
+const MAX_VECTOR_CACHE_DATABASE_BYTES = 256 * 1024 * 1024;
 const MAX_EMBEDDING_INPUT_CHARACTERS = 6_000;
 const VECTOR_STORE_SCHEMA_VERSION = "sqlite-json-v1";
 
@@ -36,11 +39,13 @@ export interface RetrievalService {
 
 export interface RetrievalServiceDependencies {
   embeddingAdapter: EmbeddingAdapter;
+  maxVectorCacheDatabaseBytes?: number;
   reporter: ProgressReporter;
 }
 
 interface StoredChunk {
   chunkId: string;
+  rowId: number;
   sourceId: string;
   sourceType: SourceType;
   sourceKey: string;
@@ -69,13 +74,31 @@ interface VectorCacheEntry {
   entries: StoredVectorEntry[];
 }
 
-interface VectorSyncResult extends RetrievalSyncSummary {
-  vectorEntries: StoredVectorEntry[];
+interface EmbeddingChunk {
+  chunkId: string;
+  content: string;
+  contentHash: string;
+  rowId: number;
+}
+
+interface VectorCandidateRow {
+  rowId: number;
+  chunkId: string;
+  sourceId: string;
+  sourceType: SourceType;
+  sourceKey: string;
+  sourceTitle: string;
+  content: string;
+  citationJson: string;
+  contentHash: string;
+  embeddingJson: string;
 }
 
 export const createSqliteRetrievalService = (dependencies: RetrievalServiceDependencies): RetrievalService => {
   let config: RuntimeConfig | null = null;
+  let shouldCacheVectorRows = true;
   let vectorCache: VectorCacheEntry | null = null;
+  const vectorCacheByteLimit = dependencies.maxVectorCacheDatabaseBytes ?? MAX_VECTOR_CACHE_DATABASE_BYTES;
 
   const openDatabase = (): Database.Database => {
     if (!config) {
@@ -92,6 +115,7 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
     config = nextConfig;
     throwIfAborted(options.abortSignal);
     await mkdir(nextConfig.retrievalDir, { recursive: true });
+    shouldCacheVectorRows = await shouldUseVectorCache(nextConfig, vectorCacheByteLimit);
     vectorCache = null;
     if (options.forceRebuild) {
       await deleteLegacyVectorIndex(nextConfig, dependencies.reporter);
@@ -108,28 +132,17 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
         database.prepare("DELETE FROM chunk_vectors").run();
       }
 
-      const chunks = readAllChunks(database);
       deleteStaleVectorRows(database);
-      const syncResult = await syncVectorStore(
-        chunks,
-        database,
-        dependencies.embeddingAdapter,
-        dependencies.reporter,
-        options.abortSignal
-      );
-      const summary = {
-        chunkCount: syncResult.chunkCount,
-        regeneratedEmbeddings: syncResult.regeneratedEmbeddings,
-        reusedEmbeddings: syncResult.reusedEmbeddings
-      };
-      vectorCache = {
-        ...createVectorCacheKey(nextConfig, dependencies.embeddingAdapter),
-        entries: syncResult.vectorEntries
-      };
+      const summary = await syncVectorStore(database, dependencies.embeddingAdapter, dependencies.reporter, options.abortSignal);
 
       dependencies.reporter.info(
         `Retrieval vector index synchronized: chunks=${summary.chunkCount}, reused=${summary.reusedEmbeddings}, regenerated=${summary.regeneratedEmbeddings}, model=${dependencies.embeddingAdapter.modelId}.`
       );
+      if (!shouldCacheVectorRows) {
+        dependencies.reporter.info(
+          "Retrieval vector cache disabled for large corpus database; searches will stream vectors directly from SQLite."
+        );
+      }
 
       return summary;
     } finally {
@@ -149,12 +162,16 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
       operationId: "untracked",
       reporter: createNoopTimingReporter()
     };
+
     try {
       const lexicalResults = await timing.reporter.time(timing, "retrieval.lexical", () =>
         searchLexical(database, request, limit)
       );
       const semanticResults = await timing.reporter.time(timing, "retrieval.vector", () =>
         searchVector(database, request, limit, dependencies.embeddingAdapter, {
+          canCache() {
+            return shouldCacheVectorRows;
+          },
           read() {
             return readCachedVectorRows(vectorCache, config, dependencies.embeddingAdapter);
           },
@@ -169,6 +186,7 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
           }
         })
       );
+
       return await timing.reporter.time(timing, "retrieval.merge", () =>
         mergeResults(lexicalResults, semanticResults, limit)
       );
@@ -232,11 +250,14 @@ const initializeVectorStore = (database: Database.Database): void => {
     .run(VECTOR_STORE_SCHEMA_VERSION);
 };
 
-const readAllChunks = (database: Database.Database): StoredChunk[] => {
+const readFilteredChunks = (database: Database.Database, request: RetrievalSearchRequest): StoredChunk[] => {
+  const filters = buildSqlFilters(request, "s");
+
   return (
     database
       .prepare(
         `SELECT
+          c.rowid AS rowId,
           c.chunk_id AS chunkId,
           c.source_id AS sourceId,
           c.text AS content,
@@ -246,9 +267,11 @@ const readAllChunks = (database: Database.Database): StoredChunk[] => {
           s.title AS sourceTitle
         FROM chunks c
         INNER JOIN sources s ON s.source_id = c.source_id
-        ORDER BY c.chunk_id`
+        WHERE 1 = 1${filters.sql}
+        ORDER BY c.rowid`
       )
-      .all() as Array<{
+      .all(...filters.values) as Array<{
+      rowId: number;
       chunkId: string;
       sourceId: string;
       content: string;
@@ -259,6 +282,7 @@ const readAllChunks = (database: Database.Database): StoredChunk[] => {
     }>
   ).map((row) => ({
     chunkId: row.chunkId,
+    rowId: row.rowId,
     sourceId: row.sourceId,
     sourceType: row.sourceType,
     sourceKey: row.sourceKey,
@@ -328,6 +352,7 @@ const searchVector = async (
   limit: number,
   embeddingAdapter: EmbeddingAdapter,
   vectorCache: {
+    canCache(): boolean;
     read(): StoredVectorEntry[] | null;
     write(entries: StoredVectorEntry[]): void;
   }
@@ -337,17 +362,25 @@ const searchVector = async (
     operationId: "untracked",
     reporter: createNoopTimingReporter()
   };
+
+  const queryEmbedding = await timing.reporter.time(timing, "retrieval.vector.embed_query", () =>
+    embeddingAdapter.embed(toEmbeddingInput(request.query))
+  );
+
+  if (!vectorCache.canCache()) {
+    return timing.reporter.time(timing, "retrieval.vector.stream_vectors", () =>
+      searchVectorStreaming(database, request, limit, embeddingAdapter, queryEmbedding)
+    );
+  }
+
   const chunks = await timing.reporter.time(timing, "retrieval.vector.read_chunks", () =>
-    readAllChunks(database).filter((chunk) => matchesRequestFilters(chunk, request))
+    readFilteredChunks(database, request)
   );
   if (chunks.length === 0) {
     return [];
   }
 
   const chunkById = new Map(chunks.map((chunk) => [chunk.chunkId, chunk]));
-  const queryEmbedding = await timing.reporter.time(timing, "retrieval.vector.embed_query", () =>
-    embeddingAdapter.embed(toEmbeddingInput(request.query))
-  );
   const compatibleRows = await timing.reporter.time(timing, "retrieval.vector.read_vectors", () => {
     const cachedRows = vectorCache.read();
     if (cachedRows) {
@@ -359,34 +392,8 @@ const searchVector = async (
     return rows;
   });
 
-  return await timing.reporter.time(timing, "retrieval.vector.score_sort", () =>
-    compatibleRows
-      .map((entry) => {
-        const chunk = chunkById.get(entry.chunkId);
-        if (!chunk || chunk.contentHash !== entry.contentHash) {
-          return null;
-        }
-
-        return {
-          chunk,
-          score: cosineSimilarity(queryEmbedding, entry.embedding)
-        };
-      })
-      .filter((entry): entry is { chunk: StoredChunk; score: number } => entry !== null)
-      .filter((entry) => entry.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map(({ chunk, score }) => ({
-        chunkId: chunk.chunkId,
-        sourceId: chunk.sourceId,
-        sourceType: chunk.sourceType,
-        sourceKey: chunk.sourceKey,
-        sourceTitle: chunk.sourceTitle,
-        content: chunk.content,
-        citation: chunk.citation,
-        score,
-        matchKind: "vector"
-      }))
+  return timing.reporter.time(timing, "retrieval.vector.score_sort", () =>
+    scoreVectorEntries(chunkById, compatibleRows, queryEmbedding, limit)
   );
 };
 
@@ -415,80 +422,85 @@ const mergeResults = (
 };
 
 const syncVectorStore = async (
-  chunks: StoredChunk[],
   database: Database.Database,
   embeddingAdapter: EmbeddingAdapter,
   reporter: ProgressReporter,
   abortSignal?: AbortSignal
-): Promise<VectorSyncResult> => {
+): Promise<RetrievalSyncSummary> => {
   throwIfAborted(abortSignal);
-  const compatibleEntries = new Map(
-    readCompatibleVectorRows(database, embeddingAdapter).map((entry) => [entry.chunkId, entry])
-  );
-
+  const chunkCount = countChunks(database);
   let reusedEmbeddings = 0;
   let regeneratedEmbeddings = 0;
-  const syncedEntries = new Map<string, StoredVectorEntry>();
-  const missingChunks: StoredChunk[] = [];
-
-  for (const chunk of chunks) {
-    throwIfAborted(abortSignal);
-    const existingEntry = compatibleEntries.get(chunk.chunkId);
-    if (existingEntry?.contentHash === chunk.contentHash) {
-      reusedEmbeddings += 1;
-      syncedEntries.set(chunk.chunkId, existingEntry);
-      continue;
-    }
-
-    missingChunks.push(chunk);
-  }
 
   reporter.info(
-    `Retrieval embedding sync started: chunks=${chunks.length}, reused=${reusedEmbeddings}, remaining=${missingChunks.length}, model=${embeddingAdapter.modelId}.`
+    `Retrieval embedding sync started: chunks=${chunkCount}, reused=0, remaining=${chunkCount}, model=${embeddingAdapter.modelId}.`
   );
 
-  for (let offset = 0; offset < missingChunks.length; offset += EMBEDDING_BATCH_SIZE) {
+  let lastRowId = 0;
+  let processedChunks = 0;
+  while (true) {
     throwIfAborted(abortSignal);
-    const batch = missingChunks.slice(offset, offset + EMBEDDING_BATCH_SIZE);
-    const embeddings = await embeddingAdapter.embedBatch(batch.map((chunk) => toEmbeddingInput(chunk.content)));
-    throwIfAborted(abortSignal);
-
-    if (embeddings.length !== batch.length) {
-      throw new Error(`Embedding adapter returned ${embeddings.length} vectors for ${batch.length} chunks.`);
+    const chunkBatch = readChunkEmbeddingBatch(database, lastRowId, REFRESH_CHUNK_BATCH_SIZE);
+    if (chunkBatch.length === 0) {
+      break;
     }
 
-    const entries = batch.map((chunk, index) => {
-      const embedding = embeddings[index];
-      if (!embedding) {
-        throw new Error(`Embedding adapter did not return a vector for chunk ${chunk.chunkId}.`);
+    const compatibleEntries = new Map(
+      readCompatibleVectorRowsForChunkIds(
+        database,
+        embeddingAdapter,
+        chunkBatch.map((chunk) => chunk.chunkId)
+      ).map((entry) => [entry.chunkId, entry])
+    );
+    const missingChunks = chunkBatch.filter((chunk) => {
+      const existingEntry = compatibleEntries.get(chunk.chunkId);
+      if (existingEntry?.contentHash === chunk.contentHash) {
+        reusedEmbeddings += 1;
+        return false;
       }
 
-      return {
-        chunkId: chunk.chunkId,
-        contentHash: chunk.contentHash,
-        embedding
-      };
+      return true;
     });
 
-    upsertVectorRows(database, entries, embeddingAdapter);
-    for (const entry of entries) {
-      syncedEntries.set(entry.chunkId, entry);
-    }
-    regeneratedEmbeddings += entries.length;
+    for (let offset = 0; offset < missingChunks.length; offset += EMBEDDING_BATCH_SIZE) {
+      throwIfAborted(abortSignal);
+      const embeddingBatch = missingChunks.slice(offset, offset + EMBEDDING_BATCH_SIZE);
+      const embeddings = await embeddingAdapter.embedBatch(embeddingBatch.map((chunk) => toEmbeddingInput(chunk.content)));
+      throwIfAborted(abortSignal);
 
+      if (embeddings.length !== embeddingBatch.length) {
+        throw new Error(`Embedding adapter returned ${embeddings.length} vectors for ${embeddingBatch.length} chunks.`);
+      }
+
+      const entries = embeddingBatch.map((chunk, index) => {
+        const embedding = embeddings[index];
+        if (!embedding) {
+          throw new Error(`Embedding adapter did not return a vector for chunk ${chunk.chunkId}.`);
+        }
+
+        return {
+          chunkId: chunk.chunkId,
+          contentHash: chunk.contentHash,
+          embedding
+        };
+      });
+
+      upsertVectorRows(database, entries, embeddingAdapter);
+      regeneratedEmbeddings += entries.length;
+    }
+
+    processedChunks += chunkBatch.length;
+    lastRowId = chunkBatch[chunkBatch.length - 1]?.rowId ?? lastRowId;
     reportProgress(
       reporter,
-      `Retrieval embedding sync progress: processed=${reusedEmbeddings + regeneratedEmbeddings}/${chunks.length}, reused=${reusedEmbeddings}, regenerated=${regeneratedEmbeddings}, remaining=${chunks.length - reusedEmbeddings - regeneratedEmbeddings}, failedRetries=${embeddingAdapter.failedRetries ?? 0}, model=${embeddingAdapter.modelId}.`
+      `Retrieval embedding sync progress: processed=${processedChunks}/${chunkCount}, reused=${reusedEmbeddings}, regenerated=${regeneratedEmbeddings}, remaining=${chunkCount - processedChunks}, failedRetries=${embeddingAdapter.failedRetries ?? 0}, model=${embeddingAdapter.modelId}.`
     );
   }
 
   return {
-    chunkCount: chunks.length,
-    regeneratedEmbeddings,
+    chunkCount,
     reusedEmbeddings,
-    vectorEntries: chunks
-      .map((chunk) => syncedEntries.get(chunk.chunkId))
-      .filter((entry): entry is StoredVectorEntry => entry !== undefined)
+    regeneratedEmbeddings
   };
 };
 
@@ -503,6 +515,41 @@ const reportProgress = (reporter: ProgressReporter, message: string): void => {
 
 const deleteStaleVectorRows = (database: Database.Database): void => {
   database.prepare("DELETE FROM chunk_vectors WHERE chunk_id NOT IN (SELECT chunk_id FROM chunks)").run();
+};
+
+const countChunks = (database: Database.Database): number => {
+  const result = database.prepare("SELECT COUNT(*) AS count FROM chunks").get() as { count: number };
+  return result.count;
+};
+
+const readChunkEmbeddingBatch = (
+  database: Database.Database,
+  afterRowId: number,
+  limit: number
+): EmbeddingChunk[] => {
+  const rows = database
+    .prepare(
+      `SELECT
+        rowid AS rowId,
+        chunk_id AS chunkId,
+        text AS content
+      FROM chunks
+      WHERE rowid > ?
+      ORDER BY rowid
+      LIMIT ?`
+    )
+    .all(afterRowId, limit) as Array<{
+    rowId: number;
+    chunkId: string;
+    content: string;
+  }>;
+
+  return rows.map((row) => ({
+    chunkId: row.chunkId,
+    content: row.content,
+    contentHash: hashContent(row.content),
+    rowId: row.rowId
+  }));
 };
 
 const readCompatibleVectorRows = (
@@ -528,8 +575,8 @@ const readCompatibleVectorRows = (
 
   return rows
     .map((row) => {
-      const embedding = JSON.parse(row.embeddingJson) as unknown;
-      if (!Array.isArray(embedding) || !embedding.every((value) => typeof value === "number")) {
+      const embedding = parseEmbedding(row.embeddingJson);
+      if (!embedding) {
         return null;
       }
 
@@ -540,6 +587,187 @@ const readCompatibleVectorRows = (
       };
     })
     .filter((entry): entry is StoredVectorEntry => entry !== null);
+};
+
+const readCompatibleVectorRowsForChunkIds = (
+  database: Database.Database,
+  embeddingAdapter: EmbeddingAdapter,
+  chunkIds: string[]
+): StoredVectorEntry[] => {
+  if (chunkIds.length === 0) {
+    return [];
+  }
+
+  const rows = database
+    .prepare(
+      `SELECT
+        chunk_id AS chunkId,
+        content_hash AS contentHash,
+        embedding_json AS embeddingJson
+      FROM chunk_vectors
+      WHERE embedding_model_id = ?
+        AND embedding_schema_version = ?
+        AND chunk_id IN (${chunkIds.map(() => "?").join(", ")})`
+    )
+    .all(embeddingAdapter.modelId, embeddingAdapter.schemaVersion, ...chunkIds) as Array<{
+    chunkId: string;
+    contentHash: string;
+    embeddingJson: string;
+  }>;
+
+  return rows
+    .map((row) => {
+      const embedding = parseEmbedding(row.embeddingJson);
+      if (!embedding) {
+        return null;
+      }
+
+      return {
+        chunkId: row.chunkId,
+        contentHash: row.contentHash,
+        embedding
+      };
+    })
+    .filter((entry): entry is StoredVectorEntry => entry !== null);
+};
+
+const searchVectorStreaming = async (
+  database: Database.Database,
+  request: RetrievalSearchRequest,
+  limit: number,
+  embeddingAdapter: EmbeddingAdapter,
+  queryEmbedding: number[]
+): Promise<RetrievalResult[]> => {
+  const filters = buildSqlFilters(request, "s");
+  const results: RetrievalResult[] = [];
+  let lastRowId = 0;
+
+  while (true) {
+    const rows = database
+      .prepare(
+        `SELECT
+          c.rowid AS rowId,
+          c.chunk_id AS chunkId,
+          c.source_id AS sourceId,
+          c.text AS content,
+          c.citation_json AS citationJson,
+          s.source_type AS sourceType,
+          s.source_key AS sourceKey,
+          s.title AS sourceTitle,
+          cv.content_hash AS contentHash,
+          cv.embedding_json AS embeddingJson
+        FROM chunk_vectors cv
+        INNER JOIN chunks c ON c.chunk_id = cv.chunk_id
+        INNER JOIN sources s ON s.source_id = c.source_id
+        WHERE cv.embedding_model_id = ?
+          AND cv.embedding_schema_version = ?
+          AND c.rowid > ?${filters.sql}
+        ORDER BY c.rowid
+        LIMIT ?`
+      )
+      .all(
+        embeddingAdapter.modelId,
+        embeddingAdapter.schemaVersion,
+        lastRowId,
+        ...filters.values,
+        VECTOR_SCAN_BATCH_SIZE
+      ) as VectorCandidateRow[];
+    if (rows.length === 0) {
+      break;
+    }
+
+    for (const row of rows) {
+      const embedding = parseEmbedding(row.embeddingJson);
+      if (!embedding || row.contentHash !== hashContent(row.content)) {
+        continue;
+      }
+
+      const score = cosineSimilarity(queryEmbedding, embedding);
+      if (score <= 0) {
+        continue;
+      }
+
+      insertSortedResult(
+        results,
+        {
+          chunkId: row.chunkId,
+          sourceId: row.sourceId,
+          sourceType: row.sourceType,
+          sourceKey: row.sourceKey,
+          sourceTitle: row.sourceTitle,
+          content: row.content,
+          citation: JSON.parse(row.citationJson) as CitationMetadata,
+          score,
+          matchKind: "vector"
+        },
+        limit
+      );
+    }
+
+    lastRowId = rows[rows.length - 1]?.rowId ?? lastRowId;
+  }
+
+  return results;
+};
+
+const scoreVectorEntries = (
+  chunkById: Map<string, StoredChunk>,
+  vectorEntries: StoredVectorEntry[],
+  queryEmbedding: number[],
+  limit: number
+): RetrievalResult[] => {
+  return vectorEntries
+    .map((entry) => {
+      const chunk = chunkById.get(entry.chunkId);
+      if (!chunk || chunk.contentHash !== entry.contentHash) {
+        return null;
+      }
+
+      return {
+        chunk,
+        score: cosineSimilarity(queryEmbedding, entry.embedding)
+      };
+    })
+    .filter((entry): entry is { chunk: StoredChunk; score: number } => entry !== null)
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, limit)
+    .map(({ chunk, score }) => ({
+      chunkId: chunk.chunkId,
+      sourceId: chunk.sourceId,
+      sourceType: chunk.sourceType,
+      sourceKey: chunk.sourceKey,
+      sourceTitle: chunk.sourceTitle,
+      content: chunk.content,
+      citation: chunk.citation,
+      score,
+      matchKind: "vector"
+    }));
+};
+
+const insertSortedResult = (results: RetrievalResult[], result: RetrievalResult, limit: number): void => {
+  let insertAt = results.findIndex((existing) => result.score > existing.score);
+  if (insertAt === -1) {
+    insertAt = results.length;
+  }
+
+  if (results.length >= limit && insertAt >= results.length) {
+    return;
+  }
+
+  results.splice(insertAt, 0, result);
+  if (results.length > limit) {
+    results.length = limit;
+  }
+};
+
+const parseEmbedding = (embeddingJson: string): number[] | null => {
+  try {
+    const embedding = JSON.parse(embeddingJson) as unknown;
+    return Array.isArray(embedding) && embedding.every((value) => typeof value === "number") ? embedding : null;
+  } catch {
+    return null;
+  }
 };
 
 const createVectorCacheKey = (
@@ -641,12 +869,6 @@ const buildSqlFilters = (
   };
 };
 
-const matchesRequestFilters = (chunk: StoredChunk, request: RetrievalSearchRequest): boolean => {
-  const sourceTypeMatches = !request.sourceTypes || request.sourceTypes.includes(chunk.sourceType);
-  const sourceKeyMatches = !request.sourceKeys || request.sourceKeys.includes(chunk.sourceKey);
-  return sourceTypeMatches && sourceKeyMatches;
-};
-
 const toFtsQuery = (query: string): string | null => {
   const tokens = query.toLowerCase().match(/[a-z0-9]+/g) ?? [];
   if (tokens.length === 0) {
@@ -687,4 +909,17 @@ const cosineSimilarity = (left: number[], right: number[]): number => {
 
   const magnitude = Math.sqrt(leftMagnitude) * Math.sqrt(rightMagnitude);
   return magnitude === 0 ? 0 : dot / magnitude;
+};
+
+const shouldUseVectorCache = async (config: RuntimeConfig, maxDatabaseBytes: number): Promise<boolean> => {
+  if (maxDatabaseBytes <= 0) {
+    return false;
+  }
+
+  try {
+    const databaseStats = await stat(getCorpusDatabasePath(config));
+    return databaseStats.size <= maxDatabaseBytes;
+  } catch {
+    return false;
+  }
 };
