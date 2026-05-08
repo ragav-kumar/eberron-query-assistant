@@ -79,6 +79,7 @@ const parseRuntimeState = (value: unknown): RuntimeStateLoadResult => {
     state: normalizeRuntimeState({
       appVersion,
       foundry: {
+        appliedExportFilenames: parseStringArray(value.foundry.appliedExportFilenames, "foundry.appliedExportFilenames"),
         lastSuccessfulExport: parseFoundryMarker(value.foundry.lastSuccessfulExport)
       },
       pdf: {
@@ -99,11 +100,16 @@ const normalizeRuntimeState = (state: RuntimeState): RuntimeState => {
   return {
     appVersion: getAppVersion(),
     foundry: {
+      appliedExportFilenames: [...new Set(state.foundry.appliedExportFilenames)].sort((a, b) => a.localeCompare(b)),
       lastSuccessfulExport: state.foundry.lastSuccessfulExport
         ? {
+            deleteCount: state.foundry.lastSuccessfulExport.deleteCount,
+            filename: state.foundry.lastSuccessfulExport.filename,
             generatedAt: state.foundry.lastSuccessfulExport.generatedAt,
             recordCount: state.foundry.lastSuccessfulExport.recordCount,
-            runId: state.foundry.lastSuccessfulExport.runId
+            runId: state.foundry.lastSuccessfulExport.runId,
+            schemaVersion: state.foundry.lastSuccessfulExport.schemaVersion,
+            upsertCount: state.foundry.lastSuccessfulExport.upsertCount
           }
         : null
     },
@@ -126,18 +132,38 @@ const parseFoundryMarker = (value: unknown): RuntimeState["foundry"]["lastSucces
     throw createInvalidRuntimeStateError("foundry.lastSuccessfulExport must be an object or null.");
   }
 
+  if (typeof value.filename !== "string") {
+    return null;
+  }
+
+  const deleteCount = value.deleteCount;
+  const filename = parseRequiredString(value.filename, "foundry.lastSuccessfulExport.filename");
   const generatedAt = parseRequiredString(value.generatedAt, "foundry.lastSuccessfulExport.generatedAt");
   const runId = parseRequiredString(value.runId, "foundry.lastSuccessfulExport.runId");
   const recordCount = value.recordCount;
+  const schemaVersion = parseRequiredString(value.schemaVersion, "foundry.lastSuccessfulExport.schemaVersion");
+  const upsertCount = value.upsertCount;
 
   if (typeof recordCount !== "number" || !Number.isInteger(recordCount) || recordCount < 0) {
     throw createInvalidRuntimeStateError("foundry.lastSuccessfulExport.recordCount must be a non-negative integer.");
   }
 
+  if (typeof upsertCount !== "number" || !Number.isInteger(upsertCount) || upsertCount < 0) {
+    throw createInvalidRuntimeStateError("foundry.lastSuccessfulExport.upsertCount must be a non-negative integer.");
+  }
+
+  if (typeof deleteCount !== "number" || !Number.isInteger(deleteCount) || deleteCount < 0) {
+    throw createInvalidRuntimeStateError("foundry.lastSuccessfulExport.deleteCount must be a non-negative integer.");
+  }
+
   return {
+    deleteCount,
+    filename,
     generatedAt,
     recordCount,
-    runId
+    runId,
+    schemaVersion,
+    upsertCount
   };
 };
 

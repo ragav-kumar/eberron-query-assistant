@@ -13,7 +13,6 @@ import {
 } from "./article-ingestion.js";
 import { createFilesystemArticleRawCache, type ArticleRawCache } from "./article-raw-cache.js";
 import type { CorpusStore } from "./corpus-store.js";
-import { parseFoundryRecords } from "./foundry-ingestion.js";
 import { createPdfDataExtractParser, type PdfParser, normalizePdf } from "./pdf-ingestion.js";
 
 export interface IngestionServiceDependencies {
@@ -44,11 +43,11 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
   const now = dependencies.now ?? (() => new Date());
   const pdfParser = dependencies.pdfParser ?? createPdfDataExtractParser();
 
-  const ingestFoundry = async (
+  const ingestFoundry = (
     config: RuntimeConfig,
     discovery: SourceDiscoverySummary,
     nextState: RuntimeState
-  ): Promise<SourceIngestionSummary> => {
+  ): SourceIngestionSummary => {
     const inventory = discovery.inventories.find((candidate) => candidate.sourceType === "foundry");
     if (!inventory || inventory.status !== "scheduled") {
       return skippedSummary("foundry", "foundry: ingestion skipped.");
@@ -59,15 +58,13 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
       return failedSummary("foundry", "foundry: scheduled without a manifest marker.");
     }
 
-    try {
-      dependencies.reporter.info("foundry: ingesting records.ndjson.");
-      const parsed = await parseFoundryRecords(config, marker);
-      await corpusStore.replaceSourcesByType(config, "foundry", parsed.sources);
-      nextState.foundry.lastSuccessfulExport = marker;
-      return succeededSummary("foundry", parsed.sources.length, parsed.sources.length, 0, "foundry: ingested records.ndjson.");
-    } catch (error) {
-      return failedSummary("foundry", `foundry: ingestion failed: ${formatThrownValue(error)}.`);
-    }
+    const scheduledFiles = inventory.details.filter((detail) => detail.startsWith("scheduled:")).length;
+    void config;
+    void nextState;
+    dependencies.reporter.warn(
+      `foundry: delta export application is deferred to phase 2; ${scheduledFiles} scheduled file(s) were not applied.`
+    );
+    return failedSummary("foundry", "foundry: delta export application is deferred to phase 2.");
   };
 
   const ingestPdf = async (
@@ -241,7 +238,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
       const nextState = cloneRuntimeState(state);
       const summaries: SourceIngestionSummary[] = [];
 
-      summaries.push(await ingestFoundry(config, discovery, nextState));
+      summaries.push(ingestFoundry(config, discovery, nextState));
       summaries.push(await ingestPdf(config, discovery, nextState));
       summaries.push(await ingestArticles(config, options, state, discovery, nextState));
 
@@ -367,6 +364,7 @@ const cloneRuntimeState = (state: RuntimeState): RuntimeState => {
   return {
     appVersion: state.appVersion,
     foundry: {
+      appliedExportFilenames: [...state.foundry.appliedExportFilenames],
       lastSuccessfulExport: state.foundry.lastSuccessfulExport ? { ...state.foundry.lastSuccessfulExport } : null
     },
     pdf: {

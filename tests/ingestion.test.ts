@@ -38,7 +38,7 @@ describe("Phase 3 ingestion", () => {
     await rm(TEST_ROOT, { force: true, recursive: true });
   });
 
-  it("ingests foundry NDJSON with citation metadata and commits the export marker", async () => {
+  it("does not apply scheduled Foundry delta exports before delta application is implemented", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await mkdir(config.foundryExportDir, { recursive: true });
     await writeFile(
@@ -61,22 +61,14 @@ describe("Phase 3 ingestion", () => {
     const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["foundry"]));
 
     expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
-      status: "succeeded",
-      ingested: 1
+      status: "failed",
+      failed: 1
     });
-    expect(result.nextState.foundry.lastSuccessfulExport?.runId).toBe("run-3");
-
-    const rows = readRows(config, "SELECT source_type, source_key, title, metadata_json FROM sources");
-    expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ source_type: "foundry", source_key: "actor-1", title: "Ashana" });
-    expect(JSON.parse(String(rows[0]?.metadata_json))).toMatchObject({
-      entityKind: "Actor",
-      recordId: "actor-1",
-      exportRunId: "run-3"
-    });
+    expect(result.nextState.foundry.lastSuccessfulExport).toBeNull();
+    expect(readRows(config, "SELECT source_type, source_key, title, metadata_json FROM sources")).toEqual([]);
   });
 
-  it("preserves Foundry export metadata needed for party context", async () => {
+  it("does not claim Foundry metadata preservation before delta application succeeds", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await mkdir(config.foundryExportDir, { recursive: true });
     await writeFile(
@@ -115,23 +107,13 @@ describe("Phase 3 ingestion", () => {
 
     const service = createService();
     const state = createDefaultRuntimeState();
-    await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["foundry"]));
+    const result = await service.ingest(config, { forceReingest: false, retrievalQuery: null }, state, scheduledDiscovery(state, ["foundry"]));
 
-    const rows = readRows(config, "SELECT source_key, title, metadata_json FROM sources");
-    expect(rows[0]).toMatchObject({
-      source_key: "world.journalentrypage.session.note",
-      title: "2026-04-25"
+    expect(result.summary.sourceSummaries.find((summary) => summary.sourceType === "foundry")).toMatchObject({
+      status: "failed",
+      failed: 1
     });
-    expect(JSON.parse(String(rows[0]?.metadata_json))).toMatchObject({
-      entityKind: "JournalEntryPage",
-      sourceScope: "world",
-      sourceUuid: "JournalEntry.session.JournalEntryPage.note",
-      parentUuid: "JournalEntry.session",
-      provenancePath: ["Session Notes", "2026-04-25"],
-      classificationTags: ["page-type:text"],
-      citationAnchor: "Session Notes > 2026-04-25",
-      modifiedTime: 1771000000000
-    });
+    expect(readRows(config, "SELECT source_key, title, metadata_json FROM sources")).toEqual([]);
   });
 
   it("does not commit foundry state when NDJSON parsing fails", async () => {
@@ -605,11 +587,8 @@ const createService = (options: { articleFetcher?: ArticleFetcher; articleRawCac
 
 const scheduledDiscovery = (state: RuntimeState, scheduled: Array<"foundry" | "pdf" | "article">): SourceDiscoverySummary => {
   const nextState = createDefaultRuntimeState();
-  nextState.foundry.lastSuccessfulExport = {
-    generatedAt: "2026-04-24T10:00:00.000Z",
-    recordCount: 1,
-    runId: "run-3"
-  };
+  nextState.foundry.appliedExportFilenames = ["20260424T100000000Z-foundry-export.ndjson"];
+  nextState.foundry.lastSuccessfulExport = createFoundryMarker();
   nextState.pdf.knownFilenames = ["new.pdf"];
   nextState.article.knownArticles = [...state.article.knownArticles];
 
@@ -626,7 +605,7 @@ const scheduledDiscovery = (state: RuntimeState, scheduled: Array<"foundry" | "p
         failed: 0,
         status: scheduled.includes("foundry") ? "scheduled" : "skipped",
         message: "foundry",
-        details: []
+        details: scheduled.includes("foundry") ? ["scheduled:20260424T100000000Z-foundry-export.ndjson"] : []
       },
       {
         sourceType: "pdf",
@@ -653,6 +632,16 @@ const scheduledDiscovery = (state: RuntimeState, scheduled: Array<"foundry" | "p
     ]
   };
 };
+
+const createFoundryMarker = () => ({
+  deleteCount: 0,
+  filename: "20260424T100000000Z-foundry-export.ndjson",
+  generatedAt: "2026-04-24T10:00:00.000Z",
+  recordCount: 1,
+  runId: "run-3",
+  schemaVersion: "2.0.0",
+  upsertCount: 1
+});
 
 const readRows = (config: ReturnType<typeof loadDefaultConfig>, sql: string): Array<Record<string, unknown>> => {
   const database = new Database(getCorpusDatabasePath(config), { readonly: true });

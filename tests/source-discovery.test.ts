@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -19,17 +19,18 @@ describe("FilesystemSourceDiscoveryService", () => {
     await rm(TEST_ROOT, { force: true, recursive: true });
   });
 
-  it("reports a missing foundry manifest without blocking PDF or article checks", async () => {
+  it("creates a missing foundry export directory and treats it as empty", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await mkdir(config.pdfDir, { recursive: true });
     await writeFile(path.join(config.pdfDir, "new.pdf"), "", "utf8");
 
     const summary = await inspect(config);
 
-    expect(summary.degraded).toBe(true);
+    expect(await readdir(config.foundryExportDir)).toEqual([]);
+    expect(summary.degraded).toBe(false);
     expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
-      status: "failed",
-      failed: 1
+      status: "skipped",
+      discovered: 0
     });
     expect(summary.inventories.find((inventory) => inventory.sourceType === "pdf")).toMatchObject({
       status: "scheduled",
@@ -37,48 +38,204 @@ describe("FilesystemSourceDiscoveryService", () => {
     });
   });
 
-  it("skips an unchanged foundry manifest and schedules changed markers", async () => {
+  it("treats an empty foundry export directory as skipped without degradation", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
-    await writeManifest(config.foundryExportDir, "run-1", "2026-04-24T10:00:00.000Z", 4);
+    await mkdir(config.foundryExportDir, { recursive: true });
 
-    const state = createDefaultRuntimeState();
-    state.foundry.lastSuccessfulExport = {
-      generatedAt: "2026-04-24T10:00:00.000Z",
-      recordCount: 4,
-      runId: "run-1"
-    };
+    const summary = await inspect(config);
 
-    const unchanged = await inspect(config, { state });
-    expect(unchanged.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
+    expect(summary.degraded).toBe(false);
+    expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
       status: "skipped",
-      updated: 0
-    });
-
-    await writeManifest(config.foundryExportDir, "run-2", "2026-04-24T10:00:00.000Z", 4);
-    const changed = await inspect(config, { state });
-
-    expect(changed.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
-      status: "scheduled",
-      updated: 1
+      discovered: 0
     });
   });
 
-  it("force re-ingest schedules an unchanged foundry manifest", async () => {
+  it("schedules one new foundry delta export file", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
-    await writeManifest(config.foundryExportDir, "run-1", "2026-04-24T10:00:00.000Z", 4);
+    await writeDeltaExport(config.foundryExportDir, "20260424T100000000Z-foundry-export.ndjson", "run-1", 4);
+
+    const summary = await inspect(config);
+
+    expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
+      status: "scheduled",
+      discovered: 1,
+      added: 1,
+      details: ["scheduled:20260424T100000000Z-foundry-export.ndjson"]
+    });
+    expect(summary.nextState.foundry.lastSuccessfulExport).toMatchObject({
+      filename: "20260424T100000000Z-foundry-export.ndjson",
+      runId: "run-1"
+    });
+  });
+
+  it("schedules multiple unapplied foundry delta export files oldest to newest", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await writeDeltaExport(config.foundryExportDir, "20260424T110000000Z-foundry-export.ndjson", "run-2", 5);
+    await writeDeltaExport(config.foundryExportDir, "20260424T100000000Z-foundry-export.ndjson", "run-1", 4);
 
     const state = createDefaultRuntimeState();
-    state.foundry.lastSuccessfulExport = {
-      generatedAt: "2026-04-24T10:00:00.000Z",
-      recordCount: 4,
-      runId: "run-1"
-    };
+    state.foundry.lastSuccessfulExport = createMarker("20260424T090000000Z-foundry-export.ndjson", "run-0", 3);
+    state.foundry.appliedExportFilenames = ["20260424T090000000Z-foundry-export.ndjson"];
+
+    const summary = await inspect(config, { state });
+
+    expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
+      status: "scheduled",
+      discovered: 2,
+      updated: 2,
+      details: [
+        "scheduled:20260424T100000000Z-foundry-export.ndjson",
+        "scheduled:20260424T110000000Z-foundry-export.ndjson"
+      ]
+    });
+    expect(summary.nextState.foundry.appliedExportFilenames).toEqual([
+      "20260424T090000000Z-foundry-export.ndjson",
+      "20260424T100000000Z-foundry-export.ndjson",
+      "20260424T110000000Z-foundry-export.ndjson"
+    ]);
+  });
+
+  it("schedules late backfilled foundry delta export files before the latest applied marker", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await writeDeltaExport(config.foundryExportDir, "20260424T100000000Z-foundry-export.ndjson", "run-a", 4);
+    await writeDeltaExport(config.foundryExportDir, "20260424T110000000Z-foundry-export.ndjson", "run-b", 5);
+    await writeDeltaExport(config.foundryExportDir, "20260424T120000000Z-foundry-export.ndjson", "run-c", 6);
+    await writeDeltaExport(config.foundryExportDir, "20260424T130000000Z-foundry-export.ndjson", "run-d", 7);
+
+    const state = createDefaultRuntimeState();
+    state.foundry.lastSuccessfulExport = createMarker("20260424T130000000Z-foundry-export.ndjson", "run-d", 7);
+    state.foundry.appliedExportFilenames = [
+      "20260424T100000000Z-foundry-export.ndjson",
+      "20260424T110000000Z-foundry-export.ndjson",
+      "20260424T130000000Z-foundry-export.ndjson"
+    ];
+
+    const summary = await inspect(config, { state });
+
+    expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
+      status: "scheduled",
+      discovered: 4,
+      updated: 1,
+      details: ["scheduled:20260424T120000000Z-foundry-export.ndjson"]
+    });
+    expect(summary.nextState.foundry.appliedExportFilenames).toEqual([
+      "20260424T100000000Z-foundry-export.ndjson",
+      "20260424T110000000Z-foundry-export.ndjson",
+      "20260424T120000000Z-foundry-export.ndjson",
+      "20260424T130000000Z-foundry-export.ndjson"
+    ]);
+  });
+
+  it("skips already-applied foundry delta export files", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await writeDeltaExport(config.foundryExportDir, "20260424T100000000Z-foundry-export.ndjson", "run-1", 4);
+
+    const state = createDefaultRuntimeState();
+    state.foundry.lastSuccessfulExport = createMarker("20260424T100000000Z-foundry-export.ndjson", "run-1", 4);
+    state.foundry.appliedExportFilenames = ["20260424T100000000Z-foundry-export.ndjson"];
+
+    const summary = await inspect(config, { state });
+
+    expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
+      status: "skipped",
+      discovered: 1,
+      updated: 0,
+      details: []
+    });
+  });
+
+  it("force re-ingest schedules all foundry delta export files and skips when none exist", async () => {
+    const emptyConfig = loadDefaultConfig(path.join(TEST_ROOT, "empty-force"));
+    const emptySummary = await inspect(emptyConfig, { forceReingest: true });
+
+    expect(emptySummary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
+      status: "skipped",
+      discovered: 0
+    });
+
+    const config = loadDefaultConfig(TEST_ROOT);
+    await writeDeltaExport(config.foundryExportDir, "20260424T100000000Z-foundry-export.ndjson", "run-1", 4);
+    await writeDeltaExport(config.foundryExportDir, "20260424T110000000Z-foundry-export.ndjson", "run-2", 5);
+
+    const state = createDefaultRuntimeState();
+    state.foundry.lastSuccessfulExport = createMarker("20260424T110000000Z-foundry-export.ndjson", "run-2", 5);
+    state.foundry.appliedExportFilenames = [
+      "20260424T100000000Z-foundry-export.ndjson",
+      "20260424T110000000Z-foundry-export.ndjson"
+    ];
 
     const summary = await inspect(config, { forceReingest: true, state });
 
     expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
-      status: "scheduled"
+      status: "scheduled",
+      discovered: 2,
+      updated: 2,
+      details: [
+        "scheduled:20260424T100000000Z-foundry-export.ndjson",
+        "scheduled:20260424T110000000Z-foundry-export.ndjson"
+      ]
     });
+    expect(summary.nextState.foundry.appliedExportFilenames).toEqual([
+      "20260424T100000000Z-foundry-export.ndjson",
+      "20260424T110000000Z-foundry-export.ndjson"
+    ]);
+  });
+
+  it("ignores invalid foundry export filenames when valid delta files exist", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await writeDeltaExport(config.foundryExportDir, "20260424T100000000Z-foundry-export.ndjson", "run-1", 4);
+    await writeFile(path.join(config.foundryExportDir, "records.ndjson"), "not scanned", "utf8");
+    await writeFile(path.join(config.foundryExportDir, "20260424T100000000Z-other.ndjson"), "not scanned", "utf8");
+
+    const summary = await inspect(config);
+
+    expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
+      status: "scheduled",
+      discovered: 1,
+      added: 1
+    });
+  });
+
+  it("fails foundry discovery for invalid delta manifest envelopes", async () => {
+    const cases: Array<{ filename: string; firstLine: string }> = [
+      {
+        filename: "20260424T100000000Z-foundry-export.ndjson",
+        firstLine: "{"
+      },
+      {
+        filename: "20260424T110000000Z-foundry-export.ndjson",
+        firstLine: JSON.stringify({ kind: "upsert", manifest: validManifest("run-1", 1) })
+      },
+      {
+        filename: "20260424T120000000Z-foundry-export.ndjson",
+        firstLine: JSON.stringify({
+          kind: "manifest",
+          manifest: { ...validManifest("run-1", 1), schemaVersion: "1.0.0" }
+        })
+      },
+      {
+        filename: "20260424T130000000Z-foundry-export.ndjson",
+        firstLine: JSON.stringify({
+          kind: "manifest",
+          manifest: { ...validManifest("run-1", 1), run: { ...validManifest("run-1", 1).run, upsertCount: -1 } }
+        })
+      }
+    ];
+
+    for (const testCase of cases) {
+      await rm(TEST_ROOT, { force: true, recursive: true });
+      const config = loadDefaultConfig(TEST_ROOT);
+      await mkdir(config.foundryExportDir, { recursive: true });
+      await writeFile(path.join(config.foundryExportDir, testCase.filename), `${testCase.firstLine}\n`, "utf8");
+
+      const summary = await inspect(config);
+
+      expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
+        status: "failed",
+        failed: 1
+      });
+    }
   });
 
   it("detects added, removed, unchanged, and forced PDF inventory", async () => {
@@ -168,17 +325,35 @@ const inspect = async (
   );
 };
 
-const writeManifest = async (foundryExportDir: string, runId: string, generatedAt: string, recordCount: number) => {
+const writeDeltaExport = async (foundryExportDir: string, filename: string, runId: string, recordCount: number) => {
   await mkdir(foundryExportDir, { recursive: true });
   await writeFile(
-    path.join(foundryExportDir, "manifest.json"),
+    path.join(foundryExportDir, filename),
     `${JSON.stringify({
-      run: {
-        generatedAt,
-        recordCount,
-        runId
-      }
+      kind: "manifest",
+      manifest: validManifest(runId, recordCount)
     })}\n`,
     "utf8"
   );
 };
+
+const validManifest = (runId: string, recordCount: number) => ({
+  schemaVersion: "2.0.0",
+  run: {
+    deleteCount: 0,
+    generatedAt: "2026-04-24T10:00:00.000Z",
+    recordCount,
+    runId,
+    upsertCount: recordCount
+  }
+});
+
+const createMarker = (filename: string, runId: string, recordCount: number) => ({
+  deleteCount: 0,
+  filename,
+  generatedAt: "2026-04-24T10:00:00.000Z",
+  recordCount,
+  runId,
+  schemaVersion: "2.0.0",
+  upsertCount: recordCount
+});

@@ -120,7 +120,7 @@ describe("startup refresh skeleton", () => {
       initialState.article.lastSuccessfulIndexScrapeAt = "2026-04-24T10:00:00.000Z";
 
       await stateStore.save(config, initialState);
-      await writeManifest(config.foundryExportDir, "run-1", "2026-04-24T10:00:00.000Z", 2);
+      await writeDeltaExport(config.foundryExportDir, "20260424T100000000Z-foundry-export.ndjson", "run-1", 2);
       await mkdir(config.pdfDir, { recursive: true });
       await writeFile(path.join(config.pdfDir, "rising.pdf"), "", "utf8");
 
@@ -136,10 +136,15 @@ describe("startup refresh skeleton", () => {
       expect(summary.degraded).toBe(false);
       expect(summary.degradedSources).toEqual([]);
       expect(persisted.state.foundry.lastSuccessfulExport).toEqual({
+        deleteCount: 0,
+        filename: "20260424T100000000Z-foundry-export.ndjson",
         generatedAt: "2026-04-24T10:00:00.000Z",
         recordCount: 2,
-        runId: "run-1"
+        runId: "run-1",
+        schemaVersion: "2.0.0",
+        upsertCount: 2
       });
+      expect(persisted.state.foundry.appliedExportFilenames).toEqual(["20260424T100000000Z-foundry-export.ndjson"]);
       expect(persisted.state.pdf.knownFilenames).toEqual(["rising.pdf"]);
       expect(persisted.state.article.lastSuccessfulIndexScrapeAt).toBe("2026-04-24T10:00:00.000Z");
     } finally {
@@ -349,15 +354,21 @@ describe("startup refresh skeleton", () => {
   });
 });
 
-const writeManifest = async (foundryExportDir: string, runId: string, generatedAt: string, recordCount: number) => {
+const writeDeltaExport = async (foundryExportDir: string, filename: string, runId: string, recordCount: number) => {
   await mkdir(foundryExportDir, { recursive: true });
   await writeFile(
-    path.join(foundryExportDir, "manifest.json"),
+    path.join(foundryExportDir, filename),
     `${JSON.stringify({
-      run: {
-        generatedAt,
-        recordCount,
-        runId
+      kind: "manifest",
+      manifest: {
+        schemaVersion: "2.0.0",
+        run: {
+          deleteCount: 0,
+          generatedAt: "2026-04-24T10:00:00.000Z",
+          recordCount,
+          runId,
+          upsertCount: recordCount
+        }
       }
     })}\n`,
     "utf8"

@@ -27,6 +27,7 @@ describe("FilesystemStateStore", () => {
       state: {
         appVersion: APP_VERSION,
         foundry: {
+          appliedExportFilenames: [],
           lastSuccessfulExport: null
         },
         pdf: {
@@ -60,11 +61,12 @@ describe("FilesystemStateStore", () => {
     const state: RuntimeState = {
       appVersion: APP_VERSION,
       foundry: {
-        lastSuccessfulExport: {
-          generatedAt: "2026-04-24T10:00:00.000Z",
-          recordCount: 2,
-          runId: "run-1"
-        }
+        appliedExportFilenames: [
+          "20260424T110000000Z-foundry-export.ndjson",
+          "20260424T100000000Z-foundry-export.ndjson",
+          "20260424T100000000Z-foundry-export.ndjson"
+        ],
+        lastSuccessfulExport: createMarker("20260424T100000000Z-foundry-export.ndjson", "run-1", 2)
       },
       pdf: {
         knownFilenames: ["z.pdf", "a.pdf", "a.pdf"]
@@ -80,6 +82,13 @@ describe("FilesystemStateStore", () => {
     await expect(store.load(config)).resolves.toEqual({
       state: {
         ...state,
+        foundry: {
+          ...state.foundry,
+          appliedExportFilenames: [
+            "20260424T100000000Z-foundry-export.ndjson",
+            "20260424T110000000Z-foundry-export.ndjson"
+          ]
+        },
         pdf: {
           knownFilenames: ["a.pdf", "z.pdf"]
         },
@@ -93,7 +102,33 @@ describe("FilesystemStateStore", () => {
     await expect(mkdir(path.dirname(getStatePath(config)))).rejects.toMatchObject({ code: "EEXIST" });
   });
 
-  it("preserves valid state when app version is missing", async () => {
+  it("preserves valid delta export state when app version is missing", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const store = createFilesystemStateStore();
+    const marker = createMarker("20260424T100000000Z-foundry-export.ndjson", "run-1", 2);
+
+    await mkdir(config.stateDir, { recursive: true });
+    await writeFile(
+      getStatePath(config),
+      `${JSON.stringify({
+        foundry: {
+          appliedExportFilenames: [marker.filename],
+          lastSuccessfulExport: marker
+        },
+        pdf: { knownFilenames: ["a.pdf"] },
+        article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }
+      })}\n`,
+      "utf8"
+    );
+
+    const result = await store.load(config);
+
+    expect(result.state.appVersion).toBe(APP_VERSION);
+    expect(result.state.foundry.lastSuccessfulExport).toEqual(marker);
+    expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
+  });
+
+  it("normalizes legacy foundry export markers to null", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = createFilesystemStateStore();
 
@@ -101,6 +136,7 @@ describe("FilesystemStateStore", () => {
     await writeFile(
       getStatePath(config),
       `${JSON.stringify({
+        appVersion: "0.10.0",
         foundry: {
           lastSuccessfulExport: {
             generatedAt: "2026-04-24T10:00:00.000Z",
@@ -116,13 +152,37 @@ describe("FilesystemStateStore", () => {
 
     const result = await store.load(config);
 
-    expect(result.state.appVersion).toBe(APP_VERSION);
-    expect(result.state.foundry.lastSuccessfulExport).toEqual({
-      generatedAt: "2026-04-24T10:00:00.000Z",
-      recordCount: 2,
-      runId: "run-1"
-    });
+    expect(result.state.foundry.lastSuccessfulExport).toBeNull();
+    expect(result.state.foundry.appliedExportFilenames).toEqual([]);
     expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
+  });
+
+  it("rejects invalid delta export marker fields", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    const store = createFilesystemStateStore();
+
+    await mkdir(config.stateDir, { recursive: true });
+    await writeFile(
+      getStatePath(config),
+      `${JSON.stringify({
+        appVersion: APP_VERSION,
+        foundry: {
+          appliedExportFilenames: [],
+          lastSuccessfulExport: {
+            ...createMarker("20260424T100000000Z-foundry-export.ndjson", "run-1", 2),
+            deleteCount: -1
+          }
+        },
+        pdf: { knownFilenames: [] },
+        article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }
+      })}\n`,
+      "utf8"
+    );
+
+    await expect(store.load(config)).rejects.toMatchObject({
+      kind: "invalid-runtime-state",
+      message: "foundry.lastSuccessfulExport.deleteCount must be a non-negative integer."
+    });
   });
 
   it("loads state from any app version without invalidation when the shape is valid", async () => {
@@ -168,4 +228,14 @@ describe("FilesystemStateStore", () => {
     expect(result.state.appVersion).toBe(APP_VERSION);
     expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
   });
+});
+
+const createMarker = (filename: string, runId: string, recordCount: number) => ({
+  deleteCount: 0,
+  filename,
+  generatedAt: "2026-04-24T10:00:00.000Z",
+  recordCount,
+  runId,
+  schemaVersion: "2.0.0",
+  upsertCount: recordCount
 });

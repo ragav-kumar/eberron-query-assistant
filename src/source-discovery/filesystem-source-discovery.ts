@@ -1,4 +1,4 @@
-import { readdir, readFile } from "node:fs/promises";
+import { mkdir, open, readdir } from "node:fs/promises";
 import path from "node:path";
 
 import { createTaggedError, formatThrownValue, hasErrorCode, isRecord } from "../errors.js";
@@ -13,6 +13,9 @@ import type {
 import type { SourceDiscoveryService, SourceDiscoverySummary } from "./source-discovery-service.js";
 
 const ARTICLE_INDEX_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+const FOUNDRY_EXPORT_FILENAME_PATTERN = /^\d{8}T\d{9}Z-foundry-export\.ndjson$/;
+const FOUNDRY_MANIFEST_READ_CHUNK_BYTES = 64 * 1024;
+const SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION = "2.0.0";
 
 export interface FilesystemSourceDiscoveryOptions {
   now?: () => Date;
@@ -29,51 +32,63 @@ export const createFilesystemSourceDiscoveryService = (
     state: RuntimeState,
     nextState: RuntimeState
   ): Promise<SourceInventoryResult> => {
-    const manifestPath = path.join(config.foundryExportDir, "manifest.json");
-
     try {
-      const manifest = parseFoundryManifest(JSON.parse(await readFile(manifestPath, "utf8")) as unknown);
-      const previous = state.foundry.lastSuccessfulExport;
-      const changed = !previous || !markersEqual(previous, manifest);
-      const scheduled = options.forceReingest || changed;
+      await mkdir(config.foundryExportDir, { recursive: true });
+      const filenames = (await readdir(config.foundryExportDir, { withFileTypes: true }))
+        .filter((entry) => entry.isFile() && FOUNDRY_EXPORT_FILENAME_PATTERN.test(entry.name))
+        .map((entry) => entry.name)
+        .sort((a, b) => a.localeCompare(b));
 
-      nextState.foundry.lastSuccessfulExport = manifest;
-
-      if (!scheduled) {
+      if (filenames.length === 0) {
         return createInventoryResult({
           sourceType: "foundry",
-          discovered: 1,
+          discovered: 0,
           status: "skipped",
-          message: "foundry: export unchanged; skipping foundry refresh."
+          message: "foundry: no timestamped delta export files found; skipping foundry refresh."
         });
       }
+
+      const markers = await Promise.all(
+        filenames.map(async (filename) => parseFoundryExportManifest(config.foundryExportDir, filename))
+      );
+      const previous = state.foundry.lastSuccessfulExport;
+      const appliedFilenames = new Set(state.foundry.appliedExportFilenames);
+      const scheduledMarkers = options.forceReingest
+        ? markers
+        : markers.filter((marker) => !appliedFilenames.has(marker.filename));
+      if (scheduledMarkers.length === 0) {
+        return createInventoryResult({
+          sourceType: "foundry",
+          discovered: markers.length,
+          status: "skipped",
+          message: options.forceReingest
+            ? "foundry: force re-ingest requested, but no delta export files were available; skipping foundry refresh."
+            : "foundry: delta export files already applied; skipping foundry refresh."
+        });
+      }
+
+      nextState.foundry.lastSuccessfulExport = scheduledMarkers.at(-1) ?? null;
+      nextState.foundry.appliedExportFilenames = options.forceReingest
+        ? scheduledMarkers.map((marker) => marker.filename)
+        : [...appliedFilenames, ...scheduledMarkers.map((marker) => marker.filename)].sort((a, b) => a.localeCompare(b));
 
       return createInventoryResult({
         sourceType: "foundry",
-        discovered: 1,
-        added: previous ? 0 : 1,
-        updated: previous ? 1 : 0,
+        discovered: markers.length,
+        added: previous ? 0 : scheduledMarkers.length,
+        updated: previous ? scheduledMarkers.length : 0,
         status: "scheduled",
         message: options.forceReingest
-          ? "foundry: force re-ingest requested; scheduling foundry refresh."
-          : "foundry: export changed; scheduling foundry refresh.",
-        details: [`runId=${manifest.runId}`, `generatedAt=${manifest.generatedAt}`, `recordCount=${manifest.recordCount}`]
+          ? `foundry: force re-ingest requested; scheduling ${scheduledMarkers.length} delta export file(s).`
+          : `foundry: scheduling ${scheduledMarkers.length} unapplied delta export file(s).`,
+        details: scheduledMarkers.map((marker) => `scheduled:${marker.filename}`)
       });
     } catch (error) {
-      if (hasErrorCode(error, "ENOENT")) {
-        return createInventoryResult({
-          sourceType: "foundry",
-          failed: 1,
-          status: "failed",
-          message: `foundry: manifest missing at ${manifestPath}.`
-        });
-      }
-
       return createInventoryResult({
         sourceType: "foundry",
         failed: 1,
         status: "failed",
-        message: `foundry: failed to inspect manifest: ${formatThrownValue(error)}.`
+        message: `foundry: failed to inspect delta export files: ${formatThrownValue(error)}.`
       });
     }
   };
@@ -216,44 +231,115 @@ export const createFilesystemSourceDiscoveryService = (
   };
 };
 
-const parseFoundryManifest = (value: unknown): FoundryExportMarker => {
+const parseFoundryExportManifest = async (foundryExportDir: string, filename: string): Promise<FoundryExportMarker> => {
+  const exportPath = path.join(foundryExportDir, filename);
+  const firstLine = (await readFirstLine(exportPath)).trim();
+  if (firstLine.length === 0) {
+    throw createManifestError(`${filename}: first line must contain a manifest envelope`);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(firstLine) as unknown;
+  } catch (error) {
+    throw createManifestError(`${filename}: invalid manifest JSON: ${formatThrownValue(error)}`);
+  }
+
+  return parseFoundryManifestEnvelope(filename, parsed);
+};
+
+const readFirstLine = async (filePath: string): Promise<string> => {
+  const file = await open(filePath, "r");
+  const chunks: Buffer[] = [];
+  let position = 0;
+
+  try {
+    while (true) {
+      const buffer = Buffer.alloc(FOUNDRY_MANIFEST_READ_CHUNK_BYTES);
+      const result = await file.read(buffer, 0, buffer.length, position);
+      if (result.bytesRead === 0) {
+        return Buffer.concat(chunks).toString("utf8");
+      }
+
+      const chunk = buffer.subarray(0, result.bytesRead);
+      const newlineIndex = chunk.indexOf(10);
+      if (newlineIndex >= 0) {
+        chunks.push(chunk.subarray(0, newlineIndex));
+        return Buffer.concat(chunks).toString("utf8");
+      }
+
+      chunks.push(chunk);
+      position += result.bytesRead;
+    }
+  } finally {
+    await file.close();
+  }
+};
+
+const parseFoundryManifestEnvelope = (filename: string, value: unknown): FoundryExportMarker => {
   if (!isRecord(value)) {
-    throw createManifestError("manifest must contain an object");
+    throw createManifestError(`${filename}: first line must contain a manifest envelope object`);
+  }
+
+  if (value.kind !== "manifest") {
+    throw createManifestError(`${filename}: first line kind must be manifest`);
+  }
+
+  return parseFoundryManifest(filename, value.manifest);
+};
+
+const parseFoundryManifest = (filename: string, value: unknown): FoundryExportMarker => {
+  if (!isRecord(value)) {
+    throw createManifestError(`${filename}: manifest must contain an object`);
+  }
+
+  const schemaVersion = value.schemaVersion;
+  if (schemaVersion !== SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION) {
+    throw createManifestError(
+      `${filename}: manifest.schemaVersion must be ${SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION}`
+    );
   }
 
   const run = value.run;
   if (!isRecord(run)) {
-    throw createManifestError("manifest.run must contain an object");
+    throw createManifestError(`${filename}: manifest.run must contain an object`);
   }
 
   const runId = run.runId;
   const generatedAt = run.generatedAt;
-  const recordCount = run.recordCount ?? value.recordCount;
+  const recordCount = run.recordCount;
+  const upsertCount = run.upsertCount;
+  const deleteCount = run.deleteCount;
 
   if (typeof runId !== "string" || runId.length === 0) {
-    throw createManifestError("manifest.run.runId must be a non-empty string");
+    throw createManifestError(`${filename}: manifest.run.runId must be a non-empty string`);
   }
 
   if (typeof generatedAt !== "string" || generatedAt.length === 0) {
-    throw createManifestError("manifest.run.generatedAt must be a non-empty string");
+    throw createManifestError(`${filename}: manifest.run.generatedAt must be a non-empty string`);
   }
 
   if (typeof recordCount !== "number" || !Number.isInteger(recordCount) || recordCount < 0) {
-    throw createManifestError("manifest.run.recordCount must be a non-negative integer");
+    throw createManifestError(`${filename}: manifest.run.recordCount must be a non-negative integer`);
+  }
+
+  if (typeof upsertCount !== "number" || !Number.isInteger(upsertCount) || upsertCount < 0) {
+    throw createManifestError(`${filename}: manifest.run.upsertCount must be a non-negative integer`);
+  }
+
+  if (typeof deleteCount !== "number" || !Number.isInteger(deleteCount) || deleteCount < 0) {
+    throw createManifestError(`${filename}: manifest.run.deleteCount must be a non-negative integer`);
   }
 
   return {
+    deleteCount,
+    filename,
     generatedAt,
     recordCount,
-    runId
+    runId,
+    schemaVersion,
+    upsertCount
   };
-};
-
-const markersEqual = (
-  left: FoundryExportMarker,
-  right: FoundryExportMarker
-): boolean => {
-  return left.generatedAt === right.generatedAt && left.recordCount === right.recordCount && left.runId === right.runId;
 };
 
 const createInventoryResult = (options: {
@@ -284,6 +370,7 @@ const cloneRuntimeState = (state: RuntimeState): RuntimeState => {
   return {
     appVersion: state.appVersion,
     foundry: {
+      appliedExportFilenames: [...state.foundry.appliedExportFilenames],
       lastSuccessfulExport: state.foundry.lastSuccessfulExport ? { ...state.foundry.lastSuccessfulExport } : null
     },
     pdf: {
