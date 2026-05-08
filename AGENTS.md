@@ -24,6 +24,7 @@ These are the highest-priority repo rules. Check them before making edits, runni
 - Do not restore, recreate, or preserve obsolete untracked local files unless the current task explicitly requires that exact file.
 - Request escalation directly for commands known to need network access, external write permissions, or esbuild process spawning, including `npm install`, `git push`, `npm test`, targeted Vitest runs, and `npm run start`.
 - Use `npm run prestart` for the TypeScript no-emit check. There is no `npm run build` script.
+- Do not hand off a non-docs change while `npm run verify` is failing. For any change that modifies code, tests, config, tooling, or package metadata outside documentation-only files, `npm run verify` is the mandatory final acceptance command and it must pass before the change can be accepted.
 - Do not add project-authored classes or constructors unless later active enhancement documentation explicitly requires them.
 - Preserve app-owned corpus and retrieval artifacts across routine startup. Only explicit force reingest through the browser UI/API may intentionally discard, clear, or force-rebuild them.
 
@@ -127,6 +128,8 @@ This repository is commonly worked on from Windows PowerShell. Vite and Vitest l
 Use sandboxed commands for checks that do not need esbuild process spawning, such as `npm run lint` and `npm run prestart`.
 
 There is no `npm run build` script. Use `npm run prestart` for the TypeScript no-emit check.
+
+Use `npm run verify` as the final acceptance command for any non-docs change. Targeted test runs may be used during iteration, but they do not replace the final full-suite gate. Documentation-only changes may stop at the smaller checks that are appropriate to the files touched.
 
 When starting the dev server from PowerShell for verification, invoke the Windows npm shim explicitly, for example `Start-Process -FilePath 'npm.cmd' -ArgumentList @('run','start','--','--host','127.0.0.1') ...`. `Start-Process -FilePath 'npm'` is known to fail on this setup with `%1 is not a valid Win32 application`.
 

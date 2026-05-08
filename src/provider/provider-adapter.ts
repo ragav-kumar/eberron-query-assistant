@@ -93,7 +93,6 @@ export const createOpenAiChatAdapter = (
   options: OpenAiProviderOptions = {}
 ): ChatAdapter => {
   const provider = createOpenAiRequestConfig(config);
-  const fetchImpl = options.fetchImpl ?? fetch;
 
   const completeStructured = async (
     messages: ChatMessage[],

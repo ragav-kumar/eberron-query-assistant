@@ -15,6 +15,7 @@ describe("package scripts", () => {
     expect(metadata.bin).toBeUndefined();
     expect(metadata.scripts.start).toBe("vite");
     expect(metadata.scripts.prestart).toBe("tsc --noEmit");
+    expect(metadata.scripts.verify).toBe("npm run lint && npm run prestart && npm run test");
     expect(metadata.scripts.build).toBeUndefined();
     expect(metadata.scripts.reingest).toBeUndefined();
     expect(metadata.scripts["debug:retrieval"]).toBeUndefined();

@@ -650,7 +650,7 @@ const readCompatibleVectorRowsForChunkIds = (
     .filter((entry): entry is StoredVectorEntry => entry !== null);
 };
 
-const searchVectorStreaming = async (
+const searchVectorStreaming = (
   database: Database.Database,
   request: RetrievalSearchRequest,
   limit: number,
@@ -726,7 +726,7 @@ const searchVectorStreaming = async (
     lastRowId = rows[rows.length - 1]?.rowId ?? lastRowId;
   }
 
-  return results;
+  return Promise.resolve(results);
 };
 
 const scoreVectorEntries = (

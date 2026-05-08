@@ -39,6 +39,13 @@ vi.mock("../src/client/api.js", () => ({
   writeContext: vi.fn()
 }));
 
+const logExchange = (user: string, title: string, assistant: string): api.ApiLogExchange => ({
+  assistant,
+  kind: "exchange",
+  title,
+  user
+});
+
 const initialLog = {
   activeFilePath: "logs/session.json" as string | null,
   exchanges: [logExchange("Initial prompt", "GUI Session", "Ready.")],
@@ -865,15 +872,6 @@ const emptyLog = (): api.ApiLog => ({
   filePath: null,
   readOnly: false
 });
-
-function logExchange(user: string, title: string, assistant: string): api.ApiLogExchange {
-  return {
-    assistant,
-    kind: "exchange",
-    title,
-    user
-  };
-}
 
 const statusResponse = (overrides: Partial<api.ApiStatus> = {}): api.ApiStatus => ({
   activeOperation: null,
