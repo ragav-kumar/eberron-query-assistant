@@ -4,5 +4,5 @@ import { queryApi } from '../utils.js';
 
 export const useNpcsQuery = () => useQuery({
     queryKey: ['api', 'npcs'],
-    queryFn: () => queryApi(v2Contracts.getNpcs),
+    queryFn: () => queryApi(v2Contracts.npcs.get),
 });

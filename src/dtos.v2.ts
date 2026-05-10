@@ -1,41 +1,82 @@
 import type { ConsoleLevel } from './types.js';
 
-export interface ConsoleEntryDto {
+export interface ConsoleEntry {
     id: string;
     level: ConsoleLevel;
     message: string;
     timestamp: string;
 }
 
-export interface LogExchangeDto {
-    assistant: string;
-    kind: 'exchange';
+export interface SessionSummary {
+    id: string;
     title: string;
-    user: string;
+    createdAt: string;
+    updatedAt: string;
+    lastEntryPreview?: string;
 }
 
-export interface LogProgressDto {
-    kind: 'progress';
-    message: string;
+export interface Session {
+    id: string;
+    title: string;
+    createdAt: string;
+    updatedAt: string;
+    activeRunId: string | null;
 }
 
-export type LogEntryDto = LogExchangeDto | LogProgressDto;
-
-export interface LogFileDto {
-    active: boolean;
-    filePath: string;
-    label: string;
+export interface CreateSession {
+    title?: string;
 }
 
-export interface LogDto {
-    activeFilePath: string | null;
-    exchanges: LogEntryDto[];
-    files: LogFileDto[];
-    filePath: string | null;
-    readOnly: boolean;
+export interface SessionUserEntry {
+    id: string;
+    kind: 'user';
+    createdAt: string;
+    content: string;
 }
 
-export interface NpcDto {
+export interface SessionAssistantEntry {
+    id: string;
+    kind: 'assistant';
+    createdAt: string;
+    content: string;
+    title?: string;
+}
+
+export interface SessionToolStatusEntry {
+    id: string;
+    kind: 'tool-status';
+    createdAt: string;
+    content: string;
+}
+
+export interface SessionSystemEntry {
+    id: string;
+    kind: 'system';
+    createdAt: string;
+    content: string;
+}
+
+export type SessionEntry =
+    | SessionUserEntry
+    | SessionAssistantEntry
+    | SessionToolStatusEntry
+    | SessionSystemEntry;
+
+export interface Run {
+    id: string;
+    sessionId: string;
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface CreateRun {
+    includePartyContext: boolean;
+    prompt: string;
+    retrievalTurnLimit: number;
+}
+
+export interface Npc {
     age?: string;
     bio: string;
     createdAt?: string;
@@ -49,11 +90,11 @@ export interface NpcDto {
     updatedAt?: string;
 }
 
-export interface NpcResponseDto {
-    npcs: NpcDto[];
+export interface NpcCollection {
+    npcs: Npc[];
 }
 
-export interface ProviderDebugEntryDto {
+export interface ProviderDebugEntry {
     assistantContent?: string;
     endpoint: string;
     error?: string;
@@ -71,28 +112,33 @@ export interface ProviderDebugEntryDto {
     timestamp: string;
 }
 
-export interface RefreshDto {
+export interface CreateRefresh {
     forceReingest: boolean;
 }
 
-// TODO integrate this
-export interface ErrorResponseDto {
-    console?: ConsoleEntryDto[];
+export interface Refresh {
+    id: string;
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    forceReingest: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ApiError {
+    console?: ConsoleEntry[];
     error?: string;
     operation?: string;
-    providerDebug?: ProviderDebugEntryDto[];
+    providerDebug?: ProviderDebugEntry[];
 }
 
-export interface RunRequestDto {
-    kind: 'assistant' | 'npc';
-    includePartyContext: boolean;
-    prompt: string;
-    retrievalTurnLimit: number;
-    sessionId: string;
+export interface ConsoleSnapshot {
+    entries: ConsoleEntry[];
 }
 
-// TODO integrate this
-export interface RuntimeEventDto {
-    activeOperation: 'refresh' | 'force-reingest' | null;
-    inputLocked: boolean;
+export interface OperationEvent {
+    resource: 'run' | 'refresh' | 'session-entry';
+    action: 'created' | 'updated' | 'completed' | 'failed' | 'appended';
+    resourceId: string;
+    sessionId?: string;
+    timestamp: string;
 }

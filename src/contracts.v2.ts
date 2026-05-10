@@ -1,10 +1,16 @@
 import type {
-    ConsoleEntryDto,
-    LogDto,
-    NpcResponseDto,
-    RefreshDto,
-    RunRequestDto,
-    RuntimeEventDto,
+    ConsoleEntry,
+    ConsoleSnapshot,
+    CreateRefresh,
+    CreateRun,
+    CreateSession,
+    NpcCollection,
+    OperationEvent,
+    Refresh,
+    Run,
+    Session,
+    SessionEntry,
+    SessionSummary,
 } from './dtos.v2.js';
 
 declare const endpointPayloadType: unique symbol;
@@ -12,12 +18,19 @@ declare const endpointResponseType: unique symbol;
 declare const sseEventType: unique symbol;
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT';
+export type EndpointHeaders = Readonly<Record<string, string>>;
+
+const defaultJsonHeaders: EndpointHeaders = {
+    'Content-Type': 'application/json',
+};
 
 export interface Endpoint<TPayload, TResponse> {
     transport: 'http';
     method: HttpMethod;
     path: string;
+    pathParams: readonly string[];
     queryParams: readonly string[];
+    headers: EndpointHeaders;
     readonly [endpointPayloadType]?: TPayload;
     readonly [endpointResponseType]?: TResponse;
 }
@@ -31,11 +44,15 @@ export interface SseEndpoint<TEvent> {
 }
 
 const defineEndpoint = <TPayload, TResponse>(
-    endpoint: Omit<Endpoint<TPayload, TResponse>, 'queryParams' | 'transport'> & {
+    endpoint: Omit<Endpoint<TPayload, TResponse>, 'headers' | 'pathParams' | 'queryParams' | 'transport'> & {
+        headers?: EndpointHeaders;
+        pathParams?: readonly string[];
         queryParams?: readonly string[];
     },
 ): Endpoint<TPayload, TResponse> => ({
     ...endpoint,
+    headers: endpoint.headers ?? defaultJsonHeaders,
+    pathParams: endpoint.pathParams ?? [],
     queryParams: endpoint.queryParams ?? [],
     transport: 'http',
 });
@@ -52,54 +69,92 @@ const defineSseEndpoint = <TEvent>(
 });
 
 export const v2Contracts = {
-    // Additional context
-    getContext: defineEndpoint<null, string>({
-        method: 'GET',
-        path: '/api/v2/context',
-    }),
-    putContext: defineEndpoint<string, string>({
-        method: 'PUT',
-        path: '/api/v2/context',
-    }),
+    additionalContext: {
+        get: defineEndpoint<null, string>({
+            headers: {
+                'Content-Type': 'text/markdown',
+            },
+            method: 'GET',
+            path: '/api/v2/additional-context',
+        }),
+        put: defineEndpoint<string, string>({
+            headers: {
+                'Content-Type': 'text/markdown',
+            },
+            method: 'PUT',
+            path: '/api/v2/additional-context',
+        }),
+    },
 
-    // Log files
-    getLog: defineEndpoint<null, LogDto>({
-        method: 'GET',
-        path: '/api/v2/logs',
-        queryParams: ['sessionId', 'filePath'],
-    }),
+    sessions: {
+        get: defineEndpoint<null, SessionSummary[]>({
+            method: 'GET',
+            path: '/api/v2/sessions',
+        }),
+        post: defineEndpoint<CreateSession, Session>({
+            method: 'POST',
+            path: '/api/v2/sessions',
+        }),
+        getOne: defineEndpoint<null, Session>({
+            method: 'GET',
+            path: '/api/v2/sessions/:sessionId',
+            pathParams: ['sessionId'],
+        }),
+        getEntries: defineEndpoint<null, SessionEntry[]>({
+            method: 'GET',
+            path: '/api/v2/sessions/:sessionId/entries',
+            pathParams: ['sessionId'],
+        }),
+    },
 
-    // NPC cards
-    getNpcs: defineEndpoint<null, NpcResponseDto>({
-        method: 'GET',
-        path: '/api/v2/npcs',
-    }),
+    runs: {
+        post: defineEndpoint<CreateRun, Run>({
+            method: 'POST',
+            path: '/api/v2/sessions/:sessionId/runs',
+            pathParams: ['sessionId'],
+        }),
+        get: defineEndpoint<null, Run>({
+            method: 'GET',
+            path: '/api/v2/runs/:runId',
+            pathParams: ['runId'],
+        }),
+    },
 
-    // Refresh
-    postRefresh: defineEndpoint<RefreshDto, null>({
-        method: 'POST',
-        path: '/api/v2/refresh',
-    }),
+    npcs: {
+        get: defineEndpoint<null, NpcCollection>({
+            method: 'GET',
+            path: '/api/v2/npcs',
+        }),
+    },
 
-    // Run management
-    postRun: defineEndpoint<RunRequestDto, null>({
-        method: 'POST',
-        path: '/api/v2/runs',
-    }),
+    refresh: {
+        post: defineEndpoint<CreateRefresh, Refresh>({
+            method: 'POST',
+            path: '/api/v2/refresh',
+        }),
+        get: defineEndpoint<null, Refresh>({
+            method: 'GET',
+            path: '/api/v2/refresh/:refreshId',
+            pathParams: ['refreshId'],
+        }),
+    },
 
-    // Console (initial fetch)
-    getConsole: defineEndpoint<null, ConsoleEntryDto[]>({
-        method: 'GET',
-        path: '/api/v2/console',
-    }),
+    console: {
+        get: defineEndpoint<null, ConsoleSnapshot>({
+            method: 'GET',
+            path: '/api/v2/console',
+        }),
+    },
 
     // Server-sent events
-    consoleEvents: defineSseEndpoint<ConsoleEntryDto>({
-        path: '/api/v2/console/events',
-    }),
-    runtimeEvents: defineSseEndpoint<RuntimeEventDto>({
-        path: '/api/v2/runtime/events',
-    }),
+    events: {
+        console: defineSseEndpoint<ConsoleEntry>({
+            path: '/api/v2/console/events',
+        }),
+        runtime: defineSseEndpoint<OperationEvent>({
+            path: '/api/v2/runtime/events',
+        }),
+    },
 } as const;
 
 export type V2ContractMap = typeof v2Contracts;

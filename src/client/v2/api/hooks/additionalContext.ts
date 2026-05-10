@@ -6,21 +6,18 @@ const queryKey = ['api', 'context'];
 
 export const useAdditionalContextQuery = () => useQuery({
     queryKey,
-    queryFn: () => queryApi(v2Contracts.getContext, {}, 'text/markdown'),
+    queryFn: () => queryApi(v2Contracts.additionalContext.get),
 });
 
 export const useAdditionalContextMutation = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (markdown: string) => mutateApi(v2Contracts.putContext, markdown, 'text/markdown'),
+        mutationFn: (markdown: string) => mutateApi(v2Contracts.additionalContext.put, markdown),
         onMutate: async markdown => {
             await queryClient.cancelQueries({queryKey});
-
             const previous = queryClient.getQueryData<string>(queryKey);
-
             queryClient.setQueryData<string>(queryKey, markdown);
-
             return {previous};
         },
         onError: (_error, _markdown, mutateResult) => {

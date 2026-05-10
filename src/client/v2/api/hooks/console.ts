@@ -4,5 +4,5 @@ import { queryApi } from '../utils.js';
 
 export const useConsoleQuery = () => useQuery({
     queryKey: ['api', 'console'],
-    queryFn: () => queryApi(v2Contracts.getConsole),
+    queryFn: () => queryApi(v2Contracts.console.get),
 });

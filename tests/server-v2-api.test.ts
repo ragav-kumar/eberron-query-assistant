@@ -1,12 +1,28 @@
 import { describe, expect, it } from "vitest";
 
-import { v2Contracts } from "../src/contracts.v2.js";
 import { handleV2ApiRequest } from "../src/server/v2/api.js";
 
 describe("v2 API handler", () => {
-  for (const endpoint of Object.values(v2Contracts)) {
-    it(`returns not implemented for ${endpoint.path}`, () => {
-      const request = createRequest(endpoint.method, endpoint.path);
+  const concretePaths: Array<[string, string]> = [
+    ["GET", "/api/v2/additional-context"],
+    ["PUT", "/api/v2/additional-context"],
+    ["GET", "/api/v2/sessions"],
+    ["POST", "/api/v2/sessions"],
+    ["GET", "/api/v2/sessions/session-1"],
+    ["GET", "/api/v2/sessions/session-1/entries"],
+    ["POST", "/api/v2/sessions/session-1/runs"],
+    ["GET", "/api/v2/runs/run-1"],
+    ["GET", "/api/v2/npcs"],
+    ["POST", "/api/v2/refresh"],
+    ["GET", "/api/v2/refresh/refresh-1"],
+    ["GET", "/api/v2/console"],
+    ["GET", "/api/v2/console/events"],
+    ["GET", "/api/v2/runtime/events"],
+  ];
+
+  for (const [method, path] of concretePaths) {
+    it(`returns not implemented for ${method} ${path}`, () => {
+      const request = createRequest(method, path);
       const response = createResponse();
 
       handleV2ApiRequest(request as never, response as never);

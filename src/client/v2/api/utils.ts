@@ -2,47 +2,69 @@ import type { Endpoint } from '@/contracts.v2.js';
 
 export const queryApi = async <TPayload, TResponse>(
     endpoint: Endpoint<TPayload, TResponse>,
-    queryParams: Record<string, string | undefined> = {},
-    contentType: string = 'application/json'
+    params: Record<string, string | undefined> = {},
 ): Promise<TResponse> => {
-    const cleanedParams = {...queryParams};
-    for (const key in cleanedParams) {
-        if (cleanedParams[key] === undefined) {
-            delete cleanedParams[key];
-        }
-    }
-    const url = `${endpoint.path}?${new URLSearchParams(cleanedParams as Record<string, string>).toString()}`;
+    const url = buildEndpointUrl(endpoint, params);
 
     return await fetchWrapper(url, {
         method: endpoint.method,
-        headers: {
-            'Content-Type': contentType,
-        },
+        headers: endpoint.headers,
     });
 };
 
 export const mutateApi = async <TPayload, TResponse>(
     endpoint: Endpoint<TPayload, TResponse>,
     payload: TPayload | null,
-    contentType: string = 'application/json'
+    params: Record<string, string | undefined> = {},
 ): Promise<TResponse> => {
     const options: RequestInit = {
         method: endpoint.method,
-        headers: {
-            'Content-Type': contentType,
-        },
+        headers: endpoint.headers,
     };
-    if (payload != null && contentType === 'application/json') {
-        options.body = JSON.stringify(payload);
+    if (payload != null) {
+        options.body = endpoint.headers['Content-Type'] === 'application/json'
+            ? JSON.stringify(payload)
+            : String(payload);
     }
 
-    return await fetchWrapper(endpoint.path, options);
+    return await fetchWrapper(buildEndpointUrl(endpoint, params), options);
+};
+
+const buildEndpointUrl = <TPayload, TResponse>(
+    endpoint: Endpoint<TPayload, TResponse>,
+    params: Record<string, string | undefined>,
+): string => {
+    let path = endpoint.path;
+    const remainingParams = {...params};
+
+    for (const key of endpoint.pathParams) {
+        const value = remainingParams[key];
+        if (value === undefined) {
+            throw new Error(`Missing path param: ${key}`);
+        }
+        path = path.replace(`:${key}`, encodeURIComponent(value));
+        delete remainingParams[key];
+    }
+
+    const cleanedParams = {...remainingParams};
+    for (const key in cleanedParams) {
+        if (cleanedParams[key] === undefined) {
+            delete cleanedParams[key];
+        }
+    }
+    const query = new URLSearchParams(cleanedParams as Record<string, string>).toString();
+    return query.length > 0 ? `${path}?${query}` : path;
 };
 
 const fetchWrapper = async <TResponse>(url: string, options: RequestInit) => {
     const rawResponse = await fetch(url, options);
-
-    const json = await rawResponse.json() as unknown;
+    const rawBody = await rawResponse.text();
+    const responseType = rawResponse.headers.get('Content-Type') ?? '';
+    const body = rawBody.length === 0
+        ? null
+        : responseType.includes('application/json')
+            ? JSON.parse(rawBody) as unknown
+            : rawBody;
 
     if (!rawResponse.ok) {
         throw new Error(`HTTP error! status: ${rawResponse.status}`);
@@ -50,5 +72,5 @@ const fetchWrapper = async <TResponse>(url: string, options: RequestInit) => {
         //const errorDto = (json ?? {}) as ErrorResponseDto;
     }
 
-    return json as TResponse;
+    return body as TResponse;
 };
