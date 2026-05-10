@@ -6,7 +6,7 @@ import "./styles.css";
 import { AppStateProvider, useAppState } from "./useAppState.js";
 
 /** Composes the local assistant browser UI around React-owned application state. */
-export const App = () => (
+export const V1App = () => (
   <AppStateProvider>
     <AppContent />
   </AppStateProvider>

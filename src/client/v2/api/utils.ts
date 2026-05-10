@@ -3,6 +3,7 @@ import type { Endpoint } from './endpoints.js';
 export const queryApi = async <TPayload, TResponse>(
     endpoint: Endpoint<TPayload, TResponse>,
     queryParams: Record<string, string | undefined> = {},
+    contentType: string = 'application/json'
 ): Promise<TResponse> => {
     const cleanedParams = {...queryParams};
     for (const key in cleanedParams) {
@@ -15,7 +16,7 @@ export const queryApi = async <TPayload, TResponse>(
     return await fetchWrapper(url, {
         method: endpoint.method,
         headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': contentType,
         },
     });
 };
@@ -23,14 +24,15 @@ export const queryApi = async <TPayload, TResponse>(
 export const mutateApi = async <TPayload, TResponse>(
     endpoint: Endpoint<TPayload, TResponse>,
     payload: TPayload | null,
+    contentType: string = 'application/json'
 ): Promise<TResponse> => {
     const options: RequestInit = {
         method: endpoint.method,
         headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': contentType,
         },
     };
-    if (payload != null) {
+    if (payload != null && contentType === 'application/json') {
         options.body = JSON.stringify(payload);
     }
 

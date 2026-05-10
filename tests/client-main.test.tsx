@@ -29,9 +29,9 @@ describe("client entry selection", () => {
   it("selects the current UI at root", async () => {
     document.body.innerHTML = '<div id="root"></div>';
     const module = await import("../src/client/main.js");
-    const { App } = await import("../src/client/App.js");
+    const { V1App } = await import("../src/client/v1/V1App.js");
 
-    expect(module.resolveAppForPath("/")).toBe(App);
+    expect(module.resolveAppForPath("/")).toBe(V1App);
   });
 
   it("selects the v2 stub at /v2", async () => {

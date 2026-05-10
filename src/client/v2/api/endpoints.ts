@@ -1,19 +1,15 @@
 import type {
-    AskAssistantDto,
-    ContextDto,
-    GenerateNpcsDto,
+    CreateRunDto,
     LogDto,
     NpcResponseDto,
-    OkDto,
-    OperationResultDto,
     RefreshDto,
-    StatusDto,
+    RunDto,
 } from './dtos.js';
 
 declare const endpointPayloadType: unique symbol;
 declare const endpointResponseType: unique symbol;
 
-export interface Endpoint<TPayload = unknown, TResponse = unknown> {
+export interface Endpoint<TPayload, TResponse> {
     method: 'GET' | 'POST' | 'PUT';
     path: string;
     queryParams: readonly string[];
@@ -21,52 +17,52 @@ export interface Endpoint<TPayload = unknown, TResponse = unknown> {
     readonly [endpointResponseType]?: TResponse;
 }
 
-const defineEndpoint = <TPayload, TResponse>(endpoint: Endpoint<TPayload, TResponse>) => endpoint;
+const defineEndpoint = <TPayload, TResponse>(
+    endpoint: Omit<Endpoint<TPayload, TResponse>, 'queryParams'> & { queryParams?: string[] },
+) => ({
+    ...endpoint,
+    queryParams: endpoint.queryParams ?? [],
+});
 
 export const endpoints = {
-    getContext: defineEndpoint<null, ContextDto>({
+    // Additional context
+    getContext: defineEndpoint<null, string>({
         method: 'GET',
         path: '/api/context',
-        queryParams: [],
     }),
-    putContext: defineEndpoint<ContextDto, OkDto>({
+    putContext: defineEndpoint<string, string>({
         method: 'PUT',
         path: '/api/context',
-        queryParams: [],
     }),
 
+    // Log files
     getLog: defineEndpoint<null, LogDto>({
         method: 'GET',
-        path: '/api/log',
+        path: '/api/logs',
         queryParams: ['sessionId', 'filePath'],
     }),
 
+    // NPC cards
     getNpcs: defineEndpoint<null, NpcResponseDto>({
         method: 'GET',
         path: '/api/npcs',
-        queryParams: [],
-    }),
-    postNpcs: defineEndpoint<GenerateNpcsDto, OperationResultDto>({
-        method: 'POST',
-        path: '/api/npcs',
-        queryParams: [],
     }),
 
-    postRefresh: defineEndpoint<RefreshDto, OperationResultDto>({
+    // Refresh
+    postRefresh: defineEndpoint<RefreshDto, null>({
         method: 'POST',
         path: '/api/refresh',
-        queryParams: [],
     }),
 
-    postAssistant: defineEndpoint<AskAssistantDto, OperationResultDto>({
+    // Run management
+    postRun: defineEndpoint<CreateRunDto, RunDto>({
         method: 'POST',
-        path: '/api/assistant',
-        queryParams: [],
+        path: '/api/runs',
     }),
-
-    getStatus: defineEndpoint<null, StatusDto>({
+    getRun: defineEndpoint<null, RunDto>({
         method: 'GET',
-        path: '/api/status',
-        queryParams: ['sessionId'],
+        path: '/api/runs/:runId',
     }),
 } as const;
+
+ // Also have to define SSE contracts for runtime state and console entries

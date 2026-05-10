@@ -139,8 +139,6 @@ export interface AskAssistantDto {
     sessionId: string;
 }
 
-export type GenerateNpcsDto = AskAssistantDto;
-
 export interface RefreshDto {
     forceReingest: boolean;
 }
@@ -150,4 +148,25 @@ export interface ErrorResponseDto {
     error?: string;
     operation?: string;
     providerDebug?: ProviderDebugEntryDto[];
+}
+
+export interface CreateRunDto {
+    kind: 'assistant' | 'npc';
+    includePartyContext: boolean;
+    prompt: string;
+    retrievalTurnLimit: number;
+    sessionId: string;
+}
+
+export interface RunDto {
+    id: string;
+    kind: 'assistant' | 'npc';
+    status: string; // For now
+    startedAt: Date;
+    // TODO: Add other fields as needed?
+}
+
+export interface RuntimeEventDto {
+    inputLocked: boolean;
+    activeOperation: 'refresh' | 'force-reingest' | null;
 }
