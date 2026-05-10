@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { contracts } from '../src/contracts.v2.js';
-import { mutateApi, queryApi } from '../src/client/v2/api/utils.js';
+import { contracts } from '@/contracts.v2.js';
+import { mutateApi, queryApi } from '@/client/v2/api/utils.js';
 
 describe('v2 client API helpers', () => {
     const fetchMock = vi.fn<typeof fetch>();

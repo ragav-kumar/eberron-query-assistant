@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { handleV2ApiRequest } from "../src/server/v2/api.js";
+import { handleV2ApiRequest } from '@/server/v2/api.js';
 
 describe("v2 API handler", () => {
   const concretePaths: Array<[string, string]> = [

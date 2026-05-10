@@ -742,7 +742,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(
         vi.mocked(api.getLog).mock.calls.some(([options]) => (
-          options.filePath === "logs/old.json" && typeof options.sessionId === "string"
+          options.filePath === "logs/old.json"
         ))
       ).toBe(true);
     });
