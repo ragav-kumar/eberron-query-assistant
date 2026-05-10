@@ -1,0 +1,55 @@
+.wrap {
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    color: #f2f4f7;
+}
+
+.buttonWrap {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.75rem 0.75rem 0;
+    background:
+            linear-gradient(#4d545c, #4d545c)
+            left bottom / 100% 1px
+            no-repeat;
+
+    overflow-x: auto;
+}
+
+.button {
+    flex: 0 0 auto;
+    padding: 0.625rem 0.875rem;
+    border: 1px solid #4d545c;
+    border-radius: 0.5rem 0.5rem 0 0;
+    background-color: #3a4046;
+    color: #ffffff;
+    cursor: pointer;
+    font: inherit;
+    line-height: 1.2;
+    user-select: none;
+    transition: background-color 120ms ease, border-color 120ms ease;
+
+    &:hover {
+        background-color: #454c54;
+        border-color: #646d77;
+    }
+
+    &.active {
+        border-bottom-color: transparent;
+        background-color: #32373c;
+        z-index: 1;
+
+        &:hover {
+            border-bottom-color: transparent;
+            background-color: #32373c;
+        }
+    }
+}
+
+.content {
+    flex: 1 1 auto;
+    min-height: 0;
+    padding: 1rem;
+    background-color: #32373c;
+}

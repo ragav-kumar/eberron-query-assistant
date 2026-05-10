@@ -15,5 +15,5 @@
     "exactOptionalPropertyTypes": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx", "eslint.config.js", "vite.config.ts", "vitest.config.ts"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.d.ts", "tests/**/*.ts", "tests/**/*.tsx", "eslint.config.js", "vite.config.ts", "vitest.config.ts"]
 }

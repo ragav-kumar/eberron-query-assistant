@@ -21,6 +21,14 @@ export default tseslint.config(
       "@typescript-eslint/consistent-type-imports": "error",
       "@typescript-eslint/no-deprecated": "error",
       "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          argsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          varsIgnorePattern: "^_"
+        }
+      ],
       "@typescript-eslint/only-throw-error": "off",
       "func-style": ["error", "expression", { "allowArrowFunctions": true }]
     }
