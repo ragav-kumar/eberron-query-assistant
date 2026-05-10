@@ -1,10 +1,10 @@
 import type { Endpoint } from './endpoints.js';
 
-export const queryApi = async <TResponse>(
-    endpoint: Endpoint,
-    queryParams: Record<string, string | undefined> = {}
+export const queryApi = async <TPayload, TResponse>(
+    endpoint: Endpoint<TPayload, TResponse>,
+    queryParams: Record<string, string | undefined> = {},
 ): Promise<TResponse> => {
-    const cleanedParams = { ...queryParams };
+    const cleanedParams = {...queryParams};
     for (const key in cleanedParams) {
         if (cleanedParams[key] === undefined) {
             delete cleanedParams[key];
@@ -12,27 +12,17 @@ export const queryApi = async <TResponse>(
     }
     const url = `${endpoint.path}?${new URLSearchParams(cleanedParams as Record<string, string>).toString()}`;
 
-    const rawResponse = await fetch(url, {
+    return await fetchWrapper(url, {
         method: endpoint.method,
         headers: {
             'Content-Type': 'application/json',
         },
     });
-
-    const json = await rawResponse.json() as unknown;
-
-    if (!rawResponse.ok) {
-        throw new Error(`HTTP error! status: ${rawResponse.status}`);
-        // TODO
-        //const errorDto = (json ?? {}) as ErrorResponseDto;
-    }
-
-    return json as TResponse;
 };
 
 export const mutateApi = async <TPayload, TResponse>(
-    endpoint: Endpoint,
-    payload: TPayload | null
+    endpoint: Endpoint<TPayload, TResponse>,
+    payload: TPayload | null,
 ): Promise<TResponse> => {
     const options: RequestInit = {
         method: endpoint.method,
@@ -43,15 +33,20 @@ export const mutateApi = async <TPayload, TResponse>(
     if (payload != null) {
         options.body = JSON.stringify(payload);
     }
-    const rawResponse = await fetch(endpoint.path, options);
+
+    return await fetchWrapper(endpoint.path, options);
+};
+
+const fetchWrapper = async <TResponse>(url: string, options: RequestInit) => {
+    const rawResponse = await fetch(url, options);
 
     const json = await rawResponse.json() as unknown;
 
     if (!rawResponse.ok) {
         throw new Error(`HTTP error! status: ${rawResponse.status}`);
-        // TODO
+        // TODO - throw a full featured dto instead?
         //const errorDto = (json ?? {}) as ErrorResponseDto;
     }
 
     return json as TResponse;
-}
+};
