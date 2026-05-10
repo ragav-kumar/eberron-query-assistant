@@ -1,14 +1,10 @@
-export type ConsoleLevelDto = 'debug' | 'error' | 'info' | 'warn';
+import type { ConsoleLevel } from './types.js';
 
 export interface ConsoleEntryDto {
     id: string;
-    level: ConsoleLevelDto;
+    level: ConsoleLevel;
     message: string;
     timestamp: string;
-}
-
-export interface ConsoleDto {
-    entries: ConsoleEntryDto[];
 }
 
 export interface LogExchangeDto {
@@ -75,74 +71,15 @@ export interface ProviderDebugEntryDto {
     timestamp: string;
 }
 
-export interface SourceInventoryResultDto {
-    added: number;
-    details: string[];
-    discovered: number;
-    failed: number;
-    message: string;
-    removed: number;
-    sourceType: 'article' | 'foundry' | 'pdf';
-    status: 'failed' | 'missing' | 'scheduled' | 'skipped';
-    updated: number;
-}
-
-export interface RefreshSummaryDto {
-    degraded: boolean;
-    degradedSources: ('article' | 'foundry' | 'pdf')[];
-    forceReingest: boolean;
-    inventories: SourceInventoryResultDto[];
-    retrieval?: {
-        chunkCount: number;
-        regeneratedEmbeddings: number;
-        reusedEmbeddings: number;
-    };
-}
-
-export interface OperationResultDto {
-    console: ConsoleDto;
-    log: LogDto;
-    npcs: NpcResponseDto;
-    ok: true;
-    providerDebug?: ProviderDebugEntryDto[];
-    summary?: RefreshSummaryDto;
-}
-
-export interface StatusDto {
-    activeOperation: string | null;
-    console: ConsoleDto;
-    log: LogDto;
-    npcs: NpcResponseDto;
-}
-
 export interface ContextDto {
     markdown: string;
-}
-
-export interface OkDto {
-    ok: true;
-}
-
-export interface StatusQueryDto {
-    sessionId: string;
-}
-
-export interface LogQueryDto {
-    filePath?: string;
-    sessionId: string;
-}
-
-export interface AskAssistantDto {
-    includePartyContext: boolean;
-    prompt: string;
-    retrievalTurnLimit: number;
-    sessionId: string;
 }
 
 export interface RefreshDto {
     forceReingest: boolean;
 }
 
+// TODO integrate this
 export interface ErrorResponseDto {
     console?: ConsoleDto;
     error?: string;
@@ -150,7 +87,7 @@ export interface ErrorResponseDto {
     providerDebug?: ProviderDebugEntryDto[];
 }
 
-export interface CreateRunDto {
+export interface RunRequestDto {
     kind: 'assistant' | 'npc';
     includePartyContext: boolean;
     prompt: string;
@@ -158,14 +95,7 @@ export interface CreateRunDto {
     sessionId: string;
 }
 
-export interface RunDto {
-    id: string;
-    kind: 'assistant' | 'npc';
-    status: string; // For now
-    startedAt: Date;
-    // TODO: Add other fields as needed?
-}
-
+// TODO integrate this
 export interface RuntimeEventDto {
     inputLocked: boolean;
     activeOperation: 'refresh' | 'force-reingest' | null;

@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mutateApi, queryApi } from '../utils.js';
 import { endpoints } from '../endpoints.js';
-import type { ContextDto } from '../dtos.js';
+import type { ContextDto } from '../index.js';
 
 const queryKey = ['api', 'context'];
 

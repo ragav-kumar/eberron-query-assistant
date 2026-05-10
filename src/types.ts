@@ -134,3 +134,5 @@ export interface IngestionSummary {
   degraded: boolean;
   corpusSourceCount: number;
 }
+
+export type ConsoleLevel = 'debug' | 'error' | 'info' | 'warn';
