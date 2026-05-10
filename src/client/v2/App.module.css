@@ -1,12 +1,39 @@
 .wrap {
-    min-height: 100vh;
-    width: 100%;
+    box-sizing: border-box;
     display: flex;
     gap: 1.5rem;
+    height: 100vh;
     padding: 1.5rem;
     background-color: #444444;
+    width: 100%;
     > * {
         width: 100%;
         background-color: #32373c;
+    }
+}
+
+.column {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+}
+
+.leftTabs.leftTabs,
+.rightTabs.rightTabs {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+@media (max-width: 900px) {
+    .wrap {
+        flex-direction: column;
+        height: auto;
+        min-height: 100vh;
+    }
+
+    .rightColumn {
+        min-height: 26rem;
     }
 }

@@ -10,44 +10,47 @@ import { joinClassNames } from '@/client/v2/utils.js';
 interface TabsProps {
     defaultKey: string;
     children: ReactNode;
+    className?: string | undefined;
 }
 
-export const Tabs = ({children, defaultKey}: TabsProps) => {
+export const Tabs = ({children, className, defaultKey}: TabsProps) => {
     const [currentTabKey, setCurrentTabKey] = useState<string>(defaultKey);
 
-    const tabButtons: { key: string, label: string }[] = [];
-    const tabContents: { key: string, content: ReactNode }[] = [];
+    const tabButtons: TabButtonProps[] = [];
+    const tabContents: TabContentProps[] = [];
     Children.forEach(children, (child) => {
         if (isValidElement(child)) {
             if (child.type === TabButton) {
-                const childProps = child.props as TabButtonProps;
-                tabButtons.push({ key: childProps.tabKey, label: childProps.children });
+                tabButtons.push(child.props as TabButtonProps);
             } else if (child.type === TabContent) {
-                const childProps = child.props as TabContentProps;
-                tabContents.push({ key: childProps.tabKey, content: childProps.children });
+                tabContents.push(child.props as TabContentProps);
             }
         }
     });
 
     return (
-        <div className={styles.wrap}>
+        <div className={joinClassNames(styles.wrap, className)}>
             <div className={styles.buttonWrap}>
-                {tabButtons.map((tabKey) => (
+                {tabButtons.map((tabButton) => (
                     <div
-                        className={joinClassNames(styles.button, currentTabKey === tabKey.key ? styles.active : null)}
-                        key={tabKey.key}
-                        onClick={() => setCurrentTabKey(tabKey.key)}
+                        className={joinClassNames(styles.button, currentTabKey === tabButton.tabKey ? styles.active : null)}
+                        key={tabButton.tabKey}
+                        onClick={() => setCurrentTabKey(tabButton.tabKey)}
                     >
-                        {tabKey.label}
+                        {tabButton.children}
                     </div>
                 ))}
             </div>
             {tabContents.map(tabContent => (
                 <div
-                    key={tabContent.key}
-                    className={joinClassNames(styles.content, currentTabKey === tabContent.key ? styles.active : null)}
+                    key={tabContent.tabKey}
+                    className={joinClassNames(
+                        styles.content,
+                        currentTabKey === tabContent.tabKey ? styles.active : null,
+                        tabContent.className
+                    )}
                 >
-                    {tabContent.content}
+                    {tabContent.children}
                 </div>
             ))}
         </div>

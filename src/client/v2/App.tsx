@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import styles from './App.module.css';
 import { Tabs } from './components/Tabs/index.js';
 import { LeftColumnHeader } from './components/LeftColumnHeader.js';
-import { Console } from './components/Console/index.js';
+import { Console } from './components/Console.js';
 import { AppContext } from '@/client/v2/AppContext.js';
 
 const queryClient = new QueryClient({
@@ -24,9 +24,9 @@ export const App = () => (
         <AppContext>
             <main className={styles.wrap}>
                 <title>Eberron Query Assistant V2</title>
-                <section className={styles.leftColumn}>
+                <section className={styles.column}>
                     <LeftColumnHeader />
-                    <Tabs defaultKey='input'>
+                    <Tabs defaultKey='input' className={styles.leftTabs}>
                         <Tabs.Button tabKey='input'>Input</Tabs.Button>
                         <Tabs.Button tabKey='Additional Context'>Additional Context</Tabs.Button>
                         <Tabs.Content tabKey='input'>
@@ -37,14 +37,14 @@ export const App = () => (
                         </Tabs.Content>
                     </Tabs>
                 </section>
-                <section className={styles.rightColumn}>
-                    <Tabs defaultKey='log'>
-                        <Tabs.Button tabKey='log'>Log</Tabs.Button>
-                        <Tabs.Button tabKey='NPC Cards'>NPC Cards</Tabs.Button>
-                        <Tabs.Content tabKey='log'>
-                            <p>TODO - Log</p>
+                <section className={styles.column}>
+                    <Tabs defaultKey='assistant' className={styles.rightTabs}>
+                        <Tabs.Button tabKey='assistant'>Assistant</Tabs.Button>
+                        <Tabs.Button tabKey='npc'>NPC Cards</Tabs.Button>
+                        <Tabs.Content tabKey='assistant'>
+                            <p>TODO - Assistant</p>
                         </Tabs.Content>
-                        <Tabs.Content tabKey='NPC Cards'>
+                        <Tabs.Content tabKey='npc'>
                             <p>TODO - NPC Cards</p>
                         </Tabs.Content>
                     </Tabs>

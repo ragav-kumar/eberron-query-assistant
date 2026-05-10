@@ -1,26 +1,101 @@
-import type { ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from "node:http";
 
 import type { Plugin } from "vite";
 
 import { formatThrownValue } from "../errors.js";
-import { createWebApp, isBusyError, isWebOperationError, type WebApp } from "./v1/app.js";
-import { handleV1ApiRequest } from "./v1/api.js";
-import { handleV2ApiRequest } from "./v2/api.js";
+
+interface WebAppLike {
+  startStartupRefresh(): void;
+}
+
+interface BusyErrorLike {
+  kind: "busy";
+  operation: string;
+}
+
+interface WebOperationErrorLike {
+  console: unknown;
+  kind: "web-operation";
+  providerDebug?: unknown;
+}
+
+type HandleV1ApiRequest = (
+  app: WebAppLike,
+  request: IncomingMessage,
+  response: ServerResponse
+) => Promise<void>;
+
+type HandleV2ApiRequest = (
+  request: IncomingMessage,
+  response: ServerResponse
+) => void;
+
+interface V1Runtime {
+  app: WebAppLike;
+  handleV1ApiRequest: HandleV1ApiRequest;
+}
+
+interface V2Runtime {
+  handleV2ApiRequest: HandleV2ApiRequest;
+}
+
+interface V1AppModule {
+  createWebApp: () => WebAppLike;
+}
+
+interface V1ApiModule {
+  handleV1ApiRequest: HandleV1ApiRequest;
+}
+
+interface V2ApiModule {
+  handleV2ApiRequest: HandleV2ApiRequest;
+}
 
 export const eberronApiPlugin = (): Plugin => {
-  let app: WebApp | null = null;
-
-  const getApp = (): WebApp => {
-    if (!app) {
-      app = createWebApp();
-      app.startStartupRefresh();
-    }
-    return app;
-  };
-
   return {
     name: "eberron-api",
     configureServer(server) {
+      let v1RuntimePromise: Promise<V1Runtime> | null = null;
+      let v2RuntimePromise: Promise<V2Runtime> | null = null;
+
+      const loadV1Runtime = async (): Promise<V1Runtime> => {
+        if (v1RuntimePromise) {
+          return v1RuntimePromise;
+        }
+
+        v1RuntimePromise = Promise.all([
+          server.ssrLoadModule("/src/server/v1/app.ts"),
+          server.ssrLoadModule("/src/server/v1/api.ts")
+        ]).then((loadedModules) => {
+          const [appModule, apiModule] = loadedModules as [V1AppModule, V1ApiModule];
+          const app = appModule.createWebApp();
+          app.startStartupRefresh();
+
+          return {
+            app,
+            handleV1ApiRequest: apiModule.handleV1ApiRequest
+          };
+        });
+
+        return v1RuntimePromise;
+      };
+
+      const loadV2Runtime = async (): Promise<V2Runtime> => {
+        if (v2RuntimePromise) {
+          return v2RuntimePromise;
+        }
+
+        v2RuntimePromise = server.ssrLoadModule("/src/server/v2/api.ts").then((loadedModule) => {
+          const apiModule = loadedModule as V2ApiModule;
+
+          return {
+            handleV2ApiRequest: apiModule.handleV2ApiRequest
+          };
+        });
+
+        return v2RuntimePromise;
+      };
+
       server.middlewares.use((request, response, next) => {
         if (!request.url?.startsWith("/api/")) {
           next();
@@ -29,18 +104,22 @@ export const eberronApiPlugin = (): Plugin => {
 
         const url = new URL(request.url, "http://localhost");
 
-        const handler = url.pathname.startsWith("/api/v1/")
-          ? () => handleV1ApiRequest(getApp(), request, response)
-          : url.pathname.startsWith("/api/v2/")
-            ? () => handleV2ApiRequest(request, response)
-            : null;
+        void Promise.resolve()
+          .then(async () => {
+            if (url.pathname.startsWith("/api/v1/")) {
+              const { app, handleV1ApiRequest } = await loadV1Runtime();
+              await handleV1ApiRequest(app, request, response);
+              return;
+            }
 
-        if (!handler) {
-          writeJson(response, 404, { error: "Unknown API route." });
-          return;
-        }
+            if (url.pathname.startsWith("/api/v2/")) {
+              const { handleV2ApiRequest } = await loadV2Runtime();
+              handleV2ApiRequest(request, response);
+              return;
+            }
 
-        void Promise.resolve(handler())
+            writeJson(response, 404, { error: "Unknown API route." });
+          })
           .catch((error: unknown) => {
             writeJson(response, isBusyError(error) ? 409 : 500, {
               error: formatThrownValue(error),
@@ -54,6 +133,27 @@ export const eberronApiPlugin = (): Plugin => {
       });
     }
   };
+};
+
+const isBusyError = (error: unknown): error is BusyErrorLike => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "kind" in error &&
+    error.kind === "busy" &&
+    "operation" in error &&
+    typeof error.operation === "string"
+  );
+};
+
+const isWebOperationError = (error: unknown): error is WebOperationErrorLike => {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "kind" in error &&
+    error.kind === "web-operation" &&
+    "console" in error
+  );
 };
 
 const writeJson = (response: ServerResponse, statusCode: number, body: unknown): void => {

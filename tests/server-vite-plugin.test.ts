@@ -4,20 +4,6 @@ const handleV1ApiRequest = vi.fn();
 const handleV2ApiRequest = vi.fn();
 const createWebApp = vi.fn();
 
-vi.mock("../src/server/v1/api.js", () => ({
-  handleV1ApiRequest
-}));
-
-vi.mock("../src/server/v2/api.js", () => ({
-  handleV2ApiRequest
-}));
-
-vi.mock("../src/server/v1/app.js", () => ({
-  createWebApp,
-  isBusyError: () => false,
-  isWebOperationError: () => false
-}));
-
 describe("vite API plugin", () => {
   const startStartupRefresh = vi.fn();
 
@@ -32,7 +18,10 @@ describe("vite API plugin", () => {
 
   it("dispatches /api/v1 requests to the v1 handler and lazily initializes the shared app", async () => {
     const { eberronApiPlugin } = await import("../src/server/vite-plugin.js");
-    const middleware = getRegisteredMiddleware(eberronApiPlugin());
+    const middleware = getRegisteredMiddleware(eberronApiPlugin(), {
+      "/src/server/v1/api.ts": { handleV1ApiRequest },
+      "/src/server/v1/app.ts": { createWebApp }
+    });
     const request = { url: "/api/v1/context", method: "GET" };
     const response = createResponse();
 
@@ -49,7 +38,9 @@ describe("vite API plugin", () => {
 
   it("dispatches /api/v2 requests to the v2 handler without creating the legacy app", async () => {
     const { eberronApiPlugin } = await import("../src/server/vite-plugin.js");
-    const middleware = getRegisteredMiddleware(eberronApiPlugin());
+    const middleware = getRegisteredMiddleware(eberronApiPlugin(), {
+      "/src/server/v2/api.ts": { handleV2ApiRequest }
+    });
     const request = { url: "/api/v2/context", method: "GET" };
     const response = createResponse();
 
@@ -64,10 +55,14 @@ describe("vite API plugin", () => {
 
   it("returns 404 for unknown /api prefixes", async () => {
     const { eberronApiPlugin } = await import("../src/server/vite-plugin.js");
-    const middleware = getRegisteredMiddleware(eberronApiPlugin());
+    const middleware = getRegisteredMiddleware(eberronApiPlugin(), {});
     const response = createResponse();
 
     middleware({ url: "/api/legacy", method: "GET" }, response, vi.fn());
+
+    await vi.waitFor(() => {
+      expect(response.statusCode).toBe(404);
+    });
 
     expect(response.statusCode).toBe(404);
     expect(response.body).toBe(JSON.stringify({ error: "Unknown API route." }));
@@ -77,7 +72,7 @@ describe("vite API plugin", () => {
 
   it("passes non-api requests through to the next middleware", async () => {
     const { eberronApiPlugin } = await import("../src/server/vite-plugin.js");
-    const middleware = getRegisteredMiddleware(eberronApiPlugin());
+    const middleware = getRegisteredMiddleware(eberronApiPlugin(), {});
     const next = vi.fn();
 
     middleware({ url: "/v2", method: "GET" }, createResponse(), next);
@@ -89,7 +84,8 @@ describe("vite API plugin", () => {
 });
 
 const getRegisteredMiddleware = (
-  plugin: { configureServer?: unknown }
+  plugin: { configureServer?: unknown },
+  ssrModules: Record<string, unknown>
 ): ((request: unknown, response: unknown, next: () => void) => void) => {
   let registered: ((request: unknown, response: unknown, next: () => void) => void) | null = null;
   const configureServer = plugin.configureServer;
@@ -102,6 +98,7 @@ const getRegisteredMiddleware = (
     middlewares: {
       use(fn: (request: unknown, response: unknown, next: () => void) => void): void;
     };
+    ssrLoadModule(id: string): Promise<unknown>;
   }) => void;
 
   runConfigureServer({
@@ -109,6 +106,13 @@ const getRegisteredMiddleware = (
       use(fn: (request: unknown, response: unknown, next: () => void) => void) {
         registered = fn;
       }
+    },
+    ssrLoadModule(id: string) {
+      const module = ssrModules[id];
+      if (module === undefined) {
+        return Promise.reject(new Error(`Unexpected module load: ${id}`));
+      }
+      return Promise.resolve(module);
     }
   });
 
