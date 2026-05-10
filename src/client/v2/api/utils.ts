@@ -1,5 +1,8 @@
 import type { Endpoint } from '@/contracts.v2.js';
 
+/**
+ * fetch() for GET endpoints
+ */
 export const queryApi = async <TPayload, TResponse>(
     endpoint: Endpoint<TPayload, TResponse>,
     params: Record<string, string | undefined> = {},
@@ -12,6 +15,9 @@ export const queryApi = async <TPayload, TResponse>(
     });
 };
 
+/**
+ * fetch() for POST and PUT endpoints (at present, we have no concept of DELETE)
+ */
 export const mutateApi = async <TPayload, TResponse>(
     endpoint: Endpoint<TPayload, TResponse>,
     payload: TPayload | null,

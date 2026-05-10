@@ -14,7 +14,7 @@ describe("v2 API handler", () => {
     ["GET", "/api/v2/runs/run-1"],
     ["GET", "/api/v2/npcs"],
     ["POST", "/api/v2/refresh"],
-    ["GET", "/api/v2/refresh/refresh-1"],
+    ["GET", "/api/v2/refresh"],
     ["GET", "/api/v2/console"],
     ["GET", "/api/v2/console/events"],
     ["GET", "/api/v2/runtime/events"],

@@ -117,7 +117,6 @@ export interface CreateRefresh {
 }
 
 export interface Refresh {
-    id: string;
     status: 'pending' | 'running' | 'completed' | 'failed';
     forceReingest: boolean;
     createdAt: string;
