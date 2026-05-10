@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { V1App } from "./v1/V1App.js";
-import { V2App } from "./v2/V2App.js";
+import { App as V1App } from "./v1/App.js";
+import { App as V2App } from "./v2/App.js";
 
 export const resolveAppForPath = (pathname: string) => {
   return pathname.includes('v2') ? V2App : V1App;

@@ -68,7 +68,7 @@ const defineSseEndpoint = <TEvent>(
     transport: 'sse',
 });
 
-export const v2Contracts = {
+export const contracts = {
     additionalContext: {
         get: defineEndpoint<null, string>({
             headers: {
@@ -157,4 +157,4 @@ export const v2Contracts = {
     },
 } as const;
 
-export type V2ContractMap = typeof v2Contracts;
+export type ContractMap = typeof contracts;

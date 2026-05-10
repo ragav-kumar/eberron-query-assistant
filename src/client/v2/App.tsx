@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import styles from './V2App.module.css';
+import styles from './App.module.css';
 import { Tabs } from './components/Tabs/index.js';
 import { LeftColumnHeader } from './components/LeftColumnHeader.js';
 import { Console } from './components/Console.js';
@@ -18,7 +18,7 @@ const queryClient = new QueryClient({
  * Future UI work should start by reading `src/client/api.ts`, which documents
  * the browser-to-runtime contract this tree is expected to use.
  */
-export const V2App = () => (
+export const App = () => (
     <QueryClientProvider client={queryClient}>
         <main className={styles.wrap}>
             <title>Eberron Query Assistant V2</title>

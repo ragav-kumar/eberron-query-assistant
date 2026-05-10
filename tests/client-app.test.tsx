@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { ChangeEvent } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { V1App } from "../src/client/v1/V1App.js";
+import { App } from "@/client/v1/App.js";
 import * as api from "../src/client/v1/api.js";
 
 vi.mock("@mdxeditor/editor", () => ({
@@ -141,7 +141,7 @@ afterEach(() => {
 
 describe("App", () => {
   it("renders input and output tabs with their default selections", async () => {
-    render(<V1App />);
+    render(<App />);
 
     expect((await screen.findByRole("tab", { name: "Input" })).getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("tab", { name: "Additional Context" }).getAttribute("aria-selected")).toBe("false");
@@ -154,7 +154,7 @@ describe("App", () => {
   });
 
   it("submits the selected retrieval turn limit for standard and NPC requests", async () => {
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.change(await screen.findByRole("slider"), { target: { value: "3" } });
     expect(screen.getByText("Extra retrieval turns: 3")).toBeTruthy();
@@ -178,7 +178,7 @@ describe("App", () => {
   });
 
   it("uses one shared party info checkbox for standard and NPC submissions", async () => {
-    render(<V1App />);
+    render(<App />);
 
     const checkbox = await screen.findByRole("checkbox", { name: "Include party info" });
     fireEvent.click(checkbox);
@@ -205,7 +205,7 @@ describe("App", () => {
   });
 
   it("switches input modes with the radio group", async () => {
-    render(<V1App />);
+    render(<App />);
 
     expect(await screen.findByRole("radio", { name: "Standard" })).toHaveProperty("checked", true);
     expect(screen.getByPlaceholderText(/Ask about Eberron/i)).toBeTruthy();
@@ -216,7 +216,7 @@ describe("App", () => {
   });
 
   it("submits assistant prompts and renders the returned log", async () => {
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.change(screen.getByPlaceholderText(/Ask about Eberron/i), {
       target: { value: "What about Aerenal?" }
@@ -262,7 +262,7 @@ describe("App", () => {
       }
     }));
 
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.change(await screen.findByPlaceholderText(/Ask about Eberron/i), {
       target: { value: "What about Aerenal?" }
@@ -279,7 +279,7 @@ describe("App", () => {
   });
 
   it("submits assistant prompts with Enter", async () => {
-    render(<V1App />);
+    render(<App />);
 
     const prompt = screen.getByPlaceholderText(/Ask about Eberron/i);
     fireEvent.change(prompt, {
@@ -293,7 +293,7 @@ describe("App", () => {
   });
 
   it("submits NPC generator prompts and renders NPC cards", async () => {
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
     fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
@@ -339,7 +339,7 @@ describe("App", () => {
       }
     }));
 
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("tab", { name: "NPCs" }));
 
@@ -351,7 +351,7 @@ describe("App", () => {
   });
 
   it("submits NPC generator prompts with Enter", async () => {
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
     const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
@@ -379,7 +379,7 @@ describe("App", () => {
       }
     }));
 
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
     fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
@@ -395,7 +395,7 @@ describe("App", () => {
   });
 
   it("persists additional context edits", async () => {
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("tab", { name: "Additional Context" }));
     fireEvent.change(await screen.findByLabelText("Additional Context Editor"), {
@@ -410,7 +410,7 @@ describe("App", () => {
   it("preloads existing additional context into the editor", async () => {
     vi.mocked(api.getContext).mockResolvedValue("Existing campaign context");
 
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("tab", { name: "Additional Context" }));
     const editor = await screen.findByLabelText("Additional Context Editor");
@@ -425,7 +425,7 @@ describe("App", () => {
       })
     );
 
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.change(await screen.findByPlaceholderText(/Ask about Eberron/i), {
       target: { value: "What about Sharn?" }
@@ -450,7 +450,7 @@ describe("App", () => {
       })
     );
 
-    render(<V1App />);
+    render(<App />);
 
     const prompt = await screen.findByPlaceholderText(/Ask about Eberron/i);
     fireEvent.change(prompt, {
@@ -470,7 +470,7 @@ describe("App", () => {
   it("keeps the submitted assistant prompt visible when the request fails", async () => {
     vi.mocked(api.askAssistant).mockRejectedValue(new Error("provider failed"));
 
-    render(<V1App />);
+    render(<App />);
 
     const prompt = await screen.findByPlaceholderText(/Ask about Eberron/i);
     fireEvent.change(prompt, {
@@ -490,7 +490,7 @@ describe("App", () => {
       })
     );
 
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
     const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
@@ -522,7 +522,7 @@ describe("App", () => {
   it("keeps NPC generator prompts visible when the request fails", async () => {
     vi.mocked(api.generateNpcs).mockRejectedValue(new Error("generation failed"));
 
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
     const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
@@ -543,7 +543,7 @@ describe("App", () => {
     });
     vi.mocked(api.askAssistant).mockReturnValue(new Promise(() => undefined));
 
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.change(await screen.findByPlaceholderText(/Ask about Eberron/i), {
       target: { value: "What about Sharn?" }
@@ -575,7 +575,7 @@ describe("App", () => {
       }
     }));
 
-    render(<V1App />);
+    render(<App />);
 
     expect(await screen.findByText("Running force-reingest")).toBeTruthy();
     expect(screen.getByRole("tab", { name: "Console" }).getAttribute("aria-selected")).toBe("true");
@@ -598,7 +598,7 @@ describe("App", () => {
       }
     }));
 
-    render(<V1App />);
+    render(<App />);
 
     expect(await screen.findByText("Running startup-refresh")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
@@ -623,7 +623,7 @@ describe("App", () => {
       }
     }));
 
-    render(<V1App />);
+    render(<App />);
     fireEvent.click(await screen.findByRole("button", { name: "Force reingest" }));
 
     await waitFor(() => {
@@ -669,7 +669,7 @@ describe("App", () => {
         }
       }));
 
-    render(<V1App />);
+    render(<App />);
 
     expect(await screen.findByText("Running force-reingest")).toBeTruthy();
     expect(await screen.findByText("Refresh complete. Force reingest: true.")).toBeTruthy();
@@ -678,7 +678,7 @@ describe("App", () => {
   });
 
   it("renders the active log Markdown", async () => {
-    render(<V1App />);
+    render(<App />);
 
     expect(await screen.findByText("Contents")).toBeTruthy();
     expect(await screen.findAllByText("GUI Session")).toHaveLength(2);
@@ -697,7 +697,7 @@ describe("App", () => {
       }
     }));
 
-    render(<V1App />);
+    render(<App />);
 
     expect(await screen.findByText("Progress")).toBeTruthy();
     expect(await screen.findByText("Checking article evidence about Aerenal.")).toBeTruthy();
@@ -707,7 +707,7 @@ describe("App", () => {
   it("renders an empty log state before a log exists", async () => {
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({ log: emptyLog() }));
 
-    render(<V1App />);
+    render(<App />);
 
     expect(await screen.findByText("No log selected")).toBeTruthy();
     expect(await screen.findByText("Submit an assistant prompt to start the log.")).toBeTruthy();
@@ -733,7 +733,7 @@ describe("App", () => {
     } }));
     vi.mocked(api.getLog).mockResolvedValueOnce(historicalLog);
 
-    render(<V1App />);
+    render(<App />);
 
     const select = await screen.findByLabelText("Log file");
     expect(screen.getByRole("option", { name: "old" })).toBeTruthy();
@@ -753,7 +753,7 @@ describe("App", () => {
   });
 
   it("starts a new lazy log session", async () => {
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "New session" }));
 
@@ -786,7 +786,7 @@ describe("App", () => {
       }
     }));
 
-    render(<V1App />);
+    render(<App />);
 
     const select = await screen.findByLabelText("Log file");
     fireEvent.change(select, { target: { value: "logs/old.json" } });
@@ -806,7 +806,7 @@ describe("App", () => {
   });
 
   it("renders refresh output as console feed text", async () => {
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Refresh" }));
 
@@ -823,7 +823,7 @@ describe("App", () => {
       value: 500
     });
 
-    render(<V1App />);
+    render(<App />);
 
     expect(await screen.findByTestId("markdown-output")).toHaveProperty("scrollTop", 500);
     fireEvent.click(screen.getByRole("tab", { name: "Console" }));
@@ -831,7 +831,7 @@ describe("App", () => {
   });
 
   it("adds tooltips to key controls", async () => {
-    render(<V1App />);
+    render(<App />);
 
     expect((await screen.findByRole("button", { name: "Refresh" })).getAttribute("title")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Force reingest" }).getAttribute("title")).toBeTruthy();
@@ -841,7 +841,7 @@ describe("App", () => {
 
   it("confirms before force reingest", async () => {
     const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Force reingest" }));
 
@@ -855,7 +855,7 @@ describe("App", () => {
 
   it("does not force reingest when confirmation is cancelled", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
-    render(<V1App />);
+    render(<App />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Force reingest" }));
 

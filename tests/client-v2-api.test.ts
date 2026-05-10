@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { v2Contracts } from '../src/contracts.v2.js';
+import { contracts } from '../src/contracts.v2.js';
 import { mutateApi, queryApi } from '../src/client/v2/api/utils.js';
 
 describe('v2 client API helpers', () => {
@@ -24,7 +24,7 @@ describe('v2 client API helpers', () => {
             status: 200,
         }));
 
-        const response = await queryApi(v2Contracts.additionalContext.get);
+        const response = await queryApi(contracts.additionalContext.get);
 
         expect(response).toBe('# Campaign Notes');
         expect(fetchMock).toHaveBeenCalledWith('/api/v2/additional-context', {
@@ -43,7 +43,7 @@ describe('v2 client API helpers', () => {
             status: 200,
         }));
 
-        const response = await mutateApi(v2Contracts.additionalContext.put, '# Session Prep');
+        const response = await mutateApi(contracts.additionalContext.put, '# Session Prep');
 
         expect(response).toBe('Updated context');
         expect(fetchMock).toHaveBeenCalledWith('/api/v2/additional-context', {
@@ -63,7 +63,7 @@ describe('v2 client API helpers', () => {
             status: 200,
         }));
 
-        await queryApi(v2Contracts.sessions.get);
+        await queryApi(contracts.sessions.get);
 
         expect(fetchMock).toHaveBeenCalledWith('/api/v2/sessions', {
             headers: {
@@ -81,7 +81,7 @@ describe('v2 client API helpers', () => {
             status: 200,
         }));
 
-        await queryApi(v2Contracts.runs.get, {
+        await queryApi(contracts.runs.get, {
             runId: 'run-1',
         });
 

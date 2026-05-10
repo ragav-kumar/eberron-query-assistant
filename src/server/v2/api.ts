@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Endpoint, SseEndpoint } from '@/contracts.v2.js';
-import { v2Contracts } from '@/contracts.v2.js';
+import { contracts } from '@/contracts.v2.js';
 
 const NOT_IMPLEMENTED_MESSAGE = 'API v2 is not implemented.';
 
@@ -25,7 +25,7 @@ const writeJson = (response: ServerResponse, statusCode: number, body: unknown):
 };
 
 const matchesV2Route = (method: string, pathname: string): boolean => {
-    return collectEndpoints(v2Contracts).some((endpoint) => {
+    return collectEndpoints(contracts).some((endpoint) => {
         if (endpoint.method !== method) {
             return false;
         }
