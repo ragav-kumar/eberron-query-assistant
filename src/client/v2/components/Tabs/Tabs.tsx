@@ -29,8 +29,6 @@ export const Tabs = ({children, defaultKey}: TabsProps) => {
         }
     });
 
-    const currentContent = tabContents.find((content) => content.key === currentTabKey)?.content;
-
     return (
         <div className={styles.wrap}>
             <div className={styles.buttonWrap}>
