@@ -8,7 +8,7 @@ import {
     toolbarPlugin,
     UndoRedo,
 } from '@mdxeditor/editor';
-import { useAdditionalContextMutation, useAdditionalContextQuery } from '../../api/index.js';
+import { useAdditionalContextMutation, useAdditionalContextQuery } from '@/client/v2/api/index.js';
 
 export const AdditionalContextInput = () => {
     const { data } = useAdditionalContextQuery();

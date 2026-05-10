@@ -3,9 +3,9 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { loadDefaultConfig } from "../src/server/config/index.js";
-import { createSqliteCorpusStore, type CorpusStore } from "../src/server/ingestion/index.js";
-import { createSqlitePartyContextService } from "../src/server/runtime/party-context.js";
+import { loadDefaultConfig } from "../src/server/v1/config/index.js";
+import { createSqliteCorpusStore, type CorpusStore } from "../src/server/v1/ingestion/index.js";
+import { createSqlitePartyContextService } from "../src/server/v1/runtime/party-context.js";
 import type { CorpusChunk, CorpusSource, RuntimeConfig } from "../src/types.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "party-context");

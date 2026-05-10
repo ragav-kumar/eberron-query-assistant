@@ -5,7 +5,7 @@ import { TabButton } from './TabButton.js';
 import type { TabContentProps } from './TabContent.js';
 import { TabContent } from './TabContent.js';
 import styles from './Tabs.module.css';
-import { joinClassNames } from '../../utils.js';
+import { joinClassNames } from '@/client/v2/utils.js';
 
 interface TabsProps {
     defaultKey: string;

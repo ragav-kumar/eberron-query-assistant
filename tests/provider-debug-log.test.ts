@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { createProviderDebugLog, getProviderDebugLogPath } from "../src/server/provider-debug-log.js";
+import { createProviderDebugLog, getProviderDebugLogPath } from "../src/server/v1/provider-debug-log.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "provider-debug-log");
 

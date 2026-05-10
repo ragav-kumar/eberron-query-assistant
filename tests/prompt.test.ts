@@ -3,18 +3,18 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { loadDefaultConfig } from "../src/server/config/index.js";
-import type { ChatAdapter } from "../src/server/provider/index.js";
-import { type RetrievalService } from "../src/server/retrieval/index.js";
+import { loadDefaultConfig } from "../src/server/v1/config/index.js";
+import type { ChatAdapter } from "../src/server/v1/provider/index.js";
+import { type RetrievalService } from "../src/server/v1/retrieval/index.js";
 import {
   buildAssistantMessages,
   formatCitation,
   loadAssistantPromptAssets,
   type AssistantPromptAssets
-} from "../src/server/runtime/assistant-prompts.js";
-import { createAssistantSession } from "../src/server/runtime/assistant-session.js";
-import { buildNpcGenerationMessages, createNpcGenerationSession } from "../src/server/runtime/npc-session.js";
-import { createSessionLog, sanitizeSessionTitle, type SessionLog } from "../src/server/runtime/session-log.js";
+} from "../src/server/v1/runtime/assistant-prompts.js";
+import { createAssistantSession } from "../src/server/v1/runtime/assistant-session.js";
+import { buildNpcGenerationMessages, createNpcGenerationSession } from "../src/server/v1/runtime/npc-session.js";
+import { createSessionLog, sanitizeSessionTitle, type SessionLog } from "../src/server/v1/runtime/session-log.js";
 import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "../src/types.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "prompt");

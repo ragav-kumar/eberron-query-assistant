@@ -3,13 +3,13 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { loadDefaultConfig } from "../src/server/config/index.js";
-import type { IngestionService } from "../src/server/ingestion/index.js";
-import type { ChatCompletionOptions, ChatMessage } from "../src/server/provider/index.js";
-import { createWebApp, isBusyError, isWebOperationError } from "../src/server/app.js";
-import { getProviderDebugLogPath } from "../src/server/provider-debug-log.js";
-import type { AssistantSessionAnswer } from "../src/server/runtime/assistant-session.js";
-import { createDefaultRuntimeState } from "../src/server/state/state-store.js";
+import { loadDefaultConfig } from "../src/server/v1/config/index.js";
+import type { IngestionService } from "../src/server/v1/ingestion/index.js";
+import type { ChatCompletionOptions, ChatMessage } from "../src/server/v1/provider/index.js";
+import { createWebApp, isBusyError, isWebOperationError } from "../src/server/v1/app.js";
+import { getProviderDebugLogPath } from "../src/server/v1/provider-debug-log.js";
+import type { AssistantSessionAnswer } from "../src/server/v1/runtime/assistant-session.js";
+import { createDefaultRuntimeState } from "../src/server/v1/state/state-store.js";
 import type { RuntimeConfig, RetrievalResult } from "../src/types.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "server-app");

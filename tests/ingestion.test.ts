@@ -4,7 +4,7 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { loadDefaultConfig } from "../src/server/config/index.js";
+import { loadDefaultConfig } from "../src/server/v1/config/index.js";
 import { createTaggedError } from "../src/errors.js";
 import {
   createFilesystemIngestionService,
@@ -17,10 +17,10 @@ import {
   type ArticleFetcher,
   type CorpusStore,
   type PdfParser
-} from "../src/server/ingestion/index.js";
-import { chunkText } from "../src/server/ingestion/chunking.js";
-import type { SourceDiscoverySummary } from "../src/server/source-discovery/index.js";
-import { createDefaultRuntimeState, type RuntimeState, type StateStore } from "../src/server/state/state-store.js";
+} from "../src/server/v1/ingestion/index.js";
+import { chunkText } from "../src/server/v1/ingestion/chunking.js";
+import type { SourceDiscoverySummary } from "../src/server/v1/source-discovery/index.js";
+import { createDefaultRuntimeState, type RuntimeState, type StateStore } from "../src/server/v1/state/state-store.js";
 
 const TEST_ROOT = path.resolve(".test-tmp", "ingestion");
 const NOW = new Date("2026-04-24T12:00:00.000Z");

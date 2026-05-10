@@ -1,5 +1,5 @@
 /**
- * Browser-side client for the local Node/Vite runtime exposed under `/api/*`.
+ * Browser-side client for the local Node/Vite runtime exposed under `/api/v1/*`.
  *
  * This module is the intended boundary between React UI code and the non-React
  * runtime. UI code should treat these functions as the contract for reading
@@ -130,29 +130,29 @@ export const getLog = async (options: { filePath?: string; sessionId: string }):
     params.set("filePath", options.filePath);
   }
   const query = `?${params.toString()}`;
-  return requestJson<ApiLog>(`/api/log${query}`);
+  return requestJson<ApiLog>(`/api/v1/log${query}`);
 };
 
 /** Reads the current contents of `assistant/additional-context.md` as markdown text. */
 export const getContext = async (): Promise<string> => {
-  const response = await requestJson<{ markdown: string }>("/api/context");
+  const response = await requestJson<{ markdown: string }>("/api/v1/context");
   return response.markdown;
 };
 
 /** Reads the currently persisted generated NPC collection. */
 export const getNpcs = async (): Promise<ApiNpcResponse> => {
-  return requestJson<ApiNpcResponse>("/api/npcs");
+  return requestJson<ApiNpcResponse>("/api/v1/npcs");
 };
 
 /** Reads the current process snapshot, including active operation, Console replay, log, and NPC state. */
 export const getStatus = async (options: { sessionId: string }): Promise<ApiStatus> => {
   const params = new URLSearchParams({ sessionId: options.sessionId });
-  return requestJson<ApiStatus>(`/api/status?${params.toString()}`);
+  return requestJson<ApiStatus>(`/api/v1/status?${params.toString()}`);
 };
 
 /** Persists the browser-edited additional context markdown back to local disk. */
 export const writeContext = async (markdown: string): Promise<void> => {
-  await requestJson<{ ok: true }>("/api/context", {
+  await requestJson<{ ok: true }>("/api/v1/context", {
     method: "PUT",
     body: JSON.stringify({ markdown })
   });
@@ -165,7 +165,7 @@ export const askAssistant = async (
   includePartyContext: boolean,
   retrievalTurnLimit: number
 ): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>("/api/assistant", {
+  return requestJson<ApiOperationResult>("/api/v1/assistant", {
     method: "POST",
     body: JSON.stringify({ prompt, sessionId, includePartyContext, retrievalTurnLimit })
   });
@@ -178,7 +178,7 @@ export const generateNpcs = async (
   includePartyContext: boolean,
   retrievalTurnLimit: number
 ): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>("/api/npcs", {
+  return requestJson<ApiOperationResult>("/api/v1/npcs", {
     method: "POST",
     body: JSON.stringify({ prompt, sessionId, includePartyContext, retrievalTurnLimit })
   });
@@ -186,7 +186,7 @@ export const generateNpcs = async (
 
 /** Starts a routine refresh or explicit force reingest against the local corpus and retrieval artifacts. */
 export const refresh = async (forceReingest: boolean): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>("/api/refresh", {
+  return requestJson<ApiOperationResult>("/api/v1/refresh", {
     method: "POST",
     body: JSON.stringify({ forceReingest })
   });
@@ -205,7 +205,7 @@ export const subscribeConsole = (onEntry: (entry: ApiConsoleEntry) => void): (()
     return () => undefined;
   }
 
-  const events = new EventSource("/api/console/events");
+  const events = new EventSource("/api/v1/console/events");
   events.onmessage = (event) => {
     if (typeof event.data === "string") {
       onEntry(JSON.parse(event.data) as ApiConsoleEntry);
