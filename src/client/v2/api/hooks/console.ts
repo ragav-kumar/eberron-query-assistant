@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
+import { v2Contracts } from '@/contracts.v2.js';
 import { queryApi } from '../utils.js';
-import { endpoints } from '../endpoints.js';
 
 export const useConsoleQuery = () => useQuery({
     queryKey: ['api', 'console'],
-    queryFn: () => queryApi(endpoints.getConsole),
+    queryFn: () => queryApi(v2Contracts.getConsole),
 });

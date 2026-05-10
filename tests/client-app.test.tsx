@@ -26,7 +26,7 @@ vi.mock("@mdxeditor/editor", () => ({
   toolbarPlugin: () => ({})
 }));
 
-vi.mock("../src/client/api.js", () => ({
+vi.mock("../src/client/v1/api.js", () => ({
   askAssistant: vi.fn(),
   generateNpcs: vi.fn(),
   getContext: vi.fn(),

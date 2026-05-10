@@ -1,26 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { v2Contracts } from '@/contracts.v2.js';
 import { mutateApi, queryApi } from '../utils.js';
-import { endpoints } from '../endpoints.js';
-import type { ContextDto } from '../index.js';
 
 const queryKey = ['api', 'context'];
 
 export const useAdditionalContextQuery = () => useQuery({
     queryKey,
-    queryFn: () => queryApi(endpoints.getContext, {}, 'text/markdown'),
+    queryFn: () => queryApi(v2Contracts.getContext, {}, 'text/markdown'),
 });
 
 export const useAdditionalContextMutation = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (markdown: string) => mutateApi(endpoints.putContext, markdown, 'text/markdown'),
+        mutationFn: (markdown: string) => mutateApi(v2Contracts.putContext, markdown, 'text/markdown'),
         onMutate: async markdown => {
             await queryClient.cancelQueries({queryKey});
 
-            const previous = queryClient.getQueryData<ContextDto>(queryKey);
+            const previous = queryClient.getQueryData<string>(queryKey);
 
-            queryClient.setQueryData<ContextDto>(queryKey, {markdown});
+            queryClient.setQueryData<string>(queryKey, markdown);
 
             return {previous};
         },

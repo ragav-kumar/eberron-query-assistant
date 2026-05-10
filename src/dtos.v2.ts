@@ -71,17 +71,13 @@ export interface ProviderDebugEntryDto {
     timestamp: string;
 }
 
-export interface ContextDto {
-    markdown: string;
-}
-
 export interface RefreshDto {
     forceReingest: boolean;
 }
 
 // TODO integrate this
 export interface ErrorResponseDto {
-    console?: ConsoleDto;
+    console?: ConsoleEntryDto[];
     error?: string;
     operation?: string;
     providerDebug?: ProviderDebugEntryDto[];
@@ -97,6 +93,6 @@ export interface RunRequestDto {
 
 // TODO integrate this
 export interface RuntimeEventDto {
-    inputLocked: boolean;
     activeOperation: 'refresh' | 'force-reingest' | null;
+    inputLocked: boolean;
 }

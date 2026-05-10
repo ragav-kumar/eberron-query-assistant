@@ -1,4 +1,4 @@
-import type { Endpoint } from './endpoints.js';
+import type { Endpoint } from '@/contracts.v2.js';
 
 export const queryApi = async <TPayload, TResponse>(
     endpoint: Endpoint<TPayload, TResponse>,
