@@ -1,28 +1,72 @@
 import type { Endpoint } from '@/contracts.v2.js';
 
+type EmptyParams = Record<never, never>;
+type PathParams = Record<string, string>;
+type QueryParams = Record<string, string | undefined>;
+type EndpointParams<TPathParams extends PathParams, TQueryParams extends QueryParams> =
+    TPathParams & Partial<TQueryParams>;
+
 /**
  * fetch() for GET endpoints
  */
-export const queryApi = async <TPayload, TResponse>(
-    endpoint: Endpoint<TPayload, TResponse>,
-    params: Record<string, string | undefined> = {},
-): Promise<TResponse> => {
+export function queryApi<TPayload, TResponse>(
+    endpoint: Endpoint<TPayload, TResponse, EmptyParams, EmptyParams>,
+    params?: EndpointParams<EmptyParams, EmptyParams>,
+): Promise<TResponse>;
+export function queryApi<
+    TPayload,
+    TResponse,
+    TPathParams extends PathParams,
+    TQueryParams extends QueryParams,
+>(
+    endpoint: Endpoint<TPayload, TResponse, TPathParams, TQueryParams>,
+    params: EndpointParams<TPathParams, TQueryParams>,
+): Promise<TResponse>;
+export async function queryApi<
+    TPayload,
+    TResponse,
+    TPathParams extends PathParams,
+    TQueryParams extends QueryParams,
+>(
+    endpoint: Endpoint<TPayload, TResponse, TPathParams, TQueryParams>,
+    params: EndpointParams<TPathParams, TQueryParams> = {} as EndpointParams<TPathParams, TQueryParams>,
+): Promise<TResponse> {
     const url = buildEndpointUrl(endpoint, params);
 
     return await fetchWrapper(url, {
         method: endpoint.method,
         headers: endpoint.headers,
     });
-};
+}
 
 /**
  * fetch() for POST and PUT endpoints (at present, we have no concept of DELETE)
  */
-export const mutateApi = async <TPayload, TResponse>(
-    endpoint: Endpoint<TPayload, TResponse>,
+export function mutateApi<TPayload, TResponse>(
+    endpoint: Endpoint<TPayload, TResponse, EmptyParams, EmptyParams>,
     payload: TPayload | null,
-    params: Record<string, string | undefined> = {},
-): Promise<TResponse> => {
+    params?: EndpointParams<EmptyParams, EmptyParams>,
+): Promise<TResponse>;
+export function mutateApi<
+    TPayload,
+    TResponse,
+    TPathParams extends PathParams,
+    TQueryParams extends QueryParams,
+>(
+    endpoint: Endpoint<TPayload, TResponse, TPathParams, TQueryParams>,
+    payload: TPayload | null,
+    params: EndpointParams<TPathParams, TQueryParams>,
+): Promise<TResponse>;
+export async function mutateApi<
+    TPayload,
+    TResponse,
+    TPathParams extends PathParams,
+    TQueryParams extends QueryParams,
+>(
+    endpoint: Endpoint<TPayload, TResponse, TPathParams, TQueryParams>,
+    payload: TPayload | null,
+    params: EndpointParams<TPathParams, TQueryParams> = {} as EndpointParams<TPathParams, TQueryParams>,
+): Promise<TResponse> {
     const options: RequestInit = {
         method: endpoint.method,
         headers: endpoint.headers,
@@ -34,14 +78,19 @@ export const mutateApi = async <TPayload, TResponse>(
     }
 
     return await fetchWrapper(buildEndpointUrl(endpoint, params), options);
-};
+}
 
-const buildEndpointUrl = <TPayload, TResponse>(
-    endpoint: Endpoint<TPayload, TResponse>,
-    params: Record<string, string | undefined>,
+const buildEndpointUrl = <
+    TPayload,
+    TResponse,
+    TPathParams extends PathParams,
+    TQueryParams extends QueryParams,
+>(
+    endpoint: Endpoint<TPayload, TResponse, TPathParams, TQueryParams>,
+    params: EndpointParams<TPathParams, TQueryParams>,
 ): string => {
     let path = endpoint.path;
-    const remainingParams = {...params};
+    const remainingParams = {...params} as Record<string, string | undefined>;
 
     for (const key of endpoint.pathParams) {
         const value = remainingParams[key];

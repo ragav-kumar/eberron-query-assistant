@@ -52,4 +52,8 @@
     min-height: 0;
     padding: 1rem;
     background-color: #32373c;
+    display: none;
+    &.active {
+        display: block;
+    }
 }

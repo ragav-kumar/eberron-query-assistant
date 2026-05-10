@@ -130,10 +130,6 @@ export interface ApiError {
     providerDebug?: ProviderDebugEntry[];
 }
 
-export interface ConsoleSnapshot {
-    entries: ConsoleEntry[];
-}
-
 export interface OperationEvent {
     resource: 'run' | 'refresh' | 'session-entry';
     action: 'created' | 'updated' | 'completed' | 'failed' | 'appended';

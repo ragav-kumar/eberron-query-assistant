@@ -44,9 +44,14 @@ export const Tabs = ({children, defaultKey}: TabsProps) => {
                     </div>
                 ))}
             </div>
-            <div className={styles.content}>
-                {currentContent}
-            </div>
+            {tabContents.map(tabContent => (
+                <div
+                    key={tabContent.key}
+                    className={joinClassNames(styles.content, currentTabKey === tabContent.key ? styles.active : null)}
+                >
+                    {tabContent.content}
+                </div>
+            ))}
         </div>
     );
 };

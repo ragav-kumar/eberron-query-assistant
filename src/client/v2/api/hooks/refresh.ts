@@ -3,10 +3,10 @@ import { mutateApi, queryApi } from '@/client/v2/api/utils.js';
 import { contracts } from '@/contracts.v2.js';
 import type { CreateRefresh } from '@/dtos.v2.js';
 
-const queryKey = ['api', 'refresh'];
+export const refreshQueryKey = ['api', 'refresh'];
 
 export const useRefreshQuery = () => useQuery({
-    queryKey,
+    queryKey: refreshQueryKey,
     queryFn: () => queryApi(contracts.refresh.get),
 });
 
@@ -15,6 +15,6 @@ export const useRefreshMutation = () => {
 
     return useMutation({
         mutationFn: (refreshRequest: CreateRefresh) => mutateApi(contracts.refresh.post, refreshRequest),
-        onSuccess: (refresh) => queryClient.setQueryData(queryKey, refresh),
+        onSuccess: (refresh) => queryClient.setQueryData(refreshQueryKey, refresh),
     });
 };

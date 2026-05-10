@@ -1,6 +1,5 @@
 import type {
     ConsoleEntry,
-    ConsoleSnapshot,
     CreateRefresh,
     CreateRun,
     CreateSession,
@@ -19,17 +18,25 @@ declare const sseEventType: unique symbol;
 
 export type HttpMethod = 'GET' | 'POST' | 'PUT';
 export type EndpointHeaders = Readonly<Record<string, string>>;
+type EmptyParams = Record<never, never>;
+type PathParams = Record<string, string>;
+type QueryParams = Record<string, string | undefined>;
 
 const defaultJsonHeaders: EndpointHeaders = {
     'Content-Type': 'application/json',
 };
 
-export interface Endpoint<TPayload, TResponse> {
+export interface Endpoint<
+    TPayload,
+    TResponse,
+    TPathParams extends PathParams = EmptyParams,
+    TQueryParams extends QueryParams = EmptyParams,
+> {
     transport: 'http';
     method: HttpMethod;
     path: string;
-    pathParams: readonly string[];
-    queryParams: readonly string[];
+    pathParams: readonly (keyof TPathParams & string)[];
+    queryParams: readonly (keyof TQueryParams & string)[];
     headers: EndpointHeaders;
     readonly [endpointPayloadType]?: TPayload;
     readonly [endpointResponseType]?: TResponse;
@@ -43,13 +50,18 @@ export interface SseEndpoint<TEvent> {
     readonly [sseEventType]?: TEvent;
 }
 
-const defineEndpoint = <TPayload, TResponse>(
-    endpoint: Omit<Endpoint<TPayload, TResponse>, 'headers' | 'pathParams' | 'queryParams' | 'transport'> & {
+const defineEndpoint = <
+    TPayload,
+    TResponse,
+    TPathParams extends PathParams = EmptyParams,
+    TQueryParams extends QueryParams = EmptyParams,
+>(
+    endpoint: Omit<Endpoint<TPayload, TResponse, TPathParams, TQueryParams>, 'headers' | 'pathParams' | 'queryParams' | 'transport'> & {
         headers?: EndpointHeaders;
-        pathParams?: readonly string[];
-        queryParams?: readonly string[];
+        pathParams?: readonly (keyof TPathParams & string)[];
+        queryParams?: readonly (keyof TQueryParams & string)[];
     },
-): Endpoint<TPayload, TResponse> => ({
+): Endpoint<TPayload, TResponse, TPathParams, TQueryParams> => ({
     ...endpoint,
     headers: endpoint.headers ?? defaultJsonHeaders,
     pathParams: endpoint.pathParams ?? [],
@@ -110,7 +122,7 @@ export const contracts = {
             path: '/api/v2/sessions',
         }),
         /** Fetches server-owned metadata for one session, excluding full entry history. */
-        getOne: defineEndpoint<null, Session>({
+        getOne: defineEndpoint<null, Session, { sessionId: string }>({
             method: 'GET',
             path: '/api/v2/sessions/:sessionId',
             pathParams: ['sessionId'],
@@ -122,7 +134,7 @@ export const contracts = {
          * include user prompts, assistant replies, tool-status updates, and
          * system notices.
          */
-        getEntries: defineEndpoint<null, SessionEntry[]>({
+        getEntries: defineEndpoint<null, SessionEntry[], { sessionId: string }>({
             method: 'GET',
             path: '/api/v2/sessions/:sessionId/entries',
             pathParams: ['sessionId'],
@@ -137,13 +149,13 @@ export const contracts = {
      */
     runs: {
         /** Starts one run against the owning session. */
-        post: defineEndpoint<CreateRun, Run>({
+        post: defineEndpoint<CreateRun, Run, { sessionId: string }>({
             method: 'POST',
             path: '/api/v2/sessions/:sessionId/runs',
             pathParams: ['sessionId'],
         }),
         /** Fetches one run resource by id. */
-        get: defineEndpoint<null, Run>({
+        get: defineEndpoint<null, Run, { runId: string }>({
             method: 'GET',
             path: '/api/v2/runs/:runId',
             pathParams: ['runId'],
@@ -192,7 +204,7 @@ export const contracts = {
      */
     console: {
         /** Reads the current in-memory console snapshot. */
-        get: defineEndpoint<null, ConsoleSnapshot>({
+        get: defineEndpoint<null, ConsoleEntry[]>({
             method: 'GET',
             path: '/api/v2/console',
         }),
