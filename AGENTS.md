@@ -18,6 +18,7 @@ These are the highest-priority repo rules. Check them before making edits, runni
   - `docs/phase-05-interactive-assistant.md`
   - `docs/phase-05.5-vector-storage-migration.md`
   - `docs/phase-06-hardening-and-alignment.md`
+- Temporary transition documentation freeze: until the user explicitly declares the transition complete, treat `AGENTS.md`, `docs/enhancements.md`, and `README.md` as frozen working documents after this rule is added. Do not modify them, and do not create additional project documentation, unless the user explicitly asks for a documentation change in the current task. This temporary freeze overrides the routine requirement to record enhancements in `docs/enhancements.md` and update `README.md`.
 - Record post-Phase 6 intended behavior only in `docs/enhancements.md`.
 - Update `README.md` whenever active enhancement documentation changes intended user-visible behavior.
 - Do not create additional enhancement, planning, or specification documents unless the user explicitly asks for them.
@@ -25,6 +26,9 @@ These are the highest-priority repo rules. Check them before making edits, runni
 - Request escalation directly for commands known to need network access, external write permissions, or esbuild process spawning, including `npm install`, `git push`, `npm test`, targeted Vitest runs, and `npm run start`.
 - Use `npm run prestart` for the TypeScript no-emit check. There is no `npm run build` script.
 - Do not hand off a non-docs change while `npm run verify` is failing. For any change that modifies code, tests, config, tooling, or package metadata outside documentation-only files, `npm run verify` is the mandatory final acceptance command and it must pass before the change can be accepted.
+- Temporary V1 freeze rule: the V1 UI and V1 server are frozen. Do not modify them unless a change is required to unblock compilation or runtime behavior.
+- During the V2 transition, treat any new user-requested feature or behavior change as targeting V2 unless the user explicitly says otherwise.
+- Temporary V2 client rule: until the user explicitly declares the V2 client ready for a unit test suite, do not add, update, or request client unit tests. Only add client unit tests when the user specifically asks for them during this transition, and remove this rule once the user declares the V2 client ready.
 - Do not add project-authored classes or constructors unless later active enhancement documentation explicitly requires them.
 - Preserve app-owned corpus and retrieval artifacts across routine startup. Only explicit force reingest through the browser UI/API may intentionally discard, clear, or force-rebuild them.
 
@@ -89,6 +93,8 @@ New enhancement documentation must:
 ## Implementation Guardrails
 Use the historical baseline documents as context for the Phase 6 product state. For enhancement work, document new intended behavior in `docs/enhancements.md` rather than editing the frozen specification or frozen phase documents.
 
+During the V2 transition, treat the V1 UI and V1 server as frozen implementation surfaces. Only touch V1 code when it is necessary to unblock compilation or runtime behavior, and otherwise route requested changes to V2 unless the user explicitly directs work to V1.
+
 Each implementation phase increments the application minor version to match the phase number. Phase 1 is `0.1.0`, Phase 2 is `0.2.0`, Phase 3 is `0.3.0`, and later phases continue that pattern. Patch revisions may be used for migration or hardening work inside a phase. The stored `appVersion` is diagnostic metadata only and must not drive compatibility decisions. Startup should validate and normalize persisted state by shape, preserving usable source and retrieval state across version bumps. The only application behavior that may intentionally discard, clear, or force-rebuild app-owned corpus or retrieval artifacts is explicit force reingest through the browser UI/API.
 
 Keep the system modular. Maintain clear separation between:
@@ -110,7 +116,7 @@ Keep persistent-state changes versioned and migration-safe. Do not make silent b
 
 Handle partial failures in a source-scoped way. Do not mark incomplete ingest or index work as current, and do not let one failed source silently invalidate successful work from another source.
 
-Add or update automated tests alongside behavior changes. If a change is intentionally left without automated coverage, document the risk and provide manual verification steps.
+Add or update automated tests alongside behavior changes, except for client unit tests during the temporary V2 client transition described in Critical Rules. Until the user explicitly declares the V2 client ready for a unit test suite, do not add, update, or request client unit tests unless the user specifically asks for them in the current task. If a change is intentionally left without automated coverage, document the risk and provide manual verification steps.
 
 For startup, source-discovery, state, API bridge, and user-visible runtime behavior changes, do not stop at unit tests. Attempt to run the start command and inspect the terminal output for the expected Vite startup behavior. Use browser/API smoke coverage when the change affects the local web app.
 

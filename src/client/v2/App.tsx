@@ -1,9 +1,11 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import './global.css';
 import styles from './App.module.css';
 import { Tabs } from './components/Tabs/index.js';
 import { LeftColumnHeader } from './components/LeftColumnHeader.js';
 import { Console } from './components/Console.js';
 import { AppContext } from '@/client/v2/AppContext.js';
+import { AdditionalContextInput } from '@/client/v2/components/AdditionalContextInput.js';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -33,9 +35,10 @@ export const App = () => (
                             <p>TODO - Input</p>
                         </Tabs.Content>
                         <Tabs.Content tabKey='Additional Context'>
-                            <p>TODO - Additional Context</p>
+                            <AdditionalContextInput />
                         </Tabs.Content>
                     </Tabs>
+                    <Console />
                 </section>
                 <section className={styles.column}>
                     <Tabs defaultKey='assistant' className={styles.rightTabs}>
@@ -48,7 +51,6 @@ export const App = () => (
                             <p>TODO - NPC Cards</p>
                         </Tabs.Content>
                     </Tabs>
-                    <Console />
                 </section>
             </main>
         </AppContext>

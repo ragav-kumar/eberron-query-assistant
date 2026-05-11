@@ -49,11 +49,13 @@
 
 .content {
     flex: 1 1 auto;
-    min-height: 0;
-    padding: 1rem;
     background-color: #32373c;
     display: none;
+    min-height: 0;
+    overflow: hidden;
+    padding: 1rem;
     &.active {
-        display: block;
+        display: flex;
+        flex-direction: column;
     }
 }
