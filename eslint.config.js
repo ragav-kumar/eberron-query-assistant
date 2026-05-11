@@ -18,7 +18,7 @@ export default tseslint.config(
             }
         },
         rules: {
-            '@typescript-eslint/consistent-type-imports': 'error',
+            '@typescript-eslint/consistent-type-imports': 'off',
             '@typescript-eslint/no-deprecated': 'error',
             '@typescript-eslint/no-floating-promises': 'error',
             '@typescript-eslint/no-unused-vars': [

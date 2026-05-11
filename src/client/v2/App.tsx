@@ -7,6 +7,9 @@ import { Console } from './components/Console.js';
 import { AppContext } from './AppContext.js';
 import { AdditionalContextInput } from './components/AdditionalContextInput.js';
 import { Input } from './components/Input.js';
+import { tabDefinitionList, tabDefinitions } from '@/client/v2/components/SessionContext/tabDefinitions.js';
+import { ReactNode } from 'react';
+import { RightColumnTabs } from './components/RightColumnTabs.js';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -42,16 +45,7 @@ export const App = () => (
                     <Console />
                 </section>
                 <section className={styles.column}>
-                    <Tabs defaultKey='assistant' className={styles.rightTabs}>
-                        <Tabs.Button tabKey='assistant'>Assistant</Tabs.Button>
-                        <Tabs.Button tabKey='npc'>NPC Cards</Tabs.Button>
-                        <Tabs.Content tabKey='assistant'>
-                            <p>TODO - Assistant</p>
-                        </Tabs.Content>
-                        <Tabs.Content tabKey='npc'>
-                            <p>TODO - NPC Cards</p>
-                        </Tabs.Content>
-                    </Tabs>
+                    <RightColumnTabs className={styles.rightTabs} />
                 </section>
             </main>
         </AppContext>
