@@ -2,7 +2,7 @@
 
 Eberron Query Assistant is a local browser-based lore and campaign assistant for an Eberron game corpus. It combines three source types into one queryable knowledge base:
 
-- Foundry VTT export data from `foundry-export/`
+- Foundry VTT export history from `foundry-export/`
 - local PDFs from `pdf/`
 - Keith Baker articles discovered from the Eberron index
 
@@ -20,8 +20,6 @@ By default, local runtime state and retrieval artifacts are stored under `.eberr
 Runtime state records the application version for diagnostics only. Routine refresh preserves existing local state and retrieval artifacts across version changes; the app only intentionally clears or force-rebuilds its corpus when you use the force-reingest control.
 Each app session writes Standard assistant output to an active local JSON transcript under `logs/`, which is gitignored. Transcript files are named from the timestamp and a readable assistant-provided session title with normal spaces. The transcript now stores an ordered mix of final Q&A exchanges and any persisted Standard-mode retrieval progress entries that happened before the final answer. Generated NPC cards are saved as local runtime state under `.eberron-query-assistant/state/generated-npcs.json`. The right column of the app separates transient Console output, the persisted Log tab, and saved NPC cards. The Log tab starts empty, can browse saved transcripts with a dropdown that shows readable date-and-title labels without file extensions, renders a linked table of contents and separated Q&A pairs, and treats older transcripts as read-only. Standard assistant prompts always write to the current session, creating one lazily when needed. NPC Generator prompts write to persistent NPC state; revising an existing NPC id updates that saved card. Use `New session` from the active output workflow to clear the Standard conversation or reset NPC generation context without deleting existing files. Standard follow-up retrieval progress is persisted only in the transcript log, while NPC follow-up retrieval progress remains transient Console output. These transcripts and generated NPC state are not loaded as future assistant memory.
 
-Detailed engineering and historical phased-delivery documentation lives in `docs/specification.md`, historical phase documents, and `docs/enhancements.md`. This README remains focused on the intended finished user experience.
-
 The app opens a local browser UI. The left column contains input tabs for assistant workflows and editable additional context. In the Input tab, use `Include party info` to control whether the active prompt includes current-party context, use `Extra retrieval turns` to allow between `0` and `3` additional follow-up corpus searches, then choose Standard assistant mode or NPC Generator mode. You can ask direct lore questions, cross-reference campaign data, refresh the corpus, generate lore-aware NPC names and cards, or ask inference-heavy questions that require combining material across sources. Standard answers are designed to include a direct response and supporting references when available, such as PDF page citations, article links, or specific foundry entities. When extra retrieval turns are enabled, Standard mode can do targeted follow-up searches and writes short progress notes into the Log before the final answer. NPC Generator can now use the same bounded follow-up retrieval path before producing its final response, but its intermediate progress stays in the Console and its final output still must validate as strict NPC JSON before cards are saved. NPC Generator answers return structured NPC cards with an id, name, physical description, very short bio, and knowable details such as species, ethnicity, gender, role, and approximate age; the NPCs tab tiles those cards when the output pane is wide enough.
 
 ## What It Is For
@@ -30,20 +28,57 @@ The app opens a local browser UI. The left column contains input tabs for assist
 - combining PDFs, articles, and foundry data in one assistant workflow
 - supporting both straightforward lookup and synthesized reasoning
 
-## Expected Inputs
-The project expects these source locations by default:
+## Before You Start
+Clone the repository, install dependencies, and make sure you have:
 
-- `foundry-export/manifest.json`
-- `foundry-export/records.ndjson`
+- Node.js 22 or newer
+- an API key for an OpenAI-compatible provider
+- a local Eberron source corpus prepared in the expected folders
+
+## Expected Inputs
+The app expects these source locations by default:
+
+- `foundry-export/`
 - `pdf/`
 - optional local assistant context in `assistant/additional-context.md`
 - optional automatic party context settings in `.env`
 
+Inside `foundry-export/`, the app expects NDJSON export history files. The export history must be ordered chronologically by lexicographic filename order.
+
 Keith Baker articles are discovered from the Eberron index and cached into the local retrieval layer after ingestion. The raw Keith Baker HTML cache is stored under `.eberron-query-assistant/cache/keith-baker/`; delete that directory before force reingest only when you intentionally want to redownload article pages.
 Article pages that return HTTP 403 or 404 are recorded as permanently inaccessible and skipped on later runs.
 
-## Usage
-Install dependencies and run the local GUI:
+## Configuration
+Create a `.env` file in the repository root. The supported settings are:
+
+- `OPENAI_API_KEY`
+- `OPENAI_BASE_URL`
+- `OPENAI_CHAT_MODEL`
+- `OPENAI_EMBEDDING_MODEL`
+- `EQA_PARTY_ACTOR_UUIDS`
+- `EQA_SESSION_NOTES_JOURNAL`
+- `EQA_QUESTS_JOURNAL`
+- `EQA_CAMPAIGN_JOURNAL_FOLDER`
+- `EQA_PROVIDER_DEBUG`
+
+Required for normal assistant use:
+
+- `OPENAI_API_KEY`
+
+Built-in defaults are provided for:
+
+- `OPENAI_BASE_URL`
+- `OPENAI_CHAT_MODEL`
+- `OPENAI_EMBEDDING_MODEL`
+- `EQA_SESSION_NOTES_JOURNAL`
+- `EQA_QUESTS_JOURNAL`
+- `EQA_CAMPAIGN_JOURNAL_FOLDER`
+- `EQA_PROVIDER_DEBUG`
+
+The party-context settings are optional. If they are not configured, the app still works, but automatic current-party context will be limited.
+
+## Installation And Startup
+Install dependencies and start the local app:
 
 ```bash
 npm install
@@ -54,6 +89,15 @@ Open the Vite URL printed by the command. Use the in-app refresh control for opt
 
 The default chat model is `gpt-5.4-mini`. Override `OPENAI_CHAT_MODEL` in `.env` if you want a different speed, cost, or quality tradeoff.
 Set `EQA_PROVIDER_DEBUG=true` only when you need to inspect raw chat provider payloads in the app Console stream or in the local capped provider debug log.
+
+## What Gets Saved Locally
+
+- `.eberron-query-assistant/` stores runtime state, retrieval artifacts, caches, generated NPC state, and bounded diagnostics
+- `logs/` stores saved Standard assistant transcript sessions
+- `assistant/additional-context.md` stores local assistant-only notes
+- `.test-tmp/timing.jsonl` stores timing diagnostics for local troubleshooting
+
+Routine refresh preserves app-owned state when possible. Force reingest is the explicit action that clears and rebuilds app-owned corpus and retrieval artifacts.
 
 ## Example Questions
 - What are the names of the clans of the Znir?
