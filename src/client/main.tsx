@@ -1,19 +1,29 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { App as V1App } from "./v1/App.js";
-import { App as V2App } from "./v2/App.js";
+import type { ComponentType } from "react";
+
+const loadV1App = async (): Promise<ComponentType> => {
+  const module = await import("./v1/App.js");
+  return module.App;
+};
+
+const loadV2App = async (): Promise<ComponentType> => {
+  const module = await import("./v2/App.js");
+  return module.App;
+};
 
 export const resolveAppForPath = (pathname: string) => {
-  return pathname.includes('v2') ? V2App : V1App;
+  return pathname.includes("v2") ? loadV2App : loadV1App;
 };
 
 export const renderApp = (root: HTMLElement, pathname: string) => {
-  const ActiveApp = resolveAppForPath(pathname);
-  createRoot(root).render(
-    <StrictMode>
-      <ActiveApp />
-    </StrictMode>
-  );
+  void resolveAppForPath(pathname)().then((ActiveApp) => {
+    createRoot(root).render(
+      <StrictMode>
+        <ActiveApp />
+      </StrictMode>
+    );
+  });
 };
 
 const root = document.getElementById("root");

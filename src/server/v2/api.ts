@@ -118,6 +118,7 @@ const RUNS = new Map<string, Run>([
     ['run-dal-quor-1', {
         id: 'run-dal-quor-1',
         sessionId: 'session-dal-quor',
+        kind: 'assistant',
         status: 'completed',
         createdAt: '2026-05-07T21:10:42.000Z',
         updatedAt: '2026-05-07T21:10:48.000Z',
@@ -232,6 +233,7 @@ const DEFAULT_CREATED_SESSION: Session = {
 const DEFAULT_CREATED_RUN: Run = {
     id: 'run-dal-quor-1',
     sessionId: 'session-dal-quor',
+    kind: 'assistant',
     status: 'completed',
     createdAt: '2026-05-07T21:10:42.000Z',
     updatedAt: '2026-05-07T21:10:48.000Z',

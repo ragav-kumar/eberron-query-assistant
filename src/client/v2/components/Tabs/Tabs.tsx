@@ -11,9 +11,10 @@ interface TabsProps {
     defaultKey: string;
     children: ReactNode;
     className?: string | undefined;
+    contentClassName?: string | undefined;
 }
 
-export const Tabs = ({children, className, defaultKey}: TabsProps) => {
+export const Tabs = ({children, className, contentClassName, defaultKey}: TabsProps) => {
     const [currentTabKey, setCurrentTabKey] = useState<string>(defaultKey);
 
     const tabButtons: TabButtonProps[] = [];
@@ -41,6 +42,7 @@ export const Tabs = ({children, className, defaultKey}: TabsProps) => {
                     </div>
                 ))}
             </div>
+            <div className={joinClassNames(styles.contentWrap, contentClassName)}>
             {tabContents.map(tabContent => (
                 <div
                     key={tabContent.tabKey}
@@ -50,9 +52,12 @@ export const Tabs = ({children, className, defaultKey}: TabsProps) => {
                         tabContent.className
                     )}
                 >
-                    {tabContent.children}
+                    <div className={styles.contentBody}>
+                        {tabContent.children}
+                    </div>
                 </div>
             ))}
+            </div>
         </div>
     );
 };

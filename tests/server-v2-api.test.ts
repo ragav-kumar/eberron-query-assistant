@@ -100,6 +100,7 @@ describe("v2 API handler", () => {
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body)).toMatchObject({
       id: "run-dal-quor-1",
+      kind: "assistant",
       sessionId: "session-dal-quor",
       status: "completed",
     });
@@ -114,6 +115,7 @@ describe("v2 API handler", () => {
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body)).toMatchObject({
       id: "run-dal-quor-1",
+      kind: "assistant",
       sessionId: "session-dal-quor",
       status: "completed",
     });

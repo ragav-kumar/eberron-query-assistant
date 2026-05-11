@@ -25,9 +25,10 @@ These are the highest-priority repo rules. Check them before making edits, runni
 - Do not restore, recreate, or preserve obsolete untracked local files unless the current task explicitly requires that exact file.
 - Request escalation directly for commands known to need network access, external write permissions, or esbuild process spawning, including `npm install`, `git push`, `npm test`, targeted Vitest runs, and `npm run start`.
 - Use `npm run prestart` for the TypeScript no-emit check. There is no `npm run build` script.
-- Do not hand off a non-docs change while `npm run verify` is failing. For any change that modifies code, tests, config, tooling, or package metadata outside documentation-only files, `npm run verify` is the mandatory final acceptance command and it must pass before the change can be accepted.
+- Do not hand off a non-docs change while its required acceptance checks are failing. During the temporary V2 transition, use `npm run verify` as the mandatory final acceptance command only when the change involves the server. For non-docs changes that do not involve the server, `npm run lint` and `npm run prestart` are the required final acceptance checks unless a later repo instruction says otherwise.
 - Temporary V1 freeze rule: the V1 UI and V1 server are frozen. Do not modify them unless a change is required to unblock compilation or runtime behavior.
 - During the V2 transition, treat any new user-requested feature or behavior change as targeting V2 unless the user explicitly says otherwise.
+- Temporary server-only unit-test rule: until the user explicitly declares that V2 client tests are starting, do not add, update, request, or run unit tests unless the change involves the server. Repeal this rule when V2 client test work begins.
 - Temporary V2 client rule: until the user explicitly declares the V2 client ready for a unit test suite, do not add, update, or request client unit tests. Only add client unit tests when the user specifically asks for them during this transition, and remove this rule once the user declares the V2 client ready.
 - Do not add project-authored classes or constructors unless later active enhancement documentation explicitly requires them.
 - Preserve app-owned corpus and retrieval artifacts across routine startup. Only explicit force reingest through the browser UI/API may intentionally discard, clear, or force-rebuild them.
@@ -116,7 +117,7 @@ Keep persistent-state changes versioned and migration-safe. Do not make silent b
 
 Handle partial failures in a source-scoped way. Do not mark incomplete ingest or index work as current, and do not let one failed source silently invalidate successful work from another source.
 
-Add or update automated tests alongside behavior changes, except for client unit tests during the temporary V2 client transition described in Critical Rules. Until the user explicitly declares the V2 client ready for a unit test suite, do not add, update, or request client unit tests unless the user specifically asks for them in the current task. If a change is intentionally left without automated coverage, document the risk and provide manual verification steps.
+Add or update automated tests alongside behavior changes when the change involves the server. During the temporary V2 transition, do not add, update, request, or run unit tests for non-server changes, and do not add or update client unit tests until the user explicitly declares the V2 client ready for that suite or specifically asks for them in the current task. Repeal this temporary exception when V2 client test work begins. If a change is intentionally left without automated coverage, document the risk and provide manual verification steps.
 
 For startup, source-discovery, state, API bridge, and user-visible runtime behavior changes, do not stop at unit tests. Attempt to run the start command and inspect the terminal output for the expected Vite startup behavior. Use browser/API smoke coverage when the change affects the local web app.
 
@@ -135,7 +136,7 @@ Use sandboxed commands for checks that do not need esbuild process spawning, suc
 
 There is no `npm run build` script. Use `npm run prestart` for the TypeScript no-emit check.
 
-Use `npm run verify` as the final acceptance command for any non-docs change. Targeted test runs may be used during iteration, but they do not replace the final full-suite gate. Documentation-only changes may stop at the smaller checks that are appropriate to the files touched.
+Use `npm run verify` as the final acceptance command for non-docs changes that involve the server. For non-docs changes that do not involve the server during the temporary V2 transition, use `npm run lint` and `npm run prestart` as the final acceptance checks instead of unit-test commands. Targeted test runs may be used during iteration when tests are in scope, but they do not replace the final full-suite gate for server-involving changes. Documentation-only changes may stop at the smaller checks that are appropriate to the files touched.
 
 When starting the dev server from PowerShell for verification, invoke the Windows npm shim explicitly, for example `Start-Process -FilePath 'npm.cmd' -ArgumentList @('run','start','--','--host','127.0.0.1') ...`. `Start-Process -FilePath 'npm'` is known to fail on this setup with `%1 is not a valid Win32 application`.
 

@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup } from "@testing-library/react";
+import { cleanup, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const rootRender = vi.fn();
@@ -8,14 +8,6 @@ vi.mock("react-dom/client", () => ({
   createRoot: vi.fn(() => ({
     render: rootRender
   }))
-}));
-
-vi.mock("../src/client/App.js", () => ({
-  App: () => <div>Current UI</div>
-}));
-
-vi.mock("../src/client/v2/V2App.js", () => ({
-  V2App: () => <div>V2 UI Stub</div>
 }));
 
 afterEach(() => {
@@ -31,7 +23,7 @@ describe("client entry selection", () => {
     const module = await import("../src/client/main.js");
     const { App } = await import("@/client/v1/App.js");
 
-    expect(module.resolveAppForPath("/")).toBe(App);
+    await expect(module.resolveAppForPath("/")()).resolves.toBe(App);
   });
 
   it("selects the v2 stub at /v2", async () => {
@@ -39,7 +31,7 @@ describe("client entry selection", () => {
     const module = await import("../src/client/main.js");
     const { App } = await import("@/client/v2/App.js");
 
-    expect(module.resolveAppForPath("/v2")).toBe(App);
+    await expect(module.resolveAppForPath("/v2")()).resolves.toBe(App);
   });
 
   it("selects the v2 stub at /v2/", async () => {
@@ -47,7 +39,7 @@ describe("client entry selection", () => {
     const module = await import("../src/client/main.js");
     const { App } = await import("@/client/v2/App.js");
 
-    expect(module.resolveAppForPath("/v2/")).toBe(App);
+    await expect(module.resolveAppForPath("/v2/")()).resolves.toBe(App);
   });
 
   it("renders into the provided root", async () => {
@@ -56,6 +48,8 @@ describe("client entry selection", () => {
 
     module.renderApp(document.getElementById("root") as HTMLElement, "/v2");
 
-    expect(rootRender).toHaveBeenCalledTimes(2);
+    await waitFor(() => {
+      expect(rootRender).toHaveBeenCalledTimes(2);
+    });
   });
 });

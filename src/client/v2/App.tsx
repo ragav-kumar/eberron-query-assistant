@@ -4,8 +4,9 @@ import styles from './App.module.css';
 import { Tabs } from './components/Tabs/index.js';
 import { LeftColumnHeader } from './components/LeftColumnHeader.js';
 import { Console } from './components/Console.js';
-import { AppContext } from '@/client/v2/AppContext.js';
-import { AdditionalContextInput } from '@/client/v2/components/AdditionalContextInput.js';
+import { AppContext } from './AppContext.js';
+import { AdditionalContextInput } from './components/AdditionalContextInput.js';
+import { Input } from './components/Input.js';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -32,7 +33,7 @@ export const App = () => (
                         <Tabs.Button tabKey='input'>Input</Tabs.Button>
                         <Tabs.Button tabKey='Additional Context'>Additional Context</Tabs.Button>
                         <Tabs.Content tabKey='input'>
-                            <p>TODO - Input</p>
+                            <Input />
                         </Tabs.Content>
                         <Tabs.Content tabKey='Additional Context'>
                             <AdditionalContextInput />

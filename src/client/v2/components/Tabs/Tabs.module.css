@@ -1,20 +1,32 @@
 .wrap {
     display: flex;
+    flex: 1 1 auto;
     flex-direction: column;
-    min-height: 100%;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
     color: #f2f4f7;
 }
 
 .buttonWrap {
     display: flex;
+    flex: 0 0 auto;
     gap: 0.5rem;
     padding: 0.75rem 0.75rem 0;
     background:
             linear-gradient(#4d545c, #4d545c)
             left bottom / 100% 1px
             no-repeat;
-
+    min-height: 0;
     overflow-x: auto;
+}
+
+.contentWrap {
+    display: flex;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
 }
 
 .button {
@@ -52,10 +64,19 @@
     background-color: #32373c;
     display: none;
     min-height: 0;
+    min-width: 0;
     overflow: hidden;
     padding: 1rem;
     &.active {
         display: flex;
         flex-direction: column;
     }
+}
+
+.contentBody {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
 }

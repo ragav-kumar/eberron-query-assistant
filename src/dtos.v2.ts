@@ -65,12 +65,14 @@ export type SessionEntry =
 export interface Run {
     id: string;
     sessionId: string;
+    kind: 'assistant' | 'npc';
     status: 'pending' | 'running' | 'completed' | 'failed';
     createdAt: string;
     updatedAt: string;
 }
 
 export interface CreateRun {
+    kind: 'assistant' | 'npc';
     includePartyContext: boolean;
     prompt: string;
     retrievalTurnLimit: number;

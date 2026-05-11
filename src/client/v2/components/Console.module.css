@@ -1,17 +1,18 @@
 .wrap {
     --console-line-height: 1.45;
+    --console-height: calc((5 * 1em * var(--console-line-height)) + 1.75rem);
     background: #101820;
     border-top: 1px solid #1d2b37;
     color: #d7e0ea;
+    flex: 0 0 var(--console-height);
     font-family: "Cascadia Mono", "SFMono-Regular", Consolas, "Liberation Mono", monospace;
     font-size: 0.85rem;
+    height: var(--console-height);
     line-height: var(--console-line-height);
-    margin-top: auto;
-    min-height: 0;
+    min-height: var(--console-height);
     overflow-y: auto;
     padding: 0.8rem 1rem 0.95rem;
     scrollbar-color: #445868 #101820;
-    height: calc((5 * 1em * var(--console-line-height)) + 1.75rem);
 }
 
 .entry {
@@ -55,6 +56,6 @@
 
 @media (max-width: 900px) {
     .wrap {
-        height: calc((4 * 1em * var(--console-line-height)) + 1.5rem);
+        --console-height: calc((4 * 1em * var(--console-line-height)) + 1.5rem);
     }
 }
