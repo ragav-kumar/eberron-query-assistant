@@ -7,8 +7,6 @@ import { Console } from './components/Console.js';
 import { AppContext } from './AppContext.js';
 import { AdditionalContextInput } from './components/AdditionalContextInput.js';
 import { Input } from './components/Input.js';
-import { tabDefinitionList, tabDefinitions } from '@/client/v2/components/SessionContext/tabDefinitions.js';
-import { ReactNode } from 'react';
 import { RightColumnTabs } from './components/RightColumnTabs.js';
 
 const queryClient = new QueryClient({
