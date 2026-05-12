@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import type { ComponentType } from "react";
+import { ErrorBoundary } from "react-error-boundary";
 
 const loadV1App = async (): Promise<ComponentType> => {
   const module = await import("./v1/App.js");
@@ -20,7 +21,9 @@ export const renderApp = (root: HTMLElement, pathname: string) => {
   void resolveAppForPath(pathname)().then((ActiveApp) => {
     createRoot(root).render(
       <StrictMode>
-        <ActiveApp />
+        <ErrorBoundary fallback={<h1>Something went wrong!</h1>}>
+          <ActiveApp />
+        </ErrorBoundary>
       </StrictMode>
     );
   });

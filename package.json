@@ -37,6 +37,7 @@
     "pdfdataextract": "^4.0.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-error-boundary": "^6.1.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1"
   }
