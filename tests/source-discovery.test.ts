@@ -3,9 +3,9 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { loadDefaultConfig } from "../src/server/v1/config/index.js";
-import { createDefaultRuntimeState } from "../src/server/v1/state/state-store.js";
-import { createFilesystemSourceDiscoveryService } from "../src/server/v1/source-discovery/index.js";
+import { loadDefaultConfig } from '@/server/v1/config/index.js';
+import { createDefaultRuntimeState } from '@/server/v1/state/state-store.js';
+import { createFilesystemSourceDiscoveryService } from '@/server/v1/source-discovery/index.js';
 
 const TEST_ROOT = path.resolve(".test-tmp", "source-discovery");
 const NOW = new Date("2026-04-24T12:00:00.000Z");
@@ -66,6 +66,24 @@ describe("FilesystemSourceDiscoveryService", () => {
     expect(summary.nextState.foundry.lastSuccessfulExport).toMatchObject({
       filename: "20260424T100000000Z-foundry-export.ndjson",
       runId: "run-1"
+    });
+  });
+
+  it("schedules foundry NDJSON exports whose filenames do not match the legacy timestamp pattern", async () => {
+    const config = loadDefaultConfig(TEST_ROOT);
+    await writeDeltaExport(config.foundryExportDir, "alpha.ndjson", "run-a", 4);
+
+    const summary = await inspect(config);
+
+    expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
+      status: "scheduled",
+      discovered: 1,
+      added: 1,
+      details: ["scheduled:alpha.ndjson"]
+    });
+    expect(summary.nextState.foundry.lastSuccessfulExport).toMatchObject({
+      filename: "alpha.ndjson",
+      runId: "run-a"
     });
   });
 
@@ -183,18 +201,24 @@ describe("FilesystemSourceDiscoveryService", () => {
     ]);
   });
 
-  it("ignores invalid foundry export filenames when valid delta files exist", async () => {
+  it("inspects all NDJSON foundry export filenames and ignores non-NDJSON files", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await writeDeltaExport(config.foundryExportDir, "20260424T100000000Z-foundry-export.ndjson", "run-1", 4);
-    await writeFile(path.join(config.foundryExportDir, "records.ndjson"), "not scanned", "utf8");
-    await writeFile(path.join(config.foundryExportDir, "20260424T100000000Z-other.ndjson"), "not scanned", "utf8");
+    await writeDeltaExport(config.foundryExportDir, "records.ndjson", "run-2", 5);
+    await writeDeltaExport(config.foundryExportDir, "20260424T100000000Z-other.ndjson", "run-3", 6);
+    await writeFile(path.join(config.foundryExportDir, "notes.txt"), "not scanned", "utf8");
 
     const summary = await inspect(config);
 
     expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
       status: "scheduled",
-      discovered: 1,
-      added: 1
+      discovered: 3,
+      added: 3,
+      details: [
+        "scheduled:20260424T100000000Z-foundry-export.ndjson",
+        "scheduled:20260424T100000000Z-other.ndjson",
+        "scheduled:records.ndjson"
+      ]
     });
   });
 

@@ -13,7 +13,6 @@ import type {
 import type { SourceDiscoveryService, SourceDiscoverySummary } from "./source-discovery-service.js";
 
 const ARTICLE_INDEX_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
-const FOUNDRY_EXPORT_FILENAME_PATTERN = /^\d{8}T\d{9}Z-foundry-export\.ndjson$/;
 const FOUNDRY_MANIFEST_READ_CHUNK_BYTES = 64 * 1024;
 const SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION = "2.0.0";
 
@@ -35,7 +34,7 @@ export const createFilesystemSourceDiscoveryService = (
     try {
       await mkdir(config.foundryExportDir, { recursive: true });
       const filenames = (await readdir(config.foundryExportDir, { withFileTypes: true }))
-        .filter((entry) => entry.isFile() && FOUNDRY_EXPORT_FILENAME_PATTERN.test(entry.name))
+        .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".ndjson"))
         .map((entry) => entry.name)
         .sort((a, b) => a.localeCompare(b));
 
@@ -44,7 +43,7 @@ export const createFilesystemSourceDiscoveryService = (
           sourceType: "foundry",
           discovered: 0,
           status: "skipped",
-          message: "foundry: no timestamped delta export files found; skipping foundry refresh."
+          message: "foundry: no NDJSON delta export files found; skipping foundry refresh."
         });
       }
 
