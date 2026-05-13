@@ -20,6 +20,10 @@ These are the highest-priority repo rules. Check them before making edits or run
 - Keep product logic, UI state transitions, presentation decisions, and user workflow behavior in the client layer when they do not require privileged Node access. Client-layer placement guidance lives in `src/client/AGENTS.md`.
 - If a change is intentionally left without automated coverage, document the risk and provide manual verification steps.
 - Do not restore, recreate, or preserve obsolete untracked local files unless the current task explicitly requires that exact file. Gitignored runtime artifacts, generated logs, and converted legacy files may represent deliberate local cleanup or migration state. Treat changes made outside the current session as user-owned work: do not revert, reintroduce, or "helpfully" reconstruct them while doing unrelated implementation or documentation work.
+- Before extending an existing pattern in a meaningful way, decide whether it reflects intended architecture or a local workaround.
+  - If the smallest change would further entrench a brittle or one-off structure or pattern, stop and tell the user before proceeding.
+  - State the risk briefly and propose the smallest cleaner alternative.
+  - Skip this for mechanical edits, formatting, renames, small localized bug fixes, and changes where the requested behavior is already explicit.
 
 ## Local Verification Workflow
 - This repository is commonly worked on from Windows PowerShell. Vite and Vitest load TypeScript config through esbuild, which may fail in the sandbox with `spawn EPERM`.
