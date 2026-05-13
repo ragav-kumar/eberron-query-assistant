@@ -7,7 +7,7 @@ export const Input = () => {
 
     return (
         <div className={styles.wrap}>
-            <label>
+            <label className={styles.checkboxLabel}>
                 <input
                     type="checkbox"
                     id="include-party-context"
@@ -17,7 +17,9 @@ export const Input = () => {
                 />
                 <span>Include party context</span>
             </label>
-            <label htmlFor="retrieval-turn-limit">Extra retrieval turns: {activeTabState.retrievalTurnLimit}</label>
+            <label htmlFor="retrieval-turn-limit" className={styles.label}>
+                Extra retrieval turns: {activeTabState.retrievalTurnLimit}
+            </label>
             <input
                 type="range"
                 id="retrieval-turn-limit"
@@ -27,7 +29,9 @@ export const Input = () => {
                 value={activeTabState.retrievalTurnLimit}
                 onChange={(e) => patchActiveTabState({retrievalTurnLimit: Number(e.target.value)})}
             />
-            <label htmlFor="prompt">Prompt</label>
+            <label htmlFor="prompt" className={styles.label}>
+                Prompt
+            </label>
             <textarea
                 id="prompt"
                 className={styles.input}

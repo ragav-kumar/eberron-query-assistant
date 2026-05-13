@@ -5,20 +5,67 @@
     gap: 0.7rem;
     min-height: 0;
     overflow: hidden;
+    padding: 1rem 1.1rem 1.1rem;
+    color: #e7edf3;
+}
+
+.label,
+.checkboxLabel {
+    color: #c9d3dc;
+    font-size: 0.95rem;
+    line-height: 1.3;
+}
+
+.checkboxLabel {
+    align-items: center;
+    display: inline-flex;
+    gap: 0.65rem;
+    width: fit-content;
 }
 
 .input {
-    /* TODO */
+    background: #1f252b;
+    border: 1px solid #536273;
+    border-radius: 8px;
+    box-sizing: border-box;
+    color: #f2f4f7;
+    flex: 1 1 auto;
+    font: inherit;
+    line-height: 1.45;
+    min-height: 12rem;
+    min-width: 0;
+    padding: 0.85rem 0.95rem;
+    resize: vertical;
+
+    &::placeholder {
+        color: #8f9ca8;
+    }
+
+    &:focus {
+        border-color: #63a8e8;
+        box-shadow: 0 0 0 3px rgb(99 168 232 / 0.2);
+        outline: none;
+    }
 }
 
 .checkbox {
-    /* TODO */
+    accent-color: #1f6feb;
+    cursor: pointer;
+    height: 1rem;
+    margin: 0;
+    width: 1rem;
 }
 
 .slider {
-    /* TODO */
+    accent-color: #4994da;
+    cursor: pointer;
+    inline-size: 100%;
+    margin: -0.15rem 0 0.15rem;
+    max-width: 400px;
 }
 
 .button {
-    /* TODO */
+    align-self: flex-start;
+    margin-top: 0.2rem;
+    min-width: 7.5rem;
 }
