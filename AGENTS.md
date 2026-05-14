@@ -8,6 +8,7 @@ Follow these rules unless a later instruction in the repo or task explicitly ove
 ## Critical Rules
 These are the highest-priority repo rules. Check them before making edits or running verification.
 
+- If you ask the user a question, and they provide a custom option which is either a question or a request for more information, prioritize responding to that.
 - Work against the current branch unless later repo instructions explicitly say otherwise.
 - During the V2 transition, treat user-requested changes as targeting V2 by default. The V1 client and V1 server are frozen unless changes are required to unblock compilation or runtime behavior. Module-specific guidance lives in `src/client/AGENTS.md` and `src/server/AGENTS.md`.
 - Request escalation directly for commands known to need network access, external write permissions, or esbuild process spawning, including `npm install`, `git push`, `npm test`, targeted Vitest runs, and `npm run start`.
