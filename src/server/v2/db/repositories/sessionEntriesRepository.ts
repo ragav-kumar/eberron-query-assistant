@@ -1,0 +1,73 @@
+import { mapSessionEntryRow } from '../mappers.js';
+import type { V2Orm } from '../contract.js';
+import type { StoredSessionEntryRow } from '../storedRows.js';
+
+import type { V2Loaders } from '../loaders.js';
+import type { RepositoryDependencies } from './shared.js';
+
+type SessionEntriesRepository = V2Orm['sessionEntries'];
+
+export const createSessionEntriesRepository = (
+    { getDatabase }: RepositoryDependencies,
+    loaders: Pick<V2Loaders, 'loadNpcsByRun' | 'loadSessionEntries'>,
+): SessionEntriesRepository => {
+    return {
+        async get(config, sessionId, entryIndex) {
+            const database = await getDatabase(config);
+            const row = database
+                .prepare(`
+                    SELECT
+                        session_id,
+                        entry_index,
+                        run_id,
+                        title,
+                        kind,
+                        content,
+                        created_at
+                    FROM session_entries
+                    WHERE session_id = ? AND entry_index = ?
+                `)
+                .get(sessionId, entryIndex) as StoredSessionEntryRow | undefined;
+            if (!row) {
+                return null;
+            }
+
+            const npcs = row.run_id ? loaders.loadNpcsByRun(database, row.run_id) : [];
+            return mapSessionEntryRow(row, npcs);
+        },
+        async listBySession(config, sessionId) {
+            const database = await getDatabase(config);
+            return loaders.loadSessionEntries(database, sessionId);
+        },
+        async save(config, entry) {
+            const database = await getDatabase(config);
+            database
+                .prepare(`
+                    INSERT INTO session_entries (
+                        session_id,
+                        entry_index,
+                        run_id,
+                        title,
+                        kind,
+                        content,
+                        created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(session_id, entry_index) DO UPDATE SET
+                        run_id = excluded.run_id,
+                        title = excluded.title,
+                        kind = excluded.kind,
+                        content = excluded.content,
+                        created_at = excluded.created_at
+                `)
+                .run(
+                    entry.sessionId,
+                    entry.entryIndex,
+                    entry.runId ?? null,
+                    entry.title ?? null,
+                    entry.kind,
+                    entry.content ?? null,
+                    entry.createdAt.toISOString(),
+                );
+        },
+    };
+};
