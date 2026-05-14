@@ -13,6 +13,7 @@ These are the highest-priority repo rules. Check them before making edits or run
 - During the V2 transition, treat user-requested changes as targeting V2 by default. The V1 client and V1 server are frozen unless changes are required to unblock compilation or runtime behavior. Module-specific guidance lives in `src/client/AGENTS.md` and `src/server/AGENTS.md`.
 - Request escalation directly for commands known to need network access, external write permissions, or esbuild process spawning, including `npm install`, `git push`, `npm test`, targeted Vitest runs, and `npm run start`.
 - Use `npm run prestart` for the TypeScript no-emit check. There is no `npm run build` script.
+- Always close any running vite processes that you started before finalizing.
 - Do not hand off a change while its required acceptance checks are failing. During the temporary V2 transition, non-server changes require `npm run lint` and `npm run prestart` as the final acceptance checks unless a later repo instruction says otherwise. Server-specific final acceptance rules live in `src/server/AGENTS.md`.
 - Do not add project-authored classes or constructors unless later repo instructions explicitly require them.
 - Keep `README.md` focused on setup, configuration, inputs, operation, and expectations for end users. Do not update `README.md` unless the user explicitly requested the documentation change or clearly suggested the change being made.

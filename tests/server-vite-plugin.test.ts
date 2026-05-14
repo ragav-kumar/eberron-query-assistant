@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const handleV1ApiRequest = vi.fn();
 const handleV2ApiRequest = vi.fn();
 const createWebApp = vi.fn();
+const initializeV2App = vi.fn();
 
 describe("vite API plugin", () => {
   const startStartupRefresh = vi.fn();
@@ -14,6 +15,7 @@ describe("vite API plugin", () => {
     });
     handleV1ApiRequest.mockResolvedValue(undefined);
     handleV2ApiRequest.mockResolvedValue(undefined);
+    initializeV2App.mockResolvedValue(undefined);
   });
 
   it("dispatches /api/v1 requests to the v1 handler and lazily initializes the shared app", async () => {
@@ -39,6 +41,7 @@ describe("vite API plugin", () => {
   it("dispatches /api/v2 requests to the v2 handler without creating the legacy app", async () => {
     const { eberronApiPlugin } = await import("../src/server/vite-plugin.js");
     const middleware = getRegisteredMiddleware(eberronApiPlugin(), {
+      "/src/server/v2/app.ts": { initializeV2App },
       "/src/server/v2/api.ts": { handleV2ApiRequest }
     });
     const request = { url: "/api/v2/context", method: "GET" };
@@ -51,6 +54,7 @@ describe("vite API plugin", () => {
 
     expect(createWebApp).not.toHaveBeenCalled();
     expect(handleV1ApiRequest).not.toHaveBeenCalled();
+    expect(initializeV2App).toHaveBeenCalledTimes(1);
   });
 
   it("returns 404 for unknown /api prefixes", async () => {

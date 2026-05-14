@@ -51,6 +51,10 @@ interface V2ApiModule {
   handleV2ApiRequest: HandleV2ApiRequest;
 }
 
+interface V2AppModule {
+  initializeV2App: () => Promise<void>;
+}
+
 export const eberronApiPlugin = (): Plugin => {
   return {
     name: "eberron-api",
@@ -85,8 +89,12 @@ export const eberronApiPlugin = (): Plugin => {
           return v2RuntimePromise;
         }
 
-        v2RuntimePromise = server.ssrLoadModule("/src/server/v2/api.ts").then((loadedModule) => {
-          const apiModule = loadedModule as V2ApiModule;
+        v2RuntimePromise = Promise.all([
+          server.ssrLoadModule("/src/server/v2/app.ts"),
+          server.ssrLoadModule("/src/server/v2/api.ts")
+        ]).then(async (loadedModules) => {
+          const [appModule, apiModule] = loadedModules as [V2AppModule, V2ApiModule];
+          await appModule.initializeV2App();
 
           return {
             handleV2ApiRequest: apiModule.handleV2ApiRequest
