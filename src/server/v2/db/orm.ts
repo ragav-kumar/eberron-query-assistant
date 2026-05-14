@@ -26,10 +26,10 @@ const createV2Orm = (): V2Orm => {
     const repositoryDependencies = { getDatabase };
 
     return {
-        async bootstrap(config) {
+        bootstrap: async config => {
             await getDatabase(config);
         },
-        close() {
+        close: () => {
             appDatabase.close();
         },
         npcs: createNpcRepository(repositoryDependencies, loaders),
