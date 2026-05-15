@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mutateApi, queryApi } from '@/client/v2/api/utils.js';
-import { contracts } from '@/contracts.v2.js';
-import type { CreateRefresh } from '@/dtos.v2.js';
+import type { CreateRefresh } from '@/dto/index.js';
+
+import { contracts } from '@/contract/index.js';
 
 export const refreshQueryKey = ['api', 'refresh'];
 

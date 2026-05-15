@@ -1,8 +1,9 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { contracts } from '@/contracts.v2.js';
 import { queryApi } from '../utils.js';
 import { useEffect } from 'react';
-import type { ConsoleEntry } from '@/dtos.v2.js';
+import type { ConsoleEntry } from '@/dto/index.js';
+
+import { contracts } from '@/contract/index.js';
 
 const queryKey = ['api', 'console'];
 

@@ -4,80 +4,16 @@ import type {
     CreateRun,
     CreateSession,
     NpcCollection,
+    NpcListQuery,
     OperationEvent,
     Refresh,
     Run,
     Session,
+    SessionEntriesResponse,
     SessionSummary,
-} from './dtos.v2.js';
-
-declare const endpointPayloadType: unique symbol;
-declare const endpointResponseType: unique symbol;
-declare const sseEventType: unique symbol;
-
-export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH';
-export type EndpointHeaders = Readonly<Record<string, string>>;
-type EmptyParams = Record<never, never>;
-type PathParams = Record<string, string>;
-type QueryParams = Record<string, string | undefined>;
-
-const defaultJsonHeaders: EndpointHeaders = {
-    'Content-Type': 'application/json',
-};
-
-export interface Endpoint<
-    TPayload,
-    TResponse,
-    TPathParams extends PathParams = EmptyParams,
-    TQueryParams extends QueryParams = EmptyParams,
-> {
-    transport: 'http';
-    method: HttpMethod;
-    path: string;
-    pathParams: readonly (keyof TPathParams & string)[];
-    queryParams: readonly (keyof TQueryParams & string)[];
-    headers: EndpointHeaders;
-    readonly [endpointPayloadType]?: TPayload;
-    readonly [endpointResponseType]?: TResponse;
-}
-
-export interface SseEndpoint<TEvent> {
-    transport: 'sse';
-    method: 'GET';
-    path: string;
-    queryParams: readonly string[];
-    readonly [sseEventType]?: TEvent;
-}
-
-const defineEndpoint = <
-    TPayload,
-    TResponse,
-    TPathParams extends PathParams = EmptyParams,
-    TQueryParams extends QueryParams = EmptyParams,
->(
-    endpoint: Omit<Endpoint<TPayload, TResponse, TPathParams, TQueryParams>, 'headers' | 'pathParams' | 'queryParams' | 'transport'> & {
-        headers?: EndpointHeaders;
-        pathParams?: readonly (keyof TPathParams & string)[];
-        queryParams?: readonly (keyof TQueryParams & string)[];
-    },
-): Endpoint<TPayload, TResponse, TPathParams, TQueryParams> => ({
-    ...endpoint,
-    headers: endpoint.headers ?? defaultJsonHeaders,
-    pathParams: endpoint.pathParams ?? [],
-    queryParams: endpoint.queryParams ?? [],
-    transport: 'http',
-});
-
-const defineSseEndpoint = <TEvent>(
-    endpoint: Omit<SseEndpoint<TEvent>, 'queryParams' | 'transport' | 'method'> & {
-        queryParams?: readonly string[];
-    },
-): SseEndpoint<TEvent> => ({
-    ...endpoint,
-    method: 'GET',
-    queryParams: endpoint.queryParams ?? [],
-    transport: 'sse',
-});
+    UpdateSession,
+} from '../dto/index.js';
+import { defineEndpoint, defineEndpointWithQuery, defineSseEndpoint, EmptyParams } from './helpers.js';
 
 export const contracts = {
     /**
@@ -111,9 +47,10 @@ export const contracts = {
      */
     sessions: {
         /** Lists session summaries for browse and selection flows. */
-        getList: defineEndpoint<null, SessionSummary[]>({
+        getList: defineEndpointWithQuery<null, SessionSummary[], EmptyParams, { mode?: string }>({
             method: 'GET',
             path: '/api/v2/sessions',
+            queryParams: ['mode'],
         }),
         /** Creates a new durable conversation session. */
         post: defineEndpoint<CreateSession, Session>({
@@ -126,8 +63,14 @@ export const contracts = {
             path: '/api/v2/sessions/:sessionId',
             pathParams: ['sessionId'],
         }),
+        /** Fetches the exchange feed for one session. */
+        getEntries: defineEndpoint<null, SessionEntriesResponse, { sessionId: string }>({
+            method: 'GET',
+            path: '/api/v2/sessions/:sessionId/entries',
+            pathParams: ['sessionId'],
+        }),
         /** This is the update endpoint for sessions. */
-        patch: defineEndpoint<Partial<Session>, Session, { sessionId: string }>({
+        patch: defineEndpoint<UpdateSession, Session, { sessionId: string }>({
             method: 'PATCH',
             path: '/api/v2/sessions/:sessionId',
             pathParams: ['sessionId'],
@@ -161,9 +104,10 @@ export const contracts = {
      */
     npcs: {
         /** Lists the saved NPC collection. */
-        get: defineEndpoint<null, NpcCollection>({
+        get: defineEndpointWithQuery<null, NpcCollection, EmptyParams, NpcListQuery>({
             method: 'GET',
             path: '/api/v2/npcs',
+            queryParams: ['skip', 'take', 'filter'],
         }),
     },
 

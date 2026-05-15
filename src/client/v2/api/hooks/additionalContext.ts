@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { contracts } from '@/contracts.v2.js';
 import { mutateApi, queryApi } from '../utils.js';
+
+import { contracts } from '@/contract/index.js';
 
 const queryKey = ['api', 'context'];
 

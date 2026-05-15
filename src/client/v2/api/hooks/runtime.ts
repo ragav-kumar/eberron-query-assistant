@@ -1,10 +1,11 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { contracts } from '@/contracts.v2.js';
-import type { OperationEvent } from '@/dtos.v2.js';
+import type { OperationEvent } from '@/dto/index.js';
 import { refreshQueryKey } from './refresh.js';
 import { runQueryKey } from './runs.js';
 import { sessionQueryKey } from './sessions.js';
+
+import { contracts } from '@/contract/index.js';
 
 export const useRuntimeSubscription = () => {
     const queryClient = useQueryClient();
@@ -33,6 +34,8 @@ export const useRuntimeSubscription = () => {
                     }
                     void queryClient.invalidateQueries({queryKey: [...sessionQueryKey, operationEvent.sessionId]});
                     void queryClient.invalidateQueries({queryKey: [...sessionQueryKey, operationEvent.sessionId, 'entries']});
+                    break;
+                case "session":
                     break;
             }
         };

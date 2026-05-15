@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { ConsoleEntry, NpcCollection, Refresh, Run, Session, SessionEntry, SessionSummary } from '@/dtos.v2.js';
+import type { ConsoleEntry, NpcCollection, Refresh, Run, Session, SessionEntry, SessionSummary } from '@/dto/index.js';
 
 const ADDITIONAL_CONTEXT_MARKDOWN = `# Campaign Context
 

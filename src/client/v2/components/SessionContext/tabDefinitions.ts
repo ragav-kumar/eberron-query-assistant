@@ -1,4 +1,4 @@
-import { CreateRun } from '@/dtos.v2.js';
+import type { CreateRun } from '@/dto/index.js';
 import { ComponentType } from 'react';
 import { Assistant } from '../Assistant/Assistant.js';
 import { NpcCards } from '../NpcCards/NpcCards.js';
