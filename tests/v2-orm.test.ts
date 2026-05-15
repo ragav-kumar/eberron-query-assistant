@@ -20,10 +20,10 @@ describe('V2 ORM', () => {
 
     it('creates a new app.sqlite with the v2 schema tables', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm();
+        const orm = createV2Orm(config);
 
         try {
-            await orm.bootstrap(config);
+            await orm.bootstrap();
 
             const database = new Database(getAppDatabasePath(config), { readonly: true });
             try {
@@ -55,7 +55,7 @@ describe('V2 ORM', () => {
 
     it('inserts and reads each schema shape successfully', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm();
+        const orm = createV2Orm(config);
         const setting = createSetting();
         const session = createSession();
         const run = createRun();
@@ -64,35 +64,35 @@ describe('V2 ORM', () => {
         const npc = createNpc();
 
         try {
-            await orm.bootstrap(config);
-            await orm.settings.save(config, setting);
-            await orm.sessions.save(config, session);
-            await orm.runs.save(config, run);
-            await orm.sessionEntries.save(config, entry);
-            await orm.runAuditLogs.save(config, auditLog);
-            await orm.npcs.save(config, npc);
+            await orm.bootstrap();
+            await orm.settings.save(setting);
+            await orm.sessions.save(session);
+            await orm.runs.save(run);
+            await orm.sessionEntries.save(entry);
+            await orm.runAuditLogs.save(auditLog);
+            await orm.npcs.save(npc);
 
-            await expect(orm.settings.get(config, setting.key)).resolves.toMatchObject({
+            await expect(orm.settings.get(setting.key)).resolves.toMatchObject({
                 key: setting.key,
                 value: setting.value,
             });
-            await expect(orm.sessions.get(config, session.id)).resolves.toMatchObject({
+            await expect(orm.sessions.get(session.id)).resolves.toMatchObject({
                 id: session.id,
                 kind: session.kind,
             });
-            await expect(orm.runs.get(config, run.id)).resolves.toMatchObject({
+            await expect(orm.runs.get(run.id)).resolves.toMatchObject({
                 id: run.id,
                 prompt: run.prompt,
             });
-            await expect(orm.sessionEntries.get(config, entry.sessionId, entry.entryIndex)).resolves.toMatchObject({
+            await expect(orm.sessionEntries.get(entry.sessionId, entry.entryIndex)).resolves.toMatchObject({
                 kind: 'user',
                 content: entry.content,
             });
-            await expect(orm.runAuditLogs.get(config, auditLog.id)).resolves.toMatchObject({
+            await expect(orm.runAuditLogs.get(auditLog.id)).resolves.toMatchObject({
                 id: auditLog.id,
                 kind: auditLog.kind,
             });
-            await expect(orm.npcs.get(config, npc.id)).resolves.toMatchObject({
+            await expect(orm.npcs.get(npc.id)).resolves.toMatchObject({
                 id: npc.id,
                 name: npc.name,
             });
@@ -103,7 +103,7 @@ describe('V2 ORM', () => {
 
     it('loads a session with ordered entries and a resolved active run', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm();
+        const orm = createV2Orm(config);
         const session = {
             ...createSession(),
             activeRunId: 'run-1',
@@ -111,13 +111,13 @@ describe('V2 ORM', () => {
         const run = createRun();
 
         try {
-            await orm.sessions.save(config, {
+            await orm.sessions.save({
                 ...session,
                 activeRunId: null,
             });
-            await orm.runs.save(config, run);
-            await orm.sessions.save(config, session);
-            await orm.sessionEntries.save(config, {
+            await orm.runs.save(run);
+            await orm.sessions.save(session);
+            await orm.sessionEntries.save({
                 sessionId: session.id,
                 entryIndex: 2,
                 runId: run.id,
@@ -126,7 +126,7 @@ describe('V2 ORM', () => {
                 content: 'Second entry',
                 createdAt: new Date('2026-05-14T12:02:00.000Z'),
             });
-            await orm.sessionEntries.save(config, {
+            await orm.sessionEntries.save({
                 sessionId: session.id,
                 entryIndex: 1,
                 runId: null,
@@ -136,7 +136,7 @@ describe('V2 ORM', () => {
                 createdAt: new Date('2026-05-14T12:01:00.000Z'),
             });
 
-            const loaded = await orm.sessions.get(config, session.id);
+            const loaded = await orm.sessions.get(session.id);
 
             expect(loaded).toMatchObject({
                 id: session.id,
@@ -158,7 +158,7 @@ describe('V2 ORM', () => {
 
     it('loads a run with optional audit logs', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm();
+        const orm = createV2Orm(config);
         const session = createSession();
         const run = createRun();
         const firstAuditLog = createRunAuditLog();
@@ -170,13 +170,13 @@ describe('V2 ORM', () => {
         };
 
         try {
-            await orm.sessions.save(config, session);
-            await orm.runs.save(config, run);
-            await orm.runAuditLogs.save(config, firstAuditLog);
-            await orm.runAuditLogs.save(config, secondAuditLog);
+            await orm.sessions.save(session);
+            await orm.runs.save(run);
+            await orm.runAuditLogs.save(firstAuditLog);
+            await orm.runAuditLogs.save(secondAuditLog);
 
-            const withoutAuditLogs = await orm.runs.get(config, run.id);
-            const withAuditLogs = await orm.runs.get(config, run.id, { includeAuditLogs: true });
+            const withoutAuditLogs = await orm.runs.get(run.id);
+            const withAuditLogs = await orm.runs.get(run.id, { includeAuditLogs: true });
 
             expect(withoutAuditLogs?.auditLogs).toBeUndefined();
             expect(withAuditLogs?.auditLogs).toHaveLength(2);
@@ -193,7 +193,7 @@ describe('V2 ORM', () => {
 
     it('loads an assistant-npc session entry with resolved NPCs', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm();
+        const orm = createV2Orm(config);
         const session = {
             ...createSession(),
             activeRunId: 'run-1',
@@ -207,24 +207,25 @@ describe('V2 ORM', () => {
         };
 
         try {
-            await orm.sessions.save(config, {
+            await orm.sessions.save({
                 ...session,
                 activeRunId: null,
             });
-            await orm.runs.save(config, run);
-            await orm.sessions.save(config, session);
-            await orm.npcs.save(config, firstNpc);
-            await orm.npcs.save(config, secondNpc);
-            await orm.sessionEntries.save(config, {
+            await orm.runs.save(run);
+            await orm.sessions.save(session);
+            await orm.npcs.save(firstNpc);
+            await orm.npcs.save(secondNpc);
+            await orm.sessionEntries.save({
                 sessionId: session.id,
                 entryIndex: 1,
                 runId: run.id,
                 title: 'NPC output',
                 kind: 'assistant-npc',
+                npcs: [],
                 createdAt: new Date('2026-05-14T12:05:00.000Z'),
             });
 
-            const entry = await orm.sessionEntries.get(config, session.id, 1);
+            const entry = await orm.sessionEntries.get(session.id, 1);
 
             expect(entry).toMatchObject({
                 kind: 'assistant-npc',
@@ -240,19 +241,19 @@ describe('V2 ORM', () => {
 
     it('preserves nullable date and foreign-key fields correctly', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm();
+        const orm = createV2Orm(config);
         const session = createSession();
         const run = createRun();
 
         try {
-            await orm.sessions.save(config, session);
-            await orm.runs.save(config, {
+            await orm.sessions.save(session);
+            await orm.runs.save({
                 ...run,
                 completedAt: null,
                 failedAt: null,
                 startedAt: null,
             });
-            await orm.sessionEntries.save(config, {
+            await orm.sessionEntries.save({
                 sessionId: session.id,
                 entryIndex: 1,
                 runId: null,
@@ -261,9 +262,9 @@ describe('V2 ORM', () => {
                 createdAt: new Date('2026-05-14T12:06:00.000Z'),
             });
 
-            const loadedSession = await orm.sessions.get(config, session.id);
-            const loadedRun = await orm.runs.get(config, run.id);
-            const loadedEntry = await orm.sessionEntries.get(config, session.id, 1);
+            const loadedSession = await orm.sessions.get(session.id);
+            const loadedRun = await orm.runs.get(run.id);
+            const loadedEntry = await orm.sessionEntries.get(session.id, 1);
 
             expect(loadedSession?.activeRunId).toBeNull();
             expect(loadedSession?.archivedAt).toBeNull();
@@ -296,6 +297,7 @@ const createSession = () => {
         lastEntryAt: null,
         createdAt: new Date('2026-05-14T12:00:00.000Z'),
         updatedAt: new Date('2026-05-14T12:00:00.000Z'),
+        entries: [],
     };
 };
 

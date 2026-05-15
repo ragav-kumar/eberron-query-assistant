@@ -13,10 +13,10 @@ import { createSessionEntriesRepository } from './repositories/sessionEntriesRep
 import { createSessionsRepository } from './repositories/sessionsRepository.js';
 import { createSettingsRepository } from './repositories/settingsRepository.js';
 
-const createV2Orm = (): V2Orm => {
+const createV2Orm = (config: RuntimeConfig): V2Orm => {
     const appDatabase = createAppDatabase();
 
-    const getDatabase = async (config: RuntimeConfig): Promise<Database.Database> => {
+    const getDatabase = async (): Promise<Database.Database> => {
         const database = await appDatabase.open(config);
         createSchema(database);
         return database;
@@ -26,8 +26,8 @@ const createV2Orm = (): V2Orm => {
     const repositoryDependencies = { getDatabase };
 
     return {
-        bootstrap: async config => {
-            await getDatabase(config);
+        bootstrap: async () => {
+            await getDatabase();
         },
         close: () => {
             appDatabase.close();

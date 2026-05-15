@@ -8,8 +8,8 @@ type SettingsRepository = V2Orm['settings'];
 
 export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies): SettingsRepository => {
     return {
-        get: async (config, key) => {
-            const database = await getDatabase(config);
+        get: async key => {
+            const database = await getDatabase();
             const row = database
                 .prepare(`
                     SELECT key, value, modified_at
@@ -19,8 +19,8 @@ export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies
                 .get(key) as StoredSettingRow | undefined;
             return row ? mapSettingRow(row) : null;
         },
-        list: async (config) => {
-            const database = await getDatabase(config);
+        list: async () => {
+            const database = await getDatabase();
             const rows = database
                 .prepare(`
                     SELECT key, value, modified_at
@@ -30,8 +30,8 @@ export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies
                 .all() as StoredSettingRow[];
             return rows.map(mapSettingRow);
         },
-        save: async (config, setting) => {
-            const database = await getDatabase(config);
+        save: async setting => {
+            const database = await getDatabase();
             database
                 .prepare(`
                     INSERT INTO settings (key, value, modified_at)

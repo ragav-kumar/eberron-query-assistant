@@ -12,8 +12,8 @@ export const createNpcRepository = (
     loaders: Pick<V2Loaders, 'loadNpcsByRun'>,
 ): NpcRepository => {
     return {
-        get: async (config, id) => {
-            const database = await getDatabase(config);
+        get: async id => {
+            const database = await getDatabase();
             const row = database
                 .prepare(`
                     SELECT
@@ -36,8 +36,8 @@ export const createNpcRepository = (
                 .get(id) as StoredNpcRow | undefined;
             return row ? mapNpcRow(row) : null;
         },
-        list: async (config) => {
-            const database = await getDatabase(config);
+        list: async () => {
+            const database = await getDatabase();
             const rows = database
                 .prepare(`
                     SELECT
@@ -60,12 +60,12 @@ export const createNpcRepository = (
                 .all() as StoredNpcRow[];
             return rows.map(mapNpcRow);
         },
-        listByRun: async (config, runId) => {
-            const database = await getDatabase(config);
+        listByRun: async runId => {
+            const database = await getDatabase();
             return loaders.loadNpcsByRun(database, runId);
         },
-        listBySession: async (config, sessionId) => {
-            const database = await getDatabase(config);
+        listBySession: async sessionId => {
+            const database = await getDatabase();
             const rows = database
                 .prepare(`
                     SELECT
@@ -89,8 +89,8 @@ export const createNpcRepository = (
                 .all(sessionId) as StoredNpcRow[];
             return rows.map(mapNpcRow);
         },
-        save: async (config, npc) => {
-            const database = await getDatabase(config);
+        save: async npc => {
+            const database = await getDatabase();
             database
                 .prepare(`
                     INSERT INTO npcs (

@@ -9,10 +9,10 @@ export interface V2AppDependencies {
 
 export const initializeV2App = async (dependencies: V2AppDependencies = {}): Promise<void> => {
     const config = dependencies.config ?? loadDefaultConfig();
-    const orm = createV2Orm();
+    const orm = createV2Orm(config);
 
     try {
-        await orm.bootstrap(config);
+        await orm.bootstrap();
     } finally {
         orm.close();
     }

@@ -12,8 +12,8 @@ export const createSessionEntriesRepository = (
     loaders: Pick<V2Loaders, 'loadNpcsByRun' | 'loadSessionEntries'>,
 ): SessionEntriesRepository => {
     return {
-        get: async (config, sessionId, entryIndex) => {
-            const database = await getDatabase(config);
+        get: async (sessionId, entryIndex) => {
+            const database = await getDatabase();
             const row = database
                 .prepare(`
                     SELECT
@@ -35,12 +35,12 @@ export const createSessionEntriesRepository = (
             const npcs = row.run_id ? loaders.loadNpcsByRun(database, row.run_id) : [];
             return mapSessionEntryRow(row, npcs);
         },
-        listBySession: async (config, sessionId) => {
-            const database = await getDatabase(config);
+        listBySession: async sessionId => {
+            const database = await getDatabase();
             return loaders.loadSessionEntries(database, sessionId);
         },
-        save: async (config, entry) => {
-            const database = await getDatabase(config);
+        save: async entry => {
+            const database = await getDatabase();
             database
                 .prepare(`
                     INSERT INTO session_entries (
@@ -65,7 +65,7 @@ export const createSessionEntriesRepository = (
                     entry.runId ?? null,
                     entry.title ?? null,
                     entry.kind,
-                    entry.content ?? null,
+                    'content' in entry ? entry.content : null,
                     entry.createdAt.toISOString(),
                 );
         },

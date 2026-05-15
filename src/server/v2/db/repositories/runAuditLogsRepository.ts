@@ -12,8 +12,8 @@ export const createRunAuditLogsRepository = (
     loaders: Pick<V2Loaders, 'loadRunAuditLogs'>,
 ): RunAuditLogsRepository => {
     return {
-        get: async (config, id) => {
-            const database = await getDatabase(config);
+        get: async id => {
+            const database = await getDatabase();
             const row = database
                 .prepare(`
                     SELECT id, run_id, kind, details, created_at
@@ -23,12 +23,12 @@ export const createRunAuditLogsRepository = (
                 .get(id) as StoredRunAuditLogRow | undefined;
             return row ? mapRunAuditLogRow(row) : null;
         },
-        listByRun: async (config, runId) => {
-            const database = await getDatabase(config);
+        listByRun: async runId => {
+            const database = await getDatabase();
             return loaders.loadRunAuditLogs(database, runId);
         },
-        save: async (config, auditLog) => {
-            const database = await getDatabase(config);
+        save: async auditLog => {
+            const database = await getDatabase();
             database
                 .prepare(`
                     INSERT INTO run_audit_logs (id, run_id, kind, details, created_at)

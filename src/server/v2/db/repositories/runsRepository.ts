@@ -12,12 +12,12 @@ export const createRunsRepository = (
     loaders: Pick<V2Loaders, 'loadRun'>,
 ): RunsRepository => {
     return {
-        get: async (config, id, options) => {
-            const database = await getDatabase(config);
+        get: async (id, options) => {
+            const database = await getDatabase();
             return loaders.loadRun(database, id, options);
         },
-        listBySession: async (config, sessionId) => {
-            const database = await getDatabase(config);
+        listBySession: async sessionId => {
+            const database = await getDatabase();
             const rows = database
                 .prepare(`
                     SELECT
@@ -40,8 +40,8 @@ export const createRunsRepository = (
                 .all(sessionId) as StoredRunRow[];
             return rows.map((row) => mapRunRow(row));
         },
-        save: async (config, run) => {
-            const database = await getDatabase(config);
+        save: async run => {
+            const database = await getDatabase();
             database
                 .prepare(`
                     INSERT INTO runs (

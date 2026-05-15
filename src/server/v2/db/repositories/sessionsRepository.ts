@@ -12,12 +12,12 @@ export const createSessionsRepository = (
     loaders: Pick<V2Loaders, 'loadRun' | 'loadSession' | 'loadSessionEntries'>,
 ): SessionsRepository => {
     return {
-        get: async (config, id, options) => {
-            const database = await getDatabase(config);
+        get: async (id, options) => {
+            const database = await getDatabase();
             return loaders.loadSession(database, id, options);
         },
-        list: async (config) => {
-            const database = await getDatabase(config);
+        list: async () => {
+            const database = await getDatabase();
             const rows = database
                 .prepare(`
                     SELECT
@@ -40,8 +40,8 @@ export const createSessionsRepository = (
                 return mapSessionRow(row, entries, activeRun);
             });
         },
-        save: async (config, session) => {
-            const database = await getDatabase(config);
+        save: async session => {
+            const database = await getDatabase();
             database
                 .prepare(`
                     INSERT INTO sessions (
