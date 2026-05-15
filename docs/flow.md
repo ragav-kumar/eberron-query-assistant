@@ -55,7 +55,19 @@
   - The intermediate reasoning is provided to the UI, and should be rendered.
 - Show the animated "Thinking" prompt that chatgpt and codex use anytime a model call is ongoing.
 
-# Mode: Assistant
+### API Calls
+1. GET for NPC list (not stored in session dto)
+   - query params for skip, take, filter
+2. GET for assistant responses (not stored in session dto)
+   - path param for session id
+3. GET for session summaries
+   - path param to filter by mode
+4. GET full info for current session
+5. POST to create a new session
+6. Api call to send a new prompt against an ongoing session.
+   - Not sure on method. PUT? PATCH? POST?
+
+## Mode: Assistant
 - This should be rendered as a back and forth between the user and agent
 - For example:
   - User prompt
@@ -71,7 +83,7 @@
 - Anytime api returns with new assistant data, smooth scroll to the top of the latest thing returned.
 - "Thinking" prompt should be at bottom of feed.
 
-# Mode: NPC Generator
+## Mode: NPC Generator
 - (server side) The assistant is configured to returns structured npc data based on the prompt.
 - Use a console-like feed to render agent chatter for intermediate steps. 
   - oldest to newest, thinking prompt being after newest.
