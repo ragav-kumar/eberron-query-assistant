@@ -1,6 +1,6 @@
 import { mapRunAuditLogRow } from '../mappers.js';
 import type { V2Orm } from '../contract.js';
-import type { StoredRunAuditLogRow } from '../storedRows.js';
+import type { RunAuditLog as StoredRunAuditLogRow } from '../schema.js';
 
 import type { V2Loaders } from '../loaders.js';
 import type { RepositoryDependencies } from './shared.js';
@@ -12,7 +12,7 @@ export const createRunAuditLogsRepository = (
     loaders: Pick<V2Loaders, 'loadRunAuditLogs'>,
 ): RunAuditLogsRepository => {
     return {
-        async get(config, id) {
+        get: async (config, id) => {
             const database = await getDatabase(config);
             const row = database
                 .prepare(`
@@ -23,11 +23,11 @@ export const createRunAuditLogsRepository = (
                 .get(id) as StoredRunAuditLogRow | undefined;
             return row ? mapRunAuditLogRow(row) : null;
         },
-        async listByRun(config, runId) {
+        listByRun: async (config, runId) => {
             const database = await getDatabase(config);
             return loaders.loadRunAuditLogs(database, runId);
         },
-        async save(config, auditLog) {
+        save: async (config, auditLog) => {
             const database = await getDatabase(config);
             database
                 .prepare(`

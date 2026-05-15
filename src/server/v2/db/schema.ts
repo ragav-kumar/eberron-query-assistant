@@ -1,9 +1,9 @@
 /**
  * Storage-oriented schema reference for the v2 app state database.
  *
- * This file is intentionally a conceptual description of the normalized
- * persistence model. It is not a REST DTO definition and it is not intended to
- * describe projected read models.
+ * This file describes the raw row shapes persisted in SQLite.
+ * It is not a REST DTO definition and it is not intended to describe
+ * projected read models.
  */
 
 /**
@@ -19,14 +19,14 @@ export interface Setting {
     // Primary key
     key: string;
     value: string;
-    modifiedAt: Date;
+    modified_at: string;
 }
 
 /**
  * Durable orchestrator resource for a resumable conversation.
  *
  * Notes:
- * - `activeRunId` references the currently active run when one exists.
+ * - `active_run_id` references the currently active run when one exists.
  * - `kind` distinguishes assistant-oriented sessions from NPC-generation
  *   sessions while keeping both inside one shared session model.
  */
@@ -34,23 +34,23 @@ export interface Session {
     // Primary key, GUID
     id: string;
     kind: 'assistant' | 'npc';
-    title?: string;
-    activeRunId?: string | null;
-    archivedAt?: Date | null;
-    lastEntryAt?: Date | null;
-    createdAt: Date;
-    updatedAt: Date;
+    title: string | null;
+    active_run_id: string | null;
+    archived_at: string | null;
+    last_entry_at: string | null;
+    created_at: string;
+    updated_at: string;
 }
 
 /**
  * Ordered, session-scoped timeline entry.
  *
  * Composite primary key:
- * - `sessionId`
- * - `entryIndex`
+ * - `session_id`
+ * - `entry_index`
  *
  * Notes:
- * - `runId` is nullable because some entries may be session-owned rather than
+ * - `run_id` is nullable because some entries may be session-owned rather than
  *   emitted by a specific run.
  * - `assistant-npc` is a timeline marker for generated NPC output.
  * - For `assistant-npc`, `content` is ignored and consumers should resolve the
@@ -58,18 +58,18 @@ export interface Session {
  */
 export interface SessionEntry {
     // Composite primary key part 1
-    sessionId: string;
+    session_id: string;
 
     // Composite primary key part 2
-    entryIndex: number;
+    entry_index: number;
 
     // Foreign key to the producing run when applicable
-    runId?: string | null;
+    run_id: string | null;
 
-    title?: string;
+    title: string | null;
     kind: 'user' | 'assistant-response' | 'assistant-tool' | 'system' | 'assistant-npc';
-    content?: string;
-    createdAt: Date;
+    content: string | null;
+    created_at: string;
 }
 
 /**
@@ -84,20 +84,20 @@ export interface Run {
     id: string;
 
     // Foreign key to Session.id
-    sessionId: string;
+    session_id: string;
 
     // Input options captured at run creation time
-    includePartyContext: boolean;
+    include_party_context: number;
     prompt: string;
-    retrievalTurnLimit: number;
+    retrieval_turn_limit: number;
 
     kind: 'assistant' | 'npc';
     status: 'pending' | 'running' | 'completed' | 'failed';
-    createdAt: Date;
-    updatedAt: Date;
-    startedAt?: Date | null;
-    completedAt?: Date | null;
-    failedAt?: Date | null;
+    created_at: string;
+    updated_at: string;
+    started_at: string | null;
+    completed_at: string | null;
+    failed_at: string | null;
 }
 
 /**
@@ -112,11 +112,11 @@ export interface RunAuditLog {
     id: string;
 
     // Foreign key to Run.id
-    runId: string;
+    run_id: string;
 
     kind: string;
     details: string;
-    createdAt: Date;
+    created_at: string;
 }
 
 /**
@@ -134,17 +134,17 @@ export interface Npc {
     id: number;
 
     // Foreign keys to the producing conversation context
-    sessionId: string;
-    runId: string;
+    session_id: string;
+    run_id: string;
 
     name: string;
     bio: string;
     description: string;
-    age?: string;
-    ethnicity?: string;
-    gender?: string;
-    role?: string;
-    species?: string;
-    createdAt?: Date;
-    modifiedAt?: Date;
+    age: string | null;
+    ethnicity: string | null;
+    gender: string | null;
+    role: string | null;
+    species: string | null;
+    created_at: string | null;
+    modified_at: string | null;
 }

@@ -2,7 +2,7 @@
  * Server-side object model for v2 application state.
  *
  * This file sits above the storage schema and below transport DTOs:
- * - `schema.ts` describes normalized persistence records.
+ * - `schema.ts` describes raw persisted row shapes.
  * - `objectModel.ts` describes the richer shapes server code works with after
  *   loading, assembling, and relating those records.
  * - DTOs remain transport-specific and should stay separate.

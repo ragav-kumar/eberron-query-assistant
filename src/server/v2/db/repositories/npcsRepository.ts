@@ -1,6 +1,6 @@
 import { mapNpcRow, toTimestamp } from '../mappers.js';
 import type { V2Orm } from '../contract.js';
-import type { StoredNpcRow } from '../storedRows.js';
+import type { Npc as StoredNpcRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';
 import type { V2Loaders } from '../loaders.js';
@@ -12,7 +12,7 @@ export const createNpcRepository = (
     loaders: Pick<V2Loaders, 'loadNpcsByRun'>,
 ): NpcRepository => {
     return {
-        async get(config, id) {
+        get: async (config, id) => {
             const database = await getDatabase(config);
             const row = database
                 .prepare(`
@@ -36,7 +36,7 @@ export const createNpcRepository = (
                 .get(id) as StoredNpcRow | undefined;
             return row ? mapNpcRow(row) : null;
         },
-        async list(config) {
+        list: async (config) => {
             const database = await getDatabase(config);
             const rows = database
                 .prepare(`
@@ -60,11 +60,11 @@ export const createNpcRepository = (
                 .all() as StoredNpcRow[];
             return rows.map(mapNpcRow);
         },
-        async listByRun(config, runId) {
+        listByRun: async (config, runId) => {
             const database = await getDatabase(config);
             return loaders.loadNpcsByRun(database, runId);
         },
-        async listBySession(config, sessionId) {
+        listBySession: async (config, sessionId) => {
             const database = await getDatabase(config);
             const rows = database
                 .prepare(`
@@ -89,7 +89,7 @@ export const createNpcRepository = (
                 .all(sessionId) as StoredNpcRow[];
             return rows.map(mapNpcRow);
         },
-        async save(config, npc) {
+        save: async (config, npc) => {
             const database = await getDatabase(config);
             database
                 .prepare(`

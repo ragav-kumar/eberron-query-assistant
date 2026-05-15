@@ -1,6 +1,6 @@
 import { mapRunRow, toTimestamp } from '../mappers.js';
 import type { V2Orm } from '../contract.js';
-import type { StoredRunRow } from '../storedRows.js';
+import type { Run as StoredRunRow } from '../schema.js';
 
 import type { V2Loaders } from '../loaders.js';
 import type { RepositoryDependencies } from './shared.js';
@@ -12,11 +12,11 @@ export const createRunsRepository = (
     loaders: Pick<V2Loaders, 'loadRun'>,
 ): RunsRepository => {
     return {
-        async get(config, id, options) {
+        get: async (config, id, options) => {
             const database = await getDatabase(config);
             return loaders.loadRun(database, id, options);
         },
-        async listBySession(config, sessionId) {
+        listBySession: async (config, sessionId) => {
             const database = await getDatabase(config);
             const rows = database
                 .prepare(`
@@ -40,7 +40,7 @@ export const createRunsRepository = (
                 .all(sessionId) as StoredRunRow[];
             return rows.map((row) => mapRunRow(row));
         },
-        async save(config, run) {
+        save: async (config, run) => {
             const database = await getDatabase(config);
             database
                 .prepare(`

@@ -16,12 +16,12 @@ import type {
     SessionEntry as ObjectModelSessionEntry,
 } from './objectModel.js';
 import type {
-    StoredNpcRow,
-    StoredRunAuditLogRow,
-    StoredRunRow,
-    StoredSessionEntryRow,
-    StoredSessionRow,
-} from './storedRows.js';
+    Npc as StoredNpcRow,
+    Run as StoredRunRow,
+    RunAuditLog as StoredRunAuditLogRow,
+    Session as StoredSessionRow,
+    SessionEntry as StoredSessionEntryRow,
+} from './schema.js';
 
 export interface V2Loaders {
     loadNpcsByRun: (database: Database.Database, runId: string) => ObjectModelNpc[];

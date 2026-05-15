@@ -8,7 +8,6 @@ import type {
     Refresh,
     Run,
     Session,
-    SessionEntry,
     SessionSummary,
 } from './dtos.v2.js';
 
@@ -16,7 +15,7 @@ declare const endpointPayloadType: unique symbol;
 declare const endpointResponseType: unique symbol;
 declare const sseEventType: unique symbol;
 
-export type HttpMethod = 'GET' | 'POST' | 'PUT';
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH';
 export type EndpointHeaders = Readonly<Record<string, string>>;
 type EmptyParams = Record<never, never>;
 type PathParams = Record<string, string>;
@@ -112,7 +111,7 @@ export const contracts = {
      */
     sessions: {
         /** Lists session summaries for browse and selection flows. */
-        get: defineEndpoint<null, SessionSummary[]>({
+        getList: defineEndpoint<null, SessionSummary[]>({
             method: 'GET',
             path: '/api/v2/sessions',
         }),
@@ -122,21 +121,15 @@ export const contracts = {
             path: '/api/v2/sessions',
         }),
         /** Fetches server-owned metadata for one session, excluding full entry history. */
-        getOne: defineEndpoint<null, Session, { sessionId: string }>({
+        get: defineEndpoint<null, Session, { sessionId: string }>({
             method: 'GET',
             path: '/api/v2/sessions/:sessionId',
             pathParams: ['sessionId'],
         }),
-        /**
-         * Lists the ordered entry timeline for one session.
-         *
-         * Entries are the canonical human-visible conversation feed and may
-         * include user prompts, assistant replies, tool-status updates, and
-         * system notices.
-         */
-        getEntries: defineEndpoint<null, SessionEntry[], { sessionId: string }>({
-            method: 'GET',
-            path: '/api/v2/sessions/:sessionId/entries',
+        /** This is the update endpoint for sessions. */
+        patch: defineEndpoint<Partial<Session>, Session, { sessionId: string }>({
+            method: 'PATCH',
+            path: '/api/v2/sessions/:sessionId',
             pathParams: ['sessionId'],
         }),
     },

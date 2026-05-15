@@ -1,6 +1,6 @@
 import { mapSettingRow } from '../mappers.js';
 import type { V2Orm } from '../contract.js';
-import type { StoredSettingRow } from '../storedRows.js';
+import type { Setting as StoredSettingRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';
 
@@ -8,7 +8,7 @@ type SettingsRepository = V2Orm['settings'];
 
 export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies): SettingsRepository => {
     return {
-        async get(config, key) {
+        get: async (config, key) => {
             const database = await getDatabase(config);
             const row = database
                 .prepare(`
@@ -19,7 +19,7 @@ export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies
                 .get(key) as StoredSettingRow | undefined;
             return row ? mapSettingRow(row) : null;
         },
-        async list(config) {
+        list: async (config) => {
             const database = await getDatabase(config);
             const rows = database
                 .prepare(`
@@ -30,7 +30,7 @@ export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies
                 .all() as StoredSettingRow[];
             return rows.map(mapSettingRow);
         },
-        async save(config, setting) {
+        save: async (config, setting) => {
             const database = await getDatabase(config);
             database
                 .prepare(`

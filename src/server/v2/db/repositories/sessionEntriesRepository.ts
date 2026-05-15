@@ -1,6 +1,6 @@
 import { mapSessionEntryRow } from '../mappers.js';
 import type { V2Orm } from '../contract.js';
-import type { StoredSessionEntryRow } from '../storedRows.js';
+import type { SessionEntry as StoredSessionEntryRow } from '../schema.js';
 
 import type { V2Loaders } from '../loaders.js';
 import type { RepositoryDependencies } from './shared.js';
@@ -12,7 +12,7 @@ export const createSessionEntriesRepository = (
     loaders: Pick<V2Loaders, 'loadNpcsByRun' | 'loadSessionEntries'>,
 ): SessionEntriesRepository => {
     return {
-        async get(config, sessionId, entryIndex) {
+        get: async (config, sessionId, entryIndex) => {
             const database = await getDatabase(config);
             const row = database
                 .prepare(`
@@ -35,11 +35,11 @@ export const createSessionEntriesRepository = (
             const npcs = row.run_id ? loaders.loadNpcsByRun(database, row.run_id) : [];
             return mapSessionEntryRow(row, npcs);
         },
-        async listBySession(config, sessionId) {
+        listBySession: async (config, sessionId) => {
             const database = await getDatabase(config);
             return loaders.loadSessionEntries(database, sessionId);
         },
-        async save(config, entry) {
+        save: async (config, entry) => {
             const database = await getDatabase(config);
             database
                 .prepare(`

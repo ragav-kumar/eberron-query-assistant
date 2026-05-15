@@ -63,7 +63,7 @@ describe('v2 client API helpers', () => {
             status: 200,
         }));
 
-        await queryApi(contracts.sessions.get);
+        await queryApi(contracts.sessions.getList);
 
         expect(fetchMock).toHaveBeenCalledWith('/api/v2/sessions', {
             headers: {

@@ -7,17 +7,12 @@ export const sessionQueryKey = ['api', 'sessions'];
 
 export const useSessionsQuery = () => useQuery({
     queryKey: sessionQueryKey,
-    queryFn: () => queryApi(contracts.sessions.get),
+    queryFn: () => queryApi(contracts.sessions.getList),
 });
 
 export const useSessionQuery = (sessionId: string) => useQuery({
     queryKey: [...sessionQueryKey, sessionId],
-    queryFn: () => queryApi(contracts.sessions.getOne, {sessionId}),
-});
-
-export const useSessionEntriesQuery = (sessionId: string) => useQuery({
-    queryKey: [...sessionQueryKey, sessionId, 'entries'],
-    queryFn: () => queryApi(contracts.sessions.getEntries, {sessionId}),
+    queryFn: () => queryApi(contracts.sessions.get, {sessionId}),
 });
 
 export const useSessionMutation = () => {

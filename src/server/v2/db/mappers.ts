@@ -7,13 +7,13 @@ import type {
     Setting as ObjectModelSetting,
 } from './objectModel.js';
 import type {
-    StoredNpcRow,
-    StoredRunAuditLogRow,
-    StoredRunRow,
-    StoredSessionEntryRow,
-    StoredSessionRow,
-    StoredSettingRow,
-} from './storedRows.js';
+    Npc as StoredNpcRow,
+    Run as StoredRunRow,
+    RunAuditLog as StoredRunAuditLogRow,
+    Session as StoredSessionRow,
+    SessionEntry as StoredSessionEntryRow,
+    Setting as StoredSettingRow,
+} from './schema.js';
 
 export const toTimestamp = (value: Date | null | undefined): string | null => {
     return value ? value.toISOString() : null;

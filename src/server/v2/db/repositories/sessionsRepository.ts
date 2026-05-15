@@ -1,6 +1,6 @@
 import { mapSessionRow, toTimestamp } from '../mappers.js';
 import type { V2Orm } from '../contract.js';
-import type { StoredSessionRow } from '../storedRows.js';
+import type { Session as StoredSessionRow } from '../schema.js';
 
 import type { V2Loaders } from '../loaders.js';
 import type { RepositoryDependencies } from './shared.js';
@@ -12,11 +12,11 @@ export const createSessionsRepository = (
     loaders: Pick<V2Loaders, 'loadRun' | 'loadSession' | 'loadSessionEntries'>,
 ): SessionsRepository => {
     return {
-        async get(config, id, options) {
+        get: async (config, id, options) => {
             const database = await getDatabase(config);
             return loaders.loadSession(database, id, options);
         },
-        async list(config) {
+        list: async (config) => {
             const database = await getDatabase(config);
             const rows = database
                 .prepare(`
@@ -40,7 +40,7 @@ export const createSessionsRepository = (
                 return mapSessionRow(row, entries, activeRun);
             });
         },
-        async save(config, session) {
+        save: async (config, session) => {
             const database = await getDatabase(config);
             database
                 .prepare(`
