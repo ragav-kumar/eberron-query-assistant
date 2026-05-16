@@ -1,6 +1,7 @@
 import type { RefreshOperationKind, RefreshStatus } from './refresh.js';
 import type { RunStatus } from './runs.js';
-import type { SessionEntry, SessionMode, SessionState } from './sessions.js';
+import type { AssistantEntry } from './assistant.js';
+import type { Session, SessionMode } from './sessions.js';
 
 interface EventBase {
     resource: string;
@@ -30,7 +31,7 @@ export interface SessionEntryOperationEvent extends EventBase {
     sessionId: string;
     runId: string;
     exchangeId: string;
-    entry: SessionEntry;
+    entry: AssistantEntry;
 }
 
 export interface SessionOperationEvent extends EventBase {
@@ -39,7 +40,7 @@ export interface SessionOperationEvent extends EventBase {
     sessionId: string;
     replacedSessionId?: string;
     mode: SessionMode;
-    state: SessionState;
+    state: Session;
 }
 
 export type OperationEvent =

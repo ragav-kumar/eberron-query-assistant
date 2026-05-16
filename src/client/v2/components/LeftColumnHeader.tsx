@@ -8,17 +8,17 @@ export const LeftColumnHeader = () => {
     const mutation = useRefreshMutation();
 
     const refresh = mutation.data ?? query.data;
-    const isRefreshActive = mutation.isPending || refresh?.status === 'pending' || refresh?.status === 'running';
+    const isRefreshActive = mutation.isPending || refresh?.activeOperation != null;
 
-    const onRefresh = (forceReingest: boolean) => {
-        if (forceReingest) {
+    const onRefresh = (kind: 'refresh' | 'reingest') => {
+        if (kind === 'reingest') {
             const confirmed = window.confirm('Force reingest clears and rebuilds app-owned corpus and retrieval artifacts. Continue?');
             if (!confirmed) {
                 return;
             }
         }
 
-        mutation.mutate({ forceReingest });
+        mutation.mutate({ kind });
     };
 
     return (
@@ -30,7 +30,7 @@ export const LeftColumnHeader = () => {
             <div className={styles.actions}>
                 <Button
                     disabled={isRefreshActive}
-                    onClick={() => onRefresh(false)}
+                    onClick={() => onRefresh('refresh')}
                     title='Check sources and update retrieval artifacts only where needed.'
                     variant='primary'
                 >
@@ -38,7 +38,7 @@ export const LeftColumnHeader = () => {
                 </Button>
                 <Button
                     disabled={isRefreshActive}
-                    onClick={() => onRefresh(true)}
+                    onClick={() => onRefresh('reingest')}
                     title='Clear and rebuild app-owned corpus and retrieval artifacts.'
                     variant='danger'
                 >
@@ -65,15 +65,52 @@ const renderRefreshStatus = (
         return 'No refresh state available yet.';
     }
 
-    if (refresh.status === 'pending' || refresh.status === 'running') {
-        return refresh.forceReingest ? 'Rebuilding app-owned corpus and retrieval artifacts.' : 'Checking sources and refresh state.';
+    if (
+        refresh.activeOperation === 'reingest'
+        || refresh.reingestStatus === 'pending'
+        || refresh.reingestStatus === 'running'
+    ) {
+        return 'Rebuilding app-owned corpus and retrieval artifacts.';
     }
 
-    if (refresh.status === 'failed') {
-        return `Last ${refresh.forceReingest ? 'force reingest' : 'refresh'} failed at ${formatTimestamp(refresh.updatedAt)}.`;
+    if (
+        refresh.activeOperation === 'refresh'
+        || refresh.refreshStatus === 'pending'
+        || refresh.refreshStatus === 'running'
+    ) {
+        return 'Checking sources and refresh state.';
     }
 
-    return `Last ${refresh.forceReingest ? 'force reingest' : 'refresh'} completed at ${formatTimestamp(refresh.updatedAt)}.`;
+    if (refresh.reingestStatus === 'failed') {
+        return `Last force reingest failed at ${formatTimestamp(refresh.updatedAt)}.`;
+    }
+
+    if (refresh.refreshStatus === 'failed') {
+        return `Last refresh failed at ${formatTimestamp(refresh.updatedAt)}.`;
+    }
+
+    const latestOperation = getLatestCompletedOperation(refresh);
+    return `Last ${latestOperation} completed at ${formatTimestamp(refresh.updatedAt)}.`;
+};
+
+const getLatestCompletedOperation = (refresh: Refresh): 'refresh' | 'force reingest' => {
+    const lastRefreshAt = parseTimestamp(refresh.lastRefreshAt);
+    const lastReingestAt = parseTimestamp(refresh.lastReingestAt);
+
+    if (lastReingestAt > lastRefreshAt) {
+        return 'force reingest';
+    }
+
+    return 'refresh';
+};
+
+const parseTimestamp = (timestamp: string | null): number => {
+    if (timestamp == null) {
+        return Number.NEGATIVE_INFINITY;
+    }
+
+    const parsed = new Date(timestamp).valueOf();
+    return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
 };
 
 const formatTimestamp = (timestamp: string): string => {

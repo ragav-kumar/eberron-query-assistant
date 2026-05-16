@@ -19,23 +19,32 @@ Use this context as local campaign guidance. It is not retrieved evidence, so do
 const SESSION_SUMMARIES: SessionSummary[] = [
     {
         id: 'session-dragonshards',
+        mode: 'assistant',
         title: 'Dragonshard pricing tiers',
         createdAt: '2026-05-09T08:45:59.000Z',
         updatedAt: '2026-05-09T08:45:59.000Z',
+        activeRunId: null,
+        includePartyContext: true,
         lastEntryPreview: 'Summarize this conversation into a reference document.',
     },
     {
         id: 'session-dal-quor',
+        mode: 'assistant',
         title: 'Dal Quor vault pitch',
         createdAt: '2026-05-07T21:10:42.000Z',
         updatedAt: '2026-05-07T21:10:42.000Z',
+        activeRunId: 'run-dal-quor-1',
+        includePartyContext: true,
         lastEntryPreview: "Let's give it a professional, spies / heist vibe.",
     },
     {
         id: 'session-thornwood',
+        mode: 'assistant',
         title: 'Thornwood north of Vathirond',
         createdAt: '2026-05-09T09:10:07.000Z',
         updatedAt: '2026-05-09T09:10:07.000Z',
+        activeRunId: null,
+        includePartyContext: true,
         lastEntryPreview: 'Is there anything in the lore about the Thornwood (north of Vathirond)?',
     },
 ];
@@ -43,92 +52,141 @@ const SESSION_SUMMARIES: SessionSummary[] = [
 const SESSIONS = new Map<string, Session>([
     ['session-dragonshards', {
         id: 'session-dragonshards',
+        mode: 'assistant',
         title: 'Dragonshard pricing tiers',
         createdAt: '2026-05-09T08:45:59.000Z',
         updatedAt: '2026-05-09T08:45:59.000Z',
         activeRunId: null,
+        includePartyContext: true,
+        promotedFromSessionId: null,
+        promotedToSessionId: null,
     }],
     ['session-dal-quor', {
         id: 'session-dal-quor',
+        mode: 'assistant',
         title: 'Dal Quor vault pitch',
         createdAt: '2026-05-07T21:10:42.000Z',
         updatedAt: '2026-05-07T21:10:42.000Z',
         activeRunId: 'run-dal-quor-1',
+        includePartyContext: true,
+        promotedFromSessionId: null,
+        promotedToSessionId: null,
     }],
     ['session-thornwood', {
         id: 'session-thornwood',
+        mode: 'assistant',
         title: 'Thornwood north of Vathirond',
         createdAt: '2026-05-09T09:10:07.000Z',
         updatedAt: '2026-05-09T09:10:07.000Z',
         activeRunId: null,
+        includePartyContext: true,
+        promotedFromSessionId: null,
+        promotedToSessionId: null,
     }],
 ]);
 
-const SESSION_ENTRIES = new Map<string, AssistantEntry[]>([
-    ['session-dal-quor', [
-        {
-            id: 'session-dal-quor-system-1',
-            kind: 'system',
+const SESSION_ENTRIES = new Map<string, { sessionId: string; exchanges: { id: string; sessionId: string; createdAt: string; updatedAt: string; runId: string; status: Run['status']; entries: AssistantEntry[]; }[] }>([
+    ['session-dal-quor', {
+        sessionId: 'session-dal-quor',
+        exchanges: [{
+            id: 'exchange-dal-quor-1',
+            sessionId: 'session-dal-quor',
             createdAt: '2026-05-07T21:10:42.000Z',
-            content: 'Mock session timeline for v2 UI build-out based on a real session log.',
-        },
-        {
-            id: 'session-dal-quor-tool-status-1',
-            kind: 'tool-status',
-            createdAt: '2026-05-07T21:10:43.000Z',
-            content: 'Looking for Eberron dragonshard tier and pricing guidance.',
-        },
-        {
-            id: 'session-dal-quor-assistant-1',
-            kind: 'assistant',
-            createdAt: '2026-05-07T21:10:44.000Z',
-            title: 'Golden Vault spiel for the forest temple',
-            content: "I can do that, but I need one or two details first so I don’t invent the wrong Golden Vault hook.\n\nWhat I have from the notes:\n- The active Vathirond thread includes **“Golden Vault”** and a dead drop at the memorial to the fallen, with a planned spiel for **“Reach for the Stars”**.\n- You want to adapt that into a **Forest Temple in Dal Quor** with a 4-day access window, poe sisters, a phantom Ganon adaptation, and a vault objective at the end.\n\nTo write a good alternate spiel, I need to know what the Golden Vault wants recovered, who the intended contact is, how obvious the job should sound to the players, and whether the time limit should be explicit in the briefing.",
-        },
-        {
-            id: 'session-dal-quor-user-1',
-            kind: 'user',
-            createdAt: '2026-05-07T21:10:45.000Z',
-            content: "I'm planning to blend Durotan's dream and the golden vault plot thread with each other. Specifically, I'm thinking of replacing most of Reach for the stars with an adaptation of the Legend of Zelda Ocarina of Time dungeon, The Forest Temple.",
-        },
-        {
-            id: 'session-dal-quor-assistant-2',
-            kind: 'assistant',
-            createdAt: '2026-05-07T21:10:46.000Z',
-            title: 'Golden Vault spiel options',
-            content: "Got it. Since you want this to feel like an early capital-G Good Golden Vault job, with a clear fetch object, prep encouraged, and no overt Dal Quor hint, here are three spiel options you can use or remix.\n\nOption 1 is a straightforward recovery mission from an old forest reliquary. Option 2 positions the object as a missing star map hidden in a warded shrine. Option 3 frames the job as recovering an item from a place where someone trapped inside also needs help.\n\nMy recommendation was Option 3 for the strongest moral hook, or Option 2 if you want the closest structural match to Reach for the Stars.",
-        },
-        {
-            id: 'session-dal-quor-user-2',
-            kind: 'user',
-            createdAt: '2026-05-07T21:10:47.000Z',
-            content: "Let's give it a professional, spies / heist vibe. Almost Q from james bond like, but you know, less familiar, since this is the first actual golden vault interaction. Do all the variants you've suggested, I'll pick / combine them myself later.",
-        },
-        {
-            id: 'session-dal-quor-assistant-3',
-            kind: 'assistant',
-            createdAt: '2026-05-07T21:10:48.000Z',
-            title: 'Golden Vault briefing variants',
-            content: "Absolutely. If you want first-contact Golden Vault to feel more like a professional intelligence or heist briefing than a quest-giver monologue, here are three polished variants in that style.\n\nVariant 1 keeps a clean field-op tone and emphasizes competence. Variant 2 leans harder into spy or extraction energy. Variant 3 is more mysterious while still sounding professional.\n\nFor your Forest Temple and Dal Quor blend, Variant 1 is the cleanest Good-aligned fit, Variant 2 is the strongest heist tone, and Variant 3 gives you the most mystery and flexibility.",
-        },
-    ]],
+            updatedAt: '2026-05-07T21:10:48.000Z',
+            runId: 'run-dal-quor-1',
+            status: 'completed',
+            entries: [
+                {
+                    id: 'session-dal-quor-reasoning-1',
+                    kind: 'reasoning',
+                    sessionId: 'session-dal-quor',
+                    runId: 'run-dal-quor-1',
+                    exchangeId: 'exchange-dal-quor-1',
+                    createdAt: '2026-05-07T21:10:42.000Z',
+                    content: 'Mock session timeline for v2 UI build-out based on a real session log.',
+                    toolCallId: null,
+                },
+                {
+                    id: 'session-dal-quor-reasoning-2',
+                    kind: 'reasoning',
+                    sessionId: 'session-dal-quor',
+                    runId: 'run-dal-quor-1',
+                    exchangeId: 'exchange-dal-quor-1',
+                    createdAt: '2026-05-07T21:10:43.000Z',
+                    content: 'Looking for Eberron dragonshard tier and pricing guidance.',
+                    toolCallId: null,
+                },
+                {
+                    id: 'session-dal-quor-response-1',
+                    kind: 'response',
+                    sessionId: 'session-dal-quor',
+                    runId: 'run-dal-quor-1',
+                    exchangeId: 'exchange-dal-quor-1',
+                    createdAt: '2026-05-07T21:10:44.000Z',
+                    title: 'Golden Vault spiel for the forest temple',
+                    content: "I can do that, but I need one or two details first so I don’t invent the wrong Golden Vault hook.\n\nWhat I have from the notes:\n- The active Vathirond thread includes **“Golden Vault”** and a dead drop at the memorial to the fallen, with a planned spiel for **“Reach for the Stars”**.\n- You want to adapt that into a **Forest Temple in Dal Quor** with a 4-day access window, poe sisters, a phantom Ganon adaptation, and a vault objective at the end.\n\nTo write a good alternate spiel, I need to know what the Golden Vault wants recovered, who the intended contact is, how obvious the job should sound to the players, and whether the time limit should be explicit in the briefing.",
+                },
+                {
+                    id: 'session-dal-quor-user-1',
+                    kind: 'user',
+                    sessionId: 'session-dal-quor',
+                    runId: 'run-dal-quor-1',
+                    exchangeId: 'exchange-dal-quor-1',
+                    createdAt: '2026-05-07T21:10:45.000Z',
+                    content: "I'm planning to blend Durotan's dream and the golden vault plot thread with each other. Specifically, I'm thinking of replacing most of Reach for the stars with an adaptation of the Legend of Zelda Ocarina of Time dungeon, The Forest Temple.",
+                },
+                {
+                    id: 'session-dal-quor-response-2',
+                    kind: 'response',
+                    sessionId: 'session-dal-quor',
+                    runId: 'run-dal-quor-1',
+                    exchangeId: 'exchange-dal-quor-1',
+                    createdAt: '2026-05-07T21:10:46.000Z',
+                    title: 'Golden Vault spiel options',
+                    content: "Got it. Since you want this to feel like an early capital-G Good Golden Vault job, with a clear fetch object, prep encouraged, and no overt Dal Quor hint, here are three spiel options you can use or remix.\n\nOption 1 is a straightforward recovery mission from an old forest reliquary. Option 2 positions the object as a missing star map hidden in a warded shrine. Option 3 frames the job as recovering an item from a place where someone trapped inside also needs help.\n\nMy recommendation was Option 3 for the strongest moral hook, or Option 2 if you want the closest structural match to Reach for the Stars.",
+                },
+                {
+                    id: 'session-dal-quor-user-2',
+                    kind: 'user',
+                    sessionId: 'session-dal-quor',
+                    runId: 'run-dal-quor-1',
+                    exchangeId: 'exchange-dal-quor-1',
+                    createdAt: '2026-05-07T21:10:47.000Z',
+                    content: "Let's give it a professional, spies / heist vibe. Almost Q from james bond like, but you know, less familiar, since this is the first actual golden vault interaction. Do all the variants you've suggested, I'll pick / combine them myself later.",
+                },
+                {
+                    id: 'session-dal-quor-response-3',
+                    kind: 'response',
+                    sessionId: 'session-dal-quor',
+                    runId: 'run-dal-quor-1',
+                    exchangeId: 'exchange-dal-quor-1',
+                    createdAt: '2026-05-07T21:10:48.000Z',
+                    title: 'Golden Vault briefing variants',
+                    content: "Absolutely. If you want first-contact Golden Vault to feel more like a professional intelligence or heist briefing than a quest-giver monologue, here are three polished variants in that style.\n\nVariant 1 keeps a clean field-op tone and emphasizes competence. Variant 2 leans harder into spy or extraction energy. Variant 3 is more mysterious while still sounding professional.\n\nFor your Forest Temple and Dal Quor blend, Variant 1 is the cleanest Good-aligned fit, Variant 2 is the strongest heist tone, and Variant 3 gives you the most mystery and flexibility.",
+                },
+            ],
+        }],
+    }],
 ]);
 
 const RUNS = new Map<string, Run>([
     ['run-dal-quor-1', {
         id: 'run-dal-quor-1',
         sessionId: 'session-dal-quor',
-        kind: 'assistant',
+        mode: 'assistant',
         status: 'completed',
         createdAt: '2026-05-07T21:10:42.000Z',
         updatedAt: '2026-05-07T21:10:48.000Z',
+        exchangeId: 'exchange-dal-quor-1',
     }],
 ]);
 
 const NPCS: NpcCollection = {
+    activeFilter: '',
     npcs: [
         {
             id: 4,
+            sessionId: 'session-dal-quor',
             name: 'Mara d’Thuranni',
             species: 'Elf (Khoravar)',
             ethnicity: 'House Thuranni (Phiarlan-descended)',
@@ -142,6 +200,7 @@ const NPCS: NpcCollection = {
         },
         {
             id: 8,
+            sessionId: 'session-dal-quor',
             name: "K-14 'Kestrel'",
             species: 'Warforged',
             ethnicity: 'Cannith-built (Last War veteran)',
@@ -155,6 +214,7 @@ const NPCS: NpcCollection = {
         },
         {
             id: 9,
+            sessionId: 'session-dal-quor',
             name: 'Thrum, Keeper of the Blue Room',
             species: 'Warforged',
             ethnicity: 'Reforged',
@@ -168,6 +228,7 @@ const NPCS: NpcCollection = {
         },
         {
             id: 15,
+            sessionId: 'session-dal-quor',
             name: "Tink 'Blue Spark'",
             species: 'Warforged',
             ethnicity: 'Cannith-built',
@@ -180,11 +241,17 @@ const NPCS: NpcCollection = {
             updatedAt: '2026-05-10T02:23:14.845Z',
         },
     ],
+    skip: 0,
+    take: 4,
+    totalCount: 4,
 };
 
 const REFRESH: Refresh = {
-    status: 'completed',
-    forceReingest: false,
+    activeOperation: null,
+    lastRefreshAt: '2026-05-08T17:49:08.127Z',
+    lastReingestAt: null,
+    refreshStatus: 'completed',
+    reingestStatus: 'idle',
     createdAt: '2026-05-08T17:49:05.654Z',
     updatedAt: '2026-05-08T17:49:08.127Z',
 };
@@ -224,10 +291,14 @@ const CONSOLE_ENTRIES: ConsoleEntry[] = [
 
 const DEFAULT_CREATED_SESSION: Session = {
     id: 'session-dal-quor',
+    mode: 'assistant',
     title: 'Dal Quor vault pitch',
     createdAt: '2026-05-07T21:10:42.000Z',
     updatedAt: '2026-05-07T21:10:42.000Z',
     activeRunId: 'run-dal-quor-1',
+    includePartyContext: true,
+    promotedFromSessionId: null,
+    promotedToSessionId: null,
 };
 
 const DEFAULT_CREATED_RUN: Run = {
@@ -237,6 +308,7 @@ const DEFAULT_CREATED_RUN: Run = {
     status: 'completed',
     createdAt: '2026-05-07T21:10:42.000Z',
     updatedAt: '2026-05-07T21:10:48.000Z',
+    exchangeId: 'exchange-dal-quor-1',
 };
 
 export const handleV2ApiRequest = (

@@ -19,8 +19,11 @@ describe('v2 left column header', () => {
     beforeEach(() => {
         useRefreshQuery.mockReturnValue({
             data: {
-                status: 'completed',
-                forceReingest: false,
+                activeOperation: null,
+                lastRefreshAt: '2026-05-08T17:49:08.127Z',
+                lastReingestAt: null,
+                refreshStatus: 'completed',
+                reingestStatus: 'idle',
                 createdAt: '2026-05-08T17:49:05.654Z',
                 updatedAt: '2026-05-08T17:49:08.127Z',
             },
@@ -52,7 +55,7 @@ describe('v2 left column header', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
-        expect(mutate).toHaveBeenCalledWith({ forceReingest: false });
+        expect(mutate).toHaveBeenCalledWith({ kind: 'refresh' });
     });
 
     it('confirms before force reingest and respects cancellation', () => {
@@ -69,10 +72,14 @@ describe('v2 left column header', () => {
     });
 
     it('disables refresh controls while refresh is active', () => {
+        // Transitional note: the refresh DTO no longer exposes a single status/forceReingest pair.
         useRefreshQuery.mockReturnValue({
             data: {
-                status: 'running',
-                forceReingest: true,
+                activeOperation: 'reingest',
+                lastRefreshAt: '2026-05-08T17:49:08.127Z',
+                lastReingestAt: null,
+                refreshStatus: 'completed',
+                reingestStatus: 'running',
                 createdAt: '2026-05-08T17:49:05.654Z',
                 updatedAt: '2026-05-08T17:49:08.127Z',
             },

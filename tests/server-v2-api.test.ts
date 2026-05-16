@@ -77,18 +77,26 @@ describe("v2 API handler", () => {
 
     handleV2ApiRequest(request as never, response as never);
 
-    const body = JSON.parse(response.body) as Array<{ kind: string; title?: string; content: string }>;
+    // Transitional note: v2 entries now follow exchange-grouped transport DTOs instead of the older flat mock timeline.
+    const body = JSON.parse(response.body) as {
+      sessionId: string;
+      exchanges: Array<{
+        entries: Array<{ kind: string; title?: string; content: string }>;
+      }>;
+    };
+    const entries = body.exchanges.flatMap(exchange => exchange.entries);
 
     expect(response.statusCode).toBe(200);
-    expect(body[0]).toMatchObject({
-      kind: "system",
+    expect(body.sessionId).toBe("session-dal-quor");
+    expect(entries[0]).toMatchObject({
+      kind: "reasoning",
     });
-    expect(body[1]).toMatchObject({
-      kind: "tool-status",
+    expect(entries[1]).toMatchObject({
+      kind: "reasoning",
       content: "Looking for Eberron dragonshard tier and pricing guidance.",
     });
-    expect(body.some(entry => entry.kind === "user")).toBe(true);
-    expect(body.some(entry => entry.kind === "assistant" && entry.title === "Golden Vault briefing variants")).toBe(true);
+    expect(entries.some(entry => entry.kind === "user")).toBe(true);
+    expect(entries.some(entry => entry.kind === "response" && entry.title === "Golden Vault briefing variants")).toBe(true);
   });
 
   it("returns a canned created run for POST", () => {
@@ -100,7 +108,7 @@ describe("v2 API handler", () => {
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body)).toMatchObject({
       id: "run-dal-quor-1",
-      kind: "assistant",
+      mode: "assistant",
       sessionId: "session-dal-quor",
       status: "completed",
     });
@@ -115,7 +123,7 @@ describe("v2 API handler", () => {
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body)).toMatchObject({
       id: "run-dal-quor-1",
-      kind: "assistant",
+      mode: "assistant",
       sessionId: "session-dal-quor",
       status: "completed",
     });
@@ -142,8 +150,8 @@ describe("v2 API handler", () => {
 
     expect(getResponse.statusCode).toBe(200);
     expect(JSON.parse(getResponse.body)).toMatchObject({
-      status: "completed",
-      forceReingest: false,
+      activeOperation: null,
+      refreshStatus: "completed",
     });
 
     const postRequest = createRequest("POST", "/api/v2/refresh");
@@ -153,8 +161,8 @@ describe("v2 API handler", () => {
 
     expect(postResponse.statusCode).toBe(200);
     expect(JSON.parse(postResponse.body)).toMatchObject({
-      status: "completed",
-      forceReingest: false,
+      activeOperation: null,
+      refreshStatus: "completed",
     });
   });
 

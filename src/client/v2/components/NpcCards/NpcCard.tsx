@@ -4,7 +4,7 @@ interface NpcCardProps {
     npc: Npc;
 }
 
-export const NpcCard = ({npc}: NpcCardProps) => (
+export const NpcCard = ({npc: _npc}: NpcCardProps) => (
     <div>
 
     </div>

@@ -26,6 +26,8 @@ export const SessionProvider = ({children}: { children: ReactNode }) => {
                 changeActiveTab: setActiveTab,
                 activeTabState: tabInputStates[activeTab],
                 patchActiveTabState,
+                activeSession: null,
+                sessionSummaries: [],
                 isBusy: false, // TODO
                 submitActiveTab: submit,
 
