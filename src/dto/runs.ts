@@ -16,8 +16,7 @@ export interface Run {
 
 export interface CreateRun {
     mode: SessionMode;
-    includePartyContext?: boolean;
-    includeAdditionalContext: boolean;
+    includePartyContext: boolean;
     prompt: string;
     retrievalTurnLimit: number;
 }

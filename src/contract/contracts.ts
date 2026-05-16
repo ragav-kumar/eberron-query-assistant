@@ -9,7 +9,7 @@ import type {
     Refresh,
     Run,
     Session,
-    SessionEntriesResponse,
+    AssistantEntries,
     SessionSummary,
     UpdateSession,
 } from '../dto/index.js';
@@ -47,7 +47,7 @@ export const contracts = {
      */
     sessions: {
         /** Lists session summaries for browse and selection flows. */
-        getList: defineEndpointWithQuery<null, SessionSummary[], EmptyParams, { mode?: string }>({
+        getSummaries: defineEndpointWithQuery<null, SessionSummary[], EmptyParams, { mode?: string }>({
             method: 'GET',
             path: '/api/v2/sessions',
             queryParams: ['mode'],
@@ -64,7 +64,7 @@ export const contracts = {
             pathParams: ['sessionId'],
         }),
         /** Fetches the exchange feed for one session. */
-        getEntries: defineEndpoint<null, SessionEntriesResponse, { sessionId: string }>({
+        getEntries: defineEndpoint<null, AssistantEntries, { sessionId: string }>({
             method: 'GET',
             path: '/api/v2/sessions/:sessionId/entries',
             pathParams: ['sessionId'],

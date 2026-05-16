@@ -8,7 +8,7 @@ export const sessionQueryKey = ['api', 'sessions'];
 
 export const useSessionsQuery = () => useQuery({
     queryKey: sessionQueryKey,
-    queryFn: () => queryApi(contracts.sessions.getList),
+    queryFn: () => queryApi(contracts.sessions.getSummaries),
 });
 
 export const useSessionQuery = (sessionId: string) => useQuery({

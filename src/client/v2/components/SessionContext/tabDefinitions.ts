@@ -1,6 +1,6 @@
 import type { CreateRun } from '@/dto/index.js';
 import { ComponentType } from 'react';
-import { Assistant } from '../Assistant/Assistant.js';
+import { Assistant } from '../Assistant.js';
 import { NpcCards } from '../NpcCards/NpcCards.js';
 
 export const tabKeys = ['assistant', 'npc'] as const;
@@ -31,7 +31,7 @@ export const tabDefinitions = {
             retrievalTurnLimit: 1,
         },
         buildRun: input => ({
-            kind: 'assistant',
+            mode: 'assistant',
             ...input,
         }),
         component: Assistant,
@@ -45,7 +45,7 @@ export const tabDefinitions = {
             retrievalTurnLimit: 1,
         },
         buildRun: input => ({
-            kind: 'npc',
+            mode: 'npc',
             ...input,
         }),
         component: NpcCards,

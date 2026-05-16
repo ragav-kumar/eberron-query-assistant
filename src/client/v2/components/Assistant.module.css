@@ -1,0 +1,28 @@
+.wrap {
+    display: flex;
+    flex-direction: column;
+}
+
+.exchange {
+    display: flex;
+    flex-direction: column;
+}
+
+.entry {
+    /*TODO*/
+}
+
+.entry-user {
+    composes: entry;
+    /*TODO*/
+}
+
+.entry-assistant {
+    composes: entry;
+    /*TODO*/
+}
+
+.entry-reasoning {
+    composes: entry;
+    /*TODO*/
+}
