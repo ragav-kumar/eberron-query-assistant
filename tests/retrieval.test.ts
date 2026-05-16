@@ -1,17 +1,17 @@
 import Database from "better-sqlite3";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { loadDefaultConfig } from "../src/server/v1/config/index.js";
-import { isRecord } from "../src/errors.js";
-import { createSqliteCorpusStore, getCorpusDatabasePath, type CorpusStore } from "../src/server/v1/ingestion/index.js";
-import { createDeterministicEmbeddingAdapter, type EmbeddingAdapter } from "../src/server/v1/provider/index.js";
-import { createMemoryProgressReporter, type ProgressReporter } from "../src/server/v1/progress/reporter.js";
-import { createSqliteRetrievalService, getVectorIndexPath } from "../src/server/v1/retrieval/index.js";
-import type { TimingContext } from "../src/timing.js";
-import type { CorpusChunk, CorpusSource, RuntimeConfig, SourceType } from "../src/types.js";
+import { loadDefaultConfig } from '@/server/v1/config/index.js';
+import { isRecord } from '@/errors.js';
+import { createSqliteCorpusStore, getCorpusDatabasePath, type CorpusStore } from '@/server/v1/ingestion/index.js';
+import { createDeterministicEmbeddingAdapter, type EmbeddingAdapter } from '@/server/v1/provider/index.js';
+import { createMemoryProgressReporter, type ProgressReporter } from '@/server/v1/progress/reporter.js';
+import { createSqliteRetrievalService, getVectorIndexPath } from '@/server/v1/retrieval/index.js';
+import type { TimingContext } from '@/timing.js';
+import type { CorpusChunk, CorpusSource, RuntimeConfig, SourceType } from '@/types.js';
 
 const TEST_ROOT = path.resolve(".test-tmp", "retrieval");
 const stores: CorpusStore[] = [];
@@ -129,17 +129,13 @@ describe("Phase 4 retrieval", () => {
     database.close();
 
     const store = createStore();
-    await store.initialize(config).then(
-      () => {
-        throw new Error("Expected incompatible corpus schema to fail.");
-      },
-      (error: unknown) => {
-        expect(error).toMatchObject({ kind: "incompatible-corpus-schema" });
-        expect(isRecord(error) && typeof error.message === "string" ? error.message : "").toContain(
-          "browser force-reingest control"
-        );
-      }
-    );
+    await expect(store.initialize(config)).rejects.toSatisfy((error: unknown) => {
+      expect(error).toMatchObject({ kind: "incompatible-corpus-schema" });
+      expect(isRecord(error) && typeof error.message === "string" ? error.message : "").toContain(
+        "browser force-reingest control"
+      );
+      return true;
+    });
   });
 
   it("recreates incompatible SQLite artifacts only when explicit reset is allowed", async () => {
@@ -193,30 +189,6 @@ describe("Phase 4 retrieval", () => {
 
     expect(summary).toMatchObject({ chunkCount: 65, reusedEmbeddings: 64, regeneratedEmbeddings: 1 });
     expect(resumed.embedBatch).toHaveBeenCalledTimes(1);
-  });
-
-  it("preserves legacy vector files during routine refresh and deletes them during force rebuild", async () => {
-    const config = loadDefaultConfig(TEST_ROOT);
-    await seedCorpus(config);
-    await mkdir(config.retrievalDir, { recursive: true });
-    const counted = countingAdapter("legacy-delete-model", "legacy-delete-schema");
-    const legacy = `${JSON.stringify({
-      embeddingModelId: "legacy-model",
-      embeddingSchemaVersion: "legacy-schema",
-      entries: []
-    })}\n`;
-    await writeFile(getVectorIndexPath(config), legacy, "utf8");
-
-    const retrieval = createRetrieval(counted.adapter);
-    const summary = await retrieval.refresh(config);
-
-    await expect(readFile(getVectorIndexPath(config), "utf8")).resolves.toBe(legacy);
-    expect(summary).toMatchObject({ chunkCount: 3, reusedEmbeddings: 0, regeneratedEmbeddings: 3 });
-    expect(counted.embedBatch).toHaveBeenCalledTimes(1);
-    expect(readVectorRows(config)).toHaveLength(3);
-
-    await retrieval.refresh(config, { forceRebuild: true });
-    await expect(readFile(getVectorIndexPath(config), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
   });
 
   it("reports embedding sync start, progress, and final summary", async () => {

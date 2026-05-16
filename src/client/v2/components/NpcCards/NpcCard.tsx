@@ -6,6 +6,8 @@ interface NpcCardProps {
 
 export const NpcCard = ({npc: _npc}: NpcCardProps) => (
     <div>
-
+        <div>Header</div>
+        <div>Metadata</div>
+        <div>Description+bio</div>
     </div>
 );

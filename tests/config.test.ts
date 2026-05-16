@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { loadDefaultConfig } from "../src/server/v1/config/index.js";
+import { loadDefaultConfig } from '@/server/v1/config/index.js';
 
 const TEST_ROOT = path.resolve(".test-tmp", "config");
 const ENV_KEYS = [

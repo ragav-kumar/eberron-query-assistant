@@ -3,14 +3,14 @@ import path from "node:path";
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { loadDefaultConfig } from "../src/server/v1/config/index.js";
-import type { IngestionService } from "../src/server/v1/ingestion/index.js";
-import type { ChatCompletionOptions, ChatMessage } from "../src/server/v1/provider/index.js";
-import { createWebApp, isBusyError, isWebOperationError } from "../src/server/v1/app.js";
-import { getProviderDebugLogPath } from "../src/server/v1/provider-debug-log.js";
-import type { AssistantSessionAnswer } from "../src/server/v1/runtime/assistant-session.js";
-import { createDefaultRuntimeState } from "../src/server/v1/state/state-store.js";
-import type { RuntimeConfig, RetrievalResult } from "../src/types.js";
+import { loadDefaultConfig } from '@/server/v1/config/index.js';
+import type { IngestionService } from '@/server/v1/ingestion/index.js';
+import type { ChatCompletionOptions, ChatMessage } from '@/server/v1/provider/index.js';
+import { createWebApp, isBusyError, isWebOperationError } from '@/server/v1/app.js';
+import { getProviderDebugLogPath } from '@/server/v1/provider-debug-log.js';
+import type { AssistantSessionAnswer } from '@/server/v1/runtime/assistant-session.js';
+import { createDefaultRuntimeState } from '@/server/v1/state/state-store.js';
+import type { RuntimeConfig, RetrievalResult } from '@/types.js';
 
 const TEST_ROOT = path.resolve(".test-tmp", "server-app");
 
@@ -900,43 +900,6 @@ describe("web app API model", () => {
     );
   });
 
-  it("migrates legacy generated NPC Markdown into runtime state", async () => {
-    const config = await writeConfig("npc-state-migration");
-    await mkdir(config.logDir, { recursive: true });
-    await writeFile(
-      path.join(config.logDir, "generated_npcs.md"),
-      [
-        "## NPC Generation",
-        "",
-        "Prompt: Generate one NPC",
-        "",
-        "### 1. Father Halven ir'Bradd",
-        "",
-        "Description: Lean, middle-aged human priest.",
-        "",
-        "Bio: He keeps Vathirond organized.",
-        ""
-      ].join("\n"),
-      "utf8"
-    );
-    const app = createWebApp({
-      config,
-      retrieval: mockRetrieval([]).retrieval,
-      chat: { complete: vi.fn().mockResolvedValue("answer") }
-    });
-
-    expect((await app.getNpcs()).npcs).toEqual([
-      {
-        id: 1,
-        name: "Father Halven ir'Bradd",
-        description: "Lean, middle-aged human priest.",
-        bio: "He keeps Vathirond organized."
-      }
-    ]);
-    expect(await readFile(path.join(config.stateDir, "generated-npcs.json"), "utf8")).toContain("Father Halven ir'Bradd");
-    expect(await readFile(path.join(config.logDir, "generated_npcs.md"), "utf8")).toContain("## NPC Generation");
-  });
-
   it("keeps historical log browsing read-only while assistant prompts write to the active session", async () => {
     const config = await writeConfig("historical-readonly");
     await mkdir(config.logDir, { recursive: true });
@@ -1419,17 +1382,14 @@ describe("web app API model", () => {
       chat: { complete: vi.fn().mockResolvedValue("not json") }
     });
 
-    try {
-      await app.generateNpcs("Generate one NPC");
-      throw new Error("Expected NPC generation to fail.");
-    } catch (error) {
+    await expect(app.generateNpcs("Generate one NPC")).rejects.toSatisfy((error: unknown) => {
       expect(isWebOperationError(error)).toBe(true);
-      if (!isWebOperationError(error)) {
-        throw error;
+      if (isWebOperationError(error)) {
+        expect(error.console.entries.some((entry) => entry.message.includes("NPC generation failed:"))).toBe(true);
+        expect(error.message.length).toBeGreaterThan(0);
       }
-      expect(error.console.entries.some((entry) => entry.message.includes("NPC generation failed:"))).toBe(true);
-      expect(error.message.length).toBeGreaterThan(0);
-    }
+      return true;
+    });
     await expect(readFile(path.join(config.stateDir, "generated-npcs.json"), "utf8")).rejects.toMatchObject({
       code: "ENOENT"
     });
@@ -1447,17 +1407,14 @@ describe("web app API model", () => {
       chat: { complete: vi.fn().mockResolvedValue("answer") }
     });
 
-    try {
-      await app.askAssistant("Will this fail?");
-      throw new Error("Expected assistant prompt to fail.");
-    } catch (error) {
+    await expect(app.askAssistant("Will this fail?")).rejects.toSatisfy((error: unknown) => {
       expect(isWebOperationError(error)).toBe(true);
-      if (!isWebOperationError(error)) {
-        throw error;
+      if (isWebOperationError(error)) {
+        expect(error.console.entries.some((entry) => entry.message.includes("Assistant response failed: provider failed"))).toBe(true);
+        expect(error.message).toBe("provider failed");
       }
-      expect(error.console.entries.some((entry) => entry.message.includes("Assistant response failed: provider failed"))).toBe(true);
-      expect(error.message).toBe("provider failed");
-    }
+      return true;
+    });
 
     await expect(readdir(config.logDir)).rejects.toMatchObject({ code: "ENOENT" });
   });

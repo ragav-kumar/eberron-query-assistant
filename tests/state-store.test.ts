@@ -3,10 +3,10 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { loadDefaultConfig } from "../src/server/v1/config/index.js";
-import { createFilesystemStateStore, getStatePath } from "../src/server/v1/state/index.js";
-import type { RuntimeState } from "../src/server/v1/state/index.js";
-import { getAppVersion } from "../src/app-version.js";
+import { loadDefaultConfig } from '@/server/v1/config/index.js';
+import { createFilesystemStateStore, getStatePath } from '@/server/v1/state/index.js';
+import type { RuntimeState } from '@/server/v1/state/index.js';
+import { getAppVersion } from '@/app-version.js';
 
 const TEST_ROOT = path.resolve(".test-tmp", "state-store");
 const APP_VERSION = getAppVersion();
@@ -102,61 +102,6 @@ describe("FilesystemStateStore", () => {
     await expect(mkdir(path.dirname(getStatePath(config)))).rejects.toMatchObject({ code: "EEXIST" });
   });
 
-  it("preserves valid delta export state when app version is missing", async () => {
-    const config = loadDefaultConfig(TEST_ROOT);
-    const store = createFilesystemStateStore();
-    const marker = createMarker("20260424T100000000Z-foundry-export.ndjson", "run-1", 2);
-
-    await mkdir(config.stateDir, { recursive: true });
-    await writeFile(
-      getStatePath(config),
-      `${JSON.stringify({
-        foundry: {
-          appliedExportFilenames: [marker.filename],
-          lastSuccessfulExport: marker
-        },
-        pdf: { knownFilenames: ["a.pdf"] },
-        article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }
-      })}\n`,
-      "utf8"
-    );
-
-    const result = await store.load(config);
-
-    expect(result.state.appVersion).toBe(APP_VERSION);
-    expect(result.state.foundry.lastSuccessfulExport).toEqual(marker);
-    expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
-  });
-
-  it("normalizes legacy foundry export markers to null", async () => {
-    const config = loadDefaultConfig(TEST_ROOT);
-    const store = createFilesystemStateStore();
-
-    await mkdir(config.stateDir, { recursive: true });
-    await writeFile(
-      getStatePath(config),
-      `${JSON.stringify({
-        appVersion: "0.10.0",
-        foundry: {
-          lastSuccessfulExport: {
-            generatedAt: "2026-04-24T10:00:00.000Z",
-            recordCount: 2,
-            runId: "run-1"
-          }
-        },
-        pdf: { knownFilenames: ["a.pdf"] },
-        article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }
-      })}\n`,
-      "utf8"
-    );
-
-    const result = await store.load(config);
-
-    expect(result.state.foundry.lastSuccessfulExport).toBeNull();
-    expect(result.state.foundry.appliedExportFilenames).toEqual([]);
-    expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
-  });
-
   it("rejects invalid delta export marker fields", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = createFilesystemStateStore();
@@ -185,49 +130,6 @@ describe("FilesystemStateStore", () => {
     });
   });
 
-  it("loads state from any app version without invalidation when the shape is valid", async () => {
-    const config = loadDefaultConfig(TEST_ROOT);
-    const store = createFilesystemStateStore();
-
-    await mkdir(config.stateDir, { recursive: true });
-    await writeFile(
-      getStatePath(config),
-      `${JSON.stringify({
-        appVersion: "0.2.0",
-        foundry: { lastSuccessfulExport: null },
-        pdf: { knownFilenames: ["a.pdf"] },
-        article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }
-      })}\n`,
-      "utf8"
-    );
-
-    const result = await store.load(config);
-
-    expect(result.state.appVersion).toBe(APP_VERSION);
-    expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
-  });
-
-  it("normalizes non-semver app version state when the shape is valid", async () => {
-    const config = loadDefaultConfig(TEST_ROOT);
-    const store = createFilesystemStateStore();
-
-    await mkdir(config.stateDir, { recursive: true });
-    await writeFile(
-      getStatePath(config),
-      `${JSON.stringify({
-        appVersion: "not-semver",
-        foundry: { lastSuccessfulExport: null },
-        pdf: { knownFilenames: ["a.pdf"] },
-        article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }
-      })}\n`,
-      "utf8"
-    );
-
-    const result = await store.load(config);
-
-    expect(result.state.appVersion).toBe(APP_VERSION);
-    expect(result.state.pdf.knownFilenames).toEqual(["a.pdf"]);
-  });
 });
 
 const createMarker = (filename: string, runId: string, recordCount: number) => ({

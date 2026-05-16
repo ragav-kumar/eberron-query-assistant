@@ -32,7 +32,7 @@ describe('V2 ORM', () => {
                         SELECT name
                         FROM sqlite_master
                         WHERE type = 'table'
-                        ORDER BY name ASC
+                        ORDER BY name
                     `)
                     .all()
                     .map((row) => (row as { name: string }).name);

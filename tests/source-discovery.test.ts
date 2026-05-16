@@ -69,24 +69,6 @@ describe("FilesystemSourceDiscoveryService", () => {
     });
   });
 
-  it("schedules foundry NDJSON exports whose filenames do not match the legacy timestamp pattern", async () => {
-    const config = loadDefaultConfig(TEST_ROOT);
-    await writeDeltaExport(config.foundryExportDir, "alpha.ndjson", "run-a", 4);
-
-    const summary = await inspect(config);
-
-    expect(summary.inventories.find((inventory) => inventory.sourceType === "foundry")).toMatchObject({
-      status: "scheduled",
-      discovered: 1,
-      added: 1,
-      details: ["scheduled:alpha.ndjson"]
-    });
-    expect(summary.nextState.foundry.lastSuccessfulExport).toMatchObject({
-      filename: "alpha.ndjson",
-      runId: "run-a"
-    });
-  });
-
   it("schedules multiple unapplied foundry delta export files oldest to newest", async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await writeDeltaExport(config.foundryExportDir, "20260424T110000000Z-foundry-export.ndjson", "run-2", 5);

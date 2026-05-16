@@ -4,8 +4,8 @@ import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { loadDefaultConfig } from "../src/server/v1/config/index.js";
-import { createTaggedError } from "../src/errors.js";
+import { loadDefaultConfig } from '@/server/v1/config/index.js';
+import { createTaggedError } from '@/errors.js';
 import {
   createFilesystemIngestionService,
   createFilesystemArticleRawCache,
@@ -17,10 +17,10 @@ import {
   type ArticleFetcher,
   type CorpusStore,
   type PdfParser
-} from "../src/server/v1/ingestion/index.js";
-import { chunkText } from "../src/server/v1/ingestion/chunking.js";
-import type { SourceDiscoverySummary } from "../src/server/v1/source-discovery/index.js";
-import { createDefaultRuntimeState, type RuntimeState, type StateStore } from "../src/server/v1/state/state-store.js";
+} from '@/server/v1/ingestion/index.js';
+import { chunkText } from '@/server/v1/ingestion/chunking.js';
+import type { SourceDiscoverySummary } from '@/server/v1/source-discovery/index.js';
+import { createDefaultRuntimeState, type RuntimeState, type StateStore } from '@/server/v1/state/state-store.js';
 
 const TEST_ROOT = path.resolve(".test-tmp", "ingestion");
 const NOW = new Date("2026-04-24T12:00:00.000Z");
@@ -607,7 +607,7 @@ describe("Phase 3 ingestion", () => {
   it("uses article-specific title metadata instead of the generic blog title", () => {
     const normalized = normalizeArticle(
       "https://keith-baker.com/example/",
-      '<html><head><title>Example Article - Keith Baker&apos;s Blog</title><meta property="og:title" content="Example Article"></head><body><article><p>Dragonmarks matter.</p></article></body></html>',
+      '<html lang="en"><head><title>Example Article - Keith Baker&apos;s Blog</title><meta property="og:title" content="Example Article"></head><body><article><p>Dragonmarks matter.</p></article></body></html>',
       null,
       NOW.toISOString()
     );

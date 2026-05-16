@@ -3,13 +3,13 @@ import path from "node:path";
 
 import { describe, expect, it, vi } from "vitest";
 
-import { loadDefaultConfig } from "../src/server/v1/config/index.js";
-import { createPlaceholderIngestionService } from "../src/server/v1/ingestion/index.js";
-import { createMemoryProgressReporter } from "../src/server/v1/progress/reporter.js";
-import { runStartupRefresh } from "../src/server/v1/runtime/refresh.js";
-import { createFilesystemSourceDiscoveryService, createPlaceholderSourceDiscoveryService } from "../src/server/v1/source-discovery/index.js";
-import { createFilesystemStateStore, createPlaceholderStateStore } from "../src/server/v1/state/index.js";
-import { createDefaultRuntimeState, type RuntimeState } from "../src/server/v1/state/state-store.js";
+import { loadDefaultConfig } from '@/server/v1/config/index.js';
+import { createPlaceholderIngestionService } from '@/server/v1/ingestion/index.js';
+import { createMemoryProgressReporter } from '@/server/v1/progress/reporter.js';
+import { runStartupRefresh } from '@/server/v1/runtime/refresh.js';
+import { createFilesystemSourceDiscoveryService, createPlaceholderSourceDiscoveryService } from '@/server/v1/source-discovery/index.js';
+import { createFilesystemStateStore, createPlaceholderStateStore } from '@/server/v1/state/index.js';
+import { createDefaultRuntimeState, type RuntimeState } from '@/server/v1/state/state-store.js';
 
 const TEST_ROOT = path.resolve(".test-tmp", "runtime");
 const PLACEHOLDER_ROOT = path.resolve(".test-tmp", "runtime-placeholder");

@@ -8,7 +8,7 @@
     "prestart": "tsc --noEmit",
     "start": "vite",
     "test": "vitest run",
-    "verify": "npm run lint && npm run prestart && npm run test"
+    "verify": "npm audit --audit-level=moderate && npm run lint && tsc --noEmit && npm run test"
   },
   "engines": {
     "node": ">=22"

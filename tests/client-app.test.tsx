@@ -4,7 +4,7 @@ import type { ChangeEvent } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "@/client/v1/App.js";
-import * as api from "../src/client/v1/api.js";
+import * as api from "@/client/v1/api.js";
 
 vi.mock("@mdxeditor/editor", () => ({
   BoldItalicUnderlineToggles: () => null,

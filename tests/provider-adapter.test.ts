@@ -5,8 +5,8 @@ import {
   createOpenAiEmbeddingAdapter,
   type ChatMessage,
   type ChatToolDefinition
-} from "../src/server/v1/provider/index.js";
-import type { ProviderConfig } from "../src/types.js";
+} from '@/server/v1/provider/index.js';
+import type { ProviderConfig } from '@/types.js';
 
 const config: ProviderConfig = {
   apiKey: "sk-test-secret",
@@ -351,14 +351,9 @@ describe("OpenAI-compatible provider adapters", () => {
   it("requires an API key before making provider requests", () => {
     const fetchImpl = vi.fn<typeof fetch>();
 
-    try {
-      createOpenAiChatAdapter({ ...config, apiKey: null }, { fetchImpl });
-      throw new Error("Expected adapter creation to fail.");
-    } catch (error) {
-      expect(error).toMatchObject({
-        message: "OPENAI_API_KEY is required for provider-backed chat."
-      });
-    }
+    expect(() => createOpenAiChatAdapter({ ...config, apiKey: null }, { fetchImpl })).toThrow(
+      "OPENAI_API_KEY is required for provider-backed chat."
+    );
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
