@@ -13,13 +13,13 @@ import type {
     SessionExchange as StoredSessionExchangeRow,
 } from './schema.js';
 
-export interface V2Loaders {
+export interface Loaders {
     loadRun: (database: Database.Database, runId: string) => ObjectModelRun | null;
     loadSession: (database: Database.Database, sessionId: string, options?: SessionLoadOptions) => ObjectModelSession | null;
     loadSessionExchanges: (database: Database.Database, sessionId: string) => ObjectModelSessionExchange[];
 }
 
-export const createLoaders = (): V2Loaders => {
+export const createLoaders = (): Loaders => {
     const loadSessionExchanges = (
         database: Database.Database,
         sessionId: string,

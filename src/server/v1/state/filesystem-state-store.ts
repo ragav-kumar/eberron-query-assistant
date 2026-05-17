@@ -20,8 +20,7 @@ export interface InvalidRuntimeStateError {
   name: string;
 }
 
-export const createFilesystemStateStore = (): StateStore => {
-  return {
+export const createFilesystemStateStore = (): StateStore => ({
     async load(config) {
       const statePath = getStatePath(config);
 
@@ -46,16 +45,11 @@ export const createFilesystemStateStore = (): StateStore => {
       await mkdir(config.stateDir, { recursive: true });
       await writeFile(getStatePath(config), `${JSON.stringify(normalizeRuntimeState(state), null, 2)}\n`, 'utf8');
     }
-  };
-};
+  });
 
-export const isInvalidRuntimeStateError = (value: unknown): value is InvalidRuntimeStateError => {
-  return isRecord(value) && value.kind === 'invalid-runtime-state' && typeof value.message === 'string';
-};
+export const isInvalidRuntimeStateError = (value: unknown): value is InvalidRuntimeStateError => isRecord(value) && value.kind === 'invalid-runtime-state' && typeof value.message === 'string';
 
-export const getStatePath = (config: RuntimeConfig): string => {
-  return path.join(config.stateDir, STATE_FILENAME);
-};
+export const getStatePath = (config: RuntimeConfig): string => path.join(config.stateDir, STATE_FILENAME);
 
 const parseRuntimeState = (value: unknown): RuntimeStateLoadResult => {
   const appVersion = getAppVersion();
@@ -96,8 +90,7 @@ const parseRuntimeState = (value: unknown): RuntimeStateLoadResult => {
   };
 };
 
-const normalizeRuntimeState = (state: RuntimeState): RuntimeState => {
-  return {
+const normalizeRuntimeState = (state: RuntimeState): RuntimeState => ({
     appVersion: getAppVersion(),
     foundry: {
       appliedExportFilenames: [...new Set(state.foundry.appliedExportFilenames)].sort((a, b) => a.localeCompare(b)),
@@ -120,8 +113,7 @@ const normalizeRuntimeState = (state: RuntimeState): RuntimeState => {
       lastSuccessfulIndexScrapeAt: state.article.lastSuccessfulIndexScrapeAt,
       knownArticles: [...state.article.knownArticles].sort((a, b) => a.canonicalUrl.localeCompare(b.canonicalUrl))
     }
-  };
-};
+  });
 
 const parseFoundryMarker = (value: unknown): RuntimeState['foundry']['lastSuccessfulExport'] => {
   if (value === null || value === undefined) {
@@ -228,6 +220,4 @@ const parseNullableString = (value: unknown, fieldName: string): string | null =
   return value;
 };
 
-const createInvalidRuntimeStateError = (message: string): InvalidRuntimeStateError => {
-  return createTaggedError('invalid-runtime-state', message) as InvalidRuntimeStateError;
-};
+const createInvalidRuntimeStateError = (message: string): InvalidRuntimeStateError => createTaggedError('invalid-runtime-state', message) as InvalidRuntimeStateError;

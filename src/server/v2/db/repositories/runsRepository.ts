@@ -1,17 +1,16 @@
 import { mapRunRow, toTimestamp } from '../mappers.js';
-import type { V2Orm } from '../contract.js';
+import type { Orm } from '../contract.js';
 import type { Run as StoredRunRow } from '../schema.js';
 
-import type { V2Loaders } from '../loaders.js';
+import type { Loaders } from '../loaders.js';
 import type { RepositoryDependencies } from './shared.js';
 
-type RunsRepository = V2Orm['runs'];
+type RunsRepository = Orm['runs'];
 
 export const createRunsRepository = (
     { getDatabase }: RepositoryDependencies,
-    loaders: Pick<V2Loaders, 'loadRun'>,
-): RunsRepository => {
-    return {
+    loaders: Pick<Loaders, 'loadRun'>,
+): RunsRepository => ({
         get: async id => {
             const database = await getDatabase();
             return loaders.loadRun(database, id);
@@ -94,5 +93,4 @@ export const createRunsRepository = (
                     toTimestamp(run.failedAt),
                 );
         },
-    };
-};
+    });

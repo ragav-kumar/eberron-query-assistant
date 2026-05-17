@@ -13,9 +13,7 @@ export interface StoredGeneratedNpc extends GeneratedNpc {
 const GENERATED_NPCS_STATE_FILE = 'generated-npcs.json';
 const LEGACY_GENERATED_NPCS_LOG_FILE = 'generated_npcs.md';
 
-export const readGeneratedNpcState = async (config: RuntimeConfig): Promise<GeneratedNpc[]> => {
-  return sortStoredNpcsForDisplay(await readStoredGeneratedNpcState(config));
-};
+export const readGeneratedNpcState = async (config: RuntimeConfig): Promise<GeneratedNpc[]> => sortStoredNpcsForDisplay(await readStoredGeneratedNpcState(config));
 
 export const updateGeneratedNpcState = async (
   config: RuntimeConfig,
@@ -41,9 +39,7 @@ export const updateGeneratedNpcState = async (
   return sortStoredNpcsForDisplay(next);
 };
 
-export const getGeneratedNpcStatePath = (config: RuntimeConfig): string => {
-  return path.join(config.stateDir, GENERATED_NPCS_STATE_FILE);
-};
+export const getGeneratedNpcStatePath = (config: RuntimeConfig): string => path.join(config.stateDir, GENERATED_NPCS_STATE_FILE);
 
 const readStoredGeneratedNpcState = async (config: RuntimeConfig): Promise<StoredGeneratedNpc[]> => {
   const statePath = getGeneratedNpcStatePath(config);
@@ -193,21 +189,13 @@ const assertUniqueNpcIds = (npcs: StoredGeneratedNpc[]): void => {
   }
 };
 
-const sortStoredNpcsForDisplay = (npcs: StoredGeneratedNpc[]): StoredGeneratedNpc[] => {
-  return [...npcs].sort((left, right) => {
+const sortStoredNpcsForDisplay = (npcs: StoredGeneratedNpc[]): StoredGeneratedNpc[] => [...npcs].sort((left, right) => {
     const updatedComparison = right.updatedAt.localeCompare(left.updatedAt);
     return updatedComparison !== 0 ? updatedComparison : right.id - left.id;
   });
-};
 
-const sortStoredNpcsForStorage = (npcs: StoredGeneratedNpc[]): StoredGeneratedNpc[] => {
-  return [...npcs].sort((left, right) => left.id - right.id);
-};
+const sortStoredNpcsForStorage = (npcs: StoredGeneratedNpc[]): StoredGeneratedNpc[] => [...npcs].sort((left, right) => left.id - right.id);
 
-const isValidIsoDate = (value: string): boolean => {
-  return !Number.isNaN(Date.parse(value));
-};
+const isValidIsoDate = (value: string): boolean => !Number.isNaN(Date.parse(value));
 
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === 'object' && value !== null;
-};
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;

@@ -1,10 +1,10 @@
 import { mapSessionExchangeRow } from '../mappers.js';
-import type { V2Orm } from '../contract.js';
+import type { Orm } from '../contract.js';
 import type { SessionExchange as StoredSessionExchangeRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';
 
-type SessionExchangesRepository = V2Orm['sessionExchanges'];
+type SessionExchangesRepository = Orm['sessionExchanges'];
 
 const EXCHANGE_SELECT = `
     SELECT
@@ -25,8 +25,7 @@ const EXCHANGE_ORDER = 'ORDER BY sequence_index ASC, id ASC';
 
 export const createSessionExchangesRepository = (
     { getDatabase }: RepositoryDependencies,
-): SessionExchangesRepository => {
-    return {
+): SessionExchangesRepository => ({
         get: async id => {
             const database = await getDatabase();
             const row = database
@@ -99,5 +98,4 @@ export const createSessionExchangesRepository = (
                     exchange.createdAt.toISOString(),
                 );
         },
-    };
-};
+    });

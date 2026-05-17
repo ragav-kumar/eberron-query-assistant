@@ -369,8 +369,7 @@ const createInventoryResult = (options: {
   status: SourceInventoryStatus;
   message: string;
   details?: string[];
-}): SourceInventoryResult => {
-  return {
+}): SourceInventoryResult => ({
     sourceType: options.sourceType,
     discovered: options.discovered ?? 0,
     added: options.added ?? 0,
@@ -380,11 +379,9 @@ const createInventoryResult = (options: {
     status: options.status,
     message: options.message,
     details: options.details ?? []
-  };
-};
+  });
 
-const cloneRuntimeState = (state: RuntimeState): RuntimeState => {
-  return {
+const cloneRuntimeState = (state: RuntimeState): RuntimeState => ({
     appVersion: state.appVersion,
     foundry: {
       appliedExportFilenames: [...state.foundry.appliedExportFilenames],
@@ -397,9 +394,6 @@ const cloneRuntimeState = (state: RuntimeState): RuntimeState => {
       lastSuccessfulIndexScrapeAt: state.article.lastSuccessfulIndexScrapeAt,
       knownArticles: state.article.knownArticles.map((article) => ({ ...article }))
     }
-  };
-};
+  });
 
-const createManifestError = (message: string): unknown => {
-  return createTaggedError('invalid-foundry-manifest', message);
-};
+const createManifestError = (message: string): unknown => createTaggedError('invalid-foundry-manifest', message);

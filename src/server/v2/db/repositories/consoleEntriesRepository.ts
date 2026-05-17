@@ -1,15 +1,14 @@
 import { mapConsoleEntryRow } from '../mappers.js';
-import type { V2Orm } from '../contract.js';
+import type { Orm } from '../contract.js';
 import type { ConsoleEntry as StoredConsoleEntryRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';
 
-type ConsoleEntriesRepository = V2Orm['consoleEntries'];
+type ConsoleEntriesRepository = Orm['consoleEntries'];
 
 export const createConsoleEntriesRepository = (
     { getDatabase }: RepositoryDependencies,
-): ConsoleEntriesRepository => {
-    return {
+): ConsoleEntriesRepository => ({
         get: async id => {
             const database = await getDatabase();
             const row = database
@@ -45,5 +44,4 @@ export const createConsoleEntriesRepository = (
                 `)
                 .run(entry.id, entry.level, entry.message, entry.createdAt.toISOString());
         },
-    };
-};
+    });

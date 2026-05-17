@@ -332,6 +332,4 @@ const clampEvidenceLimit = (value: unknown): number => {
   return Math.min(MAX_EVIDENCE_RESULTS, Math.max(1, Math.trunc(value)));
 };
 
-const isSourceType = (value: string): value is SourceType => {
-  return value === 'foundry' || value === 'pdf' || value === 'article';
-};
+const isSourceType = (value: string): value is SourceType => value === 'foundry' || value === 'pdf' || value === 'article';

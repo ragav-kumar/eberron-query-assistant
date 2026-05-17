@@ -366,8 +366,7 @@ const seedCorpus = async (config: RuntimeConfig, chunkCount = 3): Promise<Corpus
     return store;
   }
 
-  const chunks = Array.from({ length: chunkCount }, (_, index) => {
-    return chunk(
+  const chunks = Array.from({ length: chunkCount }, (_, index) => chunk(
       `pdf:eberron.pdf:${index}`,
       'pdf:eberron.pdf',
       index,
@@ -378,8 +377,7 @@ const seedCorpus = async (config: RuntimeConfig, chunkCount = 3): Promise<Corpus
         locator: `page ${index + 1}`,
         url: null
       }
-    );
-  });
+    ));
 
   await store.replaceSource(config, source('pdf', 'eberron.pdf', 'Eberron Rising'), chunks);
   return store;
@@ -395,8 +393,7 @@ const createRetrieval = (
   embeddingAdapter: EmbeddingAdapter = createDeterministicEmbeddingAdapter(),
   reporter?: ProgressReporter,
   options: { maxVectorCacheDatabaseBytes?: number } = {}
-) => {
-  return createSqliteRetrievalService({
+) => createSqliteRetrievalService({
     embeddingAdapter,
     ...(options.maxVectorCacheDatabaseBytes === undefined
       ? {}
@@ -406,18 +403,15 @@ const createRetrieval = (
       warn: () => undefined
     }
   });
-};
 
-const source = (sourceType: SourceType, sourceKey: string, title: string): CorpusSource => {
-  return {
+const source = (sourceType: SourceType, sourceKey: string, title: string): CorpusSource => ({
     sourceId: `${sourceType}:${sourceKey}`,
     sourceType,
     sourceKey,
     title,
     metadata: {},
     status: 'succeeded'
-  };
-};
+  });
 
 const chunk = (
   chunkId: string,
@@ -425,16 +419,14 @@ const chunk = (
   chunkIndex: number,
   text: string,
   citation: CorpusChunk['citation']
-): CorpusChunk => {
-  return {
+): CorpusChunk => ({
     chunkId,
     sourceId,
     chunkIndex,
     text,
     citation,
     metadata: {}
-  };
-};
+  });
 
 const countingAdapter = (
   modelId: string,
@@ -545,12 +537,10 @@ const readRows = (config: RuntimeConfig, sql: string): Array<Record<string, unkn
   }
 };
 
-const readVectorRows = (config: RuntimeConfig): Array<Record<string, unknown>> => {
-  return readRows(
+const readVectorRows = (config: RuntimeConfig): Array<Record<string, unknown>> => readRows(
     config,
     'SELECT chunk_id, content_hash, embedding_model_id, embedding_schema_version, embedding_json FROM chunk_vectors ORDER BY chunk_id'
   );
-};
 
 const rewriteVectorJson = (config: RuntimeConfig, embeddingJson: string, chunkId?: string): void => {
   const database = new Database(getCorpusDatabasePath(config));

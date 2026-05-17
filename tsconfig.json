@@ -13,7 +13,6 @@
     "skipLibCheck": true,
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
     "paths": {
       "@/*": ["src/*"]
     },

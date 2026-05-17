@@ -360,13 +360,9 @@ const buildNpcJsonRepairPrompt = (): string => [
   'Use the exact shape {"npcs":[...]} with no Markdown fences and no commentary.'
 ].join('\n');
 
-const isMalformedNpcJsonError = (error: unknown): boolean => {
-  return error instanceof SyntaxError || (
+const isMalformedNpcJsonError = (error: unknown): boolean => error instanceof SyntaxError || (
     error instanceof Error &&
     error.message === 'NPC generation response must be JSON with an npcs array.'
   );
-};
 
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === 'object' && value !== null;
-};
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;

@@ -207,11 +207,9 @@ const useCreateAppState = (): AppState => {
     };
   }, [isRecoveringOperation, standardSessionId, status.busy]);
 
-  useEffect(() => {
-    return subscribeConsole((entry) => {
+  useEffect(() => subscribeConsole((entry) => {
       setConsoleOutput((current) => appendConsoleEntry(current, entry));
-    });
-  }, []);
+    }), []);
 
   useEffect(() => {
     if (!contextLoaded || contextMarkdown === lastSavedContext) {
@@ -414,9 +412,7 @@ const useCreateAppState = (): AppState => {
   };
 };
 
-const formatError = (error: unknown): string => {
-  return error instanceof Error ? error.message : String(error);
-};
+const formatError = (error: unknown): string => error instanceof Error ? error.message : String(error);
 
 const appendConsoleEntry = (consoleOutput: ApiConsole, entry: ApiConsoleEntry): ApiConsole => {
   if (consoleOutput.entries.some((current) => current.id === entry.id)) {

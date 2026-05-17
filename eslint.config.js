@@ -37,6 +37,7 @@ export default tseslint.config(
                 }
             ],
             '@typescript-eslint/only-throw-error': 'off',
+            'arrow-body-style': ['error', 'as-needed'],
             'func-style': ['error', 'expression', {'allowArrowFunctions': true}],
             'jsx-quotes': ['error', 'prefer-single'],
             quotes: ['error', 'single', {'avoidEscape': true}],

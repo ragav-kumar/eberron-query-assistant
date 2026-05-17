@@ -79,11 +79,9 @@ const splitOversizedParagraph = (paragraph: string, targetCharacters: number): s
   return segments;
 };
 
-export const normalizeText = (text: string): string => {
-  return text
+export const normalizeText = (text: string): string => text
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
-};

@@ -1,10 +1,10 @@
 import { mapNpcRow, toTimestamp } from '../mappers.js';
-import type { V2Orm } from '../contract.js';
+import type { Orm } from '../contract.js';
 import type { Npc as StoredNpcRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';
 
-type NpcRepository = V2Orm['npcs'];
+type NpcRepository = Orm['npcs'];
 
 const NPC_SELECT = `
     SELECT
@@ -28,8 +28,7 @@ const NPC_LIST_ORDER = 'ORDER BY updated_at DESC, id DESC';
 
 export const createNpcRepository = (
     { getDatabase }: RepositoryDependencies,
-): NpcRepository => {
-    return {
+): NpcRepository => ({
         get: async id => {
             const database = await getDatabase();
             const row = database
@@ -121,5 +120,4 @@ export const createNpcRepository = (
                     toTimestamp(npc.updatedAt),
                 );
         },
-    };
-};
+    });

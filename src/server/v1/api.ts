@@ -164,6 +164,4 @@ const writeConsoleEvents = (app: WebApp, request: IncomingMessage, response: Ser
   });
 };
 
-const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === 'object' && value !== null;
-};
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;

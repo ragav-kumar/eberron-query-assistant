@@ -400,12 +400,10 @@ const readArticleHtml = async (options: {
   return html;
 };
 
-const readScheduledFilenames = (details: string[]): string[] => {
-  return details
+const readScheduledFilenames = (details: string[]): string[] => details
     .filter((detail) => detail.startsWith('scheduled:'))
     .map((detail) => detail.slice('scheduled:'.length))
     .sort((a, b) => a.localeCompare(b));
-};
 
 const applyFoundryDeltaFile = async (
   corpusStore: CorpusStore,
@@ -450,8 +448,7 @@ const applyFoundryMarker = (state: RuntimeState, marker: FoundryDeltaFile['marke
   }
 };
 
-const skippedSummary = (sourceType: SourceIngestionSummary['sourceType'], message: string): SourceIngestionSummary => {
-  return {
+const skippedSummary = (sourceType: SourceIngestionSummary['sourceType'], message: string): SourceIngestionSummary => ({
     sourceType,
     status: 'skipped',
     discovered: 0,
@@ -460,8 +457,7 @@ const skippedSummary = (sourceType: SourceIngestionSummary['sourceType'], messag
     failed: 0,
     message,
     details: []
-  };
-};
+  });
 
 const succeededSummary = (
   sourceType: SourceIngestionSummary['sourceType'],
@@ -470,8 +466,7 @@ const succeededSummary = (
   removed: number,
   message: string,
   details: string[] = []
-): SourceIngestionSummary => {
-  return {
+): SourceIngestionSummary => ({
     sourceType,
     status: 'succeeded',
     discovered,
@@ -480,11 +475,9 @@ const succeededSummary = (
     failed: 0,
     message,
     details
-  };
-};
+  });
 
-const failedSummary = (sourceType: SourceIngestionSummary['sourceType'], message: string): SourceIngestionSummary => {
-  return {
+const failedSummary = (sourceType: SourceIngestionSummary['sourceType'], message: string): SourceIngestionSummary => ({
     sourceType,
     status: 'failed',
     discovered: 0,
@@ -493,11 +486,9 @@ const failedSummary = (sourceType: SourceIngestionSummary['sourceType'], message
     failed: 1,
     message,
     details: []
-  };
-};
+  });
 
-const cloneRuntimeState = (state: RuntimeState): RuntimeState => {
-  return {
+const cloneRuntimeState = (state: RuntimeState): RuntimeState => ({
     appVersion: state.appVersion,
     foundry: {
       appliedExportFilenames: [...state.foundry.appliedExportFilenames],
@@ -510,9 +501,6 @@ const cloneRuntimeState = (state: RuntimeState): RuntimeState => {
       lastSuccessfulIndexScrapeAt: state.article.lastSuccessfulIndexScrapeAt,
       knownArticles: state.article.knownArticles.map((article) => ({ ...article }))
     }
-  };
-};
+  });
 
-const sortArticles = (articles: ArticleStateRecord[]): ArticleStateRecord[] => {
-  return articles.sort((a, b) => a.canonicalUrl.localeCompare(b.canonicalUrl));
-};
+const sortArticles = (articles: ArticleStateRecord[]): ArticleStateRecord[] => articles.sort((a, b) => a.canonicalUrl.localeCompare(b.canonicalUrl));

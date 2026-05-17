@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
-import { createV2Orm, getAppDatabasePath } from '@/server/v2/db/index.js';
+import { createOrm, getAppDatabasePath } from '@/server/v2/db/index.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-orm');
 
@@ -20,7 +20,7 @@ describe('V2 ORM', () => {
 
     it('creates the expected v2 schema tables', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm(config);
+        const orm = createOrm(config);
 
         try {
             await orm.bootstrap();
@@ -54,18 +54,23 @@ describe('V2 ORM', () => {
         }
     });
 
-    it('round-trips additional context through settings', async () => {
+    it('round-trips generic settings rows', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm(config);
-        const document = createAdditionalContext();
+        const orm = createOrm(config);
+        const setting = createSetting();
 
         try {
             await orm.bootstrap();
-            await orm.settings.saveAdditionalContext(document);
+            await orm.settings.save(setting);
 
-            await expect(orm.settings.getAdditionalContext()).resolves.toMatchObject({
-                markdown: document.markdown,
+            await expect(orm.settings.get(setting.key)).resolves.toMatchObject({
+                key: setting.key,
+                value: setting.value,
             });
+            await expect(orm.settings.list()).resolves.toEqual([expect.objectContaining({
+                key: setting.key,
+                value: setting.value,
+            })]);
         } finally {
             orm.close();
         }
@@ -73,7 +78,7 @@ describe('V2 ORM', () => {
 
     it('round-trips refresh state through the singleton repository', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm(config);
+        const orm = createOrm(config);
         const refreshState = createRefreshState();
 
         try {
@@ -92,7 +97,7 @@ describe('V2 ORM', () => {
 
     it('loads a session with ordered exchanges and a resolved active run', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm(config);
+        const orm = createOrm(config);
         const session = {
             ...createSession(),
             activeRunId: 'run-1',
@@ -134,7 +139,7 @@ describe('V2 ORM', () => {
 
     it('preserves reasoning tool call ids and run exchange ids', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm(config);
+        const orm = createOrm(config);
         const session = createSession();
         const run = createRun();
         const reasoningExchange = createReasoningExchange();
@@ -164,7 +169,7 @@ describe('V2 ORM', () => {
 
     it('round-trips failed runs including nullable lifecycle timestamps and error', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm(config);
+        const orm = createOrm(config);
         const session = createSession();
         const failedRun = {
             ...createRun(),
@@ -196,7 +201,7 @@ describe('V2 ORM', () => {
 
     it('lists NPC rows newest-first by updatedAt', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm(config);
+        const orm = createOrm(config);
         const session = createSession();
         const run = createRun();
         const olderNpc = createNpc();
@@ -226,7 +231,7 @@ describe('V2 ORM', () => {
 
     it('round-trips console entries independently of sessions and runs', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
-        const orm = createV2Orm(config);
+        const orm = createOrm(config);
         const olderEntry = createConsoleEntry();
         const newerEntry = {
             ...createConsoleEntry(),
@@ -254,15 +259,13 @@ describe('V2 ORM', () => {
     });
 });
 
-const createAdditionalContext = () => {
-    return {
-        markdown: 'Keep the tone grounded.',
-        updatedAt: new Date('2026-05-14T12:00:00.000Z'),
-    };
-};
+const createSetting = () => ({
+        key: 'additionalContext',
+        modifiedAt: new Date('2026-05-14T12:00:00.000Z'),
+        value: 'Keep the tone grounded.',
+    });
 
-const createRefreshState = () => {
-    return {
+const createRefreshState = () => ({
         activeOperation: 'refresh' as const,
         createdAt: new Date('2026-05-14T12:00:00.000Z'),
         lastRefreshAt: new Date('2026-05-14T12:01:00.000Z'),
@@ -270,11 +273,9 @@ const createRefreshState = () => {
         refreshStatus: 'running' as const,
         reingestStatus: 'idle' as const,
         updatedAt: new Date('2026-05-14T12:01:00.000Z'),
-    };
-};
+    });
 
-const createSession = () => {
-    return {
+const createSession = () => ({
         activeRun: null,
         activeRunId: null,
         archivedAt: null,
@@ -285,11 +286,9 @@ const createSession = () => {
         mode: 'assistant' as const,
         title: 'Session One',
         updatedAt: new Date('2026-05-14T12:00:00.000Z'),
-    };
-};
+    });
 
-const createRun = () => {
-    return {
+const createRun = () => ({
         completedAt: null,
         createdAt: new Date('2026-05-14T12:01:00.000Z'),
         exchangeId: 'exchange-1',
@@ -303,11 +302,9 @@ const createRun = () => {
         startedAt: new Date('2026-05-14T12:01:05.000Z'),
         status: 'running' as const,
         updatedAt: new Date('2026-05-14T12:01:10.000Z'),
-    };
-};
+    });
 
-const createUserExchange = () => {
-    return {
+const createUserExchange = () => ({
         content: 'Tell me about Sharn.',
         createdAt: new Date('2026-05-14T12:01:11.000Z'),
         exchangeId: 'exchange-1',
@@ -316,11 +313,9 @@ const createUserExchange = () => {
         runId: 'run-1',
         sequenceIndex: 1,
         sessionId: 'session-1',
-    };
-};
+    });
 
-const createReasoningExchange = () => {
-    return {
+const createReasoningExchange = () => ({
         content: 'Checking retrieved notes about districts and tone.',
         createdAt: new Date('2026-05-14T12:01:12.000Z'),
         exchangeId: 'exchange-1',
@@ -330,11 +325,9 @@ const createReasoningExchange = () => {
         sequenceIndex: 2,
         sessionId: 'session-1',
         toolCallId: 'tool-call-1',
-    };
-};
+    });
 
-const createResponseExchange = () => {
-    return {
+const createResponseExchange = () => ({
         content: 'Sharn rises in layered towers above the Dagger River.',
         createdAt: new Date('2026-05-14T12:01:13.000Z'),
         exchangeId: 'exchange-1',
@@ -344,11 +337,9 @@ const createResponseExchange = () => {
         sequenceIndex: 3,
         sessionId: 'session-1',
         title: 'Sharn overview',
-    };
-};
+    });
 
-const createNpc = () => {
-    return {
+const createNpc = () => ({
         age: '30s',
         bio: 'A quiet scout from Aundair.',
         createdAt: new Date('2026-05-14T12:04:00.000Z'),
@@ -362,14 +353,11 @@ const createNpc = () => {
         sessionId: 'session-1',
         species: 'Half-elf',
         updatedAt: new Date('2026-05-14T12:04:00.000Z'),
-    };
-};
+    });
 
-const createConsoleEntry = () => {
-    return {
+const createConsoleEntry = () => ({
         createdAt: new Date('2026-05-14T12:05:00.000Z'),
         id: 'console-1',
         level: 'info' as const,
         message: 'Refresh complete.',
-    };
-};
+    });

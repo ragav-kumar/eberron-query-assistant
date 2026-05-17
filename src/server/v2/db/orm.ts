@@ -3,7 +3,7 @@ import type Database from 'better-sqlite3';
 import type { RuntimeConfig } from '@/types.js';
 
 import { createAppDatabase } from './database.js';
-import type { V2Orm } from './contract.js';
+import type { Orm } from './contract.js';
 import { createLoaders } from './loaders.js';
 import { createSchema } from './schemaDefinition.js';
 import { createConsoleEntriesRepository } from './repositories/consoleEntriesRepository.js';
@@ -14,7 +14,7 @@ import { createSessionExchangesRepository } from './repositories/sessionExchange
 import { createSessionsRepository } from './repositories/sessionsRepository.js';
 import { createSettingsRepository } from './repositories/settingsRepository.js';
 
-const createV2Orm = (config: RuntimeConfig): V2Orm => {
+export const createOrm = (config: RuntimeConfig): Orm => {
     const appDatabase = createAppDatabase();
 
     const getDatabase = async (): Promise<Database.Database> => {
@@ -42,6 +42,3 @@ const createV2Orm = (config: RuntimeConfig): V2Orm => {
         settings: createSettingsRepository(repositoryDependencies),
     };
 };
-
-export type { V2Orm } from './contract.js';
-export { createV2Orm };

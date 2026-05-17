@@ -1,11 +1,11 @@
 import type {
-    AdditionalContextDocument,
     ConsoleEntry,
     Npc,
     RefreshState,
     Run,
     Session,
     SessionExchange,
+    Setting,
 } from './objectModel.js';
 
 export interface SessionLoadOptions {
@@ -13,12 +13,13 @@ export interface SessionLoadOptions {
     includeExchanges?: boolean;
 }
 
-export interface V2Orm {
+export interface Orm {
     bootstrap: () => Promise<void>;
     close: () => void;
     settings: {
-        getAdditionalContext: () => Promise<AdditionalContextDocument | null>;
-        saveAdditionalContext: (document: AdditionalContextDocument) => Promise<void>;
+        get: (key: string) => Promise<Setting | null>;
+        list: () => Promise<Setting[]>;
+        save: (setting: Setting) => Promise<void>;
     };
     refreshState: {
         get: () => Promise<RefreshState | null>;

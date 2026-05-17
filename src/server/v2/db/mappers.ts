@@ -1,11 +1,11 @@
 import type {
-    AdditionalContextDocument,
     ConsoleEntry as ObjectModelConsoleEntry,
     Npc as ObjectModelNpc,
     RefreshState as ObjectModelRefreshState,
     Run as ObjectModelRun,
     Session as ObjectModelSession,
     SessionExchange as ObjectModelSessionExchange,
+    Setting as ObjectModelSetting,
 } from './objectModel.js';
 import type {
     ConsoleEntry as StoredConsoleEntryRow,
@@ -17,25 +17,17 @@ import type {
     Setting as StoredSettingRow,
 } from './schema.js';
 
-export const ADDITIONAL_CONTEXT_KEY = 'additionalContext';
+export const toTimestamp = (value: Date | null | undefined): string | null => value ? value.toISOString() : null;
 
-export const toTimestamp = (value: Date | null | undefined): string | null => {
-    return value ? value.toISOString() : null;
-};
+const toDate = (value: string | null): Date | null => value ? new Date(value) : null;
 
-const toDate = (value: string | null): Date | null => {
-    return value ? new Date(value) : null;
-};
+export const mapSettingRow = (row: StoredSettingRow): ObjectModelSetting => ({
+        key: row.key,
+        modifiedAt: new Date(row.modified_at),
+        value: row.value,
+    });
 
-export const mapSettingRow = (row: StoredSettingRow): AdditionalContextDocument => {
-    return {
-        markdown: row.value,
-        updatedAt: new Date(row.modified_at),
-    };
-};
-
-export const mapRefreshStateRow = (row: StoredRefreshStateRow): ObjectModelRefreshState => {
-    return {
+export const mapRefreshStateRow = (row: StoredRefreshStateRow): ObjectModelRefreshState => ({
         activeOperation: row.active_operation,
         createdAt: new Date(row.created_at),
         lastRefreshAt: toDate(row.last_refresh_at),
@@ -43,8 +35,7 @@ export const mapRefreshStateRow = (row: StoredRefreshStateRow): ObjectModelRefre
         refreshStatus: row.refresh_status,
         reingestStatus: row.reingest_status,
         updatedAt: new Date(row.updated_at),
-    };
-};
+    });
 
 export const mapSessionExchangeRow = (row: StoredSessionExchangeRow): ObjectModelSessionExchange => {
     const base = {
@@ -71,25 +62,19 @@ export const mapSessionExchangeRow = (row: StoredSessionExchangeRow): ObjectMode
                 toolCallId: row.tool_call_id,
             };
         case 'response':
-            return row.title === null
-                ? {
-                    ...base,
-                    content: row.content,
-                    kind: 'response',
-                }
-                : {
+            return {
                 ...base,
                 content: row.content,
                 kind: 'response',
-                title: row.title,
+                title: row.title ?? undefined,
             };
     }
 };
 
-export const mapRunRow = (row: StoredRunRow): ObjectModelRun => {
-    const run: ObjectModelRun = {
+export const mapRunRow = (row: StoredRunRow): ObjectModelRun => ({
         completedAt: toDate(row.completed_at),
         createdAt: new Date(row.created_at),
+        error: row.error ?? undefined,
         exchangeId: row.exchange_id,
         failedAt: toDate(row.failed_at),
         id: row.id,
@@ -101,21 +86,13 @@ export const mapRunRow = (row: StoredRunRow): ObjectModelRun => {
         startedAt: toDate(row.started_at),
         status: row.status,
         updatedAt: new Date(row.updated_at),
-    };
-
-    if (row.error !== null) {
-        run.error = row.error;
-    }
-
-    return run;
-};
+    });
 
 export const mapSessionRow = (
     row: StoredSessionRow,
     exchanges: ObjectModelSessionExchange[],
     activeRun: ObjectModelRun | null,
-): ObjectModelSession => {
-    const session: ObjectModelSession = {
+): ObjectModelSession => ({
         activeRun,
         activeRunId: row.active_run_id,
         archivedAt: toDate(row.archived_at),
@@ -124,52 +101,29 @@ export const mapSessionRow = (
         id: row.id,
         includePartyContext: row.include_party_context === 1,
         mode: row.mode,
+        title: row.title ?? undefined,
         updatedAt: new Date(row.updated_at),
-    };
+    });
 
-    if (row.title !== null) {
-        session.title = row.title;
-    }
-
-    return session;
-};
-
-export const mapNpcRow = (row: StoredNpcRow): ObjectModelNpc => {
-    const npc: ObjectModelNpc = {
+export const mapNpcRow = (row: StoredNpcRow): ObjectModelNpc => ({
+        age: row.age ?? undefined,
         bio: row.bio,
         createdAt: toDate(row.created_at),
         description: row.description,
+        ethnicity: row.ethnicity ?? undefined,
+        gender: row.gender ?? undefined,
         id: row.id,
         name: row.name,
+        role: row.role ?? undefined,
         runId: row.run_id,
         sessionId: row.session_id,
+        species: row.species ?? undefined,
         updatedAt: toDate(row.updated_at),
-    };
+    });
 
-    if (row.age !== null) {
-        npc.age = row.age;
-    }
-    if (row.ethnicity !== null) {
-        npc.ethnicity = row.ethnicity;
-    }
-    if (row.gender !== null) {
-        npc.gender = row.gender;
-    }
-    if (row.role !== null) {
-        npc.role = row.role;
-    }
-    if (row.species !== null) {
-        npc.species = row.species;
-    }
-
-    return npc;
-};
-
-export const mapConsoleEntryRow = (row: StoredConsoleEntryRow): ObjectModelConsoleEntry => {
-    return {
+export const mapConsoleEntryRow = (row: StoredConsoleEntryRow): ObjectModelConsoleEntry => ({
         createdAt: new Date(row.created_at),
         id: row.id,
         level: row.level,
         message: row.message,
-    };
-};
+    });

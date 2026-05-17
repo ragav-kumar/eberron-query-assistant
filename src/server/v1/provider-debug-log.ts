@@ -9,9 +9,7 @@ export interface ProviderDebugLog {
   flush(): Promise<void>;
 }
 
-export const getProviderDebugLogPath = (runtimeDir: string): string => {
-  return path.join(runtimeDir, PROVIDER_DEBUG_LOG_FILENAME);
-};
+export const getProviderDebugLogPath = (runtimeDir: string): string => path.join(runtimeDir, PROVIDER_DEBUG_LOG_FILENAME);
 
 export const createProviderDebugLog = (
   runtimeDir: string,
@@ -59,6 +57,4 @@ const readExistingLines = async (filePath: string): Promise<string[]> => {
   }
 };
 
-const isMissingFileError = (error: unknown): boolean => {
-  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
-};
+const isMissingFileError = (error: unknown): boolean => typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';

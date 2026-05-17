@@ -207,13 +207,11 @@ describe('OpenAI-compatible provider adapters', () => {
   });
 
   it('times out stalled chat requests', async () => {
-    const fetchImpl = vi.fn<typeof fetch>().mockImplementation((_url, init) => {
-      return new Promise<Response>((_resolve, reject) => {
+    const fetchImpl = vi.fn<typeof fetch>().mockImplementation((_url, init) => new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener('abort', () => {
           reject(new DOMException('The operation was aborted.', 'AbortError'));
         });
-      });
-    });
+      }));
 
     await expect(createOpenAiChatAdapter(config, {
       fetchImpl,
@@ -329,13 +327,11 @@ describe('OpenAI-compatible provider adapters', () => {
   });
 
   it('times out stalled embedding requests', async () => {
-    const fetchImpl = vi.fn<typeof fetch>().mockImplementation((_url, init) => {
-      return new Promise<Response>((_resolve, reject) => {
+    const fetchImpl = vi.fn<typeof fetch>().mockImplementation((_url, init) => new Promise<Response>((_resolve, reject) => {
         init?.signal?.addEventListener('abort', () => {
           reject(new DOMException('The operation was aborted.', 'AbortError'));
         });
-      });
-    });
+      }));
     const adapter = createOpenAiEmbeddingAdapter(config, {
       fetchImpl,
       maxRetries: 0,
@@ -417,14 +413,12 @@ describe('OpenAI-compatible provider adapters', () => {
   });
 });
 
-const jsonResponse = (body: unknown, status = 200): Response => {
-  return new Response(JSON.stringify(body), {
+const jsonResponse = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), {
     status,
     headers: {
       'Content-Type': 'application/json'
     }
   });
-};
 
 const readRequestBody = (fetchImpl: ReturnType<typeof vi.fn<typeof fetch>>): unknown => {
   const body = fetchImpl.mock.calls[0]?.[1]?.body;

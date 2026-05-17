@@ -220,9 +220,7 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
   };
 };
 
-export const getVectorIndexPath = (config: RuntimeConfig): string => {
-  return path.join(config.retrievalDir, VECTOR_INDEX_FILENAME);
-};
+export const getVectorIndexPath = (config: RuntimeConfig): string => path.join(config.retrievalDir, VECTOR_INDEX_FILENAME);
 
 const deleteLegacyVectorIndex = async (config: RuntimeConfig, reporter: ProgressReporter): Promise<void> => {
   const legacyIndexPath = getVectorIndexPath(config);
@@ -734,8 +732,7 @@ const scoreVectorEntries = (
   vectorEntries: StoredVectorEntry[],
   queryEmbedding: number[],
   limit: number
-): RetrievalResult[] => {
-  return vectorEntries
+): RetrievalResult[] => vectorEntries
     .map((entry) => {
       const chunk = chunkById.get(entry.chunkId);
       if (!chunk || chunk.contentHash !== entry.contentHash) {
@@ -762,7 +759,6 @@ const scoreVectorEntries = (
       score,
       matchKind: 'vector'
     }));
-};
 
 const insertSortedResult = (results: RetrievalResult[], result: RetrievalResult, limit: number): void => {
   let insertAt = results.findIndex((existing) => result.score > existing.score);
@@ -897,9 +893,7 @@ const toFtsQuery = (query: string): string | null => {
   return tokens.map((token) => `"${token.replaceAll('"', '""')}"`).join(' OR ');
 };
 
-const hashContent = (content: string): string => {
-  return createHash('sha256').update(content).digest('hex');
-};
+const hashContent = (content: string): string => createHash('sha256').update(content).digest('hex');
 
 const toEmbeddingInput = (content: string): string => {
   if (content.length <= MAX_EMBEDDING_INPUT_CHARACTERS) {

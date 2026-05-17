@@ -55,8 +55,7 @@ interface V2AppModule {
   initializeV2App: () => Promise<void>;
 }
 
-export const eberronApiPlugin = (): Plugin => {
-  return {
+export const eberronApiPlugin = (): Plugin => ({
     name: 'eberron-api',
     configureServer(server) {
       let v1RuntimePromise: Promise<V1Runtime> | null = null;
@@ -140,11 +139,9 @@ export const eberronApiPlugin = (): Plugin => {
           });
       });
     }
-  };
-};
+  });
 
-const isBusyError = (error: unknown): error is BusyErrorLike => {
-  return (
+const isBusyError = (error: unknown): error is BusyErrorLike => (
     typeof error === 'object' &&
     error !== null &&
     'kind' in error &&
@@ -152,17 +149,14 @@ const isBusyError = (error: unknown): error is BusyErrorLike => {
     'operation' in error &&
     typeof error.operation === 'string'
   );
-};
 
-const isWebOperationError = (error: unknown): error is WebOperationErrorLike => {
-  return (
+const isWebOperationError = (error: unknown): error is WebOperationErrorLike => (
     typeof error === 'object' &&
     error !== null &&
     'kind' in error &&
     error.kind === 'web-operation' &&
     'console' in error
   );
-};
 
 const writeJson = (response: ServerResponse, statusCode: number, body: unknown): void => {
   response.statusCode = statusCode;

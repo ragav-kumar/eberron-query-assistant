@@ -34,6 +34,4 @@ export const ConsoleFeed = ({ entries }: ConsoleFeedProps) => {
   );
 };
 
-const formatTimestamp = (timestamp: string): string => {
-  return timestamp.length >= 19 ? timestamp.slice(11, 19) : timestamp;
-};
+const formatTimestamp = (timestamp: string): string => timestamp.length >= 19 ? timestamp.slice(11, 19) : timestamp;

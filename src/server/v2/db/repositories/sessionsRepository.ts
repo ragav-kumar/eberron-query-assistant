@@ -1,17 +1,16 @@
 import { mapSessionRow, toTimestamp } from '../mappers.js';
-import type { V2Orm } from '../contract.js';
+import type { Orm } from '../contract.js';
 import type { Session as StoredSessionRow } from '../schema.js';
 
-import type { V2Loaders } from '../loaders.js';
+import type { Loaders } from '../loaders.js';
 import type { RepositoryDependencies } from './shared.js';
 
-type SessionsRepository = V2Orm['sessions'];
+type SessionsRepository = Orm['sessions'];
 
 export const createSessionsRepository = (
     { getDatabase }: RepositoryDependencies,
-    loaders: Pick<V2Loaders, 'loadRun' | 'loadSession' | 'loadSessionExchanges'>,
-): SessionsRepository => {
-    return {
+    loaders: Pick<Loaders, 'loadRun' | 'loadSession' | 'loadSessionExchanges'>,
+): SessionsRepository => ({
         get: async (id, options) => {
             const database = await getDatabase();
             return loaders.loadSession(database, id, options);
@@ -74,5 +73,4 @@ export const createSessionsRepository = (
                     session.updatedAt.toISOString(),
                 );
         },
-    };
-};
+    });

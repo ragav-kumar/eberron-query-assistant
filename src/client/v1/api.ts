@@ -140,9 +140,7 @@ export const getContext = async (): Promise<string> => {
 };
 
 /** Reads the currently persisted generated NPC collection. */
-export const getNpcs = async (): Promise<ApiNpcResponse> => {
-  return requestJson<ApiNpcResponse>('/api/v1/npcs');
-};
+export const getNpcs = async (): Promise<ApiNpcResponse> => requestJson<ApiNpcResponse>('/api/v1/npcs');
 
 /** Reads the current process snapshot, including active operation, Console replay, log, and NPC state. */
 export const getStatus = async (options: { sessionId: string }): Promise<ApiStatus> => {
@@ -164,12 +162,10 @@ export const askAssistant = async (
   sessionId: string,
   includePartyContext: boolean,
   retrievalTurnLimit: number
-): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>('/api/v1/assistant', {
+): Promise<ApiOperationResult> => requestJson<ApiOperationResult>('/api/v1/assistant', {
     method: 'POST',
     body: JSON.stringify({ prompt, sessionId, includePartyContext, retrievalTurnLimit })
   });
-};
 
 /** Starts one NPC generation operation and returns updated Console, log, and persisted NPC snapshots when it completes. */
 export const generateNpcs = async (
@@ -177,20 +173,16 @@ export const generateNpcs = async (
   sessionId: string,
   includePartyContext: boolean,
   retrievalTurnLimit: number
-): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>('/api/v1/npcs', {
+): Promise<ApiOperationResult> => requestJson<ApiOperationResult>('/api/v1/npcs', {
     method: 'POST',
     body: JSON.stringify({ prompt, sessionId, includePartyContext, retrievalTurnLimit })
   });
-};
 
 /** Starts a routine refresh or explicit force reingest against the local corpus and retrieval artifacts. */
-export const refresh = async (forceReingest: boolean): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>('/api/v1/refresh', {
+export const refresh = async (forceReingest: boolean): Promise<ApiOperationResult> => requestJson<ApiOperationResult>('/api/v1/refresh', {
     method: 'POST',
     body: JSON.stringify({ forceReingest })
   });
-};
 
 /**
  * Subscribes to transient process-local Console events via Server-Sent Events.
@@ -249,9 +241,7 @@ export interface ApiRequestError extends Error {
 }
 
 /** Narrows an unknown thrown value to the enriched API error shape used by `requestJson`. */
-export const isApiRequestError = (error: unknown): error is ApiRequestError => {
-  return error instanceof Error && 'console' in error;
-};
+export const isApiRequestError = (error: unknown): error is ApiRequestError => error instanceof Error && 'console' in error;
 
 const readErrorMessage = (body: unknown): string => {
   if (

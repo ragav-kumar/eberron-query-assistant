@@ -6,9 +6,10 @@ import type {
     SessionMode,
 } from '@/types.js';
 
-export interface AdditionalContextDocument {
-    markdown: string;
-    updatedAt: Date;
+export interface Setting {
+    key: string;
+    value: string;
+    modifiedAt: Date;
 }
 
 export interface RefreshState {

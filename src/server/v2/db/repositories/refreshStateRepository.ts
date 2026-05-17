@@ -1,17 +1,16 @@
 import { mapRefreshStateRow, toTimestamp } from '../mappers.js';
-import type { V2Orm } from '../contract.js';
+import type { Orm } from '../contract.js';
 import type { RefreshState as StoredRefreshStateRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';
 
-type RefreshStateRepository = V2Orm['refreshState'];
+type RefreshStateRepository = Orm['refreshState'];
 
 const SINGLETON_KEY = 1;
 
 export const createRefreshStateRepository = (
     { getDatabase }: RepositoryDependencies,
-): RefreshStateRepository => {
-    return {
+): RefreshStateRepository => ({
         get: async () => {
             const database = await getDatabase();
             const row = database
@@ -65,5 +64,4 @@ export const createRefreshStateRepository = (
                     refreshState.updatedAt.toISOString(),
                 );
         },
-    };
-};
+    });

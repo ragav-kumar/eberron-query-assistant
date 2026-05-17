@@ -1539,9 +1539,7 @@ const writeConfig = async (name: string): Promise<RuntimeConfig> => {
   return config;
 };
 
-const readChatMessages = (chat: ReturnType<typeof vi.fn>, callIndex = 0): ChatMessage[] => {
-  return (chat.mock.calls[callIndex]?.[0] ?? []) as ChatMessage[];
-};
+const readChatMessages = (chat: ReturnType<typeof vi.fn>, callIndex = 0): ChatMessage[] => (chat.mock.calls[callIndex]?.[0] ?? []) as ChatMessage[];
 
 const mockRetrieval = (
   results: RetrievalResult[]

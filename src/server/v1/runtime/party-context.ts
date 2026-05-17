@@ -107,16 +107,13 @@ const formatPartyContext = (request: FormatPartyContextRequest): string => {
 };
 
 const readPartyActors = (database: Database.Database, actorUuids: string[]): FoundrySourceRow[] => {
-  const rows = readAllFoundrySources(database).filter((row) => {
-    return actorUuids.includes(readString(row.metadata.sourceUuid));
-  });
+  const rows = readAllFoundrySources(database).filter((row) => actorUuids.includes(readString(row.metadata.sourceUuid)));
   return actorUuids
     .map((uuid) => rows.find((row) => row.metadata.sourceUuid === uuid))
     .filter((row): row is FoundrySourceRow => row !== undefined);
 };
 
-const readJournalPages = (database: Database.Database, journalName: string, limit: number): FoundrySourceRow[] => {
-  return readAllFoundrySources(database)
+const readJournalPages = (database: Database.Database, journalName: string, limit: number): FoundrySourceRow[] => readAllFoundrySources(database)
     .filter((row) => readString(row.metadata.entityKind) === 'JournalEntryPage')
     .filter((row) => {
       const path = readStringArray(row.metadata.provenancePath);
@@ -124,7 +121,6 @@ const readJournalPages = (database: Database.Database, journalName: string, limi
     })
     .sort(compareJournalPages)
     .slice(0, limit);
-};
 
 const compareJournalPages = (left: FoundrySourceRow, right: FoundrySourceRow): number => {
   const modifiedComparison = compareNullableStrings(
@@ -227,9 +223,7 @@ const readString = (value: unknown): string => {
   return '';
 };
 
-const readStringArray = (value: unknown): string[] => {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
-};
+const readStringArray = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 
 const fileExists = async (filePath: string): Promise<boolean> => {
   try {

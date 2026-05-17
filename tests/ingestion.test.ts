@@ -913,8 +913,7 @@ const readRows = (config: ReturnType<typeof loadDefaultConfig>, sql: string): Ar
   }
 };
 
-const createMapArticleFetcher = (responses: Map<string, string>, statuses: Map<string, number> = new Map()): ArticleFetcher => {
-  return {
+const createMapArticleFetcher = (responses: Map<string, string>, statuses: Map<string, number> = new Map()): ArticleFetcher => ({
     fetchText(url) {
       const status = statuses.get(url);
       if (status) {
@@ -933,8 +932,7 @@ const createMapArticleFetcher = (responses: Map<string, string>, statuses: Map<s
       }
       return Promise.resolve(response);
     }
-  };
-};
+  });
 
 const writeDeltaExport = async (
   config: ReturnType<typeof loadDefaultConfig>,

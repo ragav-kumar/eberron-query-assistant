@@ -1,14 +1,13 @@
-import { ADDITIONAL_CONTEXT_KEY, mapSettingRow } from '../mappers.js';
-import type { V2Orm } from '../contract.js';
+import { mapSettingRow } from '../mappers.js';
+import type { Orm } from '../contract.js';
 import type { Setting as StoredSettingRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';
 
-type SettingsRepository = V2Orm['settings'];
+type SettingsRepository = Orm['settings'];
 
-export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies): SettingsRepository => {
-    return {
-        getAdditionalContext: async () => {
+export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies): SettingsRepository => ({
+        get: async key => {
             const database = await getDatabase();
             const row = database
                 .prepare(`
@@ -16,10 +15,21 @@ export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies
                     FROM settings
                     WHERE key = ?
                 `)
-                .get(ADDITIONAL_CONTEXT_KEY) as StoredSettingRow | undefined;
+                .get(key) as StoredSettingRow | undefined;
             return row ? mapSettingRow(row) : null;
         },
-        saveAdditionalContext: async document => {
+        list: async () => {
+            const database = await getDatabase();
+            const rows = database
+                .prepare(`
+                    SELECT key, value, modified_at
+                    FROM settings
+                    ORDER BY key ASC
+                `)
+                .all() as StoredSettingRow[];
+            return rows.map(mapSettingRow);
+        },
+        save: async setting => {
             const database = await getDatabase();
             database
                 .prepare(`
@@ -29,7 +39,6 @@ export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies
                         value = excluded.value,
                         modified_at = excluded.modified_at
                 `)
-                .run(ADDITIONAL_CONTEXT_KEY, document.markdown, document.updatedAt.toISOString());
+                .run(setting.key, setting.value, setting.modifiedAt.toISOString());
         },
-    };
-};
+    });

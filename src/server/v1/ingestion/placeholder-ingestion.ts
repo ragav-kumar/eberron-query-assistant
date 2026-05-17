@@ -3,8 +3,7 @@ import type { RuntimeState } from '../state/index.js';
 import type { IngestionSummary, RuntimeConfig, RuntimeOptions } from '@/types.js';
 import type { IngestionService } from './ingestion-service.js';
 
-export const createPlaceholderIngestionService = (): IngestionService => {
-  return {
+export const createPlaceholderIngestionService = (): IngestionService => ({
     ingest(
       _config: RuntimeConfig,
       _options: RuntimeOptions,
@@ -29,5 +28,4 @@ export const createPlaceholderIngestionService = (): IngestionService => {
         nextState: discovery.nextState
       });
     }
-  };
-};
+  });

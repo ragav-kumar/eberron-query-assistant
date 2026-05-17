@@ -211,15 +211,9 @@ const isCompatibleSchema = (database: Database.Database): boolean => {
     hasColumns(chunkColumns, ['chunk_id', 'source_id', 'chunk_index', 'text', 'citation_json', 'metadata_json']);
 };
 
-const readColumnNames = (database: Database.Database, tableName: string): string[] => {
-  return database.prepare(`PRAGMA table_info(${tableName})`).all().map((row) => {
-    return (row as { name: string }).name;
-  });
-};
+const readColumnNames = (database: Database.Database, tableName: string): string[] => database.prepare(`PRAGMA table_info(${tableName})`).all().map((row) => (row as { name: string }).name);
 
-const hasColumns = (actual: string[], expected: string[]): boolean => {
-  return expected.every((column) => actual.includes(column));
-};
+const hasColumns = (actual: string[], expected: string[]): boolean => expected.every((column) => actual.includes(column));
 
 const insertSource = (database: Database.Database, source: CorpusSource, chunks: CorpusChunk[]): void => {
   const now = new Date().toISOString();
@@ -270,10 +264,6 @@ const insertSource = (database: Database.Database, source: CorpusSource, chunks:
   }
 };
 
-export const getCorpusDatabasePath = (config: RuntimeConfig): string => {
-  return nextDatabasePath(config);
-};
+export const getCorpusDatabasePath = (config: RuntimeConfig): string => nextDatabasePath(config);
 
-const nextDatabasePath = (config: RuntimeConfig): string => {
-  return path.join(config.retrievalDir, DATABASE_FILENAME);
-};
+const nextDatabasePath = (config: RuntimeConfig): string => path.join(config.retrievalDir, DATABASE_FILENAME);

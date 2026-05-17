@@ -1,7 +1,7 @@
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
 import type { RuntimeConfig } from '@/types.js';
 
-import { createV2Orm } from './db/index.js';
+import { createOrm } from './db/index.js';
 
 export interface V2AppDependencies {
     config?: RuntimeConfig;
@@ -9,7 +9,7 @@ export interface V2AppDependencies {
 
 export const initializeV2App = async (dependencies: V2AppDependencies = {}): Promise<void> => {
     const config = dependencies.config ?? loadDefaultConfig();
-    const orm = createV2Orm(config);
+    const orm = createOrm(config);
 
     try {
         await orm.bootstrap();

@@ -8,9 +8,7 @@ const refreshStatuses = ['idle', 'pending', 'running', 'completed', 'failed'] as
 const runStatuses = ['pending', 'running', 'completed', 'failed'] as const;
 const sessionFeedEntryKinds = ['user', 'reasoning', 'response'] as const;
 
-const quoteSqlStrings = (values: readonly string[]): string => {
-    return values.map((value) => `'${value}'`).join(', ');
-};
+const quoteSqlStrings = (values: readonly string[]): string => values.map((value) => `'${value}'`).join(', ');
 
 const SESSION_MODE_SQL = quoteSqlStrings(sessionModes);
 const RUN_STATUS_SQL = quoteSqlStrings(runStatuses);

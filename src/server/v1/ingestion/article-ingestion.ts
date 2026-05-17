@@ -24,8 +24,7 @@ export interface HttpFetchFailedError {
   url: string;
 }
 
-export const createFetchArticleFetcher = (): ArticleFetcher => {
-  return {
+export const createFetchArticleFetcher = (): ArticleFetcher => ({
     async fetchText(url, options = {}) {
       const abortController = new AbortController();
       const abortFromCaller = (): void => {
@@ -57,8 +56,7 @@ export const createFetchArticleFetcher = (): ArticleFetcher => {
       }
       return response.text();
     }
-  };
-};
+  });
 
 export const isPermanentlyInaccessibleArticleFetch = (value: unknown): value is HttpFetchFailedError => {
   if (!value || typeof value !== 'object') {
@@ -230,13 +228,9 @@ const canonicalArticleUrl = (href: string | undefined): string | null => {
   return value;
 };
 
-const normalizeTitleElement = (title: string): string => {
-  return normalizeText(title)
+const normalizeTitleElement = (title: string): string => normalizeText(title)
     .replace(/\s*[-|]\s*Keith Baker'?s Blog$/i, '')
     .replace(/\s*[-|]\s*Keith Baker.*$/i, '')
     .trim();
-};
 
-const hashText = (text: string): string => {
-  return createHash('sha256').update(text).digest('hex').slice(0, 24);
-};
+const hashText = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 24);

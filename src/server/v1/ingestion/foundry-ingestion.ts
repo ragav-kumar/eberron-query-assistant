@@ -251,9 +251,7 @@ const normalizeFoundryRecord = (
   return { source, chunks };
 };
 
-const readRecordId = (record: Record<string, unknown>): string | null => {
-  return firstString(record, ['recordId', 'id', '_id', 'uuid', 'key']);
-};
+const readRecordId = (record: Record<string, unknown>): string | null => firstString(record, ['recordId', 'id', '_id', 'uuid', 'key']);
 
 const extractText = (value: unknown): string => {
   const textParts: string[] = [];
@@ -334,14 +332,8 @@ const readNestedValue = (record: Record<string, unknown>, pathSegments: string[]
   return value;
 };
 
-const createSourceId = (sourceType: string, sourceKey: string): string => {
-  return `${sourceType}:${hashText(sourceKey)}`;
-};
+const createSourceId = (sourceType: string, sourceKey: string): string => `${sourceType}:${hashText(sourceKey)}`;
 
-const hashText = (text: string): string => {
-  return createHash('sha256').update(text).digest('hex').slice(0, 24);
-};
+const hashText = (text: string): string => createHash('sha256').update(text).digest('hex').slice(0, 24);
 
-const stripHtml = (value: string): string => {
-  return value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
-};
+const stripHtml = (value: string): string => value.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');

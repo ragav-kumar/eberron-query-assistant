@@ -146,8 +146,7 @@ const normalizeReadableTitle = (title: string): string => {
   return separated;
 };
 
-const titleCaseWords = (title: string): string => {
-  return title
+const titleCaseWords = (title: string): string => title
     .split(' ')
     .map((word) => {
       if (word.length === 0 || /[a-z][A-Z]/.test(word)) {
@@ -159,7 +158,6 @@ const titleCaseWords = (title: string): string => {
       return `${word.charAt(0).toUpperCase()}${word.slice(1).toLowerCase()}`;
     })
     .join(' ');
-};
 
 export const listSessionLogFiles = async (
   logDir: string,
@@ -222,19 +220,15 @@ export const readSessionLogFile = async (logDir: string, filePath: string): Prom
   });
 };
 
-const isUnsafeFilenameCharacter = (character: string): boolean => {
-  return '\\/:*?"<>|'.includes(character) || character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127;
-};
+const isUnsafeFilenameCharacter = (character: string): boolean => '\\/:*?"<>|'.includes(character) || character.charCodeAt(0) < 32 || character.charCodeAt(0) === 127;
 
-const hasNodeErrorCode = (error: unknown, code: string): boolean => {
-  return (
+const hasNodeErrorCode = (error: unknown, code: string): boolean => (
     typeof error === 'object' &&
     error !== null &&
     'code' in error &&
     typeof error.code === 'string' &&
     error.code === code
   );
-};
 
 const formatTimestamp = (date: Date): string => {
   const pad = (value: number): string => value.toString().padStart(2, '0');
@@ -278,8 +272,7 @@ const normalizeEntry = (entry: SessionLogEntry): SessionLogEntry => entry.kind =
     message: entry.message.trim()
   };
 
-const isSessionLogExchangeRecord = (value: unknown): value is LegacySessionLogExchange => {
-  return (
+const isSessionLogExchangeRecord = (value: unknown): value is LegacySessionLogExchange => (
     typeof value === 'object' &&
     value !== null &&
     'user' in value &&
@@ -289,10 +282,8 @@ const isSessionLogExchangeRecord = (value: unknown): value is LegacySessionLogEx
     'title' in value &&
     typeof value.title === 'string'
   );
-};
 
-const isSessionLogProgressRecord = (value: unknown): value is SessionLogProgress => {
-  return (
+const isSessionLogProgressRecord = (value: unknown): value is SessionLogProgress => (
     typeof value === 'object' &&
     value !== null &&
     'kind' in value &&
@@ -300,4 +291,3 @@ const isSessionLogProgressRecord = (value: unknown): value is SessionLogProgress
     'message' in value &&
     typeof value.message === 'string'
   );
-};

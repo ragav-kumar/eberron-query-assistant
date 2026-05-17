@@ -12,9 +12,7 @@ export interface AppDatabase {
     open: (config: RuntimeConfig) => Promise<Database.Database>;
 }
 
-export const getAppDatabasePath = (config: RuntimeConfig): string => {
-    return path.join(config.runtimeDir, APP_DATABASE_FILENAME);
-};
+export const getAppDatabasePath = (config: RuntimeConfig): string => path.join(config.runtimeDir, APP_DATABASE_FILENAME);
 
 export const createAppDatabase = (): AppDatabase => {
     let database: Database.Database | null = null;

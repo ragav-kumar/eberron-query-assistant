@@ -506,8 +506,7 @@ export interface WebOperationError {
   providerDebug?: ChatCompletionDiagnostic[];
 }
 
-export const isBusyError = (error: unknown): error is BusyError => {
-  return (
+export const isBusyError = (error: unknown): error is BusyError => (
     typeof error === 'object' &&
     error !== null &&
     'kind' in error &&
@@ -515,7 +514,6 @@ export const isBusyError = (error: unknown): error is BusyError => {
     'operation' in error &&
     typeof error.operation === 'string'
   );
-};
 
 const createBusyError = (operation: string): BusyError => ({
   kind: 'busy',
@@ -523,8 +521,7 @@ const createBusyError = (operation: string): BusyError => ({
   operation
 });
 
-export const isWebOperationError = (error: unknown): error is WebOperationError => {
-  return (
+export const isWebOperationError = (error: unknown): error is WebOperationError => (
     typeof error === 'object' &&
     error !== null &&
     'kind' in error &&
@@ -532,7 +529,6 @@ export const isWebOperationError = (error: unknown): error is WebOperationError 
     'console' in error &&
     typeof error.console === 'object'
   );
-};
 
 const createWebOperationError = (
   message: string,
@@ -735,13 +731,9 @@ const formatRefreshSummaryMessage = (summary: StartupRefreshSummary): string => 
   return `Refresh complete. Force reingest: ${String(summary.forceReingest)}.${retrieval}${degraded}`;
 };
 
-const formatProviderDiagnosticMessage = (diagnostic: ChatCompletionDiagnostic): string => {
-  return JSON.stringify({
+const formatProviderDiagnosticMessage = (diagnostic: ChatCompletionDiagnostic): string => JSON.stringify({
     kind: 'provider-diagnostic',
     ...diagnostic
   });
-};
 
-export const toPublicPath = (filePath: string): string => {
-  return path.normalize(filePath);
-};
+export const toPublicPath = (filePath: string): string => path.normalize(filePath);

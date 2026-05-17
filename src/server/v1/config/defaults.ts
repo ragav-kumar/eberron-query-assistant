@@ -96,10 +96,6 @@ const parseCommaSeparatedList = (value: string | undefined): string[] => {
     .filter((item) => item.length > 0);
 };
 
-const parseBoolean = (value: string | undefined): boolean => {
-  return value?.toLowerCase() === 'true';
-};
+const parseBoolean = (value: string | undefined): boolean => value?.toLowerCase() === 'true';
 
-const normalizeBaseUrl = (value: string): string => {
-  return value.replace(/\/+$/, '');
-};
+const normalizeBaseUrl = (value: string): string => value.replace(/\/+$/, '');

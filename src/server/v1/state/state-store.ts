@@ -43,8 +43,7 @@ export interface StateStore {
   save(config: RuntimeConfig, state: RuntimeState): Promise<void>;
 }
 
-export const createDefaultRuntimeState = (): RuntimeState => {
-  return {
+export const createDefaultRuntimeState = (): RuntimeState => ({
     appVersion: getAppVersion(),
     foundry: {
       appliedExportFilenames: [],
@@ -57,5 +56,4 @@ export const createDefaultRuntimeState = (): RuntimeState => {
       lastSuccessfulIndexScrapeAt: null,
       knownArticles: []
     }
-  };
-};
+  });

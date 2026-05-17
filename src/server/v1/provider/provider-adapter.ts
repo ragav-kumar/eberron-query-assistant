@@ -474,9 +474,7 @@ const fetchWithTimeout = async (
   }
 };
 
-const isRetryableStatus = (status: number): boolean => {
-  return status === 408 || status === 409 || status === 429 || status >= 500;
-};
+const isRetryableStatus = (status: number): boolean => status === 408 || status === 409 || status === 429 || status >= 500;
 
 const isRetryableFetchError = (error: unknown): boolean => {
   if (!isRecord(error)) {

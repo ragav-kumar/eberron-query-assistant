@@ -3,6 +3,4 @@ interface ErrorBannerProps {
 }
 
 /** Displays the latest request error without interrupting the current UI state. */
-export const ErrorBanner = ({ message }: ErrorBannerProps) => {
-  return message ? <div className='error'>{message}</div> : null;
-};
+export const ErrorBanner = ({ message }: ErrorBannerProps) => message ? <div className='error'>{message}</div> : null;

@@ -78,26 +78,18 @@ export const createMemoryProgressReporter = (): MemoryProgressReporter => {
   };
 };
 
-const shouldUseColor = (): boolean => {
-  return Boolean(process.stdout.isTTY) && process.env.NO_COLOR === undefined;
-};
+const shouldUseColor = (): boolean => Boolean(process.stdout.isTTY) && process.env.NO_COLOR === undefined;
 
-const shouldRewriteProgress = (): boolean => {
-  return Boolean(process.stdout.isTTY);
-};
+const shouldRewriteProgress = (): boolean => Boolean(process.stdout.isTTY);
 
 const countRenderedRows = (value: string, columns: number | undefined): number => {
   const terminalColumns = columns && columns > 0 ? columns : 80;
   const visibleLines = stripAnsiCodes(value).split('\n');
 
-  return visibleLines.reduce((rows, line) => {
-    return rows + Math.max(1, Math.ceil(line.length / terminalColumns));
-  }, 0);
+  return visibleLines.reduce((rows, line) => rows + Math.max(1, Math.ceil(line.length / terminalColumns)), 0);
 };
 
-const stripAnsiCodes = (value: string): string => {
-  return value.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g'), '');
-};
+const stripAnsiCodes = (value: string): string => value.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g'), '');
 
 const formatInfoMessage = (message: string, colorsEnabled: boolean): string => {
   const styled = createStyle(colorsEnabled);
@@ -141,14 +133,10 @@ const formatInfoMessage = (message: string, colorsEnabled: boolean): string => {
   return message;
 };
 
-const formatWarningMessage = (message: string, colorsEnabled: boolean): string => {
-  return createStyle(colorsEnabled).yellow(message);
-};
+const formatWarningMessage = (message: string, colorsEnabled: boolean): string => createStyle(colorsEnabled).yellow(message);
 
 const createStyle = (enabled: boolean) => {
-  const wrap = (open: string, close: string, value: string): string => {
-    return enabled ? `${open}${value}${close}` : value;
-  };
+  const wrap = (open: string, close: string, value: string): string => enabled ? `${open}${value}${close}` : value;
 
   return {
     bold(value: string) {
