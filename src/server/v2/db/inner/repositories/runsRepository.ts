@@ -1,22 +1,38 @@
-import type { Orm } from '../../contract.js';
-import type { Loaders } from '../../loaders.js';
-import { mapRunRow, toTimestamp } from '../../mappers.js';
-import type { Run as StoredRunRow } from '../schema.js';
-import type { RepositoryDependencies } from './shared.js';
+import type Database from 'better-sqlite3';
 
-type RunsRepository = Orm['runs'];
+import type { Run as StoredRunRow } from '../schema.js';
 
 export const createRunsRepository = (
-    { getDatabase }: RepositoryDependencies,
-    loaders: Pick<Loaders, 'loadRun'>,
-): RunsRepository => ({
-        get: async id => {
+    getDatabase: () => Promise<Database.Database>,
+) => ({
+        get: async (id: string) => {
             const database = await getDatabase();
-            return loaders.loadRun(database, id);
+            const row = database
+                .prepare(`
+                    SELECT
+                        id,
+                        session_id,
+                        exchange_id,
+                        mode,
+                        status,
+                        prompt,
+                        retrieval_turn_limit,
+                        include_party_context,
+                        error,
+                        created_at,
+                        updated_at,
+                        started_at,
+                        completed_at,
+                        failed_at
+                    FROM runs
+                    WHERE id = ?
+                `)
+                .get(id) as StoredRunRow | undefined;
+            return row ?? null;
         },
-        listBySession: async sessionId => {
+        listBySession: async (sessionId: string) => {
             const database = await getDatabase();
-            const rows = database
+            return database
                 .prepare(`
                     SELECT
                         id,
@@ -38,9 +54,8 @@ export const createRunsRepository = (
                     ORDER BY created_at, id
                 `)
                 .all(sessionId) as StoredRunRow[];
-            return rows.map(mapRunRow);
         },
-        save: async run => {
+        save: async (run: StoredRunRow) => {
             const database = await getDatabase();
             database
                 .prepare(`
@@ -77,19 +92,19 @@ export const createRunsRepository = (
                 `)
                 .run(
                     run.id,
-                    run.sessionId,
-                    run.exchangeId,
+                    run.session_id,
+                    run.exchange_id,
                     run.mode,
                     run.status,
                     run.prompt,
-                    run.retrievalTurnLimit,
-                    run.includePartyContext ? 1 : 0,
+                    run.retrieval_turn_limit,
+                    run.include_party_context,
                     run.error ?? null,
-                    run.createdAt.toISOString(),
-                    run.updatedAt.toISOString(),
-                    toTimestamp(run.startedAt),
-                    toTimestamp(run.completedAt),
-                    toTimestamp(run.failedAt),
+                    run.created_at,
+                    run.updated_at,
+                    run.started_at,
+                    run.completed_at,
+                    run.failed_at,
                 );
         },
     });

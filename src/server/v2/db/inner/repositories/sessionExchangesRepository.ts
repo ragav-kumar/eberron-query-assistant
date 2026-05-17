@@ -1,10 +1,6 @@
-import type { Orm } from '../../contract.js';
-import { mapSessionExchangeRow } from '../../mappers.js';
+import type Database from 'better-sqlite3';
+
 import type { SessionExchange as StoredSessionExchangeRow } from '../schema.js';
-
-import type { RepositoryDependencies } from './shared.js';
-
-type SessionExchangesRepository = Orm['sessionExchanges'];
 
 const EXCHANGE_SELECT = `
     SELECT
@@ -24,9 +20,9 @@ const EXCHANGE_SELECT = `
 const EXCHANGE_ORDER = 'ORDER BY sequence_index ASC, id ASC';
 
 export const createSessionExchangesRepository = (
-    { getDatabase }: RepositoryDependencies,
-): SessionExchangesRepository => ({
-        get: async id => {
+    getDatabase: () => Promise<Database.Database>,
+) => ({
+        get: async (id: string) => {
             const database = await getDatabase();
             const row = database
                 .prepare(`
@@ -34,31 +30,29 @@ export const createSessionExchangesRepository = (
                     WHERE id = ?
                 `)
                 .get(id) as StoredSessionExchangeRow | undefined;
-            return row ? mapSessionExchangeRow(row) : null;
+            return row ?? null;
         },
-        listBySession: async sessionId => {
+        listBySession: async (sessionId: string) => {
             const database = await getDatabase();
-            const rows = database
+            return database
                 .prepare(`
                     ${EXCHANGE_SELECT}
                     WHERE session_id = ?
                     ${EXCHANGE_ORDER}
                 `)
                 .all(sessionId) as StoredSessionExchangeRow[];
-            return rows.map(mapSessionExchangeRow);
         },
-        listByRun: async runId => {
+        listByRun: async (runId: string) => {
             const database = await getDatabase();
-            const rows = database
+            return database
                 .prepare(`
                     ${EXCHANGE_SELECT}
                     WHERE run_id = ?
                     ${EXCHANGE_ORDER}
                 `)
                 .all(runId) as StoredSessionExchangeRow[];
-            return rows.map(mapSessionExchangeRow);
         },
-        save: async exchange => {
+        save: async (exchange: StoredSessionExchangeRow) => {
             const database = await getDatabase();
             database
                 .prepare(`
@@ -87,15 +81,15 @@ export const createSessionExchangesRepository = (
                 `)
                 .run(
                     exchange.id,
-                    exchange.sessionId,
-                    exchange.runId,
-                    exchange.exchangeId,
-                    exchange.sequenceIndex,
+                    exchange.session_id,
+                    exchange.run_id,
+                    exchange.exchange_id,
+                    exchange.sequence_index,
                     exchange.kind,
                     exchange.content,
-                    exchange.kind === 'response' ? (exchange.title ?? null) : null,
-                    exchange.kind === 'reasoning' ? exchange.toolCallId : null,
-                    exchange.createdAt.toISOString(),
+                    exchange.title,
+                    exchange.tool_call_id,
+                    exchange.created_at,
                 );
         },
     });

@@ -1,15 +1,11 @@
-import type { Orm } from '../../contract.js';
-import { mapConsoleEntryRow } from '../../mappers.js';
+import type Database from 'better-sqlite3';
+
 import type { ConsoleEntry as StoredConsoleEntryRow } from '../schema.js';
 
-import type { RepositoryDependencies } from './shared.js';
-
-type ConsoleEntriesRepository = Orm['consoleEntries'];
-
 export const createConsoleEntriesRepository = (
-    { getDatabase }: RepositoryDependencies,
-): ConsoleEntriesRepository => ({
-        get: async id => {
+    getDatabase: () => Promise<Database.Database>,
+) => ({
+        get: async (id: string) => {
             const database = await getDatabase();
             const row = database
                 .prepare(`
@@ -18,20 +14,19 @@ export const createConsoleEntriesRepository = (
                     WHERE id = ?
                 `)
                 .get(id) as StoredConsoleEntryRow | undefined;
-            return row ? mapConsoleEntryRow(row) : null;
+            return row ?? null;
         },
         list: async () => {
             const database = await getDatabase();
-            const rows = database
+            return database
                 .prepare(`
                     SELECT id, level, message, created_at
                     FROM console_entries
                     ORDER BY created_at, id
                 `)
                 .all() as StoredConsoleEntryRow[];
-            return rows.map(mapConsoleEntryRow);
         },
-        save: async entry => {
+        save: async (entry: StoredConsoleEntryRow) => {
             const database = await getDatabase();
             database
                 .prepare(`
@@ -42,6 +37,6 @@ export const createConsoleEntriesRepository = (
                         message = excluded.message,
                         created_at = excluded.created_at
                 `)
-                .run(entry.id, entry.level, entry.message, entry.createdAt.toISOString());
+                .run(entry.id, entry.level, entry.message, entry.created_at);
         },
     });

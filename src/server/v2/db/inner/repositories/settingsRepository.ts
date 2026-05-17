@@ -1,13 +1,9 @@
-import type { Orm } from '../../contract.js';
-import { mapSettingRow } from '../../mappers.js';
+import type Database from 'better-sqlite3';
+
 import type { Setting as StoredSettingRow } from '../schema.js';
 
-import type { RepositoryDependencies } from './shared.js';
-
-type SettingsRepository = Orm['settings'];
-
-export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies): SettingsRepository => ({
-        get: async key => {
+export const createSettingsRepository = (getDatabase: () => Promise<Database.Database>) => ({
+        get: async (key: string) => {
             const database = await getDatabase();
             const row = database
                 .prepare(`
@@ -16,20 +12,19 @@ export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies
                     WHERE key = ?
                 `)
                 .get(key) as StoredSettingRow | undefined;
-            return row ? mapSettingRow(row) : null;
+            return row ?? null;
         },
         list: async () => {
             const database = await getDatabase();
-            const rows = database
+            return database
                 .prepare(`
                     SELECT key, value, modified_at
                     FROM settings
                     ORDER BY key
                 `)
                 .all() as StoredSettingRow[];
-            return rows.map(mapSettingRow);
         },
-        save: async setting => {
+        save: async (setting: StoredSettingRow) => {
             const database = await getDatabase();
             database
                 .prepare(`
@@ -39,6 +34,6 @@ export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies
                         value = excluded.value,
                         modified_at = excluded.modified_at
                 `)
-                .run(setting.key, setting.value, setting.modifiedAt.toISOString());
+                .run(setting.key, setting.value, setting.modified_at);
         },
     });

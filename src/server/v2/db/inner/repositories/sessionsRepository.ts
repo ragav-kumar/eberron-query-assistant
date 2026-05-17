@@ -1,22 +1,32 @@
-import type { Orm } from '../../contract.js';
-import type { Loaders } from '../../loaders.js';
-import { mapSessionRow, toTimestamp } from '../../mappers.js';
-import type { Session as StoredSessionRow } from '../schema.js';
-import type { RepositoryDependencies } from './shared.js';
+import type Database from 'better-sqlite3';
 
-type SessionsRepository = Orm['sessions'];
+import type { Session as StoredSessionRow } from '../schema.js';
 
 export const createSessionsRepository = (
-    { getDatabase }: RepositoryDependencies,
-    loaders: Pick<Loaders, 'loadRun' | 'loadSession' | 'loadSessionExchanges'>,
-): SessionsRepository => ({
-        get: async (id, options) => {
+    getDatabase: () => Promise<Database.Database>,
+) => ({
+        get: async (id: string) => {
             const database = await getDatabase();
-            return loaders.loadSession(database, id, options);
+            const row = database
+                .prepare(`
+                    SELECT
+                        id,
+                        mode,
+                        title,
+                        active_run_id,
+                        include_party_context,
+                        archived_at,
+                        created_at,
+                        updated_at
+                    FROM sessions
+                    WHERE id = ?
+                `)
+                .get(id) as StoredSessionRow | undefined;
+            return row ?? null;
         },
         list: async () => {
             const database = await getDatabase();
-            const rows = database
+            return database
                 .prepare(`
                     SELECT
                         id,
@@ -31,14 +41,8 @@ export const createSessionsRepository = (
                     ORDER BY created_at, id
                 `)
                 .all() as StoredSessionRow[];
-
-            return rows.map((row) => {
-                const exchanges = loaders.loadSessionExchanges(database, row.id);
-                const activeRun = row.active_run_id ? loaders.loadRun(database, row.active_run_id) : null;
-                return mapSessionRow(row, exchanges, activeRun);
-            });
         },
-        save: async session => {
+        save: async (session: StoredSessionRow) => {
             const database = await getDatabase();
             database
                 .prepare(`
@@ -65,11 +69,11 @@ export const createSessionsRepository = (
                     session.id,
                     session.mode,
                     session.title ?? null,
-                    session.activeRunId,
-                    session.includePartyContext ? 1 : 0,
-                    toTimestamp(session.archivedAt),
-                    session.createdAt.toISOString(),
-                    session.updatedAt.toISOString(),
+                    session.active_run_id,
+                    session.include_party_context,
+                    session.archived_at,
+                    session.created_at,
+                    session.updated_at,
                 );
         },
     });

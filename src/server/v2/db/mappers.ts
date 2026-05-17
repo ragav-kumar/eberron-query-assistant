@@ -27,6 +27,12 @@ export const mapSettingRow = (row: StoredSettingRow): ObjectModelSetting => ({
         value: row.value,
     });
 
+export const toStoredSettingRow = (setting: ObjectModelSetting): StoredSettingRow => ({
+        key: setting.key,
+        modified_at: setting.modifiedAt.toISOString(),
+        value: setting.value,
+    });
+
 export const mapRefreshStateRow = (row: StoredRefreshStateRow): ObjectModelRefreshState => ({
         activeOperation: row.active_operation,
         createdAt: new Date(row.created_at),
@@ -35,6 +41,17 @@ export const mapRefreshStateRow = (row: StoredRefreshStateRow): ObjectModelRefre
         refreshStatus: row.refresh_status,
         reingestStatus: row.reingest_status,
         updatedAt: new Date(row.updated_at),
+    });
+
+export const toStoredRefreshStateRow = (refreshState: ObjectModelRefreshState): StoredRefreshStateRow => ({
+        active_operation: refreshState.activeOperation,
+        created_at: refreshState.createdAt.toISOString(),
+        last_refresh_at: toTimestamp(refreshState.lastRefreshAt),
+        last_reingest_at: toTimestamp(refreshState.lastReingestAt),
+        refresh_status: refreshState.refreshStatus,
+        reingest_status: refreshState.reingestStatus,
+        singleton_key: 1,
+        updated_at: refreshState.updatedAt.toISOString(),
     });
 
 export const mapSessionExchangeRow = (row: StoredSessionExchangeRow): ObjectModelSessionExchange => {
@@ -71,6 +88,50 @@ export const mapSessionExchangeRow = (row: StoredSessionExchangeRow): ObjectMode
     }
 };
 
+export const toStoredSessionExchangeRow = (exchange: ObjectModelSessionExchange): StoredSessionExchangeRow => {
+    switch (exchange.kind) {
+        case 'user':
+            return {
+                content: exchange.content,
+                created_at: exchange.createdAt.toISOString(),
+                exchange_id: exchange.exchangeId,
+                id: exchange.id,
+                kind: 'user',
+                run_id: exchange.runId,
+                sequence_index: exchange.sequenceIndex,
+                session_id: exchange.sessionId,
+                title: null,
+                tool_call_id: null,
+            };
+        case 'reasoning':
+            return {
+                content: exchange.content,
+                created_at: exchange.createdAt.toISOString(),
+                exchange_id: exchange.exchangeId,
+                id: exchange.id,
+                kind: 'reasoning',
+                run_id: exchange.runId,
+                sequence_index: exchange.sequenceIndex,
+                session_id: exchange.sessionId,
+                title: null,
+                tool_call_id: exchange.toolCallId,
+            };
+        case 'response':
+            return {
+                content: exchange.content,
+                created_at: exchange.createdAt.toISOString(),
+                exchange_id: exchange.exchangeId,
+                id: exchange.id,
+                kind: 'response',
+                run_id: exchange.runId,
+                sequence_index: exchange.sequenceIndex,
+                session_id: exchange.sessionId,
+                title: exchange.title ?? null,
+                tool_call_id: null,
+            };
+    }
+};
+
 export const mapRunRow = (row: StoredRunRow): ObjectModelRun => ({
         completedAt: toDate(row.completed_at),
         createdAt: new Date(row.created_at),
@@ -86,6 +147,23 @@ export const mapRunRow = (row: StoredRunRow): ObjectModelRun => ({
         startedAt: toDate(row.started_at),
         status: row.status,
         updatedAt: new Date(row.updated_at),
+    });
+
+export const toStoredRunRow = (run: ObjectModelRun): StoredRunRow => ({
+        completed_at: toTimestamp(run.completedAt),
+        created_at: run.createdAt.toISOString(),
+        error: run.error ?? null,
+        exchange_id: run.exchangeId,
+        failed_at: toTimestamp(run.failedAt),
+        id: run.id,
+        include_party_context: run.includePartyContext ? 1 : 0,
+        mode: run.mode,
+        prompt: run.prompt,
+        retrieval_turn_limit: run.retrievalTurnLimit,
+        session_id: run.sessionId,
+        started_at: toTimestamp(run.startedAt),
+        status: run.status,
+        updated_at: run.updatedAt.toISOString(),
     });
 
 export const mapSessionRow = (
@@ -105,6 +183,17 @@ export const mapSessionRow = (
         updatedAt: new Date(row.updated_at),
     });
 
+export const toStoredSessionRow = (session: ObjectModelSession): StoredSessionRow => ({
+        active_run_id: session.activeRunId,
+        archived_at: toTimestamp(session.archivedAt),
+        created_at: session.createdAt.toISOString(),
+        id: session.id,
+        include_party_context: session.includePartyContext ? 1 : 0,
+        mode: session.mode,
+        title: session.title ?? null,
+        updated_at: session.updatedAt.toISOString(),
+    });
+
 export const mapNpcRow = (row: StoredNpcRow): ObjectModelNpc => ({
         age: row.age ?? undefined,
         bio: row.bio,
@@ -121,9 +210,32 @@ export const mapNpcRow = (row: StoredNpcRow): ObjectModelNpc => ({
         updatedAt: toDate(row.updated_at),
     });
 
+export const toStoredNpcRow = (npc: ObjectModelNpc): StoredNpcRow => ({
+        age: npc.age ?? null,
+        bio: npc.bio,
+        created_at: toTimestamp(npc.createdAt),
+        description: npc.description,
+        ethnicity: npc.ethnicity ?? null,
+        gender: npc.gender ?? null,
+        id: npc.id,
+        name: npc.name,
+        role: npc.role ?? null,
+        run_id: npc.runId,
+        session_id: npc.sessionId,
+        species: npc.species ?? null,
+        updated_at: toTimestamp(npc.updatedAt),
+    });
+
 export const mapConsoleEntryRow = (row: StoredConsoleEntryRow): ObjectModelConsoleEntry => ({
         createdAt: new Date(row.created_at),
         id: row.id,
         level: row.level,
         message: row.message,
+    });
+
+export const toStoredConsoleEntryRow = (entry: ObjectModelConsoleEntry): StoredConsoleEntryRow => ({
+        created_at: entry.createdAt.toISOString(),
+        id: entry.id,
+        level: entry.level,
+        message: entry.message,
     });

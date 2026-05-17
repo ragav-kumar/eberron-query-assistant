@@ -1,10 +1,6 @@
-import type { Orm } from '../../contract.js';
-import { mapNpcRow, toTimestamp } from '../../mappers.js';
+import type Database from 'better-sqlite3';
+
 import type { Npc as StoredNpcRow } from '../schema.js';
-
-import type { RepositoryDependencies } from './shared.js';
-
-type NpcRepository = Orm['npcs'];
 
 const NPC_SELECT = `
     SELECT
@@ -27,9 +23,9 @@ const NPC_SELECT = `
 const NPC_LIST_ORDER = 'ORDER BY updated_at DESC, id DESC';
 
 export const createNpcRepository = (
-    { getDatabase }: RepositoryDependencies,
-): NpcRepository => ({
-        get: async id => {
+    getDatabase: () => Promise<Database.Database>,
+) => ({
+        get: async (id: number) => {
             const database = await getDatabase();
             const row = database
                 .prepare(`
@@ -37,41 +33,38 @@ export const createNpcRepository = (
                     WHERE id = ?
                 `)
                 .get(id) as StoredNpcRow | undefined;
-            return row ? mapNpcRow(row) : null;
+            return row ?? null;
         },
         list: async () => {
             const database = await getDatabase();
-            const rows = database
+            return database
                 .prepare(`
                     ${NPC_SELECT}
                     ${NPC_LIST_ORDER}
                 `)
                 .all() as StoredNpcRow[];
-            return rows.map(mapNpcRow);
         },
-        listByRun: async runId => {
+        listByRun: async (runId: string) => {
             const database = await getDatabase();
-            const rows = database
+            return database
                 .prepare(`
                     ${NPC_SELECT}
                     WHERE run_id = ?
                     ${NPC_LIST_ORDER}
                 `)
                 .all(runId) as StoredNpcRow[];
-            return rows.map(mapNpcRow);
         },
-        listBySession: async sessionId => {
+        listBySession: async (sessionId: string) => {
             const database = await getDatabase();
-            const rows = database
+            return database
                 .prepare(`
                     ${NPC_SELECT}
                     WHERE session_id = ?
                     ${NPC_LIST_ORDER}
                 `)
                 .all(sessionId) as StoredNpcRow[];
-            return rows.map(mapNpcRow);
         },
-        save: async npc => {
+        save: async (npc: StoredNpcRow) => {
             const database = await getDatabase();
             database
                 .prepare(`
@@ -106,8 +99,8 @@ export const createNpcRepository = (
                 `)
                 .run(
                     npc.id,
-                    npc.sessionId,
-                    npc.runId,
+                    npc.session_id,
+                    npc.run_id,
                     npc.name,
                     npc.bio,
                     npc.description,
@@ -116,8 +109,8 @@ export const createNpcRepository = (
                     npc.gender ?? null,
                     npc.role ?? null,
                     npc.species ?? null,
-                    toTimestamp(npc.createdAt),
-                    toTimestamp(npc.updatedAt),
+                    npc.created_at,
+                    npc.updated_at,
                 );
         },
     });

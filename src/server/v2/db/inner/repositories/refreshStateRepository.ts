@@ -1,16 +1,12 @@
-import type { Orm } from '../../contract.js';
-import { mapRefreshStateRow, toTimestamp } from '../../mappers.js';
+import type Database from 'better-sqlite3';
+
 import type { RefreshState as StoredRefreshStateRow } from '../schema.js';
-
-import type { RepositoryDependencies } from './shared.js';
-
-type RefreshStateRepository = Orm['refreshState'];
 
 const SINGLETON_KEY = 1;
 
 export const createRefreshStateRepository = (
-    { getDatabase }: RepositoryDependencies,
-): RefreshStateRepository => ({
+    getDatabase: () => Promise<Database.Database>,
+) => ({
         get: async () => {
             const database = await getDatabase();
             const row = database
@@ -28,9 +24,9 @@ export const createRefreshStateRepository = (
                     WHERE singleton_key = ?
                 `)
                 .get(SINGLETON_KEY) as StoredRefreshStateRow | undefined;
-            return row ? mapRefreshStateRow(row) : null;
+            return row ?? null;
         },
-        save: async refreshState => {
+        save: async (refreshState: StoredRefreshStateRow) => {
             const database = await getDatabase();
             database
                 .prepare(`
@@ -55,13 +51,13 @@ export const createRefreshStateRepository = (
                 `)
                 .run(
                     SINGLETON_KEY,
-                    refreshState.activeOperation,
-                    refreshState.refreshStatus,
-                    refreshState.reingestStatus,
-                    toTimestamp(refreshState.lastRefreshAt),
-                    toTimestamp(refreshState.lastReingestAt),
-                    refreshState.createdAt.toISOString(),
-                    refreshState.updatedAt.toISOString(),
+                    refreshState.active_operation,
+                    refreshState.refresh_status,
+                    refreshState.reingest_status,
+                    refreshState.last_refresh_at,
+                    refreshState.last_reingest_at,
+                    refreshState.created_at,
+                    refreshState.updated_at,
                 );
         },
     });
