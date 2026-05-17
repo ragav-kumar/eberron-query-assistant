@@ -1,9 +1,9 @@
 import type { ReactNode } from 'react';
 
-export interface TabContentProps {
+export interface TabContentProps<T extends string> {
     children: ReactNode;
-    tabKey: string;
+    tabKey: T;
     className?: string | undefined;
 }
 
-export const TabContent = (_: TabContentProps) => null;
+export const TabContent = <T extends string>(_: TabContentProps<T>) => null;

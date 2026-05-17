@@ -1,12 +1,12 @@
 .wrap {
-    --tabs-active-surface: #32373c;
+    --tabs-active-surface: var(--color-surface-app);
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
     min-height: 0;
     min-width: 0;
     overflow: hidden;
-    color: #f2f4f7;
+    color: var(--color-text-primary);
 }
 
 .buttonWrap {
@@ -15,7 +15,7 @@
     gap: 0.5rem;
     padding: 0.75rem 0.75rem 0;
     background:
-            linear-gradient(#4d545c, #4d545c)
+            linear-gradient(var(--color-border-default), var(--color-border-default))
             left bottom / 100% 1px
             no-repeat;
     min-height: 0;
@@ -33,10 +33,10 @@
 .button {
     flex: 0 0 auto;
     padding: 0.625rem 0.875rem;
-    border: 1px solid #4d545c;
+    border: 1px solid var(--color-border-default);
     border-radius: 0.5rem 0.5rem 0 0;
-    background-color: #3a4046;
-    color: #ffffff;
+    background-color: var(--color-surface-raised);
+    color: var(--color-text-primary);
     cursor: pointer;
     font: inherit;
     line-height: 1.2;
@@ -44,8 +44,8 @@
     transition: background-color 120ms ease, border-color 120ms ease;
 
     &:hover {
-        background-color: #454c54;
-        border-color: #646d77;
+        background-color: var(--color-surface-raised-hover);
+        border-color: var(--color-border-strong-hover);
     }
 
     &.active {

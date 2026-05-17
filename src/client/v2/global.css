@@ -7,5 +7,5 @@ body,
 body {
     margin: 0;
     overflow: hidden;
-    background-color: #444444;
+    background-color: var(--color-app-background);
 }

@@ -1,6 +1,6 @@
-export interface TabButtonProps {
+export interface TabButtonProps<T extends string> {
     children: string;
-    tabKey: string;
+    tabKey: T;
 }
 
-export const TabButton = (_: TabButtonProps) => null;
+export const TabButton = <T extends string>(_: TabButtonProps<T>) => null;

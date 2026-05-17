@@ -1,13 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import './themes.css';
 import './global.css';
 import styles from './App.module.css';
-import { Tabs } from './components/Tabs/index.js';
 import { LeftColumnHeader } from './components/LeftColumnHeader.js';
 import { Console } from './components/Console.js';
 import { AppContext } from './AppContext.js';
-import { AdditionalContextInput } from './components/AdditionalContextInput.js';
-import { Input } from './components/Input/Input.js';
 import { RightColumnTabs } from './components/RightColumnTabs.js';
+import { LeftColumnTabs } from './components/LeftColumnTabs.js';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -30,16 +29,7 @@ export const App = () => (
                 <title>Eberron Query Assistant V2</title>
                 <section className={styles.column}>
                     <LeftColumnHeader />
-                    <Tabs defaultKey='input' className={styles.leftTabs}>
-                        <Tabs.Button tabKey='input'>Input</Tabs.Button>
-                        <Tabs.Button tabKey='Additional Context'>Additional Context</Tabs.Button>
-                        <Tabs.Content tabKey='input'>
-                            <Input />
-                        </Tabs.Content>
-                        <Tabs.Content tabKey='Additional Context'>
-                            <AdditionalContextInput />
-                        </Tabs.Content>
-                    </Tabs>
+                    <LeftColumnTabs />
                     <Console />
                 </section>
                 <section className={styles.column}>

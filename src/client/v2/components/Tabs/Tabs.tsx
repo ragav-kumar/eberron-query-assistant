@@ -1,30 +1,27 @@
 import type { ReactNode} from 'react';
-import { useState, Children, isValidElement } from 'react';
-import type { TabButtonProps } from './TabButton.js';
-import { TabButton } from './TabButton.js';
-import type { TabContentProps } from './TabContent.js';
-import { TabContent } from './TabContent.js';
+import { Children, isValidElement } from 'react';
+import { TabButtonProps, TabButton } from './TabButton.js';
+import { TabContentProps, TabContent } from './TabContent.js';
 import styles from './Tabs.module.css';
 import { joinClassNames } from '@/client/v2/utils.js';
 
-interface TabsProps {
-    defaultKey: string;
+interface TabsProps<T> {
     children: ReactNode;
     className?: string | undefined;
     contentClassName?: string | undefined;
+    currentTabKey: T;
+    onTabChanged: (tabKey: T) => void;
 }
 
-export const Tabs = ({children, className, contentClassName, defaultKey}: TabsProps) => {
-    const [currentTabKey, setCurrentTabKey] = useState<string>(defaultKey);
-
-    const tabButtons: TabButtonProps[] = [];
-    const tabContents: TabContentProps[] = [];
+export const Tabs = <T extends string>({children, className, contentClassName, currentTabKey, onTabChanged}: TabsProps<T>) => {
+    const tabButtons: TabButtonProps<T>[] = [];
+    const tabContents: TabContentProps<T>[] = [];
     Children.forEach(children, (child) => {
         if (isValidElement(child)) {
             if (child.type === TabButton) {
-                tabButtons.push(child.props as TabButtonProps);
+                tabButtons.push(child.props as TabButtonProps<T>);
             } else if (child.type === TabContent) {
-                tabContents.push(child.props as TabContentProps);
+                tabContents.push(child.props as TabContentProps<T>);
             }
         }
     });
@@ -36,7 +33,7 @@ export const Tabs = ({children, className, contentClassName, defaultKey}: TabsPr
                     <div
                         className={joinClassNames(styles.button, currentTabKey === tabButton.tabKey ? styles.active : null)}
                         key={tabButton.tabKey}
-                        onClick={() => setCurrentTabKey(tabButton.tabKey)}
+                        onClick={() => onTabChanged(tabButton.tabKey)}
                     >
                         {tabButton.children}
                     </div>

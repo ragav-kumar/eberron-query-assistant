@@ -20,40 +20,40 @@
 }
 
 .status {
-    color: #b0b9c2;
+    color: var(--color-text-subtle);
     font-size: 0.9rem;
 }
 
 .editor {
-    --accentBase: #102033;
-    --accentBgSubtle: #12263e;
-    --accentBg: #15314d;
-    --accentBgHover: #1a3d60;
-    --accentBgActive: #234f7a;
-    --accentLine: #2c679f;
-    --accentBorder: #3179bc;
-    --accentBorderHover: #4994da;
-    --accentSolid: #4994da;
-    --accentSolidHover: #63a8e8;
-    --accentText: #9bd0ff;
-    --accentTextContrast: #f3f8fd;
-    --basePageBg: #1a1f25;
-    --baseBase: #1f252b;
-    --baseBgSubtle: #242b33;
-    --baseBg: #29323b;
-    --baseBgHover: #313c46;
-    --baseBgActive: #394551;
-    --baseLine: #44515e;
-    --baseBorder: #536273;
-    --baseBorderHover: #66778a;
-    --baseSolid: #6c7d90;
-    --baseSolidHover: #7a8da2;
-    --baseText: #b8c2cc;
-    --baseTextContrast: #f2f4f7;
-    background: #1f252b;
-    border: 1px solid #536273;
+    --accentBase: var(--color-accent-base);
+    --accentBgSubtle: var(--color-accent-surface-subtle);
+    --accentBg: var(--color-accent-surface);
+    --accentBgHover: var(--color-accent-surface-hover);
+    --accentBgActive: var(--color-accent-surface-active);
+    --accentLine: var(--color-accent-line);
+    --accentBorder: var(--color-accent-border);
+    --accentBorderHover: var(--color-accent-primary);
+    --accentSolid: var(--color-accent-primary);
+    --accentSolidHover: var(--color-accent-primary-hover);
+    --accentText: var(--color-accent-link);
+    --accentTextContrast: var(--color-text-primary);
+    --basePageBg: var(--color-app-background);
+    --baseBase: var(--color-surface-panel);
+    --baseBgSubtle: var(--color-surface-panel-subtle);
+    --baseBg: var(--color-surface-panel-active);
+    --baseBgHover: var(--color-surface-panel-hover);
+    --baseBgActive: var(--color-surface-panel-hover);
+    --baseLine: var(--color-border-subtle);
+    --baseBorder: var(--color-border-strong);
+    --baseBorderHover: var(--color-border-active);
+    --baseSolid: var(--color-text-tertiary);
+    --baseSolidHover: var(--color-text-subtle);
+    --baseText: var(--color-text-subtle);
+    --baseTextContrast: var(--color-text-primary);
+    background: var(--color-surface-panel);
+    border: 1px solid var(--color-border-strong);
     border-radius: 6px;
-    color: #f2f4f7;
+    color: var(--color-text-primary);
     display: flex;
     flex: 1 1 auto;
     flex-direction: column;
@@ -61,26 +61,26 @@
     overflow: hidden;
 
     :global(.cm-editor) {
-        background: #1f252b;
+        background: var(--color-surface-panel);
     }
 
     :global(.cm-scroller) {
-        background: #1f252b;
-        color: #f2f4f7;
+        background: var(--color-surface-panel);
+        color: var(--color-text-primary);
     }
 
     :global(.cm-gutters) {
-        background: #1f252b;
-        border-right-color: #44515e;
+        background: var(--color-surface-panel);
+        border-right-color: var(--color-border-subtle);
     }
 
     :global(.cm-activeLine),
     :global(.cm-activeLineGutter) {
-        background: #29323b;
+        background: var(--color-surface-panel-active);
     }
 
     :global(a) {
-        color: #9bd0ff;
+        color: var(--color-accent-link);
     }
 
     :global(.mdxeditor-toolbar) {
@@ -95,19 +95,19 @@
 }
 
 .contentEditable {
-    background: #1f252b;
-    color: #f2f4f7;
+    background: var(--color-surface-panel);
+    color: var(--color-text-primary);
     min-height: 100%;
 
     &::selection {
-        background: rgb(99 168 232 / 0.35);
+        background: var(--color-selection);
     }
 }
 
 .loading,
 .error {
     align-items: center;
-    border: 1px solid #536273;
+    border: 1px solid var(--color-border-strong);
     border-radius: 6px;
     display: flex;
     flex: 1 1 auto;
@@ -116,12 +116,12 @@
 }
 
 .loading {
-    background: #1f252b;
-    color: #b0b9c2;
+    background: var(--color-surface-panel);
+    color: var(--color-text-subtle);
 }
 
 .error {
-    background: #3a1f22;
-    border-color: #8f494f;
-    color: #ffd7db;
+    background: var(--color-danger-surface);
+    border-color: var(--color-danger-border);
+    color: var(--color-danger-text);
 }

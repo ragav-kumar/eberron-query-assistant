@@ -17,6 +17,7 @@
 - If a component only needs its own component file plus stylesheet, keep it as standalone sibling files instead of creating a folder. Use a component folder when the component owns additional files such as child components or other closely related modules.
 - Keep simple one-off render helpers private to the module instead of promoting them into shared utilities too early.
 - Prefer CSS Modules for component-scoped styles, with a nearby `*.module.css` file and `styles.foo` access.
+- Prefer color tokens from `/src/client/v2/themes.css` instead of component-local hex values or one-off RGB literals. Add to the shared theme file first when a new reusable color is needed.
 - Use shared utilities like `joinClassNames` for conditional class assembly instead of inline string building.
 - Prefer barrel exports such as local `index.ts` files when they simplify a component family or API surface without hiding ownership.
 - All api interactions must happen within `/src/client/v2/api`. Build custom api hooks around `queryApi`, `mutateApi`, contract definitions, and stable query-key exports.

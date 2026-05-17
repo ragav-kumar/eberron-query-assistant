@@ -29,21 +29,19 @@ export const NpcCard = ({npc, isInSession}: NpcCardProps) => {
             className={joinClassNames(styles.wrap, isInSession ? styles.inSession : null)}
         >
             <header className={styles.header}>
-                <div className={styles.headerText}>
-                    <span className={styles.id}>
+                <span className={styles.id}>
                         #{npc.id}
                     </span>
-                    <h2 className={styles.name}>
-                        {npc.name}
-                    </h2>
-                </div>
+                <h2 className={styles.name}>
+                    {npc.name}
+                </h2>
                 {speciesIcon ? (
                     <img
                         className={styles.icon}
                         src={speciesIcon}
                         alt={npc.species ? `${npc.species} icon` : 'Species icon'}
                     />
-                ) : null}
+                ) : <div />}
             </header>
             {metadata.length > 0 ? (
                 <dl className={styles.metadata}>
