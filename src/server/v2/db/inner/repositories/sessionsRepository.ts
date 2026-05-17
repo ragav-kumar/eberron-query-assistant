@@ -8,7 +8,7 @@ export const createSessionsRepository = (
         get: async (id: string) => {
             const database = await getDatabase();
             const row = database
-                .prepare(`
+                .prepare<[string], StoredSessionRow>(`
                     SELECT
                         id,
                         mode,
@@ -21,13 +21,13 @@ export const createSessionsRepository = (
                     FROM sessions
                     WHERE id = ?
                 `)
-                .get(id) as StoredSessionRow | undefined;
+                .get(id);
             return row ?? null;
         },
         list: async () => {
             const database = await getDatabase();
             return database
-                .prepare(`
+                .prepare<[], StoredSessionRow>(`
                     SELECT
                         id,
                         mode,
@@ -40,7 +40,7 @@ export const createSessionsRepository = (
                     FROM sessions
                     ORDER BY created_at, id
                 `)
-                .all() as StoredSessionRow[];
+                .all();
         },
         save: async (session: StoredSessionRow) => {
             const database = await getDatabase();

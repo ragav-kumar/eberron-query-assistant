@@ -6,23 +6,23 @@ export const createSettingsRepository = (getDatabase: () => Promise<Database.Dat
         get: async (key: string) => {
             const database = await getDatabase();
             const row = database
-                .prepare(`
+                .prepare<[string], StoredSettingRow>(`
                     SELECT key, value, modified_at
                     FROM settings
                     WHERE key = ?
                 `)
-                .get(key) as StoredSettingRow | undefined;
+                .get(key);
             return row ?? null;
         },
         list: async () => {
             const database = await getDatabase();
             return database
-                .prepare(`
+                .prepare<[], StoredSettingRow>(`
                     SELECT key, value, modified_at
                     FROM settings
                     ORDER BY key
                 `)
-                .all() as StoredSettingRow[];
+                .all();
         },
         save: async (setting: StoredSettingRow) => {
             const database = await getDatabase();

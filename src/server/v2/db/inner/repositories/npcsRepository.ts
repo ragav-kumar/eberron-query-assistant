@@ -28,41 +28,41 @@ export const createNpcRepository = (
         get: async (id: number) => {
             const database = await getDatabase();
             const row = database
-                .prepare(`
+                .prepare<[number], StoredNpcRow>(`
                     ${NPC_SELECT}
                     WHERE id = ?
                 `)
-                .get(id) as StoredNpcRow | undefined;
+                .get(id);
             return row ?? null;
         },
         list: async () => {
             const database = await getDatabase();
             return database
-                .prepare(`
+                .prepare<[], StoredNpcRow>(`
                     ${NPC_SELECT}
                     ${NPC_LIST_ORDER}
                 `)
-                .all() as StoredNpcRow[];
+                .all();
         },
         listByRun: async (runId: string) => {
             const database = await getDatabase();
             return database
-                .prepare(`
+                .prepare<[string], StoredNpcRow>(`
                     ${NPC_SELECT}
                     WHERE run_id = ?
                     ${NPC_LIST_ORDER}
                 `)
-                .all(runId) as StoredNpcRow[];
+                .all(runId);
         },
         listBySession: async (sessionId: string) => {
             const database = await getDatabase();
             return database
-                .prepare(`
+                .prepare<[string], StoredNpcRow>(`
                     ${NPC_SELECT}
                     WHERE session_id = ?
                     ${NPC_LIST_ORDER}
                 `)
-                .all(sessionId) as StoredNpcRow[];
+                .all(sessionId);
         },
         save: async (npc: StoredNpcRow) => {
             const database = await getDatabase();

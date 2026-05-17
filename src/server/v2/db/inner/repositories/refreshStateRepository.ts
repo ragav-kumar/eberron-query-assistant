@@ -10,7 +10,7 @@ export const createRefreshStateRepository = (
         get: async () => {
             const database = await getDatabase();
             const row = database
-                .prepare(`
+                .prepare<[number], StoredRefreshStateRow>(`
                     SELECT
                         singleton_key,
                         active_operation,
@@ -23,7 +23,7 @@ export const createRefreshStateRepository = (
                     FROM refresh_state
                     WHERE singleton_key = ?
                 `)
-                .get(SINGLETON_KEY) as StoredRefreshStateRow | undefined;
+                .get(SINGLETON_KEY);
             return row ?? null;
         },
         save: async (refreshState: StoredRefreshStateRow) => {

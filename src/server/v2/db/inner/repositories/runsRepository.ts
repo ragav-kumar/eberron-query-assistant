@@ -8,7 +8,7 @@ export const createRunsRepository = (
         get: async (id: string) => {
             const database = await getDatabase();
             const row = database
-                .prepare(`
+                .prepare<[string], StoredRunRow>(`
                     SELECT
                         id,
                         session_id,
@@ -27,13 +27,13 @@ export const createRunsRepository = (
                     FROM runs
                     WHERE id = ?
                 `)
-                .get(id) as StoredRunRow | undefined;
+                .get(id);
             return row ?? null;
         },
         listBySession: async (sessionId: string) => {
             const database = await getDatabase();
             return database
-                .prepare(`
+                .prepare<[string], StoredRunRow>(`
                     SELECT
                         id,
                         session_id,
@@ -53,7 +53,7 @@ export const createRunsRepository = (
                     WHERE session_id = ?
                     ORDER BY created_at, id
                 `)
-                .all(sessionId) as StoredRunRow[];
+                .all(sessionId);
         },
         save: async (run: StoredRunRow) => {
             const database = await getDatabase();

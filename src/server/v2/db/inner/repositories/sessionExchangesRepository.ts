@@ -25,32 +25,32 @@ export const createSessionExchangesRepository = (
         get: async (id: string) => {
             const database = await getDatabase();
             const row = database
-                .prepare(`
+                .prepare<[string], StoredSessionExchangeRow>(`
                     ${EXCHANGE_SELECT}
                     WHERE id = ?
                 `)
-                .get(id) as StoredSessionExchangeRow | undefined;
+                .get(id);
             return row ?? null;
         },
         listBySession: async (sessionId: string) => {
             const database = await getDatabase();
             return database
-                .prepare(`
+                .prepare<[string], StoredSessionExchangeRow>(`
                     ${EXCHANGE_SELECT}
                     WHERE session_id = ?
                     ${EXCHANGE_ORDER}
                 `)
-                .all(sessionId) as StoredSessionExchangeRow[];
+                .all(sessionId);
         },
         listByRun: async (runId: string) => {
             const database = await getDatabase();
             return database
-                .prepare(`
+                .prepare<[string], StoredSessionExchangeRow>(`
                     ${EXCHANGE_SELECT}
                     WHERE run_id = ?
                     ${EXCHANGE_ORDER}
                 `)
-                .all(runId) as StoredSessionExchangeRow[];
+                .all(runId);
         },
         save: async (exchange: StoredSessionExchangeRow) => {
             const database = await getDatabase();

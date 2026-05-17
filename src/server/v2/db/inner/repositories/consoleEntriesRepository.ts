@@ -8,23 +8,23 @@ export const createConsoleEntriesRepository = (
         get: async (id: string) => {
             const database = await getDatabase();
             const row = database
-                .prepare(`
+                .prepare<[string], StoredConsoleEntryRow>(`
                     SELECT id, level, message, created_at
                     FROM console_entries
                     WHERE id = ?
                 `)
-                .get(id) as StoredConsoleEntryRow | undefined;
+                .get(id);
             return row ?? null;
         },
         list: async () => {
             const database = await getDatabase();
             return database
-                .prepare(`
+                .prepare<[], StoredConsoleEntryRow>(`
                     SELECT id, level, message, created_at
                     FROM console_entries
                     ORDER BY created_at, id
                 `)
-                .all() as StoredConsoleEntryRow[];
+                .all();
         },
         save: async (entry: StoredConsoleEntryRow) => {
             const database = await getDatabase();
