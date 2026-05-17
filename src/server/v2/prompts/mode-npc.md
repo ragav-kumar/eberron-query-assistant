@@ -42,4 +42,5 @@ NPC behavior:
 - Keep each description concise and physical.
 - Keep each bio very short.
 - Include species, ethnicity, gender, role, and age when each field is applicable and reasonably knowable in-setting.
+- For gender, use `male` or `female` whenever either clearly applies. Otherwise, use a short write-in value and do not use pronouns as the gender value.
 - Omit optional fields only when they do not apply or cannot reasonably be known.
