@@ -7,6 +7,7 @@ export interface V2AppDependencies {
     config?: RuntimeConfig;
 }
 
+// noinspection JSUnusedGlobalSymbols
 export const initializeV2App = async (dependencies: V2AppDependencies = {}): Promise<void> => {
     const config = dependencies.config ?? loadDefaultConfig();
     const orm = createOrm(config);
