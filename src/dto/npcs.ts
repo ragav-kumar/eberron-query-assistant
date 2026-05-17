@@ -21,9 +21,10 @@ export interface NpcListQuery {
 }
 
 export interface NpcCollection {
-    activeFilter: string;
-    npcs: Npc[];
+    filter: string;
     skip: number;
     take: number;
+
+    npcs: Npc[];
     totalCount: number;
 }

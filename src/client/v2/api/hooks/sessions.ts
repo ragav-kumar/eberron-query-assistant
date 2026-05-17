@@ -1,6 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mutateApi, queryApi } from '@/client/v2/api/utils.js';
-import type { CreateSession } from '@/dto/index.js';
+import { CreateSession } from '@/dto/index.js';
 
 import { contracts } from '@/contract/index.js';
 
@@ -8,15 +8,18 @@ export const sessionQueryKey = ['api', 'sessions'];
 
 export const useSessionsQuery = () => useQuery({
     queryKey: sessionQueryKey,
-    queryFn: () => queryApi(contracts.sessions.getSummaries),
+    queryFn: () => queryApi(contracts.sessions.get),
 });
 
-export const useSessionQuery = (sessionId: string) => useQuery({
-    queryKey: [...sessionQueryKey, sessionId],
-    queryFn: () => queryApi(contracts.sessions.get, {sessionId}),
+export const useSessionFeedsQuery = (sessionIds: string[]) => useQueries({
+    queries: sessionIds.map(sessionId => ({
+        enabled: sessionId.trim() !== '',
+        queryKey: [...sessionQueryKey, sessionId, 'feed'],
+        queryFn: () => queryApi(contracts.sessions.getFeed, {sessionId}),
+    })),
 });
 
-export const useSessionMutation = () => {
+export const useCreateSessionMutation = () => {
     const queryClient = useQueryClient();
 
     return useMutation({

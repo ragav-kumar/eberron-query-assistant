@@ -43,7 +43,7 @@
 - At the top of a mode tab is a dropdown which allows selecting a session. There is also a button to create a new session.
   - Creating a new session creates a "temporary" session of sorts
   - This looks like a regular session, but is transient.
-  - This is replaced by a proper session once the first agent call is complete on that thread. By that point, the agent will have generated a session title as well.
+  - This UI-local temporary state is replaced by the first persisted session once the first agent call is complete on that thread. By that point, the agent will have generated a session title as well.
 - Eventually, I'll want to add general fuzzy text search across sessions.
 - Every assistant call in all modes will look like this:
   - Send the prompt, optionally party context + additional context, and mandatorily appropriate data from RAG db

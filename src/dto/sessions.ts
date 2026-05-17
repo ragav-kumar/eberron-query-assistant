@@ -1,15 +1,6 @@
-export type SessionMode = 'assistant' | 'npc';
+import { SessionFeedExchange } from './sessionFeed.js';
 
-export interface SessionSummary {
-    id: string;
-    mode: SessionMode;
-    title: string;
-    createdAt: string;
-    updatedAt: string;
-    activeRunId: string | null;
-    includePartyContext: boolean | null;
-    lastEntryPreview?: string;
-}
+export type SessionMode = 'assistant' | 'npc';
 
 export interface Session {
     id: string;
@@ -19,8 +10,6 @@ export interface Session {
     updatedAt: string;
     activeRunId: string | null;
     includePartyContext: boolean | null;
-    promotedFromSessionId: string | null;
-    promotedToSessionId: string | null;
 }
 
 export interface CreateSession {
@@ -29,10 +18,8 @@ export interface CreateSession {
     includePartyContext?: boolean | null;
 }
 
-export interface UpdateSession {
-    title?: string;
-    includePartyContext?: boolean | null;
-    promotedFromSessionId?: string | null;
-    promotedToSessionId?: string | null;
+export interface SessionFeed {
+    sessionId: string;
+    mode: SessionMode;
+    items: SessionFeedExchange[];
 }
-

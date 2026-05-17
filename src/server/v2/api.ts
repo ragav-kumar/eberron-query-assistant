@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { ConsoleEntry, NpcCollection, Refresh, Run, Session, AssistantEntry, SessionSummary } from '@/dto/index.js';
+import type { ConsoleEntry, NpcCollection, Refresh, Run, Session, SessionFeedEntry, SessionSummary } from '@/dto/index.js';
 
 const ADDITIONAL_CONTEXT_MARKDOWN = `# Campaign Context
 
@@ -85,7 +85,7 @@ const SESSIONS = new Map<string, Session>([
     }],
 ]);
 
-const SESSION_ENTRIES = new Map<string, { sessionId: string; exchanges: { id: string; sessionId: string; createdAt: string; updatedAt: string; runId: string; status: Run['status']; entries: AssistantEntry[]; }[] }>([
+const SESSION_ENTRIES = new Map<string, { sessionId: string; exchanges: { id: string; sessionId: string; createdAt: string; updatedAt: string; runId: string; status: Run['status']; entries: SessionFeedEntry[]; }[] }>([
     ['session-dal-quor', {
         sessionId: 'session-dal-quor',
         exchanges: [{
@@ -182,7 +182,7 @@ const RUNS = new Map<string, Run>([
 ]);
 
 const NPCS: NpcCollection = {
-    activeFilter: '',
+    filter: '',
     npcs: [
         {
             id: 4,

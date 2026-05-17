@@ -1,3 +1,5 @@
+import styles from './NpcCards.module.css';
+import { NpcCard } from './NpcCard.js';
 import { useSessionContext } from '../SessionContext/index.js';
 
 export const NpcCards = () => {
@@ -8,7 +10,19 @@ export const NpcCards = () => {
         return null;
     }
 
+    if (activeSession.npcs.length === 0) {
+        return (
+            <p className={styles.empty}>
+                Generate NPCs to save cards here.
+            </p>
+        );
+    }
+
     return (
-        <p>TODO</p>
+        <div className={styles.grid}>
+            {activeSession.npcs.map(npc => (
+                <NpcCard key={npc.id} npc={npc}/>
+            ))}
+        </div>
     );
 };

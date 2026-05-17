@@ -5,4 +5,4 @@ export * from './npcs.js';
 export * from './refresh.js';
 export * from './runs.js';
 export * from './sessions.js';
-export * from './assistant.js';
+export * from './sessionFeed.js';

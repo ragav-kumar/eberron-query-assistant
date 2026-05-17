@@ -1,27 +1,25 @@
 import { createContext, use } from 'react';
 import { TabInputState, TabKey } from './tabDefinitions.js';
-import { AssistantExchange, Npc, Session, SessionSummary } from '@/dto/index.js';
+import { SessionFeedExchange, Session, SessionMode } from '@/dto/index.js';
 
-type SessionData = Session & ({
-    mode: 'assistant',
-    exchanges: AssistantExchange[];
-    npcs: null;
-} | {
-    mode: 'npc',
-    exchanges: null;
-    npcs: Npc[];
-});
+export type SessionData = Session & {
+    exchanges: SessionFeedExchange[];
+};
 
-interface SessionContextType {
+interface SessionContextTabManagement {
     changeActiveTab: (tab: TabKey) => void;
     activeTabState: TabInputState;
     patchActiveTabState: (state: Partial<TabInputState>) => void;
+}
 
-    activeSession: SessionData | null;
-    sessionSummaries: SessionSummary[];
+interface SessionContextSessionData {
+    activeSessions: Record<SessionMode, SessionData | undefined>;
+    sessionsByMode: (mode: SessionMode) => Session[];
+    changeActiveSession: (sessionId: string, mode: SessionMode) => void;
+}
 
+interface SessionContextType extends SessionContextTabManagement, SessionContextSessionData {
     isBusy: boolean;
-    submitActiveTab: () => Promise<void>;
 }
 
 export const SessionContext = createContext<SessionContextType | undefined>(undefined);

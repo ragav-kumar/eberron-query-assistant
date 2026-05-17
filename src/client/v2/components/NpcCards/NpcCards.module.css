@@ -1,0 +1,95 @@
+.grid {
+    align-items: flex-start;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.85rem;
+}
+
+.empty {
+    margin: 0;
+    color: #52616f;
+}
+
+.wrap {
+    background: #ffffff;
+    border: 1px solid #d8dee4;
+    border-radius: 8px;
+    display: flex;
+    flex: 1 1 28rem;
+    flex-direction: column;
+    gap: 0.65rem;
+    max-width: 32rem;
+    padding: 0.9rem;
+}
+
+.header {
+    align-items: baseline;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.55rem;
+}
+
+.headerText {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.id {
+    color: #52616f;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.name {
+    margin: 0;
+    font-size: 1rem;
+    line-height: 1.25;
+}
+
+.icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 6px;
+    object-fit: cover;
+    flex-shrink: 0;
+}
+
+.metadata {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0;
+}
+
+.metadataItem {
+    background: #f4f7fa;
+    border: 1px solid #d8dee4;
+    border-radius: 6px;
+    display: flex;
+    gap: 0.25rem;
+    margin: 0;
+    padding: 0.25rem 0.45rem;
+}
+
+.metadataItem dt {
+    color: #52616f;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.metadataItem dd {
+    font-size: 0.75rem;
+    margin: 0;
+}
+
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+}
+
+.body p {
+    line-height: 1.45;
+    margin: 0;
+}

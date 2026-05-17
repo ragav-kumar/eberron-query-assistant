@@ -9,10 +9,9 @@ import type {
     Refresh,
     Run,
     Session,
-    AssistantEntries,
-    SessionSummary,
-    UpdateSession,
-} from '../dto/index.js';
+    SessionFeed,
+    SessionMode,
+} from '@/dto/index.js';
 import { defineEndpoint, defineEndpointWithQuery, defineSseEndpoint, EmptyParams } from './helpers.js';
 
 export const contracts = {
@@ -46,8 +45,8 @@ export const contracts = {
      * human-visible entry timeline.
      */
     sessions: {
-        /** Lists session summaries for browse and selection flows. */
-        getSummaries: defineEndpointWithQuery<null, SessionSummary[], EmptyParams, { mode?: string }>({
+        /** Lists sessions. */
+        get: defineEndpointWithQuery<null, Session[], EmptyParams, { mode?: SessionMode }>({
             method: 'GET',
             path: '/api/v2/sessions',
             queryParams: ['mode'],
@@ -57,22 +56,10 @@ export const contracts = {
             method: 'POST',
             path: '/api/v2/sessions',
         }),
-        /** Fetches server-owned metadata for one session, excluding full entry history. */
-        get: defineEndpoint<null, Session, { sessionId: string }>({
-            method: 'GET',
-            path: '/api/v2/sessions/:sessionId',
-            pathParams: ['sessionId'],
-        }),
         /** Fetches the exchange feed for one session. */
-        getEntries: defineEndpoint<null, AssistantEntries, { sessionId: string }>({
+        getFeed: defineEndpoint<null, SessionFeed, { sessionId: string }>({
             method: 'GET',
-            path: '/api/v2/sessions/:sessionId/entries',
-            pathParams: ['sessionId'],
-        }),
-        /** This is the update endpoint for sessions. */
-        patch: defineEndpoint<UpdateSession, Session, { sessionId: string }>({
-            method: 'PATCH',
-            path: '/api/v2/sessions/:sessionId',
+            path: '/api/v2/sessions/:sessionId/feed',
             pathParams: ['sessionId'],
         }),
     },
@@ -101,6 +88,8 @@ export const contracts = {
     /**
      * NPCs are persisted generated cards, independent of the current session or
      * the run that originally created them.
+     *
+     * This needs to be its own resource because we list npcs in a session-independent way
      */
     npcs: {
         /** Lists the saved NPC collection. */
