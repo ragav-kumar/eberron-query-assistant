@@ -7,6 +7,7 @@ export interface Session {
     id: string;
     mode: SessionMode;
     title: string;
+    exchangeCount: number;
     createdAt: string;
     updatedAt: string;
     activeRunId: string | null;
