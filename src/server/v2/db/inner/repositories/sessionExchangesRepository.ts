@@ -1,5 +1,5 @@
-import { mapSessionExchangeRow } from '../mappers.js';
-import type { Orm } from '../contract.js';
+import type { Orm } from '../../contract.js';
+import { mapSessionExchangeRow } from '../../mappers.js';
 import type { SessionExchange as StoredSessionExchangeRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';

@@ -11,7 +11,7 @@ import type {
     Run as StoredRunRow,
     Session as StoredSessionRow,
     SessionExchange as StoredSessionExchangeRow,
-} from './schema.js';
+} from './inner/schema.js';
 
 export interface Loaders {
     loadRun: (database: Database.Database, runId: string) => ObjectModelRun | null;
@@ -39,7 +39,7 @@ export const createLoaders = (): Loaders => {
                     created_at
                 FROM session_exchanges
                 WHERE session_id = ?
-                ORDER BY sequence_index ASC, id ASC
+                ORDER BY sequence_index, id
             `)
             .all(sessionId) as StoredSessionExchangeRow[];
 

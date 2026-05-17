@@ -1,5 +1,5 @@
-import { mapSettingRow } from '../mappers.js';
-import type { Orm } from '../contract.js';
+import type { Orm } from '../../contract.js';
+import { mapSettingRow } from '../../mappers.js';
 import type { Setting as StoredSettingRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';
@@ -24,7 +24,7 @@ export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies
                 .prepare(`
                     SELECT key, value, modified_at
                     FROM settings
-                    ORDER BY key ASC
+                    ORDER BY key
                 `)
                 .all() as StoredSettingRow[];
             return rows.map(mapSettingRow);

@@ -5,7 +5,8 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
-import { createOrm, getAppDatabasePath } from '@/server/v2/db/index.js';
+import { createOrm } from '@/server/v2/db/index.js';
+import { getAppDatabasePath } from '@/server/v2/db/inner/database.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-orm');
 

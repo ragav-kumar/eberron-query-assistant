@@ -1,5 +1,5 @@
-import { mapConsoleEntryRow } from '../mappers.js';
-import type { Orm } from '../contract.js';
+import type { Orm } from '../../contract.js';
+import { mapConsoleEntryRow } from '../../mappers.js';
 import type { ConsoleEntry as StoredConsoleEntryRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';
@@ -26,7 +26,7 @@ export const createConsoleEntriesRepository = (
                 .prepare(`
                     SELECT id, level, message, created_at
                     FROM console_entries
-                    ORDER BY created_at ASC, id ASC
+                    ORDER BY created_at, id
                 `)
                 .all() as StoredConsoleEntryRow[];
             return rows.map(mapConsoleEntryRow);

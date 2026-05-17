@@ -1,5 +1,5 @@
-import { mapNpcRow, toTimestamp } from '../mappers.js';
-import type { Orm } from '../contract.js';
+import type { Orm } from '../../contract.js';
+import { mapNpcRow, toTimestamp } from '../../mappers.js';
 import type { Npc as StoredNpcRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';

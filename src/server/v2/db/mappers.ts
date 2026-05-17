@@ -15,7 +15,7 @@ import type {
     Session as StoredSessionRow,
     SessionExchange as StoredSessionExchangeRow,
     Setting as StoredSettingRow,
-} from './schema.js';
+} from './inner/schema.js';
 
 export const toTimestamp = (value: Date | null | undefined): string | null => value ? value.toISOString() : null;
 

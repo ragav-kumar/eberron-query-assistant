@@ -1,8 +1,7 @@
-import { mapSessionRow, toTimestamp } from '../mappers.js';
-import type { Orm } from '../contract.js';
+import type { Orm } from '../../contract.js';
+import type { Loaders } from '../../loaders.js';
+import { mapSessionRow, toTimestamp } from '../../mappers.js';
 import type { Session as StoredSessionRow } from '../schema.js';
-
-import type { Loaders } from '../loaders.js';
 import type { RepositoryDependencies } from './shared.js';
 
 type SessionsRepository = Orm['sessions'];
@@ -29,7 +28,7 @@ export const createSessionsRepository = (
                         created_at,
                         updated_at
                     FROM sessions
-                    ORDER BY created_at ASC, id ASC
+                    ORDER BY created_at, id
                 `)
                 .all() as StoredSessionRow[];
 
