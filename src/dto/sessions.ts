@@ -13,12 +13,6 @@ export interface Session {
     includePartyContext: boolean | null;
 }
 
-export interface CreateSession {
-    mode: SessionMode;
-    title?: string;
-    includePartyContext?: boolean | null;
-}
-
 export interface SessionFeed {
     sessionId: string;
     mode: SessionMode;

@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { ConsoleEntry, NpcCollection, Refresh, Run, Session, SessionFeedEntry, SessionSummary } from '@/dto/index.js';
+import type { ConsoleEntry, NpcCollection, Refresh, Run, Session, SessionFeed } from '@/dto/index.js';
 
 const ADDITIONAL_CONTEXT_MARKDOWN = `# Campaign Context
 
@@ -16,7 +16,7 @@ Use this context as local campaign guidance. It is not retrieved evidence, so do
 * Durotan's player tends to focus on the immediate scene and combat. Keep lore concise and concrete, without too much player-facing complexity, when Durotan is the focus. Complex information that the GM has to track is okay.
 `;
 
-const SESSION_SUMMARIES: SessionSummary[] = [
+const SESSIONS: Session[] = [
     {
         id: 'session-dragonshards',
         mode: 'assistant',
@@ -25,17 +25,15 @@ const SESSION_SUMMARIES: SessionSummary[] = [
         updatedAt: '2026-05-09T08:45:59.000Z',
         activeRunId: null,
         includePartyContext: true,
-        lastEntryPreview: 'Summarize this conversation into a reference document.',
     },
     {
         id: 'session-dal-quor',
         mode: 'assistant',
         title: 'Dal Quor vault pitch',
         createdAt: '2026-05-07T21:10:42.000Z',
-        updatedAt: '2026-05-07T21:10:42.000Z',
+        updatedAt: '2026-05-07T21:10:48.000Z',
         activeRunId: 'run-dal-quor-1',
         includePartyContext: true,
-        lastEntryPreview: "Let's give it a professional, spies / heist vibe.",
     },
     {
         id: 'session-thornwood',
@@ -45,50 +43,28 @@ const SESSION_SUMMARIES: SessionSummary[] = [
         updatedAt: '2026-05-09T09:10:07.000Z',
         activeRunId: null,
         includePartyContext: true,
-        lastEntryPreview: 'Is there anything in the lore about the Thornwood (north of Vathirond)?',
+    },
+    {
+        id: 'session-boxing-contenders',
+        mode: 'npc',
+        title: 'Boxing contenders',
+        createdAt: '2026-05-10T02:23:14.845Z',
+        updatedAt: '2026-05-10T02:23:14.845Z',
+        activeRunId: null,
+        includePartyContext: true,
     },
 ];
 
-const SESSIONS = new Map<string, Session>([
+const SESSION_FEEDS = new Map<string, SessionFeed>([
     ['session-dragonshards', {
-        id: 'session-dragonshards',
+        sessionId: 'session-dragonshards',
         mode: 'assistant',
-        title: 'Dragonshard pricing tiers',
-        createdAt: '2026-05-09T08:45:59.000Z',
-        updatedAt: '2026-05-09T08:45:59.000Z',
-        activeRunId: null,
-        includePartyContext: true,
-        promotedFromSessionId: null,
-        promotedToSessionId: null,
+        items: [],
     }],
-    ['session-dal-quor', {
-        id: 'session-dal-quor',
-        mode: 'assistant',
-        title: 'Dal Quor vault pitch',
-        createdAt: '2026-05-07T21:10:42.000Z',
-        updatedAt: '2026-05-07T21:10:42.000Z',
-        activeRunId: 'run-dal-quor-1',
-        includePartyContext: true,
-        promotedFromSessionId: null,
-        promotedToSessionId: null,
-    }],
-    ['session-thornwood', {
-        id: 'session-thornwood',
-        mode: 'assistant',
-        title: 'Thornwood north of Vathirond',
-        createdAt: '2026-05-09T09:10:07.000Z',
-        updatedAt: '2026-05-09T09:10:07.000Z',
-        activeRunId: null,
-        includePartyContext: true,
-        promotedFromSessionId: null,
-        promotedToSessionId: null,
-    }],
-]);
-
-const SESSION_ENTRIES = new Map<string, { sessionId: string; exchanges: { id: string; sessionId: string; createdAt: string; updatedAt: string; runId: string; status: Run['status']; entries: SessionFeedEntry[]; }[] }>([
     ['session-dal-quor', {
         sessionId: 'session-dal-quor',
-        exchanges: [{
+        mode: 'assistant',
+        items: [{
             id: 'exchange-dal-quor-1',
             sessionId: 'session-dal-quor',
             createdAt: '2026-05-07T21:10:42.000Z',
@@ -103,28 +79,8 @@ const SESSION_ENTRIES = new Map<string, { sessionId: string; exchanges: { id: st
                     runId: 'run-dal-quor-1',
                     exchangeId: 'exchange-dal-quor-1',
                     createdAt: '2026-05-07T21:10:42.000Z',
-                    content: 'Mock session timeline for v2 UI build-out based on a real session log.',
-                    toolCallId: null,
-                },
-                {
-                    id: 'session-dal-quor-reasoning-2',
-                    kind: 'reasoning',
-                    sessionId: 'session-dal-quor',
-                    runId: 'run-dal-quor-1',
-                    exchangeId: 'exchange-dal-quor-1',
-                    createdAt: '2026-05-07T21:10:43.000Z',
                     content: 'Looking for Eberron dragonshard tier and pricing guidance.',
                     toolCallId: null,
-                },
-                {
-                    id: 'session-dal-quor-response-1',
-                    kind: 'response',
-                    sessionId: 'session-dal-quor',
-                    runId: 'run-dal-quor-1',
-                    exchangeId: 'exchange-dal-quor-1',
-                    createdAt: '2026-05-07T21:10:44.000Z',
-                    title: 'Golden Vault spiel for the forest temple',
-                    content: 'I can do that, but I need one or two details first so I don’t invent the wrong Golden Vault hook.\n\nWhat I have from the notes:\n- The active Vathirond thread includes **“Golden Vault”** and a dead drop at the memorial to the fallen, with a planned spiel for **“Reach for the Stars”**.\n- You want to adapt that into a **Forest Temple in Dal Quor** with a 4-day access window, poe sisters, a phantom Ganon adaptation, and a vault objective at the end.\n\nTo write a good alternate spiel, I need to know what the Golden Vault wants recovered, who the intended contact is, how obvious the job should sound to the players, and whether the time limit should be explicit in the briefing.',
                 },
                 {
                     id: 'session-dal-quor-user-1',
@@ -133,39 +89,30 @@ const SESSION_ENTRIES = new Map<string, { sessionId: string; exchanges: { id: st
                     runId: 'run-dal-quor-1',
                     exchangeId: 'exchange-dal-quor-1',
                     createdAt: '2026-05-07T21:10:45.000Z',
-                    content: "I'm planning to blend Durotan's dream and the golden vault plot thread with each other. Specifically, I'm thinking of replacing most of Reach for the stars with an adaptation of the Legend of Zelda Ocarina of Time dungeon, The Forest Temple.",
+                    content: "Let's give it a professional, spies / heist vibe.",
                 },
                 {
-                    id: 'session-dal-quor-response-2',
-                    kind: 'response',
-                    sessionId: 'session-dal-quor',
-                    runId: 'run-dal-quor-1',
-                    exchangeId: 'exchange-dal-quor-1',
-                    createdAt: '2026-05-07T21:10:46.000Z',
-                    title: 'Golden Vault spiel options',
-                    content: 'Got it. Since you want this to feel like an early capital-G Good Golden Vault job, with a clear fetch object, prep encouraged, and no overt Dal Quor hint, here are three spiel options you can use or remix.\n\nOption 1 is a straightforward recovery mission from an old forest reliquary. Option 2 positions the object as a missing star map hidden in a warded shrine. Option 3 frames the job as recovering an item from a place where someone trapped inside also needs help.\n\nMy recommendation was Option 3 for the strongest moral hook, or Option 2 if you want the closest structural match to Reach for the Stars.',
-                },
-                {
-                    id: 'session-dal-quor-user-2',
-                    kind: 'user',
-                    sessionId: 'session-dal-quor',
-                    runId: 'run-dal-quor-1',
-                    exchangeId: 'exchange-dal-quor-1',
-                    createdAt: '2026-05-07T21:10:47.000Z',
-                    content: "Let's give it a professional, spies / heist vibe. Almost Q from james bond like, but you know, less familiar, since this is the first actual golden vault interaction. Do all the variants you've suggested, I'll pick / combine them myself later.",
-                },
-                {
-                    id: 'session-dal-quor-response-3',
+                    id: 'session-dal-quor-response-1',
                     kind: 'response',
                     sessionId: 'session-dal-quor',
                     runId: 'run-dal-quor-1',
                     exchangeId: 'exchange-dal-quor-1',
                     createdAt: '2026-05-07T21:10:48.000Z',
                     title: 'Golden Vault briefing variants',
-                    content: 'Absolutely. If you want first-contact Golden Vault to feel more like a professional intelligence or heist briefing than a quest-giver monologue, here are three polished variants in that style.\n\nVariant 1 keeps a clean field-op tone and emphasizes competence. Variant 2 leans harder into spy or extraction energy. Variant 3 is more mysterious while still sounding professional.\n\nFor your Forest Temple and Dal Quor blend, Variant 1 is the cleanest Good-aligned fit, Variant 2 is the strongest heist tone, and Variant 3 gives you the most mystery and flexibility.',
+                    content: 'Variant 1 keeps a clean field-op tone and emphasizes competence. Variant 2 leans harder into spy or extraction energy. Variant 3 is more mysterious while still sounding professional.',
                 },
             ],
         }],
+    }],
+    ['session-thornwood', {
+        sessionId: 'session-thornwood',
+        mode: 'assistant',
+        items: [],
+    }],
+    ['session-boxing-contenders', {
+        sessionId: 'session-boxing-contenders',
+        mode: 'npc',
+        items: [],
     }],
 ]);
 
@@ -181,12 +128,22 @@ const RUNS = new Map<string, Run>([
     }],
 ]);
 
+const DEFAULT_CREATED_RUN: Run = {
+    id: 'run-dal-quor-1',
+    sessionId: 'session-dal-quor',
+    mode: 'assistant',
+    status: 'completed',
+    createdAt: '2026-05-07T21:10:42.000Z',
+    updatedAt: '2026-05-07T21:10:48.000Z',
+    exchangeId: 'exchange-dal-quor-1',
+};
+
 const NPCS: NpcCollection = {
     filter: '',
     npcs: [
         {
             id: 4,
-            sessionId: 'session-dal-quor',
+            sessionId: 'session-boxing-contenders',
             name: 'Mara d’Thuranni',
             species: 'Elf (Khoravar)',
             ethnicity: 'House Thuranni (Phiarlan-descended)',
@@ -200,7 +157,7 @@ const NPCS: NpcCollection = {
         },
         {
             id: 8,
-            sessionId: 'session-dal-quor',
+            sessionId: 'session-boxing-contenders',
             name: "K-14 'Kestrel'",
             species: 'Warforged',
             ethnicity: 'Cannith-built (Last War veteran)',
@@ -214,7 +171,7 @@ const NPCS: NpcCollection = {
         },
         {
             id: 9,
-            sessionId: 'session-dal-quor',
+            sessionId: 'session-boxing-contenders',
             name: 'Thrum, Keeper of the Blue Room',
             species: 'Warforged',
             ethnicity: 'Reforged',
@@ -228,7 +185,7 @@ const NPCS: NpcCollection = {
         },
         {
             id: 15,
-            sessionId: 'session-dal-quor',
+            sessionId: 'session-boxing-contenders',
             name: "Tink 'Blue Spark'",
             species: 'Warforged',
             ethnicity: 'Cannith-built',
@@ -289,28 +246,6 @@ const CONSOLE_ENTRIES: ConsoleEntry[] = [
     },
 ];
 
-const DEFAULT_CREATED_SESSION: Session = {
-    id: 'session-dal-quor',
-    mode: 'assistant',
-    title: 'Dal Quor vault pitch',
-    createdAt: '2026-05-07T21:10:42.000Z',
-    updatedAt: '2026-05-07T21:10:42.000Z',
-    activeRunId: 'run-dal-quor-1',
-    includePartyContext: true,
-    promotedFromSessionId: null,
-    promotedToSessionId: null,
-};
-
-const DEFAULT_CREATED_RUN: Run = {
-    id: 'run-dal-quor-1',
-    sessionId: 'session-dal-quor',
-    mode: 'assistant',
-    status: 'completed',
-    createdAt: '2026-05-07T21:10:42.000Z',
-    updatedAt: '2026-05-07T21:10:48.000Z',
-    exchangeId: 'exchange-dal-quor-1',
-};
-
 export const handleV2ApiRequest = (
     request: IncomingMessage,
     response: ServerResponse,
@@ -318,104 +253,74 @@ export const handleV2ApiRequest = (
     const url = new URL(request.url ?? '/', 'http://localhost');
 
     if (request.method === 'GET' && url.pathname === '/api/v2/additional-context') {
-        // Mock response for v2 UI build-out; no persistence yet.
         writeText(response, 200, ADDITIONAL_CONTEXT_MARKDOWN, 'text/markdown; charset=utf-8');
         return;
     }
 
     if (request.method === 'PUT' && url.pathname === '/api/v2/additional-context') {
-        // Mock response for v2 UI build-out; no persistence yet.
-        writeText(response, 200, ADDITIONAL_CONTEXT_MARKDOWN, 'text/plain; charset=utf-8');
+        writeText(response, 200, ADDITIONAL_CONTEXT_MARKDOWN, 'text/markdown; charset=utf-8');
         return;
     }
 
     if (request.method === 'GET' && url.pathname === '/api/v2/sessions') {
-        // Mock response for v2 UI build-out; no persistence yet.
-        writeJson(response, 200, SESSION_SUMMARIES);
+        const mode = url.searchParams.get('mode');
+        writeJson(
+            response,
+            200,
+            mode == null ? SESSIONS : SESSIONS.filter(session => session.mode === mode),
+        );
         return;
     }
 
-    if (request.method === 'POST' && url.pathname === '/api/v2/sessions') {
-        // Mock response for v2 UI build-out; no persistence yet.
-        writeJson(response, 200, DEFAULT_CREATED_SESSION);
-        return;
-    }
-
-    if (request.method === 'GET' && url.pathname.startsWith('/api/v2/sessions/')) {
-        const sessionPath = url.pathname.slice('/api/v2/sessions/'.length);
-
-        if (sessionPath.endsWith('/entries')) {
-            const sessionId = sessionPath.slice(0, -'/entries'.length);
-            const entries = SESSION_ENTRIES.get(sessionId);
-            if (entries) {
-                // Mock response for v2 UI build-out; no persistence yet.
-                writeJson(response, 200, entries);
-                return;
-            }
-        } else {
-            const session = SESSIONS.get(sessionPath);
-            if (session) {
-                // Mock response for v2 UI build-out; no persistence yet.
-                writeJson(response, 200, session);
-                return;
-            }
-        }
-    }
-
-    if (request.method === 'POST' && url.pathname.startsWith('/api/v2/sessions/') && url.pathname.endsWith('/runs')) {
-        const sessionId = url.pathname.slice('/api/v2/sessions/'.length, -'/runs'.length);
-        if (SESSIONS.has(sessionId)) {
-            // Mock response for v2 UI build-out; no persistence yet.
-            writeJson(response, 200, {
-                ...DEFAULT_CREATED_RUN,
-                sessionId,
-            } satisfies Run);
+    if (request.method === 'GET' && url.pathname.startsWith('/api/v2/sessions/') && url.pathname.endsWith('/feed')) {
+        const sessionId = url.pathname.slice('/api/v2/sessions/'.length, -'/feed'.length);
+        const feed = SESSION_FEEDS.get(sessionId);
+        if (feed != null) {
+            writeJson(response, 200, feed);
             return;
         }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/v2/runs') {
+        writeJson(response, 200, DEFAULT_CREATED_RUN);
+        return;
     }
 
     if (request.method === 'GET' && url.pathname.startsWith('/api/v2/runs/')) {
         const runId = url.pathname.slice('/api/v2/runs/'.length);
         const run = RUNS.get(runId);
-        if (run) {
-            // Mock response for v2 UI build-out; no persistence yet.
+        if (run != null) {
             writeJson(response, 200, run);
             return;
         }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/v2/npcs') {
-        // Mock response for v2 UI build-out; no persistence yet.
         writeJson(response, 200, NPCS);
         return;
     }
 
     if (request.method === 'GET' && url.pathname === '/api/v2/refresh') {
-        // Mock response for v2 UI build-out; no persistence yet.
         writeJson(response, 200, REFRESH);
         return;
     }
 
     if (request.method === 'POST' && url.pathname === '/api/v2/refresh') {
-        // Mock response for v2 UI build-out; no persistence yet.
         writeJson(response, 200, REFRESH);
         return;
     }
 
     if (request.method === 'GET' && url.pathname === '/api/v2/console') {
-        // Mock response for v2 UI build-out; no persistence yet.
         writeJson(response, 200, CONSOLE_ENTRIES);
         return;
     }
 
     if (request.method === 'GET' && url.pathname === '/api/v2/console/events') {
-        // Mock SSE endpoint for v2 UI build-out; intentionally emits no events yet.
         writeSse(response, request);
         return;
     }
 
     if (request.method === 'GET' && url.pathname === '/api/v2/runtime/events') {
-        // Mock SSE endpoint for v2 UI build-out; intentionally emits no events yet.
         writeSse(response, request);
         return;
     }

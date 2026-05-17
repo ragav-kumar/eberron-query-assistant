@@ -2,7 +2,6 @@ import type {
     ConsoleEntry,
     CreateRefresh,
     CreateRun,
-    CreateSession,
     NpcCollection,
     NpcListQuery,
     OperationEvent,

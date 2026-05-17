@@ -9,7 +9,8 @@ export const useRun = () => {
     const sessionId = activeSessions[mode]?.id;
 
     return async (prompt: string, retrievalTurnLimit: number, includePartyContext: boolean) => {
-        const res = await runsMutation.mutateAsync({
+        // TODO: enhance this to make the temporary session.
+        const _res = await runsMutation.mutateAsync({
             sessionId,
             mode,
             prompt,
