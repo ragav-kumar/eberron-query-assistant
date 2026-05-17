@@ -22,7 +22,7 @@ export const RightColumnTabs = ({className}: RightColumnTabsProps) => {
         const ContentComponent = tabDefinitions[tabDefinition.key].component;
         components.push(
             <Tabs.Content tabKey={tabDefinition.key}>
-                <SessionSelector />
+                <SessionSelector mode={tabDefinition.key} />
                 <ContentComponent/>
             </Tabs.Content>,
         );
