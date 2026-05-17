@@ -6,7 +6,7 @@ import { LeftColumnHeader } from './components/LeftColumnHeader.js';
 import { Console } from './components/Console.js';
 import { AppContext } from './AppContext.js';
 import { AdditionalContextInput } from './components/AdditionalContextInput.js';
-import { Input } from './components/Input.js';
+import { Input } from './components/Input/Input.js';
 import { RightColumnTabs } from './components/RightColumnTabs.js';
 
 const queryClient = new QueryClient({

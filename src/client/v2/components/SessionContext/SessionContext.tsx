@@ -1,5 +1,5 @@
 import { createContext, use } from 'react';
-import { TabInputState, TabKey } from './tabDefinitions.js';
+import { TabInputState } from './tabDefinitions.js';
 import { SessionFeedExchange, Session, SessionMode } from '@/dto/index.js';
 
 export type SessionData = Session & {
@@ -7,7 +7,7 @@ export type SessionData = Session & {
 };
 
 interface SessionContextTabManagement {
-    changeActiveTab: (tab: TabKey) => void;
+    changeActiveTab: (tab: SessionMode) => void;
     activeTabState: TabInputState;
     patchActiveTabState: (state: Partial<TabInputState>) => void;
 }

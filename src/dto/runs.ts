@@ -15,6 +15,8 @@ export interface Run {
 }
 
 export interface CreateRun {
+    // If not set, create a temporary session in memory
+    sessionId?: string | undefined | null;
     mode: SessionMode;
     includePartyContext: boolean;
     prompt: string;

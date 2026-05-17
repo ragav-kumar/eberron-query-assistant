@@ -1,11 +1,18 @@
 import { SessionContext, SessionData } from './SessionContext.js';
 import { ReactNode, useState } from 'react';
-import { TabInputState, TabKey, tabKeys } from './tabDefinitions.js';
-import { Session, SessionFeed, SessionMode, useSessionFeedsQuery, useSessionsQuery } from '@/client/v2/api/index.js';
+import { tabDefinitions, TabInputState } from './tabDefinitions.js';
+import {
+    Session,
+    SessionFeed,
+    SessionMode,
+    sessionModes,
+    useSessionFeedsQuery,
+    useSessionsQuery,
+} from '@/client/v2/api/index.js';
 
 export const SessionProvider = ({children}: { children: ReactNode }) => {
-    const [activeTab, setActiveTab] = useState<TabKey>('assistant');
-    const [tabInputStates, setTabInputStates] = useState<Record<TabKey, TabInputState>>(initTabInputStates);
+    const [activeTab, setActiveTab] = useState<SessionMode>('assistant');
+    const [tabInputStates, setTabInputStates] = useState<Record<SessionMode, TabInputState>>(initTabInputStates);
     const [activeSessionIds, setActiveSessionIds] = useState<Record<SessionMode, string | undefined>>(initActiveSessionIds);
 
     const sessionsQuery = useSessionsQuery();
@@ -53,15 +60,11 @@ export const SessionProvider = ({children}: { children: ReactNode }) => {
 };
 
 const initTabInputStates = () => {
-    const stateMap: Partial<Record<TabKey, TabInputState>> = {};
-    for (const tabKey of tabKeys) {
-        stateMap[tabKey] = {
-            prompt: '',
-            includePartyContext: true,
-            retrievalTurnLimit: 1,
-        };
+    const stateMap: Partial<Record<SessionMode, TabInputState>> = {};
+    for (const tabKey of sessionModes) {
+        stateMap[tabKey] = tabDefinitions[tabKey].emptyInput;
     }
-    return stateMap as Record<TabKey, TabInputState>;
+    return stateMap as Record<SessionMode, TabInputState>;
 };
 
 const initActiveSessionIds = () => ({

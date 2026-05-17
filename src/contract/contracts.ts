@@ -51,11 +51,6 @@ export const contracts = {
             path: '/api/v2/sessions',
             queryParams: ['mode'],
         }),
-        /** Creates a new durable conversation session. */
-        post: defineEndpoint<CreateSession, Session>({
-            method: 'POST',
-            path: '/api/v2/sessions',
-        }),
         /** Fetches the exchange feed for one session. */
         getFeed: defineEndpoint<null, SessionFeed, { sessionId: string }>({
             method: 'GET',
@@ -65,17 +60,13 @@ export const contracts = {
     },
 
     /**
-     * Runs represent one execution against an existing session.
-     *
-     * They are created in session scope but remain independently addressable by
-     * run id for follow-up fetches and event correlation.
+     * Runs represent one execution against an existing session, or trigger creating a new session.
      */
     runs: {
-        /** Starts one run against the owning session. */
-        post: defineEndpoint<CreateRun, Run, { sessionId: string }>({
+        /** Starts a run against a session, ore create a new session. */
+        post: defineEndpoint<CreateRun, Run>({
             method: 'POST',
-            path: '/api/v2/sessions/:sessionId/runs',
-            pathParams: ['sessionId'],
+            path: '/api/v2/runs',
         }),
         /** Fetches one run resource by id. */
         get: defineEndpoint<null, Run, { runId: string }>({

@@ -4,11 +4,6 @@ import type { CreateRun } from '@/dto/index.js';
 
 import { contracts } from '@/contract/index.js';
 
-interface CreateRunRequest {
-    sessionId: string;
-    payload: CreateRun;
-}
-
 export const runQueryKey = ['api', 'runs'] as const;
 
 export const useRunsQuery = (runId: string) => useQuery({
@@ -20,7 +15,7 @@ export const useRunsMutation = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({sessionId, payload}: CreateRunRequest) => mutateApi(contracts.runs.post, payload, {sessionId}),
+        mutationFn: (payload: CreateRun) => mutateApi(contracts.runs.post, payload),
         onSuccess: createdRun => queryClient.setQueryData(
             [...runQueryKey, createdRun.id],
             createdRun,

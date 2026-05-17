@@ -1,20 +1,19 @@
-import type { CreateRun } from '@/dto/index.js';
+import { CreateRun, SessionMode } from '@/dto/index.js';
 import { ComponentType } from 'react';
 import { Assistant } from '../Assistant.js';
 import { NpcCards } from '../NpcCards/NpcCards.js';
 
-export const tabKeys = ['assistant', 'npc'] as const;
-export type TabKey = typeof tabKeys[number];
-export const defaultTabKey: TabKey = 'assistant';
+export const defaultTabKey: SessionMode = 'assistant';
 
 export interface TabInputState {
+    key: SessionMode;
     prompt: string;
     includePartyContext: boolean;
     retrievalTurnLimit: number;
 }
 
 export interface TabDefinition {
-    key: TabKey;
+    key: SessionMode;
     label: string;
     emptyInput: TabInputState;
     buildRun: (input: TabInputState) => CreateRun;
@@ -26,6 +25,7 @@ export const tabDefinitions = {
         key: 'assistant',
         label: 'Assistant',
         emptyInput: {
+            key: 'assistant',
             prompt: '',
             includePartyContext: true,
             retrievalTurnLimit: 1,
@@ -40,6 +40,7 @@ export const tabDefinitions = {
         key: 'npc',
         label: 'NPC Cards',
         emptyInput: {
+            key: 'npc',
             prompt: '',
             includePartyContext: true,
             retrievalTurnLimit: 1,
@@ -50,6 +51,6 @@ export const tabDefinitions = {
         }),
         component: NpcCards,
     },
-} as const satisfies Record<TabKey, TabDefinition>;
+} as const satisfies Record<SessionMode, TabDefinition>;
 
 export const tabDefinitionList: Readonly<TabDefinition[]> = Object.values(tabDefinitions);

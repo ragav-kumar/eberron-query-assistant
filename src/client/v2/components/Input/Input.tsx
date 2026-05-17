@@ -1,9 +1,11 @@
-import { useSessionContext } from './SessionContext/index.js';
-import { Button } from './Button.js';
+import { useSessionContext } from '../SessionContext/index.js';
+import { Button } from '../Button.js';
 import styles from './Input.module.css';
+import { useRun } from './useRun.js';
 
 export const Input = () => {
     const {isBusy, activeTabState, patchActiveTabState} = useSessionContext();
+    const submit = useRun();
 
     return (
         <div className={styles.wrap}>
@@ -44,7 +46,7 @@ export const Input = () => {
                 variant='primary'
                 className={styles.button}
                 disabled={isBusy}
-                onClick={void submitActiveTab}
+                onClick={void submit}
             >
                 Submit
             </Button>
