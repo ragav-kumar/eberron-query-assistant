@@ -35,7 +35,7 @@ export const useRuntimeSubscription = () => {
                     void queryClient.invalidateQueries({queryKey: [...sessionQueryKey, operationEvent.sessionId]});
                     void queryClient.invalidateQueries({queryKey: [...sessionQueryKey, operationEvent.sessionId, 'entries']});
                     break;
-                case "session":
+                case 'session':
                     break;
             }
         };

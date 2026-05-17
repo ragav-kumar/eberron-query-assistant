@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef } from 'react';
 
-import type { ApiConsoleEntry } from "../api.js";
+import type { ApiConsoleEntry } from '../api.js';
 
 interface ConsoleFeedProps {
   entries: ApiConsoleEntry[];
@@ -18,17 +18,17 @@ export const ConsoleFeed = ({ entries }: ConsoleFeedProps) => {
   }, [entries]);
 
   return (
-    <div className="console-feed" ref={scrollRef} data-testid="console-feed">
+    <div className='console-feed' ref={scrollRef} data-testid='console-feed'>
       {entries.length > 0 ? (
         entries.map((entry) => (
           <div className={`console-entry ${entry.level}`} key={entry.id}>
-            <span className="console-time">{formatTimestamp(entry.timestamp)}</span>
-            <span className="console-level">{entry.level.toUpperCase()}</span>
-            <span className="console-message">{entry.message}</span>
+            <span className='console-time'>{formatTimestamp(entry.timestamp)}</span>
+            <span className='console-level'>{entry.level.toUpperCase()}</span>
+            <span className='console-message'>{entry.message}</span>
           </div>
         ))
       ) : (
-        <p className="empty-output">No local console output yet.</p>
+        <p className='empty-output'>No local console output yet.</p>
       )}
     </div>
   );

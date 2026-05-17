@@ -1,8 +1,8 @@
-import { AdditionalContextPanel } from "./AdditionalContextPanel.js";
-import { AssistantPromptPanel } from "./AssistantPromptPanel.js";
-import { InputModeSelector } from "./InputModeSelector.js";
-import { NameGeneratorPanel } from "./NameGeneratorPanel.js";
-import type { InputMode, LeftTab } from "./ui-types.js";
+import { AdditionalContextPanel } from './AdditionalContextPanel.js';
+import { AssistantPromptPanel } from './AssistantPromptPanel.js';
+import { InputModeSelector } from './InputModeSelector.js';
+import { NameGeneratorPanel } from './NameGeneratorPanel.js';
+import type { InputMode, LeftTab } from './ui-types.js';
 
 interface LeftInputColumnProps {
   assistantPrompt: string;
@@ -49,77 +49,77 @@ export const LeftInputColumn = ({
   retrievalTurnLimit
 }: LeftInputColumnProps) => (
   <>
-    <div className="tab-list" role="tablist" aria-label="Left column tabs">
+    <div className='tab-list' role='tablist' aria-label='Left column tabs'>
       <button
-        type="button"
-        role="tab"
-        aria-selected={leftTab === "input"}
-        className={leftTab === "input" ? "tab active" : "tab"}
-        onClick={() => onLeftTabChange("input")}
-        title="Show assistant and generator inputs."
+          type='button'
+          role='tab'
+          aria-selected={leftTab === 'input'}
+          className={leftTab === 'input' ? 'tab active' : 'tab'}
+          onClick={() => onLeftTabChange('input')}
+          title='Show assistant and generator inputs.'
       >
         Input
       </button>
       <button
-        type="button"
-        role="tab"
-        aria-selected={leftTab === "additional-context"}
-        className={leftTab === "additional-context" ? "tab active" : "tab"}
-        onClick={() => onLeftTabChange("additional-context")}
-        title="Edit local assistant-only context."
+          type='button'
+          role='tab'
+          aria-selected={leftTab === 'additional-context'}
+          className={leftTab === 'additional-context' ? 'tab active' : 'tab'}
+          onClick={() => onLeftTabChange('additional-context')}
+          title='Edit local assistant-only context.'
       >
         Additional Context
       </button>
     </div>
 
-    {leftTab === "input" ? (
-      <div className="tab-panel" role="tabpanel">
-        <label className="checkbox-row">
+    {leftTab === 'input' ? (
+      <div className='tab-panel' role='tabpanel'>
+        <label className='checkbox-row'>
           <input
-            type="checkbox"
-            checked={includePartyContext}
-            disabled={isBusy}
-            onChange={(event) => onIncludePartyContextChange(event.currentTarget.checked)}
+              type='checkbox'
+              checked={includePartyContext}
+              disabled={isBusy}
+              onChange={(event) => onIncludePartyContextChange(event.currentTarget.checked)}
           />
           Include party info
         </label>
-        <label className="range-row">
+        <label className='range-row'>
           <span>Extra retrieval turns: {retrievalTurnLimit}</span>
           <input
-            type="range"
-            min={0}
-            max={3}
-            step={1}
-            value={retrievalTurnLimit}
-            disabled={isBusy}
-            onChange={(event) => onRetrievalTurnLimitChange(Number(event.currentTarget.value))}
+              type='range'
+              min={0}
+              max={3}
+              step={1}
+              value={retrievalTurnLimit}
+              disabled={isBusy}
+              onChange={(event) => onRetrievalTurnLimitChange(Number(event.currentTarget.value))}
           />
         </label>
         <InputModeSelector mode={inputMode} onModeChange={onInputModeChange} />
-        {inputMode === "standard" ? (
+        {inputMode === 'standard' ? (
           <AssistantPromptPanel
-            disabled={isBusy}
-            onPromptChange={onAssistantPromptChange}
-            onSubmit={onSubmitAssistant}
-            prompt={assistantPrompt}
+              disabled={isBusy}
+              onPromptChange={onAssistantPromptChange}
+              onSubmit={onSubmitAssistant}
+              prompt={assistantPrompt}
           />
         ) : null}
-        {inputMode === "name-generator" ? (
+        {inputMode === 'name-generator' ? (
           <NameGeneratorPanel
-            disabled={isBusy}
-            onPromptChange={onNameGeneratorPromptChange}
-            onSubmit={onSubmitNameGenerator}
-            prompt={nameGeneratorPrompt}
+              disabled={isBusy}
+              onPromptChange={onNameGeneratorPromptChange}
+              onSubmit={onSubmitNameGenerator}
+              prompt={nameGeneratorPrompt}
           />
         ) : null}
       </div>
     ) : (
-      <div className="tab-panel" role="tabpanel">
+      <div className='tab-panel' role='tabpanel'>
         <AdditionalContextPanel
-          isLoaded={contextLoaded}
-          markdown={contextMarkdown}
-          onChange={onContextChange}
-          saveState={contextSaveState}
+            isLoaded={contextLoaded}
+            markdown={contextMarkdown}
+            onChange={onContextChange}
+            saveState={contextSaveState}
         />
       </div>
     )}

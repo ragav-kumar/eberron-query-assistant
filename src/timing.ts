@@ -1,6 +1,6 @@
-import { appendFile, mkdir } from "node:fs/promises";
-import { performance } from "node:perf_hooks";
-import path from "node:path";
+import { appendFile, mkdir } from 'node:fs/promises';
+import { performance } from 'node:perf_hooks';
+import path from 'node:path';
 
 export interface TimingContext {
   operation: string;
@@ -34,14 +34,14 @@ export const createNoopTimingReporter = (): TimingReporter => ({
 });
 
 export const createJsonlTimingReporter = (options: JsonlTimingReporterOptions): TimingReporter => {
-  const filePath = options.filePath ?? path.join(options.repoRoot, ".test-tmp", "timing.jsonl");
+  const filePath = options.filePath ?? path.join(options.repoRoot, '.test-tmp', 'timing.jsonl');
   let queue = Promise.resolve();
 
   const append = async (entry: TimingEntry): Promise<void> => {
     queue = queue
       .then(async () => {
         await mkdir(path.dirname(filePath), { recursive: true });
-        await appendFile(filePath, `${JSON.stringify(entry)}\n`, "utf8");
+        await appendFile(filePath, `${JSON.stringify(entry)}\n`, 'utf8');
       })
       .catch(() => undefined);
     await queue;

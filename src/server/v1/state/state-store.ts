@@ -1,5 +1,5 @@
-import type { RuntimeConfig } from "@/types.js";
-import { getAppVersion } from "@/app-version.js";
+import type { RuntimeConfig } from '@/types.js';
+import { getAppVersion } from '@/app-version.js';
 
 export interface FoundryExportMarker {
   deleteCount: number;
@@ -16,7 +16,7 @@ export interface ArticleStateRecord {
   title: string | null;
   firstSeenAt: string;
   lastIngestedAt: string | null;
-  scrapeStatus: "pending" | "succeeded" | "failed" | "inaccessible";
+  scrapeStatus: 'pending' | 'succeeded' | 'failed' | 'inaccessible';
 }
 
 export interface RuntimeState {

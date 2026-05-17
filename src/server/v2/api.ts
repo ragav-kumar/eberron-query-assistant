@@ -124,7 +124,7 @@ const SESSION_ENTRIES = new Map<string, { sessionId: string; exchanges: { id: st
                     exchangeId: 'exchange-dal-quor-1',
                     createdAt: '2026-05-07T21:10:44.000Z',
                     title: 'Golden Vault spiel for the forest temple',
-                    content: "I can do that, but I need one or two details first so I don’t invent the wrong Golden Vault hook.\n\nWhat I have from the notes:\n- The active Vathirond thread includes **“Golden Vault”** and a dead drop at the memorial to the fallen, with a planned spiel for **“Reach for the Stars”**.\n- You want to adapt that into a **Forest Temple in Dal Quor** with a 4-day access window, poe sisters, a phantom Ganon adaptation, and a vault objective at the end.\n\nTo write a good alternate spiel, I need to know what the Golden Vault wants recovered, who the intended contact is, how obvious the job should sound to the players, and whether the time limit should be explicit in the briefing.",
+                    content: 'I can do that, but I need one or two details first so I don’t invent the wrong Golden Vault hook.\n\nWhat I have from the notes:\n- The active Vathirond thread includes **“Golden Vault”** and a dead drop at the memorial to the fallen, with a planned spiel for **“Reach for the Stars”**.\n- You want to adapt that into a **Forest Temple in Dal Quor** with a 4-day access window, poe sisters, a phantom Ganon adaptation, and a vault objective at the end.\n\nTo write a good alternate spiel, I need to know what the Golden Vault wants recovered, who the intended contact is, how obvious the job should sound to the players, and whether the time limit should be explicit in the briefing.',
                 },
                 {
                     id: 'session-dal-quor-user-1',
@@ -143,7 +143,7 @@ const SESSION_ENTRIES = new Map<string, { sessionId: string; exchanges: { id: st
                     exchangeId: 'exchange-dal-quor-1',
                     createdAt: '2026-05-07T21:10:46.000Z',
                     title: 'Golden Vault spiel options',
-                    content: "Got it. Since you want this to feel like an early capital-G Good Golden Vault job, with a clear fetch object, prep encouraged, and no overt Dal Quor hint, here are three spiel options you can use or remix.\n\nOption 1 is a straightforward recovery mission from an old forest reliquary. Option 2 positions the object as a missing star map hidden in a warded shrine. Option 3 frames the job as recovering an item from a place where someone trapped inside also needs help.\n\nMy recommendation was Option 3 for the strongest moral hook, or Option 2 if you want the closest structural match to Reach for the Stars.",
+                    content: 'Got it. Since you want this to feel like an early capital-G Good Golden Vault job, with a clear fetch object, prep encouraged, and no overt Dal Quor hint, here are three spiel options you can use or remix.\n\nOption 1 is a straightforward recovery mission from an old forest reliquary. Option 2 positions the object as a missing star map hidden in a warded shrine. Option 3 frames the job as recovering an item from a place where someone trapped inside also needs help.\n\nMy recommendation was Option 3 for the strongest moral hook, or Option 2 if you want the closest structural match to Reach for the Stars.',
                 },
                 {
                     id: 'session-dal-quor-user-2',
@@ -162,7 +162,7 @@ const SESSION_ENTRIES = new Map<string, { sessionId: string; exchanges: { id: st
                     exchangeId: 'exchange-dal-quor-1',
                     createdAt: '2026-05-07T21:10:48.000Z',
                     title: 'Golden Vault briefing variants',
-                    content: "Absolutely. If you want first-contact Golden Vault to feel more like a professional intelligence or heist briefing than a quest-giver monologue, here are three polished variants in that style.\n\nVariant 1 keeps a clean field-op tone and emphasizes competence. Variant 2 leans harder into spy or extraction energy. Variant 3 is more mysterious while still sounding professional.\n\nFor your Forest Temple and Dal Quor blend, Variant 1 is the cleanest Good-aligned fit, Variant 2 is the strongest heist tone, and Variant 3 gives you the most mystery and flexibility.",
+                    content: 'Absolutely. If you want first-contact Golden Vault to feel more like a professional intelligence or heist briefing than a quest-giver monologue, here are three polished variants in that style.\n\nVariant 1 keeps a clean field-op tone and emphasizes competence. Variant 2 leans harder into spy or extraction energy. Variant 3 is more mysterious while still sounding professional.\n\nFor your Forest Temple and Dal Quor blend, Variant 1 is the cleanest Good-aligned fit, Variant 2 is the strongest heist tone, and Variant 3 gives you the most mystery and flexibility.',
                 },
             ],
         }],

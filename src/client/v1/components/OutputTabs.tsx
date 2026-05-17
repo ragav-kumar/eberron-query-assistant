@@ -1,10 +1,10 @@
-import type { ApiConsole, ApiLog, ApiNpcResponse } from "../api.js";
-import { ConsoleFeed } from "./ConsoleFeed.js";
-import { MarkdownOutputPane } from "./MarkdownOutputPane.js";
-import { NpcCardsPane } from "./NpcCardsPane.js";
-import type { OutputTab } from "./ui-types.js";
+import type { ApiConsole, ApiLog, ApiNpcResponse } from '../api.js';
+import { ConsoleFeed } from './ConsoleFeed.js';
+import { MarkdownOutputPane } from './MarkdownOutputPane.js';
+import { NpcCardsPane } from './NpcCardsPane.js';
+import type { OutputTab } from './ui-types.js';
 
-type SessionMode = "npcs" | "standard";
+type SessionMode = 'npcs' | 'standard';
 
 interface OutputTabsProps {
   consoleOutput: ApiConsole;
@@ -28,60 +28,60 @@ export const OutputTabs = ({
   onTabChange,
   tab
 }: OutputTabsProps) => (
-  <aside className="output-view" aria-label="Application output">
-    <div className="output-header">
-      <div className="tab-list" role="tablist" aria-label="Output tabs">
+  <aside className='output-view' aria-label='Application output'>
+    <div className='output-header'>
+      <div className='tab-list' role='tablist' aria-label='Output tabs'>
         <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "console"}
-          className={tab === "console" ? "tab active" : "tab"}
-          onClick={() => onTabChange("console")}
-          title="Show unsaved local progress, debug, warning, and error messages."
+            type='button'
+            role='tab'
+            aria-selected={tab === 'console'}
+            className={tab === 'console' ? 'tab active' : 'tab'}
+            onClick={() => onTabChange('console')}
+            title='Show unsaved local progress, debug, warning, and error messages.'
         >
           Console
         </button>
         <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "log"}
-          className={tab === "log" ? "tab active" : "tab"}
-          onClick={() => onTabChange("log")}
-          title="Show the persisted assistant transcript for this session."
+            type='button'
+            role='tab'
+            aria-selected={tab === 'log'}
+            className={tab === 'log' ? 'tab active' : 'tab'}
+            onClick={() => onTabChange('log')}
+            title='Show the persisted assistant transcript for this session.'
         >
           Log
         </button>
         <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "npcs"}
-          className={tab === "npcs" ? "tab active" : "tab"}
-          onClick={() => onTabChange("npcs")}
-          title="Show saved generated NPC cards."
+            type='button'
+            role='tab'
+            aria-selected={tab === 'npcs'}
+            className={tab === 'npcs' ? 'tab active' : 'tab'}
+            onClick={() => onTabChange('npcs')}
+            title='Show saved generated NPC cards.'
         >
           NPCs
         </button>
-        {isBusy ? <span className="output-loading-spinner" role="status" aria-label="Loading output" /> : null}
+        {isBusy ? <span className='output-loading-spinner' role='status' aria-label='Loading output' /> : null}
       </div>
-      {tab === "log" ? (
+      {tab === 'log' ? (
         <LogToolbar
-          isBusy={isBusy}
-          log={log}
-          onNewSession={onNewSession}
-          onSelectLog={onSelectLog}
+            isBusy={isBusy}
+            log={log}
+            onNewSession={onNewSession}
+            onSelectLog={onSelectLog}
         />
-      ) : tab === "npcs" ? (
+      ) : tab === 'npcs' ? (
         <NpcToolbar isBusy={isBusy} npcs={npcs} onNewSession={onNewSession} />
       ) : (
         <span>Local only; not saved to logs</span>
       )}
     </div>
-    {tab === "console" ? (
+    {tab === 'console' ? (
       <ConsoleFeed entries={consoleOutput.entries} />
-    ) : tab === "npcs" ? (
+    ) : tab === 'npcs' ? (
       <NpcCardsPane npcs={npcs.npcs} />
     ) : (
-      <MarkdownOutputPane exchanges={log.exchanges} emptyMessage="Submit an assistant prompt to start the log." />
+      <MarkdownOutputPane exchanges={log.exchanges} emptyMessage='Submit an assistant prompt to start the log.' />
     )}
   </aside>
 );
@@ -96,30 +96,30 @@ interface LogToolbarProps {
 const LogToolbar = ({ isBusy, log, onNewSession, onSelectLog }: LogToolbarProps) => {
   const historicalFiles = log.files.filter((file) => !file.active);
   const currentFile = log.files.find((file) => file.active);
-  const selectedFilePath = log.filePath ?? "";
+  const selectedFilePath = log.filePath ?? '';
   const status = log.filePath
     ? log.readOnly
-      ? "Read only"
-      : "Current session"
-    : "No log selected";
+      ? 'Read only'
+      : 'Current session'
+    : 'No log selected';
 
   return (
-    <div className="log-toolbar">
-      <div className="log-select-row">
-        <label className="sr-only" htmlFor="log-file-select">
+    <div className='log-toolbar'>
+      <div className='log-select-row'>
+        <label className='sr-only' htmlFor='log-file-select'>
           Log file
         </label>
         <select
-          id="log-file-select"
-          value={selectedFilePath}
-          onChange={(event) => onSelectLog(event.currentTarget.value)}
-          disabled={log.files.length === 0}
-          title="Browse saved JSON transcript logs."
+            id='log-file-select'
+            value={selectedFilePath}
+            onChange={(event) => onSelectLog(event.currentTarget.value)}
+            disabled={log.files.length === 0}
+            title='Browse saved JSON transcript logs.'
         >
           {log.files.length === 0 ? (
-            <option value="">No saved logs</option>
+            <option value=''>No saved logs</option>
           ) : (
-            <option value="" disabled>
+            <option value='' disabled>
               Select a log
             </option>
           )}
@@ -131,17 +131,17 @@ const LogToolbar = ({ isBusy, log, onNewSession, onSelectLog }: LogToolbarProps)
           ))}
         </select>
         <button
-          type="button"
-          onClick={() => onNewSession("standard")}
-          disabled={isBusy}
-          title="Start a fresh assistant transcript. The file is created after the next answer."
+            type='button'
+            onClick={() => onNewSession('standard')}
+            disabled={isBusy}
+            title='Start a fresh assistant transcript. The file is created after the next answer.'
         >
           New session
         </button>
       </div>
       <span>
         {status}
-        {log.filePath ? `: ${log.filePath}` : ""}
+        {log.filePath ? `: ${log.filePath}` : ''}
       </span>
     </div>
   );
@@ -154,17 +154,17 @@ interface NpcToolbarProps {
 }
 
 const NpcToolbar = ({ isBusy, npcs, onNewSession }: NpcToolbarProps) => (
-  <div className="log-toolbar">
-    <div className="log-select-row">
+  <div className='log-toolbar'>
+    <div className='log-select-row'>
       <button
-        type="button"
-        onClick={() => onNewSession("npcs")}
-        disabled={isBusy}
-        title="Start fresh NPC generation context without deleting saved NPC cards."
+          type='button'
+          onClick={() => onNewSession('npcs')}
+          disabled={isBusy}
+          title='Start fresh NPC generation context without deleting saved NPC cards.'
       >
         New session
       </button>
     </div>
-    <span>{npcs.npcs.length === 1 ? "1 NPC saved" : `${npcs.npcs.length} NPCs saved`}</span>
+    <span>{npcs.npcs.length === 1 ? '1 NPC saved' : `${npcs.npcs.length} NPCs saved`}</span>
   </div>
 );

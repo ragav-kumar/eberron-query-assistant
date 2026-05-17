@@ -1,4 +1,4 @@
-import type { TimingContext } from "./timing.js";
+import type { TimingContext } from './timing.js';
 
 export interface RuntimeOptions {
   abortSignal?: AbortSignal | undefined;
@@ -43,9 +43,9 @@ export interface ProviderConfig {
   embeddingModel: string;
 }
 
-export type SourceType = "foundry" | "pdf" | "article";
+export type SourceType = 'foundry' | 'pdf' | 'article';
 
-export type SourceInventoryStatus = "skipped" | "scheduled" | "missing" | "failed";
+export type SourceInventoryStatus = 'skipped' | 'scheduled' | 'missing' | 'failed';
 
 export interface SourceInventoryResult {
   sourceType: SourceType;
@@ -84,7 +84,7 @@ export interface CorpusSource {
   sourceKey: string;
   title: string;
   metadata: Record<string, unknown>;
-  status: "succeeded" | "failed";
+  status: 'succeeded' | 'failed';
 }
 
 export interface CorpusChunk {
@@ -104,7 +104,7 @@ export interface RetrievalSearchRequest {
   limit?: number;
 }
 
-export type RetrievalMatchKind = "lexical" | "vector" | "hybrid";
+export type RetrievalMatchKind = 'lexical' | 'vector' | 'hybrid';
 
 export interface RetrievalResult {
   chunkId: string;
@@ -120,7 +120,7 @@ export interface RetrievalResult {
 
 export interface SourceIngestionSummary {
   sourceType: SourceType;
-  status: "skipped" | "succeeded" | "failed";
+  status: 'skipped' | 'succeeded' | 'failed';
   discovered: number;
   ingested: number;
   removed: number;

@@ -1,12 +1,12 @@
-import { mkdir, rm } from "node:fs/promises";
-import path from "node:path";
+import { mkdir, rm } from 'node:fs/promises';
+import path from 'node:path';
 
-import Database from "better-sqlite3";
+import Database from 'better-sqlite3';
 
-import { createTaggedError } from "@/errors.js";
-import type { CorpusChunk, CorpusSource, RuntimeConfig, SourceType } from "@/types.js";
+import { createTaggedError } from '@/errors.js';
+import type { CorpusChunk, CorpusSource, RuntimeConfig, SourceType } from '@/types.js';
 
-const DATABASE_FILENAME = "corpus.sqlite";
+const DATABASE_FILENAME = 'corpus.sqlite';
 
 export interface CorpusStore {
   initialize(config: RuntimeConfig, options?: { allowIncompatibleReset?: boolean }): Promise<void>;
@@ -15,8 +15,8 @@ export interface CorpusStore {
     options: {
       clearSourceType?: SourceType;
       changes: Array<
-        | { kind: "delete"; sourceKey: string; sourceType: SourceType }
-        | { kind: "upsert"; source: CorpusSource; chunks: CorpusChunk[] }
+        | { kind: 'delete'; sourceKey: string; sourceType: SourceType }
+        | { kind: 'upsert'; source: CorpusSource; chunks: CorpusChunk[] }
       >;
     }
   ): Promise<void>;
@@ -54,7 +54,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
     await mkdir(config.retrievalDir, { recursive: true });
     database = new Database(nextDatabasePath);
     databasePath = nextDatabasePath;
-    database.pragma("foreign_keys = ON");
+    database.pragma('foreign_keys = ON');
     return database;
   };
 
@@ -64,8 +64,8 @@ export const createSqliteCorpusStore = (): CorpusStore => {
       if (!isCompatibleSchema(openedDatabase)) {
         if (options.allowIncompatibleReset !== true) {
           throw createTaggedError(
-            "incompatible-corpus-schema",
-            "Existing corpus.sqlite is not compatible with the current corpus schema. Use the browser force-reingest control to rebuild retrieval artifacts explicitly."
+            'incompatible-corpus-schema',
+            'Existing corpus.sqlite is not compatible with the current corpus schema. Use the browser force-reingest control to rebuild retrieval artifacts explicitly.'
           );
         }
         close();
@@ -80,16 +80,16 @@ export const createSqliteCorpusStore = (): CorpusStore => {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
         if (options.clearSourceType) {
-          openedDatabase.prepare("DELETE FROM sources WHERE source_type = ?").run(options.clearSourceType);
+          openedDatabase.prepare('DELETE FROM sources WHERE source_type = ?').run(options.clearSourceType);
         }
         for (const change of options.changes) {
-          if (change.kind === "delete") {
-            openedDatabase.prepare("DELETE FROM sources WHERE source_type = ? AND source_key = ?").run(
+          if (change.kind === 'delete') {
+            openedDatabase.prepare('DELETE FROM sources WHERE source_type = ? AND source_key = ?').run(
               change.sourceType,
               change.sourceKey
             );
           } else {
-            openedDatabase.prepare("DELETE FROM sources WHERE source_type = ? AND source_key = ?").run(
+            openedDatabase.prepare('DELETE FROM sources WHERE source_type = ? AND source_key = ?').run(
               change.source.sourceType,
               change.source.sourceKey
             );
@@ -103,8 +103,8 @@ export const createSqliteCorpusStore = (): CorpusStore => {
     async clear(config) {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
-        openedDatabase.prepare("DELETE FROM chunks").run();
-        openedDatabase.prepare("DELETE FROM sources").run();
+        openedDatabase.prepare('DELETE FROM chunks').run();
+        openedDatabase.prepare('DELETE FROM sources').run();
         rebuildFts(openedDatabase);
       })();
     },
@@ -112,7 +112,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
     async replaceSource(config, source, chunks) {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
-        openedDatabase.prepare("DELETE FROM sources WHERE source_type = ? AND source_key = ?").run(source.sourceType, source.sourceKey);
+        openedDatabase.prepare('DELETE FROM sources WHERE source_type = ? AND source_key = ?').run(source.sourceType, source.sourceKey);
         insertSource(openedDatabase, source, chunks);
         rebuildFts(openedDatabase);
       })();
@@ -121,7 +121,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
     async replaceSourcesByType(config, sourceType, sources) {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
-        openedDatabase.prepare("DELETE FROM sources WHERE source_type = ?").run(sourceType);
+        openedDatabase.prepare('DELETE FROM sources WHERE source_type = ?').run(sourceType);
         for (const source of sources) {
           insertSource(openedDatabase, source.source, source.chunks);
         }
@@ -132,7 +132,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
     async removeSource(config, sourceType, sourceKey) {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
-        openedDatabase.prepare("DELETE FROM sources WHERE source_type = ? AND source_key = ?").run(sourceType, sourceKey);
+        openedDatabase.prepare('DELETE FROM sources WHERE source_type = ? AND source_key = ?').run(sourceType, sourceKey);
         rebuildFts(openedDatabase);
       })();
     },
@@ -140,14 +140,14 @@ export const createSqliteCorpusStore = (): CorpusStore => {
     async removeSourcesByType(config, sourceType) {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
-        openedDatabase.prepare("DELETE FROM sources WHERE source_type = ?").run(sourceType);
+        openedDatabase.prepare('DELETE FROM sources WHERE source_type = ?').run(sourceType);
         rebuildFts(openedDatabase);
       })();
     },
 
     async countSources(config) {
       const openedDatabase = await open(config);
-      const result = openedDatabase.prepare("SELECT COUNT(*) AS count FROM sources").get() as { count: number };
+      const result = openedDatabase.prepare('SELECT COUNT(*) AS count FROM sources').get() as { count: number };
       return result.count;
     },
 
@@ -201,14 +201,14 @@ const rebuildFts = (database: Database.Database): void => {
 };
 
 const isCompatibleSchema = (database: Database.Database): boolean => {
-  const sourceColumns = readColumnNames(database, "sources");
-  const chunkColumns = readColumnNames(database, "chunks");
+  const sourceColumns = readColumnNames(database, 'sources');
+  const chunkColumns = readColumnNames(database, 'chunks');
   if (sourceColumns.length === 0 && chunkColumns.length === 0) {
     return true;
   }
 
-  return hasColumns(sourceColumns, ["source_id", "source_type", "source_key", "title", "metadata_json", "status"]) &&
-    hasColumns(chunkColumns, ["chunk_id", "source_id", "chunk_index", "text", "citation_json", "metadata_json"]);
+  return hasColumns(sourceColumns, ['source_id', 'source_type', 'source_key', 'title', 'metadata_json', 'status']) &&
+    hasColumns(chunkColumns, ['chunk_id', 'source_id', 'chunk_index', 'text', 'citation_json', 'metadata_json']);
 };
 
 const readColumnNames = (database: Database.Database, tableName: string): string[] => {

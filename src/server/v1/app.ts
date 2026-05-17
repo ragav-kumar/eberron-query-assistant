@@ -1,25 +1,25 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
-import { loadDefaultConfig } from "./config/index.js";
-import { formatThrownValue, hasErrorCode, isOperationAbortedError } from "@/errors.js";
-import { createFilesystemIngestionService, createSqliteCorpusStore, type IngestionService } from "./ingestion/index.js";
+import { loadDefaultConfig } from './config/index.js';
+import { formatThrownValue, hasErrorCode, isOperationAbortedError } from '@/errors.js';
+import { createFilesystemIngestionService, createSqliteCorpusStore, type IngestionService } from './ingestion/index.js';
 import {
   createOpenAiChatAdapter,
   createOpenAiEmbeddingAdapter,
   type ChatAdapter,
   type ChatCompletionDiagnostic
-} from "./provider/index.js";
-import type { ProgressReporter } from "./progress/reporter.js";
-import { createSqliteRetrievalService, type RetrievalService } from "./retrieval/index.js";
-import { createAssistantSession, type AssistantSession, type AssistantSessionLogExchange } from "./runtime/assistant-session.js";
+} from './provider/index.js';
+import type { ProgressReporter } from './progress/reporter.js';
+import { createSqliteRetrievalService, type RetrievalService } from './retrieval/index.js';
+import { createAssistantSession, type AssistantSession, type AssistantSessionLogExchange } from './runtime/assistant-session.js';
 import {
   createNpcGenerationSession,
   type GeneratedNpc,
   type NpcGenerationSession
-} from "./runtime/npc-session.js";
-import { createSqlitePartyContextService, type PartyContextService } from "./runtime/party-context.js";
-import { runStartupRefresh } from "./runtime/refresh.js";
+} from './runtime/npc-session.js';
+import { createSqlitePartyContextService, type PartyContextService } from './runtime/party-context.js';
+import { runStartupRefresh } from './runtime/refresh.js';
 import {
   createSessionLog,
   listSessionLogFiles,
@@ -27,12 +27,12 @@ import {
   type SessionLogEntry,
   type SessionLog,
   type SessionLogFile
-} from "./runtime/session-log.js";
-import { createProviderDebugLog } from "./provider-debug-log.js";
-import { createFilesystemSourceDiscoveryService, type SourceDiscoveryService } from "./source-discovery/index.js";
-import { createFilesystemStateStore, type StateStore } from "./state/index.js";
-import { createJsonlTimingReporter, type TimingContext, type TimingReporter } from "@/timing.js";
-import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from "@/types.js";
+} from './runtime/session-log.js';
+import { createProviderDebugLog } from './provider-debug-log.js';
+import { createFilesystemSourceDiscoveryService, type SourceDiscoveryService } from './source-discovery/index.js';
+import { createFilesystemStateStore, type StateStore } from './state/index.js';
+import { createJsonlTimingReporter, type TimingContext, type TimingReporter } from '@/timing.js';
+import type { RuntimeConfig, RuntimeOptions, StartupRefreshSummary } from '@/types.js';
 
 export interface WebApp {
   askAssistant(
@@ -79,7 +79,7 @@ export interface WebLogResponse {
   readOnly: boolean;
 }
 
-export type WebConsoleLevel = "debug" | "error" | "info" | "warn";
+export type WebConsoleLevel = 'debug' | 'error' | 'info' | 'warn';
 
 export interface WebConsoleEntry {
   id: string;
@@ -114,7 +114,7 @@ export interface WebStatusResponse {
   npcs: WebNpcResponse;
 }
 
-const DEFAULT_SESSION_ID = "default";
+const DEFAULT_SESSION_ID = 'default';
 const MAX_CONSOLE_ENTRIES = 2_000;
 
 interface StandardSessionState {
@@ -213,7 +213,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     }
     await log.append({
       assistant: exchange.assistant,
-      kind: "exchange",
+      kind: 'exchange',
       title: exchange.title,
       user: exchange.user
     });
@@ -223,7 +223,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       assistant: config.assistant,
       appendProgress: async (entry) => {
         const shouldCreateProvisionalLog = session.log === null;
-        const log = await ensureLog(session, "Retrieval Session");
+        const log = await ensureLog(session, 'Retrieval Session');
         if (shouldCreateProvisionalLog) {
           session.logNeedsSessionTitle = true;
         }
@@ -261,7 +261,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   });
 
   const readLog = async (options: string | { filePath?: string; sessionId?: string } = {}): Promise<WebLogResponse> => {
-    const normalizedOptions = typeof options === "string" ? { filePath: options } : options;
+    const normalizedOptions = typeof options === 'string' ? { filePath: options } : options;
     const sessionId = normalizedOptions.sessionId ?? DEFAULT_SESSION_ID;
     const activeFilePath = readStandardSession(sessionId).log?.filePath ?? null;
     const filePath = normalizedOptions.filePath !== undefined
@@ -296,9 +296,9 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     options: { cancelStartupRefresh?: boolean } = {}
   ): Promise<T> => {
     if (activeOperation !== null) {
-      if (options.cancelStartupRefresh && activeOperation.name === "startup-refresh") {
+      if (options.cancelStartupRefresh && activeOperation.name === 'startup-refresh') {
         const canceledOperation = activeOperation;
-        consoleFeed.warn("Canceling startup refresh before force reingest.");
+        consoleFeed.warn('Canceling startup refresh before force reingest.');
         canceledOperation.abortController.abort();
         await canceledOperation.done;
       } else {
@@ -325,7 +325,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     };
     nextOperationId += 1;
     try {
-      return await timingReporter.time(timing, "web.operation", () => task(timing, abortController.signal));
+      return await timingReporter.time(timing, 'web.operation', () => task(timing, abortController.signal));
     } finally {
       if (activeOperation?.id === operationId) {
         activeOperation = null;
@@ -339,12 +339,12 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       return;
     }
 
-    void runExclusive("startup-refresh", async (timing, abortSignal) => {
+    void runExclusive('startup-refresh', async (timing, abortSignal) => {
       try {
-        await timing.reporter.time(timing, "web.startup_refresh.run", () => runRefreshTask(false, abortSignal));
+        await timing.reporter.time(timing, 'web.startup_refresh.run', () => runRefreshTask(false, abortSignal));
       } catch (error) {
         if (isOperationAbortedError(error)) {
-          consoleFeed.warn("Startup refresh canceled.");
+          consoleFeed.warn('Startup refresh canceled.');
           return;
         }
         const message = formatThrownValue(error);
@@ -385,9 +385,9 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     if (hasRoutineRefresh) {
       return;
     }
-    consoleFeed.info("No completed refresh found for this server session; running routine refresh before continuing.");
+    consoleFeed.info('No completed refresh found for this server session; running routine refresh before continuing.');
     if (timing) {
-        await timing.reporter.time(timing, "web.refresh.ensure", () => runRefreshTask(false));
+        await timing.reporter.time(timing, 'web.refresh.ensure', () => runRefreshTask(false));
       return;
     }
     await runRefreshTask(false);
@@ -395,12 +395,12 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
 
   return {
     async askAssistant(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true, retrievalTurnLimit = 1) {
-      return runExclusive("assistant", async (timing) => {
+      return runExclusive('assistant', async (timing) => {
         const standardSession = readStandardSession(sessionId);
         const providerDebug = createProviderDebugCollector(config, consoleFeed);
         try {
           await ensureRoutineRefresh(timing);
-          await timing.reporter.time(timing, "web.assistant.ask", () =>
+          await timing.reporter.time(timing, 'web.assistant.ask', () =>
             ensureAssistant(standardSession).ask(prompt, {
               includePartyContext,
               onProviderDiagnostic: providerDebug.collect,
@@ -425,12 +425,12 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       });
     },
     async generateNpcs(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true, retrievalTurnLimit = 1) {
-      return runExclusive("npcs", async (timing) => {
+      return runExclusive('npcs', async (timing) => {
         const npcSessionState = readNpcSession(sessionId);
         const providerDebug = createProviderDebugCollector(config, consoleFeed);
         try {
           await ensureRoutineRefresh(timing);
-          await timing.reporter.time(timing, "web.npcs.generate", () =>
+          await timing.reporter.time(timing, 'web.npcs.generate', () =>
             ensureNpcSession(npcSessionState).generate(prompt, {
               includePartyContext,
               onProviderDiagnostic: providerDebug.collect,
@@ -456,7 +456,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     },
     async getContext() {
       await ensureAdditionalContextFile(config);
-      return readFile(config.assistant.additionalContextPath, "utf8");
+      return readFile(config.assistant.additionalContextPath, 'utf8');
     },
     getLog: readLog,
     getNpcs() {
@@ -471,8 +471,8 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
       };
     },
     async refresh(forceReingest) {
-      return runExclusive(forceReingest ? "force-reingest" : "refresh", async (timing, abortSignal) => {
-        const summary = await timing.reporter.time(timing, "web.refresh.run", () => runRefreshTask(forceReingest, abortSignal));
+      return runExclusive(forceReingest ? 'force-reingest' : 'refresh', async (timing, abortSignal) => {
+        const summary = await timing.reporter.time(timing, 'web.refresh.run', () => runRefreshTask(forceReingest, abortSignal));
         return {
           ok: true,
           console: consoleFeed.read(),
@@ -488,49 +488,49 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
     },
     async writeContext(markdown) {
       await ensureAdditionalContextFile(config);
-      await writeFile(config.assistant.additionalContextPath, markdown, "utf8");
+      await writeFile(config.assistant.additionalContextPath, markdown, 'utf8');
     }
   };
 };
 
 export interface BusyError {
-  kind: "busy";
+  kind: 'busy';
   message: string;
   operation: string;
 }
 
 export interface WebOperationError {
   console: WebConsoleResponse;
-  kind: "web-operation";
+  kind: 'web-operation';
   message: string;
   providerDebug?: ChatCompletionDiagnostic[];
 }
 
 export const isBusyError = (error: unknown): error is BusyError => {
   return (
-    typeof error === "object" &&
+    typeof error === 'object' &&
     error !== null &&
-    "kind" in error &&
-    error.kind === "busy" &&
-    "operation" in error &&
-    typeof error.operation === "string"
+    'kind' in error &&
+    error.kind === 'busy' &&
+    'operation' in error &&
+    typeof error.operation === 'string'
   );
 };
 
 const createBusyError = (operation: string): BusyError => ({
-  kind: "busy",
+  kind: 'busy',
   message: `Another operation is already running: ${operation}.`,
   operation
 });
 
 export const isWebOperationError = (error: unknown): error is WebOperationError => {
   return (
-    typeof error === "object" &&
+    typeof error === 'object' &&
     error !== null &&
-    "kind" in error &&
-    error.kind === "web-operation" &&
-    "console" in error &&
-    typeof error.console === "object"
+    'kind' in error &&
+    error.kind === 'web-operation' &&
+    'console' in error &&
+    typeof error.console === 'object'
   );
 };
 
@@ -540,7 +540,7 @@ const createWebOperationError = (
   providerDebug: ChatCompletionDiagnostic[] = []
 ): WebOperationError => ({
   console,
-  kind: "web-operation",
+  kind: 'web-operation',
   message,
   ...(providerDebug.length > 0 ? { providerDebug } : {})
 });
@@ -606,10 +606,10 @@ const createCachedPartyContextService = (inner: PartyContextService): CachedPart
 const ensureAdditionalContextFile = async (config: RuntimeConfig): Promise<void> => {
   await mkdir(config.assistant.assistantDir, { recursive: true });
   try {
-    await readFile(config.assistant.additionalContextPath, "utf8");
+    await readFile(config.assistant.additionalContextPath, 'utf8');
   } catch (error) {
-    if (hasErrorCode(error, "ENOENT")) {
-      await writeFile(config.assistant.additionalContextPath, "", "utf8");
+    if (hasErrorCode(error, 'ENOENT')) {
+      await writeFile(config.assistant.additionalContextPath, '', 'utf8');
       return;
     }
     throw error;
@@ -643,7 +643,7 @@ const createMemoryConsoleFeed = (debugLog: ReturnType<typeof createProviderDebug
       timestamp: new Date().toISOString()
     };
     debugLog?.append({
-      kind: "console-entry",
+      kind: 'console-entry',
       level,
       message,
       timestamp: entry.timestamp
@@ -657,7 +657,7 @@ const createMemoryConsoleFeed = (debugLog: ReturnType<typeof createProviderDebug
         hasDroppedEntriesNotice = true;
         const notice = {
           id: String(nextId),
-          level: "warn" as const,
+          level: 'warn' as const,
           message: `Console history is capped at ${MAX_CONSOLE_ENTRIES} entries; older output was discarded.`,
           timestamp: new Date().toISOString()
         };
@@ -675,13 +675,13 @@ const createMemoryConsoleFeed = (debugLog: ReturnType<typeof createProviderDebug
 
   return {
     debug(message) {
-      append("debug", message);
+      append('debug', message);
     },
     error(message) {
-      append("error", message);
+      append('error', message);
     },
     info(message) {
-      append("info", message);
+      append('info', message);
     },
     read() {
       return {
@@ -698,7 +698,7 @@ const createMemoryConsoleFeed = (debugLog: ReturnType<typeof createProviderDebug
       };
     },
     warn(message) {
-      append("warn", message);
+      append('warn', message);
     }
   };
 };
@@ -716,13 +716,13 @@ const createQueuedConsoleProgressReporter = (consoleFeed: MemoryConsoleFeed): Qu
       await queue;
     },
     info(message) {
-      append("info", message);
+      append('info', message);
     },
     progress(message) {
-      append("info", message);
+      append('info', message);
     },
     warn(message) {
-      append("warn", message);
+      append('warn', message);
     }
   };
 };
@@ -730,14 +730,14 @@ const createQueuedConsoleProgressReporter = (consoleFeed: MemoryConsoleFeed): Qu
 const formatRefreshSummaryMessage = (summary: StartupRefreshSummary): string => {
   const retrieval = summary.retrieval
     ? ` Retrieval chunks=${summary.retrieval.chunkCount}, reused=${summary.retrieval.reusedEmbeddings}, regenerated=${summary.retrieval.regeneratedEmbeddings}.`
-    : "";
-  const degraded = summary.degraded ? ` Degraded sources: ${summary.degradedSources.join(", ")}.` : "";
+    : '';
+  const degraded = summary.degraded ? ` Degraded sources: ${summary.degradedSources.join(', ')}.` : '';
   return `Refresh complete. Force reingest: ${String(summary.forceReingest)}.${retrieval}${degraded}`;
 };
 
 const formatProviderDiagnosticMessage = (diagnostic: ChatCompletionDiagnostic): string => {
   return JSON.stringify({
-    kind: "provider-diagnostic",
+    kind: 'provider-diagnostic',
     ...diagnostic
   });
 };

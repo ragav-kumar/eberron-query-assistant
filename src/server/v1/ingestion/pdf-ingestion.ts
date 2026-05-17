@@ -1,11 +1,11 @@
-import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
+import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
+import path from 'node:path';
 
-import { PdfData, VerbosityLevel } from "pdfdataextract";
+import { PdfData, VerbosityLevel } from 'pdfdataextract';
 
-import type { CorpusChunk, CorpusSource, RuntimeConfig } from "@/types.js";
-import { chunkText, normalizeText } from "./chunking.js";
+import type { CorpusChunk, CorpusSource, RuntimeConfig } from '@/types.js';
+import { chunkText, normalizeText } from './chunking.js';
 
 export interface ParsedPdfPage {
   pageNumber: number;
@@ -44,7 +44,7 @@ export const createPdfDataExtractParser = (): PdfParser => {
       return {
         pageCount: data.pages ?? text.length,
         fingerprint: data.fingerprint ?? null,
-        title: typeof data.info?.Title === "string" && data.info.Title.trim().length > 0 ? data.info.Title.trim() : null,
+        title: typeof data.info?.Title === 'string' && data.info.Title.trim().length > 0 ? data.info.Title.trim() : null,
         pages: text.map((pageText, index) => ({
           pageNumber: index + 1,
           text: normalizeText(pageText)
@@ -67,12 +67,12 @@ export const normalizePdf = async (
 
   const source: CorpusSource = {
     sourceId,
-    sourceType: "pdf",
+    sourceType: 'pdf',
     sourceKey,
     title,
-    status: "succeeded",
+    status: 'succeeded',
     metadata: {
-      sourceType: "pdf",
+      sourceType: 'pdf',
       filename,
       title,
       pageCount: parsed.pageCount,
@@ -94,13 +94,13 @@ export const normalizePdf = async (
         chunkIndex,
         text: chunk.text,
         citation: {
-          sourceType: "pdf",
+          sourceType: 'pdf',
           label: title,
           locator: `page ${page.pageNumber}`,
           url: null
         },
         metadata: {
-          sourceType: "pdf",
+          sourceType: 'pdf',
           filename,
           pageNumber: page.pageNumber,
           startParagraph: chunk.startParagraph,
@@ -116,11 +116,11 @@ export const normalizePdf = async (
 const friendlyTitle = (filename: string): string => {
   return path
     .basename(filename, path.extname(filename))
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ")
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 };
 
 const hashText = (text: string): string => {
-  return createHash("sha256").update(text).digest("hex").slice(0, 24);
+  return createHash('sha256').update(text).digest('hex').slice(0, 24);
 };

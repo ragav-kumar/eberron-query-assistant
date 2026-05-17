@@ -1,1 +1,1 @@
-export { loadDefaultConfig } from "./defaults.js";
+export { loadDefaultConfig } from './defaults.js';

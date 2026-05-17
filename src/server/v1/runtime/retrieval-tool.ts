@@ -6,48 +6,48 @@ import type {
   ChatStructuredResult,
   ChatToolCall,
   ChatToolDefinition
-} from "../provider/index.js";
-import { formatEvidence } from "./assistant-prompts.js";
-import type { RetrievalService } from "../retrieval/index.js";
-import type { TimingContext } from "@/timing.js";
-import type { SourceType } from "@/types.js";
+} from '../provider/index.js';
+import { formatEvidence } from './assistant-prompts.js';
+import type { RetrievalService } from '../retrieval/index.js';
+import type { TimingContext } from '@/timing.js';
+import type { SourceType } from '@/types.js';
 
 const MAX_EVIDENCE_RESULTS = 8;
 const MAX_RETRIEVAL_TOOL_TURNS = 3;
-const SEARCH_CORPUS_TOOL_NAME = "search_corpus";
+const SEARCH_CORPUS_TOOL_NAME = 'search_corpus';
 
 export const RETRIEVAL_TOOL: ChatToolDefinition = {
-  description: "Search the local Eberron corpus for targeted supporting evidence.",
+  description: 'Search the local Eberron corpus for targeted supporting evidence.',
   name: SEARCH_CORPUS_TOOL_NAME,
   parameters: {
-    type: "object",
+    type: 'object',
     properties: {
       query: {
-        type: "string"
+        type: 'string'
       },
       sourceTypes: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "string",
-          enum: ["foundry", "pdf", "article"]
+          type: 'string',
+          enum: ['foundry', 'pdf', 'article']
         }
       },
       sourceKeys: {
-        type: "array",
+        type: 'array',
         items: {
-          type: "string"
+          type: 'string'
         }
       },
       limit: {
-        type: "integer",
+        type: 'integer',
         minimum: 1,
         maximum: MAX_EVIDENCE_RESULTS
       },
       userMessage: {
-        type: "string"
+        type: 'string'
       }
     },
-    required: ["query", "userMessage"]
+    required: ['query', 'userMessage']
   }
 };
 
@@ -87,11 +87,11 @@ export const clampRetrievalTurnLimit = (value: number): number => {
 export const buildRetrievalToolInstructions = (retrievalTurnLimit: number): string => retrievalTurnLimit > 0
   ? [
     `You may call the ${SEARCH_CORPUS_TOOL_NAME} tool when the initial evidence is not enough.`,
-    "Use it only for targeted follow-up retrieval.",
-    `You may make at most ${retrievalTurnLimit} additional retrieval request${retrievalTurnLimit === 1 ? "" : "s"}.`,
-    "Set userMessage to concise progress text suitable for user-visible progress output. Do not include hidden reasoning."
-  ].join("\n")
-  : "No additional retrieval tool calls are available for this response. Answer from the initial evidence only.";
+    'Use it only for targeted follow-up retrieval.',
+    `You may make at most ${retrievalTurnLimit} additional retrieval request${retrievalTurnLimit === 1 ? '' : 's'}.`,
+    'Set userMessage to concise progress text suitable for user-visible progress output. Do not include hidden reasoning.'
+  ].join('\n')
+  : 'No additional retrieval tool calls are available for this response. Answer from the initial evidence only.';
 
 export const completeStructured = async (
   chat: ChatAdapter,
@@ -104,7 +104,7 @@ export const completeStructured = async (
 
   return {
     content: await chat.complete(messages, options),
-    kind: "text"
+    kind: 'text'
   };
 };
 
@@ -116,10 +116,10 @@ export const runRetrievalToolLoop = async (request: RetrievalToolLoopRequest): P
   let response = request.initialResponse;
   let remainingTurns = request.retrievalTurnLimit;
 
-  while (response.kind === "tool-calls") {
+  while (response.kind === 'tool-calls') {
     messages.push({
       content: response.content,
-      role: "assistant",
+      role: 'assistant',
       toolCalls: response.toolCalls
     });
 
@@ -139,7 +139,7 @@ export const runRetrievalToolLoop = async (request: RetrievalToolLoopRequest): P
       messages.push({
         content: toolResult.content,
         name: toolCall.name,
-        role: "tool",
+        role: 'tool',
         toolCallId: toolCall.id
       });
     }
@@ -187,7 +187,7 @@ const executeToolCall = async (
   if (request.remainingTurns <= 0) {
     return {
       consumeTurn: false,
-      content: "No more retrieval turns are available for this answer. Produce the final response from the evidence already provided."
+      content: 'No more retrieval turns are available for this answer. Produce the final response from the evidence already provided.'
     };
   }
 
@@ -220,10 +220,10 @@ const executeToolCall = async (
     consumeTurn: true,
     content: [
       `Search progress: ${parsedArgs.value.userMessage}`,
-      "",
-      "Retrieved evidence:",
+      '',
+      'Retrieved evidence:',
       formatEvidence(results)
-    ].join("\n")
+    ].join('\n')
   };
 };
 
@@ -233,30 +233,30 @@ const readSearchCorpusArgs = (rawArguments: string): { ok: true; value: SearchCo
     parsed = JSON.parse(rawArguments) as unknown;
   } catch {
     return {
-      message: "tool arguments must be valid JSON.",
+      message: 'tool arguments must be valid JSON.',
       ok: false
     };
   }
 
-  if (typeof parsed !== "object" || parsed === null) {
+  if (typeof parsed !== 'object' || parsed === null) {
     return {
-      message: "tool arguments must be a JSON object.",
+      message: 'tool arguments must be a JSON object.',
       ok: false
     };
   }
 
   const record = parsed as Record<string, unknown>;
-  const query = typeof record.query === "string" ? record.query.trim() : "";
-  const userMessage = typeof record.userMessage === "string" ? record.userMessage.trim() : "";
+  const query = typeof record.query === 'string' ? record.query.trim() : '';
+  const userMessage = typeof record.userMessage === 'string' ? record.userMessage.trim() : '';
   if (query.length === 0) {
     return {
-      message: "query is required.",
+      message: 'query is required.',
       ok: false
     };
   }
   if (userMessage.length === 0) {
     return {
-      message: "userMessage is required.",
+      message: 'userMessage is required.',
       ok: false
     };
   }
@@ -265,7 +265,7 @@ const readSearchCorpusArgs = (rawArguments: string): { ok: true; value: SearchCo
   if (!sourceTypes.ok) {
     return sourceTypes;
   }
-  const sourceKeys = readStringArray(record.sourceKeys, "sourceKeys");
+  const sourceKeys = readStringArray(record.sourceKeys, 'sourceKeys');
   if (!sourceKeys.ok) {
     return sourceKeys;
   }
@@ -285,7 +285,7 @@ const readSearchCorpusArgs = (rawArguments: string): { ok: true; value: SearchCo
 const readSourceTypes = (
   value: unknown
 ): { ok: true; value?: SourceType[] } | { message: string; ok: false } => {
-  const sourceTypes = readStringArray(value, "sourceTypes");
+  const sourceTypes = readStringArray(value, 'sourceTypes');
   if (!sourceTypes.ok) {
     return sourceTypes;
   }
@@ -294,7 +294,7 @@ const readSourceTypes = (
   }
   if (sourceTypes.value.some((sourceType) => !isSourceType(sourceType))) {
     return {
-      message: "sourceTypes must contain only foundry, pdf, or article.",
+      message: 'sourceTypes must contain only foundry, pdf, or article.',
       ok: false
     };
   }
@@ -311,7 +311,7 @@ const readStringArray = (
   if (value === undefined) {
     return { ok: true };
   }
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== 'string')) {
     return {
       message: `${field} must be an array of strings.`,
       ok: false
@@ -325,7 +325,7 @@ const readStringArray = (
 };
 
 const clampEvidenceLimit = (value: unknown): number => {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
     return MAX_EVIDENCE_RESULTS;
   }
 
@@ -333,5 +333,5 @@ const clampEvidenceLimit = (value: unknown): number => {
 };
 
 const isSourceType = (value: string): value is SourceType => {
-  return value === "foundry" || value === "pdf" || value === "article";
+  return value === 'foundry' || value === 'pdf' || value === 'article';
 };

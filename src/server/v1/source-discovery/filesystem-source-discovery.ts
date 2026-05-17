@@ -1,20 +1,20 @@
-import { mkdir, open, readdir } from "node:fs/promises";
-import path from "node:path";
+import { mkdir, open, readdir } from 'node:fs/promises';
+import path from 'node:path';
 
-import { createTaggedError, formatThrownValue, hasErrorCode, isRecord } from "@/errors.js";
-import type { FoundryExportMarker, RuntimeState } from "../state/index.js";
+import { createTaggedError, formatThrownValue, hasErrorCode, isRecord } from '@/errors.js';
+import type { FoundryExportMarker, RuntimeState } from '../state/index.js';
 import type {
   RuntimeConfig,
   RuntimeOptions,
   SourceInventoryResult,
   SourceInventoryStatus,
   SourceType
-} from "@/types.js";
-import type { SourceDiscoveryService, SourceDiscoverySummary } from "./source-discovery-service.js";
+} from '@/types.js';
+import type { SourceDiscoveryService, SourceDiscoverySummary } from './source-discovery-service.js';
 
 const ARTICLE_INDEX_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 const FOUNDRY_MANIFEST_READ_CHUNK_BYTES = 64 * 1024;
-const SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION = "2.0.0";
+const SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION = '2.0.0';
 
 export interface FilesystemSourceDiscoveryOptions {
   now?: () => Date;
@@ -34,16 +34,16 @@ export const createFilesystemSourceDiscoveryService = (
     try {
       await mkdir(config.foundryExportDir, { recursive: true });
       const filenames = (await readdir(config.foundryExportDir, { withFileTypes: true }))
-        .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".ndjson"))
+        .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.ndjson'))
         .map((entry) => entry.name)
         .sort((a, b) => a.localeCompare(b));
 
       if (filenames.length === 0) {
         return createInventoryResult({
-          sourceType: "foundry",
+          sourceType: 'foundry',
           discovered: 0,
-          status: "skipped",
-          message: "foundry: no NDJSON delta export files found; skipping foundry refresh."
+          status: 'skipped',
+          message: 'foundry: no NDJSON delta export files found; skipping foundry refresh.'
         });
       }
 
@@ -57,12 +57,12 @@ export const createFilesystemSourceDiscoveryService = (
         : markers.filter((marker) => !appliedFilenames.has(marker.filename));
       if (scheduledMarkers.length === 0) {
         return createInventoryResult({
-          sourceType: "foundry",
+          sourceType: 'foundry',
           discovered: markers.length,
-          status: "skipped",
+          status: 'skipped',
           message: options.forceReingest
-            ? "foundry: force re-ingest requested, but no delta export files were available; skipping foundry refresh."
-            : "foundry: delta export files already applied; skipping foundry refresh."
+            ? 'foundry: force re-ingest requested, but no delta export files were available; skipping foundry refresh.'
+            : 'foundry: delta export files already applied; skipping foundry refresh.'
         });
       }
 
@@ -76,11 +76,11 @@ export const createFilesystemSourceDiscoveryService = (
       );
 
       return createInventoryResult({
-        sourceType: "foundry",
+        sourceType: 'foundry',
         discovered: markers.length,
         added: previous ? 0 : scheduledMarkers.length,
         updated: previous ? scheduledMarkers.length : 0,
-        status: "scheduled",
+        status: 'scheduled',
         message: options.forceReingest
           ? `foundry: force re-ingest requested; scheduling ${scheduledMarkers.length} delta export file(s).`
           : `foundry: scheduling ${scheduledMarkers.length} unapplied delta export file(s).`,
@@ -88,9 +88,9 @@ export const createFilesystemSourceDiscoveryService = (
       });
     } catch (error) {
       return createInventoryResult({
-        sourceType: "foundry",
+        sourceType: 'foundry',
         failed: 1,
-        status: "failed",
+        status: 'failed',
         message: `foundry: failed to inspect delta export files: ${formatThrownValue(error)}.`
       });
     }
@@ -105,7 +105,7 @@ export const createFilesystemSourceDiscoveryService = (
     try {
       const entries = await readdir(config.pdfDir, { withFileTypes: true });
       const filenames = entries
-        .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".pdf"))
+        .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith('.pdf'))
         .map((entry) => entry.name)
         .sort((a, b) => a.localeCompare(b));
 
@@ -119,43 +119,43 @@ export const createFilesystemSourceDiscoveryService = (
 
       if (scheduledCount === 0) {
         return createInventoryResult({
-          sourceType: "pdf",
+          sourceType: 'pdf',
           discovered: filenames.length,
-          status: "skipped",
+          status: 'skipped',
           message: `pdf: ${filenames.length} PDF file(s) unchanged; skipping PDF refresh.`
         });
       }
 
       return createInventoryResult({
-        sourceType: "pdf",
+        sourceType: 'pdf',
         discovered: filenames.length,
         added: options.forceReingest ? filenames.length : added.length,
         removed: options.forceReingest ? 0 : removed.length,
-        status: "scheduled",
+        status: 'scheduled',
         message: options.forceReingest
           ? `pdf: force re-ingest requested; scheduling ${filenames.length} PDF file(s).`
           : `pdf: scheduling PDF inventory changes; added=${added.length}, removed=${removed.length}.`,
         details: [...added.map((filename) => `added:${filename}`), ...removed.map((filename) => `removed:${filename}`)]
       });
     } catch (error) {
-      if (hasErrorCode(error, "ENOENT")) {
+      if (hasErrorCode(error, 'ENOENT')) {
         nextState.pdf.knownFilenames = [];
         return createInventoryResult({
-          sourceType: "pdf",
+          sourceType: 'pdf',
           discovered: 0,
           removed: state.pdf.knownFilenames.length,
-          status: state.pdf.knownFilenames.length > 0 ? "scheduled" : "skipped",
+          status: state.pdf.knownFilenames.length > 0 ? 'scheduled' : 'skipped',
           message:
             state.pdf.knownFilenames.length > 0
-              ? "pdf: PDF directory is missing; scheduling removal of previously known PDFs."
-              : "pdf: PDF directory is missing; treating as zero discovered PDFs."
+              ? 'pdf: PDF directory is missing; scheduling removal of previously known PDFs.'
+              : 'pdf: PDF directory is missing; treating as zero discovered PDFs.'
         });
       }
 
       return createInventoryResult({
-        sourceType: "pdf",
+        sourceType: 'pdf',
         failed: 1,
-        status: "failed",
+        status: 'failed',
         message: `pdf: failed to inspect PDF directory: ${formatThrownValue(error)}.`
       });
     }
@@ -164,31 +164,31 @@ export const createFilesystemSourceDiscoveryService = (
   const inspectArticles = (options: RuntimeOptions, state: RuntimeState): SourceInventoryResult => {
     if (options.forceReingest) {
       return createInventoryResult({
-        sourceType: "article",
+        sourceType: 'article',
         discovered: state.article.knownArticles.length,
         updated: 1,
-        status: "scheduled",
-        message: "article: force re-ingest requested; scheduling Keith Baker index discovery."
+        status: 'scheduled',
+        message: 'article: force re-ingest requested; scheduling Keith Baker index discovery.'
       });
     }
 
     const lastScrape = state.article.lastSuccessfulIndexScrapeAt;
     if (!lastScrape) {
       return createInventoryResult({
-        sourceType: "article",
+        sourceType: 'article',
         discovered: state.article.knownArticles.length,
         updated: 1,
-        status: "scheduled",
-        message: "article: no successful index scrape recorded; scheduling Keith Baker index discovery."
+        status: 'scheduled',
+        message: 'article: no successful index scrape recorded; scheduling Keith Baker index discovery.'
       });
     }
 
     const lastScrapeTime = Date.parse(lastScrape);
     if (Number.isNaN(lastScrapeTime)) {
       return createInventoryResult({
-        sourceType: "article",
+        sourceType: 'article',
         failed: 1,
-        status: "failed",
+        status: 'failed',
         message: `article: invalid last successful index scrape timestamp: ${lastScrape}.`
       });
     }
@@ -196,19 +196,19 @@ export const createFilesystemSourceDiscoveryService = (
     const ageMs = now().getTime() - lastScrapeTime;
     if (ageMs >= ARTICLE_INDEX_INTERVAL_MS) {
       return createInventoryResult({
-        sourceType: "article",
+        sourceType: 'article',
         discovered: state.article.knownArticles.length,
         updated: 1,
-        status: "scheduled",
-        message: "article: last index scrape is at least 7 days old; scheduling Keith Baker index discovery."
+        status: 'scheduled',
+        message: 'article: last index scrape is at least 7 days old; scheduling Keith Baker index discovery.'
       });
     }
 
     return createInventoryResult({
-      sourceType: "article",
+      sourceType: 'article',
       discovered: state.article.knownArticles.length,
-      status: "skipped",
-      message: "article: recent Keith Baker index scrape recorded; skipping article discovery."
+      status: 'skipped',
+      message: 'article: recent Keith Baker index scrape recorded; skipping article discovery.'
     });
   };
 
@@ -228,7 +228,7 @@ export const createFilesystemSourceDiscoveryService = (
       return {
         inventories,
         nextState,
-        degraded: inventories.some((inventory) => inventory.status === "failed")
+        degraded: inventories.some((inventory) => inventory.status === 'failed')
       };
     }
   };
@@ -266,7 +266,7 @@ const selectLatestAppliedMarker = (
 };
 
 const readFirstLine = async (filePath: string): Promise<string> => {
-  const file = await open(filePath, "r");
+  const file = await open(filePath, 'r');
   const chunks: Buffer[] = [];
   let position = 0;
 
@@ -275,14 +275,14 @@ const readFirstLine = async (filePath: string): Promise<string> => {
       const buffer = Buffer.alloc(FOUNDRY_MANIFEST_READ_CHUNK_BYTES);
       const result = await file.read(buffer, 0, buffer.length, position);
       if (result.bytesRead === 0) {
-        return Buffer.concat(chunks).toString("utf8");
+        return Buffer.concat(chunks).toString('utf8');
       }
 
       const chunk = buffer.subarray(0, result.bytesRead);
       const newlineIndex = chunk.indexOf(10);
       if (newlineIndex >= 0) {
         chunks.push(chunk.subarray(0, newlineIndex));
-        return Buffer.concat(chunks).toString("utf8");
+        return Buffer.concat(chunks).toString('utf8');
       }
 
       chunks.push(chunk);
@@ -298,7 +298,7 @@ const parseFoundryManifestEnvelope = (filename: string, value: unknown): Foundry
     throw createManifestError(`${filename}: first line must contain a manifest envelope object`);
   }
 
-  if (value.kind !== "manifest") {
+  if (value.kind !== 'manifest') {
     throw createManifestError(`${filename}: first line kind must be manifest`);
   }
 
@@ -328,23 +328,23 @@ const parseFoundryManifest = (filename: string, value: unknown): FoundryExportMa
   const upsertCount = run.upsertCount;
   const deleteCount = run.deleteCount;
 
-  if (typeof runId !== "string" || runId.length === 0) {
+  if (typeof runId !== 'string' || runId.length === 0) {
     throw createManifestError(`${filename}: manifest.run.runId must be a non-empty string`);
   }
 
-  if (typeof generatedAt !== "string" || generatedAt.length === 0) {
+  if (typeof generatedAt !== 'string' || generatedAt.length === 0) {
     throw createManifestError(`${filename}: manifest.run.generatedAt must be a non-empty string`);
   }
 
-  if (typeof recordCount !== "number" || !Number.isInteger(recordCount) || recordCount < 0) {
+  if (typeof recordCount !== 'number' || !Number.isInteger(recordCount) || recordCount < 0) {
     throw createManifestError(`${filename}: manifest.run.recordCount must be a non-negative integer`);
   }
 
-  if (typeof upsertCount !== "number" || !Number.isInteger(upsertCount) || upsertCount < 0) {
+  if (typeof upsertCount !== 'number' || !Number.isInteger(upsertCount) || upsertCount < 0) {
     throw createManifestError(`${filename}: manifest.run.upsertCount must be a non-negative integer`);
   }
 
-  if (typeof deleteCount !== "number" || !Number.isInteger(deleteCount) || deleteCount < 0) {
+  if (typeof deleteCount !== 'number' || !Number.isInteger(deleteCount) || deleteCount < 0) {
     throw createManifestError(`${filename}: manifest.run.deleteCount must be a non-negative integer`);
   }
 
@@ -401,5 +401,5 @@ const cloneRuntimeState = (state: RuntimeState): RuntimeState => {
 };
 
 const createManifestError = (message: string): unknown => {
-  return createTaggedError("invalid-foundry-manifest", message);
+  return createTaggedError('invalid-foundry-manifest', message);
 };

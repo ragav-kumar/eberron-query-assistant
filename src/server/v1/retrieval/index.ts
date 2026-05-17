@@ -3,5 +3,5 @@ export {
   getVectorIndexPath,
   type RetrievalService,
   type RetrievalSyncSummary
-} from "./retrieval-service.js";
-export type { RetrievalResult, RetrievalSearchRequest } from "@/types.js";
+} from './retrieval-service.js';
+export type { RetrievalResult, RetrievalSearchRequest } from '@/types.js';

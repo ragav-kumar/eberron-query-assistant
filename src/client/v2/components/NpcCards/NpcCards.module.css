@@ -22,6 +22,10 @@
     padding: 0.9rem;
 }
 
+.inSession {
+    background: #f7fafc;
+}
+
 .header {
     align-items: baseline;
     display: flex;

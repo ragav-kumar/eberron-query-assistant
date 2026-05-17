@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
+import { useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
-import type { ApiLogEntry } from "../api.js";
+import type { ApiLogEntry } from '../api.js';
 
 interface MarkdownOutputPaneProps {
   emptyMessage: string;
@@ -12,7 +12,7 @@ interface MarkdownOutputPaneProps {
 /** Renders structured assistant transcript logs and keeps the latest output in view. */
 export const MarkdownOutputPane = ({ emptyMessage, exchanges }: MarkdownOutputPaneProps) => {
   const scrollRef = useRef<HTMLElement>(null);
-  const tocEntries = exchanges.flatMap((entry, index) => entry.kind === "exchange"
+  const tocEntries = exchanges.flatMap((entry, index) => entry.kind === 'exchange'
     ? [{ index, title: entry.title }]
     : []);
 
@@ -24,11 +24,11 @@ export const MarkdownOutputPane = ({ emptyMessage, exchanges }: MarkdownOutputPa
   }, [exchanges]);
 
   return (
-    <article className="markdown-output" ref={scrollRef} data-testid="markdown-output">
+    <article className='markdown-output' ref={scrollRef} data-testid='markdown-output'>
       {exchanges.length > 0 ? (
         <>
           {tocEntries.length > 0 ? (
-            <nav className="log-toc" aria-label="Log table of contents">
+            <nav className='log-toc' aria-label='Log table of contents'>
               <h2>Contents</h2>
               <ol>
                 {tocEntries.map((entry) => (
@@ -39,25 +39,25 @@ export const MarkdownOutputPane = ({ emptyMessage, exchanges }: MarkdownOutputPa
               </ol>
             </nav>
           ) : null}
-          <div className="log-exchanges">
-            {exchanges.map((entry, index) => entry.kind === "exchange" ? (
+          <div className='log-exchanges'>
+            {exchanges.map((entry, index) => entry.kind === 'exchange' ? (
               <section
-                className="log-exchange"
-                id={`log-exchange-${index + 1}`}
-                key={`exchange-${index}`}
+                  className='log-exchange'
+                  id={`log-exchange-${index + 1}`}
+                  key={`exchange-${index}`}
               >
                 <h2>{entry.title}</h2>
-                <div className="log-question">
+                <div className='log-question'>
                   <h3>User</h3>
                   <p>{entry.user}</p>
                 </div>
-                <div className="log-answer">
+                <div className='log-answer'>
                   <h3>Assistant</h3>
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.assistant}</ReactMarkdown>
                 </div>
               </section>
             ) : (
-              <section className="log-progress" key={`progress-${index}`}>
+              <section className='log-progress' key={`progress-${index}`}>
                 <h2>Progress</h2>
                 <p>{entry.message}</p>
               </section>
@@ -65,7 +65,7 @@ export const MarkdownOutputPane = ({ emptyMessage, exchanges }: MarkdownOutputPa
           </div>
         </>
       ) : (
-        <p className="empty-output">{emptyMessage}</p>
+        <p className='empty-output'>{emptyMessage}</p>
       )}
     </article>
   );

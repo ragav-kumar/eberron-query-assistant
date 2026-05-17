@@ -1,10 +1,10 @@
-import { access } from "node:fs/promises";
+import { access } from 'node:fs/promises';
 
-import Database from "better-sqlite3";
+import Database from 'better-sqlite3';
 
-import { isRecord } from "@/errors.js";
-import { getCorpusDatabasePath } from "../ingestion/index.js";
-import type { RuntimeConfig } from "@/types.js";
+import { isRecord } from '@/errors.js';
+import { getCorpusDatabasePath } from '../ingestion/index.js';
+import type { RuntimeConfig } from '@/types.js';
 
 export interface PartyContextService {
   build(config: RuntimeConfig): Promise<string>;
@@ -28,14 +28,14 @@ export const createSqlitePartyContextService = (): PartyContextService => ({
   async build(config) {
     if (config.campaign.partyActorUuids.length === 0) {
       return [
-        "Current party context:",
-        "- Party actor UUIDs are not configured. Set EQA_PARTY_ACTOR_UUIDS to enable automatic party context."
-      ].join("\n");
+        'Current party context:',
+        '- Party actor UUIDs are not configured. Set EQA_PARTY_ACTOR_UUIDS to enable automatic party context.'
+      ].join('\n');
     }
 
     const databasePath = getCorpusDatabasePath(config);
     if (!(await fileExists(databasePath))) {
-      return ["Current party context:", "- Party context unavailable: corpus.sqlite has not been created."].join("\n");
+      return ['Current party context:', '- Party context unavailable: corpus.sqlite has not been created.'].join('\n');
     }
 
     const database = new Database(databasePath, { readonly: true });
@@ -71,39 +71,39 @@ const formatPartyContext = (request: FormatPartyContextRequest): string => {
     (uuid) => !request.actors.some((actor) => actor.metadata.sourceUuid === uuid)
   );
   const lines = [
-    "Current party context:",
-    `- Foundry export freshness: ${request.exportGeneratedAt ?? "unknown"}.`,
-    `- Configured campaign journal folder: ${request.config.campaign.campaignJournalFolder ?? "none"}. Journal matching uses configured journal names when folder metadata is unavailable.`,
-    "- Source weighting: Session Notes are authoritative for events that happened in play. Quests are authoritative for active or expected quest threads. Actor-sheet mechanics describe the character sheet. Actor backstory describes what the character believes happened, but may include player error, incomplete knowledge, or unreliable narration.",
-    "",
-    "Party actors:"
+    'Current party context:',
+    `- Foundry export freshness: ${request.exportGeneratedAt ?? 'unknown'}.`,
+    `- Configured campaign journal folder: ${request.config.campaign.campaignJournalFolder ?? 'none'}. Journal matching uses configured journal names when folder metadata is unavailable.`,
+    '- Source weighting: Session Notes are authoritative for events that happened in play. Quests are authoritative for active or expected quest threads. Actor-sheet mechanics describe the character sheet. Actor backstory describes what the character believes happened, but may include player error, incomplete knowledge, or unreliable narration.',
+    '',
+    'Party actors:'
   ];
 
   if (request.actors.length === 0) {
-    lines.push("- No configured party actors were found in the Foundry corpus.");
+    lines.push('- No configured party actors were found in the Foundry corpus.');
   } else {
     lines.push(...request.actors.map((actor) => formatSourceBullet(actor, ACTOR_CONTENT_LIMIT)));
   }
 
   if (missingActorUuids.length > 0) {
-    lines.push(`- Missing configured actor UUIDs: ${missingActorUuids.join(", ")}.`);
+    lines.push(`- Missing configured actor UUIDs: ${missingActorUuids.join(', ')}.`);
   }
 
-  lines.push("", `Latest ${request.config.campaign.sessionNotesJournal} pages:`);
+  lines.push('', `Latest ${request.config.campaign.sessionNotesJournal} pages:`);
   if (request.sessionPages.length === 0) {
     lines.push(`- No pages found for journal "${request.config.campaign.sessionNotesJournal}".`);
   } else {
     lines.push(...request.sessionPages.map((page) => formatSourceBullet(page, SESSION_CONTENT_LIMIT)));
   }
 
-  lines.push("", `${request.config.campaign.questsJournal} pages:`);
+  lines.push('', `${request.config.campaign.questsJournal} pages:`);
   if (request.questPages.length === 0) {
     lines.push(`- No pages found for journal "${request.config.campaign.questsJournal}".`);
   } else {
     lines.push(...request.questPages.map((page) => formatSourceBullet(page, QUEST_CONTENT_LIMIT)));
   }
 
-  return lines.join("\n");
+  return lines.join('\n');
 };
 
 const readPartyActors = (database: Database.Database, actorUuids: string[]): FoundrySourceRow[] => {
@@ -117,7 +117,7 @@ const readPartyActors = (database: Database.Database, actorUuids: string[]): Fou
 
 const readJournalPages = (database: Database.Database, journalName: string, limit: number): FoundrySourceRow[] => {
   return readAllFoundrySources(database)
-    .filter((row) => readString(row.metadata.entityKind) === "JournalEntryPage")
+    .filter((row) => readString(row.metadata.entityKind) === 'JournalEntryPage')
     .filter((row) => {
       const path = readStringArray(row.metadata.provenancePath);
       return path[0] === journalName;
@@ -188,13 +188,13 @@ const formatSourceBullet = (row: FoundrySourceRow, contentLimit: number): string
   const sourceUuid = readString(row.metadata.sourceUuid);
   const content = summarizeContent(row.content, contentLimit);
   return [
-    `- ${row.title}${locator ? ` (${locator})` : ""}${sourceUuid ? ` [${sourceUuid}]` : ""}:`,
-    `  ${content || "No text content exported for this record."}`
-  ].join("\n");
+    `- ${row.title}${locator ? ` (${locator})` : ''}${sourceUuid ? ` [${sourceUuid}]` : ''}:`,
+    `  ${content || 'No text content exported for this record.'}`
+  ].join('\n');
 };
 
 const summarizeContent = (content: string, limit: number): string => {
-  const normalized = content.replace(/\s+/g, " ").trim();
+  const normalized = content.replace(/\s+/g, ' ').trim();
   if (normalized.length <= limit) {
     return normalized;
   }
@@ -218,17 +218,17 @@ const parseMetadata = (value: string): Record<string, unknown> => {
 };
 
 const readString = (value: unknown): string => {
-  if (typeof value === "string") {
+  if (typeof value === 'string') {
     return value.trim();
   }
-  if (typeof value === "number") {
+  if (typeof value === 'number') {
     return String(value);
   }
-  return "";
+  return '';
 };
 
 const readStringArray = (value: unknown): string[] => {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
 };
 
 const fileExists = async (filePath: string): Promise<boolean> => {

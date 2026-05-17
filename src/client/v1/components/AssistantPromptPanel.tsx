@@ -1,4 +1,4 @@
-import type { KeyboardEvent, SubmitEvent } from "react";
+import type { KeyboardEvent, SubmitEvent } from 'react';
 
 interface AssistantPromptPanelProps {
   disabled: boolean;
@@ -15,24 +15,24 @@ export const AssistantPromptPanel = ({ disabled, onPromptChange, onSubmit, promp
   };
 
   const submitOnEnter = (event: KeyboardEvent<HTMLTextAreaElement>): void => {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       onSubmit();
     }
   };
 
   return (
-    <form className="panel" aria-labelledby="assistant-heading" onSubmit={submitPrompt}>
-      <h2 id="assistant-heading">Assistant</h2>
+    <form className='panel' aria-labelledby='assistant-heading' onSubmit={submitPrompt}>
+      <h2 id='assistant-heading'>Assistant</h2>
       <textarea
-        value={prompt}
-        onChange={(event) => onPromptChange(event.currentTarget.value)}
-        onKeyDown={submitOnEnter}
-        placeholder="Ask about Eberron lore, campaign notes, PDFs, or articles."
-        disabled={disabled}
-        title="Ask a grounded assistant question using the configured corpus and additional context."
+          value={prompt}
+          onChange={(event) => onPromptChange(event.currentTarget.value)}
+          onKeyDown={submitOnEnter}
+          placeholder='Ask about Eberron lore, campaign notes, PDFs, or articles.'
+          disabled={disabled}
+          title='Ask a grounded assistant question using the configured corpus and additional context.'
       />
-      <button type="submit" disabled={disabled || prompt.trim().length === 0} title="Submit this prompt to the assistant.">
+      <button type='submit' disabled={disabled || prompt.trim().length === 0} title='Submit this prompt to the assistant.'>
         Ask
       </button>
     </form>

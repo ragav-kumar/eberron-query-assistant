@@ -2,7 +2,7 @@ export {
   createDeterministicEmbeddingAdapter,
   createOpenAiChatAdapter,
   createOpenAiEmbeddingAdapter
-} from "./provider-adapter.js";
+} from './provider-adapter.js';
 export type {
   ChatAdapter,
   ChatCompletionDiagnostic,
@@ -13,4 +13,4 @@ export type {
   ChatToolDefinition,
   EmbeddingAdapter,
   OpenAiProviderOptions
-} from "./provider-adapter.js";
+} from './provider-adapter.js';

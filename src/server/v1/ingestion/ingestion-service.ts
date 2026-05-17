@@ -1,8 +1,8 @@
-import { formatThrownValue, isOperationAbortedError, throwIfAborted } from "@/errors.js";
-import type { ProgressReporter } from "../progress/reporter.js";
-import type { SourceDiscoverySummary } from "../source-discovery/index.js";
-import type { ArticleStateRecord, RuntimeState, StateStore } from "../state/index.js";
-import type { IngestionSummary, RuntimeConfig, RuntimeOptions, SourceIngestionSummary } from "@/types.js";
+import { formatThrownValue, isOperationAbortedError, throwIfAborted } from '@/errors.js';
+import type { ProgressReporter } from '../progress/reporter.js';
+import type { SourceDiscoverySummary } from '../source-discovery/index.js';
+import type { ArticleStateRecord, RuntimeState, StateStore } from '../state/index.js';
+import type { IngestionSummary, RuntimeConfig, RuntimeOptions, SourceIngestionSummary } from '@/types.js';
 import {
   createFetchArticleFetcher,
   KEITH_BAKER_INDEX_URL,
@@ -10,11 +10,11 @@ import {
   discoverArticleLinks,
   isPermanentlyInaccessibleArticleFetch,
   normalizeArticle
-} from "./article-ingestion.js";
-import { createFilesystemArticleRawCache, type ArticleRawCache } from "./article-raw-cache.js";
-import type { CorpusStore } from "./corpus-store.js";
-import { parseFoundryDeltaFile, type FoundryDeltaFile } from "./foundry-ingestion.js";
-import { createPdfDataExtractParser, type PdfParser, normalizePdf } from "./pdf-ingestion.js";
+} from './article-ingestion.js';
+import { createFilesystemArticleRawCache, type ArticleRawCache } from './article-raw-cache.js';
+import type { CorpusStore } from './corpus-store.js';
+import { parseFoundryDeltaFile, type FoundryDeltaFile } from './foundry-ingestion.js';
+import { createPdfDataExtractParser, type PdfParser, normalizePdf } from './pdf-ingestion.js';
 
 export interface IngestionServiceDependencies {
   articleRawCache?: ArticleRawCache;
@@ -52,10 +52,10 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     discovery: SourceDiscoverySummary,
     nextState: RuntimeState
   ): Promise<SourceIngestionSummary> => {
-    const inventory = discovery.inventories.find((candidate) => candidate.sourceType === "foundry");
+    const inventory = discovery.inventories.find((candidate) => candidate.sourceType === 'foundry');
     throwIfAborted(options.abortSignal);
-    if (!inventory || inventory.status !== "scheduled") {
-      return skippedSummary("foundry", "foundry: ingestion skipped.");
+    if (!inventory || inventory.status !== 'scheduled') {
+      return skippedSummary('foundry', 'foundry: ingestion skipped.');
     }
 
     const scheduledFilenames = readScheduledFilenames(inventory.details);
@@ -65,7 +65,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     );
     const filenames = isBackfill ? allAppliedFilenames : scheduledFilenames;
     if (filenames.length === 0) {
-      return failedSummary("foundry", "foundry: scheduled without delta export filenames.");
+      return failedSummary('foundry', 'foundry: scheduled without delta export filenames.');
     }
 
     let ingested = 0;
@@ -105,11 +105,11 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
       }
 
       return succeededSummary(
-        "foundry",
+        'foundry',
         inventory.discovered,
         ingested,
         removed,
-        isBackfill ? "foundry: replayed delta export history after backfill." : "foundry: applied delta export files.",
+        isBackfill ? 'foundry: replayed delta export history after backfill.' : 'foundry: applied delta export files.',
         filenames.map((filename) => `applied:${filename}`)
       );
     } catch (error) {
@@ -117,8 +117,8 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
         throw error;
       }
       return {
-        sourceType: "foundry",
-        status: "failed",
+        sourceType: 'foundry',
+        status: 'failed',
         discovered: inventory.discovered,
         ingested,
         removed,
@@ -135,18 +135,18 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     discovery: SourceDiscoverySummary,
     nextState: RuntimeState
   ): Promise<SourceIngestionSummary> => {
-    const inventory = discovery.inventories.find((candidate) => candidate.sourceType === "pdf");
+    const inventory = discovery.inventories.find((candidate) => candidate.sourceType === 'pdf');
     throwIfAborted(options.abortSignal);
-    if (!inventory || inventory.status !== "scheduled") {
-      return skippedSummary("pdf", "pdf: ingestion skipped.");
+    if (!inventory || inventory.status !== 'scheduled') {
+      return skippedSummary('pdf', 'pdf: ingestion skipped.');
     }
 
     const added = inventory.details
-      .filter((detail) => detail.startsWith("added:"))
-      .map((detail) => detail.slice("added:".length));
+      .filter((detail) => detail.startsWith('added:'))
+      .map((detail) => detail.slice('added:'.length));
     const removed = inventory.details
-      .filter((detail) => detail.startsWith("removed:"))
-      .map((detail) => detail.slice("removed:".length));
+      .filter((detail) => detail.startsWith('removed:'))
+      .map((detail) => detail.slice('removed:'.length));
     const filenames = inventory.added > 0 && added.length === 0 ? discovery.nextState.pdf.knownFilenames : added;
 
     let ingested = 0;
@@ -156,7 +156,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     for (const filename of removed) {
       throwIfAborted(options.abortSignal);
       dependencies.reporter.info(`pdf: removing stale source ${filename}.`);
-      await corpusStore.removeSource(config, "pdf", filename);
+      await corpusStore.removeSource(config, 'pdf', filename);
     }
 
     for (const [index, filename] of filenames.entries()) {
@@ -180,20 +180,20 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
 
     if (failed === 0) {
       nextState.pdf.knownFilenames = [...discovery.nextState.pdf.knownFilenames];
-      return succeededSummary("pdf", inventory.discovered, ingested, removed.length, "pdf: ingested inventory changes.", details);
+      return succeededSummary('pdf', inventory.discovered, ingested, removed.length, 'pdf: ingested inventory changes.', details);
     }
 
     return {
-      sourceType: "pdf",
-      status: ingested > 0 || removed.length > 0 ? "succeeded" : "failed",
+      sourceType: 'pdf',
+      status: ingested > 0 || removed.length > 0 ? 'succeeded' : 'failed',
       discovered: inventory.discovered,
       ingested,
       removed: removed.length,
       failed,
       message:
         ingested > 0 || removed.length > 0
-          ? "pdf: ingestion completed with source-scoped failures."
-          : "pdf: ingestion failed.",
+          ? 'pdf: ingestion completed with source-scoped failures.'
+          : 'pdf: ingestion failed.',
       details
     };
   };
@@ -205,10 +205,10 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
     discovery: SourceDiscoverySummary,
     nextState: RuntimeState
   ): Promise<SourceIngestionSummary> => {
-    const inventory = discovery.inventories.find((candidate) => candidate.sourceType === "article");
+    const inventory = discovery.inventories.find((candidate) => candidate.sourceType === 'article');
     throwIfAborted(options.abortSignal);
-    if (!inventory || inventory.status !== "scheduled") {
-      return skippedSummary("article", "article: ingestion skipped.");
+    if (!inventory || inventory.status !== 'scheduled') {
+      return skippedSummary('article', 'article: ingestion skipped.');
     }
 
     const nowIso = now().toISOString();
@@ -225,8 +225,8 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
       const articleMap = new Map(discovered.articles.map((article) => [article.canonicalUrl, article]));
       const ingestCandidates = discovered.articles.filter(
         (article) =>
-          article.scrapeStatus !== "inaccessible" &&
-          (options.forceReingest || article.scrapeStatus !== "succeeded" || !article.lastIngestedAt)
+          article.scrapeStatus !== 'inaccessible' &&
+          (options.forceReingest || article.scrapeStatus !== 'succeeded' || !article.lastIngestedAt)
       );
 
       let ingested = 0;
@@ -270,7 +270,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
           }
           articleMap.set(article.canonicalUrl, {
             ...article,
-            scrapeStatus: permanentlyInaccessible ? "inaccessible" : "failed"
+            scrapeStatus: permanentlyInaccessible ? 'inaccessible' : 'failed'
           });
         }
       }
@@ -279,25 +279,25 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
       nextState.article.knownArticles = sortArticles([...articleMap.values()]);
 
       return {
-        sourceType: "article",
-        status: failed > 0 && ingested === 0 ? "failed" : "succeeded",
+        sourceType: 'article',
+        status: failed > 0 && ingested === 0 ? 'failed' : 'succeeded',
         discovered: discovered.discoveredUrls.length,
         ingested,
         removed: 0,
         failed,
         message:
           failed > 0
-            ? "article: ingestion completed with source-scoped failures."
+            ? 'article: ingestion completed with source-scoped failures.'
             : details.length > 0
-              ? "article: discovered article changes with permanently inaccessible pages."
-            : "article: discovered and ingested article changes.",
+              ? 'article: discovered article changes with permanently inaccessible pages.'
+            : 'article: discovered and ingested article changes.',
         details
       };
     } catch (error) {
       if (isOperationAbortedError(error)) {
         throw error;
       }
-      return failedSummary("article", `article: ingestion failed: ${formatThrownValue(error)}.`);
+      return failedSummary('article', `article: ingestion failed: ${formatThrownValue(error)}.`);
     }
   };
 
@@ -323,7 +323,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
       summaries.push(await ingestArticles(config, options, state, discovery, nextState));
 
       const sourceCount = await corpusStore.countSources(config);
-      const degraded = summaries.some((summary) => summary.status === "failed" || summary.failed > 0) || sourceCount === 0;
+      const degraded = summaries.some((summary) => summary.status === 'failed' || summary.failed > 0) || sourceCount === 0;
 
       return {
         summary: {
@@ -383,7 +383,7 @@ const readArticleHtml = async (options: {
 }): Promise<string> => {
   const { abortSignal, article, articleFetcher, articleRawCache, config, forceReingest, index, reporter, total } = options;
   throwIfAborted(abortSignal);
-  if (forceReingest && article.scrapeStatus === "succeeded" && article.lastIngestedAt) {
+  if (forceReingest && article.scrapeStatus === 'succeeded' && article.lastIngestedAt) {
     const cached = await articleRawCache.read(config, article.canonicalUrl);
     if (cached !== null) {
       reporter.info(`article: using cached raw HTML ${article.canonicalUrl} (${index + 1}/${total}).`);
@@ -402,8 +402,8 @@ const readArticleHtml = async (options: {
 
 const readScheduledFilenames = (details: string[]): string[] => {
   return details
-    .filter((detail) => detail.startsWith("scheduled:"))
-    .map((detail) => detail.slice("scheduled:".length))
+    .filter((detail) => detail.startsWith('scheduled:'))
+    .map((detail) => detail.slice('scheduled:'.length))
     .sort((a, b) => a.localeCompare(b));
 };
 
@@ -414,25 +414,25 @@ const applyFoundryDeltaFile = async (
   clearFoundry: boolean
 ): Promise<{ deleteCount: number; upsertCount: number }> => {
   const changes = deltaFile.operations.map((operation) =>
-    operation.kind === "delete"
+    operation.kind === 'delete'
       ? {
-          kind: "delete" as const,
+          kind: 'delete' as const,
           sourceKey: operation.recordId,
-          sourceType: "foundry" as const
+          sourceType: 'foundry' as const
         }
       : {
-          kind: "upsert" as const,
+          kind: 'upsert' as const,
           chunks: operation.chunks,
           source: operation.source
         }
   );
   await corpusStore.applySourceChanges(config, {
     changes,
-    ...(clearFoundry ? { clearSourceType: "foundry" } : {})
+    ...(clearFoundry ? { clearSourceType: 'foundry' } : {})
   });
   return {
-    deleteCount: deltaFile.operations.filter((operation) => operation.kind === "delete").length,
-    upsertCount: deltaFile.operations.filter((operation) => operation.kind === "upsert").length
+    deleteCount: deltaFile.operations.filter((operation) => operation.kind === 'delete').length,
+    upsertCount: deltaFile.operations.filter((operation) => operation.kind === 'upsert').length
   };
 };
 
@@ -441,7 +441,7 @@ const resetFoundryState = (state: RuntimeState): void => {
   state.foundry.lastSuccessfulExport = null;
 };
 
-const applyFoundryMarker = (state: RuntimeState, marker: FoundryDeltaFile["marker"]): void => {
+const applyFoundryMarker = (state: RuntimeState, marker: FoundryDeltaFile['marker']): void => {
   state.foundry.appliedExportFilenames = [...new Set([...state.foundry.appliedExportFilenames, marker.filename])].sort((a, b) =>
     a.localeCompare(b)
   );
@@ -450,10 +450,10 @@ const applyFoundryMarker = (state: RuntimeState, marker: FoundryDeltaFile["marke
   }
 };
 
-const skippedSummary = (sourceType: SourceIngestionSummary["sourceType"], message: string): SourceIngestionSummary => {
+const skippedSummary = (sourceType: SourceIngestionSummary['sourceType'], message: string): SourceIngestionSummary => {
   return {
     sourceType,
-    status: "skipped",
+    status: 'skipped',
     discovered: 0,
     ingested: 0,
     removed: 0,
@@ -464,7 +464,7 @@ const skippedSummary = (sourceType: SourceIngestionSummary["sourceType"], messag
 };
 
 const succeededSummary = (
-  sourceType: SourceIngestionSummary["sourceType"],
+  sourceType: SourceIngestionSummary['sourceType'],
   discovered: number,
   ingested: number,
   removed: number,
@@ -473,7 +473,7 @@ const succeededSummary = (
 ): SourceIngestionSummary => {
   return {
     sourceType,
-    status: "succeeded",
+    status: 'succeeded',
     discovered,
     ingested,
     removed,
@@ -483,10 +483,10 @@ const succeededSummary = (
   };
 };
 
-const failedSummary = (sourceType: SourceIngestionSummary["sourceType"], message: string): SourceIngestionSummary => {
+const failedSummary = (sourceType: SourceIngestionSummary['sourceType'], message: string): SourceIngestionSummary => {
   return {
     sourceType,
-    status: "failed",
+    status: 'failed',
     discovered: 0,
     ingested: 0,
     removed: 0,

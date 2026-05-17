@@ -1,21 +1,21 @@
-import type { ChatAdapter, ChatCompletionDiagnostic, ChatMessage } from "../provider/index.js";
-import type { RetrievalService } from "../retrieval/index.js";
-import { createNoopTimingReporter, type TimingContext } from "@/timing.js";
-import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "@/types.js";
-import { readGeneratedNpcState, updateGeneratedNpcState } from "./npc-store.js";
+import type { ChatAdapter, ChatCompletionDiagnostic, ChatMessage } from '../provider/index.js';
+import type { RetrievalService } from '../retrieval/index.js';
+import { createNoopTimingReporter, type TimingContext } from '@/timing.js';
+import type { AssistantConfig, RetrievalResult, RuntimeConfig } from '@/types.js';
+import { readGeneratedNpcState, updateGeneratedNpcState } from './npc-store.js';
 import {
   formatCitation,
   loadAssistantPromptAssets,
   type AssistantPromptAssets
-} from "./assistant-prompts.js";
-import { createSqlitePartyContextService, type PartyContextService } from "./party-context.js";
+} from './assistant-prompts.js';
+import { createSqlitePartyContextService, type PartyContextService } from './party-context.js';
 import {
   buildRetrievalToolInstructions,
   clampRetrievalTurnLimit,
   completeStructured,
   RETRIEVAL_TOOL,
   runRetrievalToolLoop
-} from "./retrieval-tool.js";
+} from './retrieval-tool.js';
 
 export interface GeneratedNpc {
   age?: string;
@@ -73,31 +73,31 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
     async generate(prompt, generationOptions = {}) {
       const normalizedPrompt = prompt.trim();
       if (normalizedPrompt.length === 0) {
-        throw new Error("NPC generation prompt cannot be empty.");
+        throw new Error('NPC generation prompt cannot be empty.');
       }
 
       const includePartyContext = generationOptions.includePartyContext ?? true;
       const retrievalTurnLimit = clampRetrievalTurnLimit(generationOptions.retrievalTurnLimit ?? 1);
       const timing = generationOptions.timing ?? {
-        operation: "npcs",
-        operationId: "untracked",
+        operation: 'npcs',
+        operationId: 'untracked',
         reporter: createNoopTimingReporter()
       };
-      const evidence = await timing.reporter.time(timing, "npcs.retrieval.search", () =>
+      const evidence = await timing.reporter.time(timing, 'npcs.retrieval.search', () =>
         options.retrieval.search({
           query: normalizedPrompt,
           timing,
           limit: MAX_EVIDENCE_RESULTS
         })
       );
-      const existingNpcs = await timing.reporter.time(timing, "npcs.state.read", () =>
+      const existingNpcs = await timing.reporter.time(timing, 'npcs.state.read', () =>
         readGeneratedNpcState(options.config)
       );
       const maxExistingId = readMaxNpcId(existingNpcs);
       const partyContextText = includePartyContext
-        ? await timing.reporter.time(timing, "npcs.party_context", () => partyContext.build(options.config))
-        : "";
-      const promptAssets = await timing.reporter.time(timing, "npcs.prompt_assets", () => loadPromptAssets());
+        ? await timing.reporter.time(timing, 'npcs.party_context', () => partyContext.build(options.config))
+        : '';
+      const promptAssets = await timing.reporter.time(timing, 'npcs.prompt_assets', () => loadPromptAssets());
       const messages = buildNpcGenerationMessages({
         evidence,
         history,
@@ -109,14 +109,14 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
         promptAssets,
         retrievalToolInstructions: buildRetrievalToolInstructions(retrievalTurnLimit)
       });
-      const response = await timing.reporter.time(timing, "npcs.chat.complete", () => completeStructured(
+      const response = await timing.reporter.time(timing, 'npcs.chat.complete', () => completeStructured(
         options.chat,
         messages,
         {
           debug: {
             operation: timing.operation,
             operationId: timing.operationId,
-            purpose: "npcs"
+            purpose: 'npcs'
           },
           onDiagnostic: generationOptions.onProviderDiagnostic,
           ...(retrievalTurnLimit > 0 ? { tools: [RETRIEVAL_TOOL] } : {})
@@ -127,13 +127,13 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
         initialMessages: messages,
         initialResponse: response,
         onProviderDiagnostic: generationOptions.onProviderDiagnostic,
-        purpose: "npcs",
+        purpose: 'npcs',
         ...(options.reportStatus ? { reportStatus: (message: string) => options.reportStatus?.(message) } : {}),
         retrieval: options.retrieval,
         retrievalTurnLimit,
         timing
       });
-      const returnedNpcs = await timing.reporter.time(timing, "npcs.response.parse", () =>
+      const returnedNpcs = await timing.reporter.time(timing, 'npcs.response.parse', () =>
         parseNpcGenerationResponseWithRepair({
           chat: options.chat,
           existingNpcs,
@@ -143,12 +143,12 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
           timing
         })
       );
-      const savedNpcs = await timing.reporter.time(timing, "npcs.state.update", () =>
+      const savedNpcs = await timing.reporter.time(timing, 'npcs.state.update', () =>
         updateGeneratedNpcState(options.config, returnedNpcs)
       );
 
       const structuredResponse = JSON.stringify({ npcs: returnedNpcs });
-      history.push({ role: "user", content: normalizedPrompt }, { role: "assistant", content: structuredResponse });
+      history.push({ role: 'user', content: normalizedPrompt }, { role: 'assistant', content: structuredResponse });
       history.splice(0, Math.max(0, history.length - MAX_HISTORY_MESSAGES));
 
       return {
@@ -179,36 +179,36 @@ interface NpcMessageBuildRequest {
 
 export const buildNpcGenerationMessages = (request: NpcMessageBuildRequest): ChatMessage[] => {
   const includePartyContext = request.includePartyContext ?? true;
-  const partyContext = includePartyContext ? (request.partyContext?.trim() ?? "") : "";
+  const partyContext = includePartyContext ? (request.partyContext?.trim() ?? '') : '';
   const systemPromptParts = [
     request.promptAssets.systemPrompt,
     request.promptAssets.additionalContext.length > 0
-      ? ["Additional assistant context:", request.promptAssets.additionalContext].join("\n")
-      : "",
-    includePartyContext ? "" : request.promptAssets.worldQueryingModePrompt,
-    request.promptAssets.npcGeneratorPrompt.replaceAll("{{maxExistingId}}", String(request.maxExistingId)),
-    request.retrievalToolInstructions?.trim() ?? ""
+      ? ['Additional assistant context:', request.promptAssets.additionalContext].join('\n')
+      : '',
+    includePartyContext ? '' : request.promptAssets.worldQueryingModePrompt,
+    request.promptAssets.npcGeneratorPrompt.replaceAll('{{maxExistingId}}', String(request.maxExistingId)),
+    request.retrievalToolInstructions?.trim() ?? ''
   ].filter((part) => part.length > 0);
 
   return [
     {
-      role: "system",
-      content: systemPromptParts.join("\n\n")
+      role: 'system',
+      content: systemPromptParts.join('\n\n')
     },
     ...request.history,
     {
-      role: "user",
+      role: 'user',
       content: [
         partyContext,
-        partyContext.length > 0 ? "" : "",
-        "Retrieved evidence:",
+        partyContext.length > 0 ? '' : '',
+        'Retrieved evidence:',
         formatEvidenceForNpcPrompt(request.evidence),
-        "",
-        "Saved NPCs:",
-        request.npcs.length > 0 ? JSON.stringify({ npcs: request.npcs }) : "[]",
-        "",
+        '',
+        'Saved NPCs:',
+        request.npcs.length > 0 ? JSON.stringify({ npcs: request.npcs }) : '[]',
+        '',
         `Prompt: ${request.prompt}`
-      ].filter((part, index) => part.length > 0 || (partyContext.length > 0 && index === 1)).join("\n")
+      ].filter((part, index) => part.length > 0 || (partyContext.length > 0 && index === 1)).join('\n')
     }
   ];
 };
@@ -216,17 +216,17 @@ export const buildNpcGenerationMessages = (request: NpcMessageBuildRequest): Cha
 export const parseNpcGenerationResponse = (response: string, existingNpcs: GeneratedNpc[]): GeneratedNpc[] => {
   const parsed = JSON.parse(stripJsonCodeFence(response)) as unknown;
   if (!isRecord(parsed) || !Array.isArray(parsed.npcs)) {
-    throw new Error("NPC generation response must be JSON with an npcs array.");
+    throw new Error('NPC generation response must be JSON with an npcs array.');
   }
 
   const npcs = parsed.npcs.map(readGeneratedNpc);
   const maxExistingId = readMaxNpcId(existingNpcs);
   const existingIds = new Set(existingNpcs.map((npc) => npc.id));
   if (new Set(npcs.map((npc) => npc.id)).size !== npcs.length) {
-    throw new Error("NPC generation response included duplicate ids.");
+    throw new Error('NPC generation response included duplicate ids.');
   }
   if (npcs.some((npc) => npc.id <= maxExistingId && !existingIds.has(npc.id))) {
-    throw new Error("NPC generation response assigned a new NPC id below the current maximum id.");
+    throw new Error('NPC generation response assigned a new NPC id below the current maximum id.');
   }
 
   return npcs;
@@ -253,14 +253,14 @@ const parseNpcGenerationResponseWithRepair = async (
     const repairedResponse = await request.chat.complete(
       [
         ...request.messages,
-        { role: "assistant", content: request.response },
-        { role: "user", content: buildNpcJsonRepairPrompt() }
+        { role: 'assistant', content: request.response },
+        { role: 'user', content: buildNpcJsonRepairPrompt() }
       ],
       {
         debug: {
           operation: request.timing.operation,
           operationId: request.timing.operationId,
-          purpose: "npcs-json-repair"
+          purpose: 'npcs-json-repair'
         },
         onDiagnostic: request.onProviderDiagnostic
       }
@@ -273,14 +273,14 @@ const readGeneratedNpc = (value: unknown): GeneratedNpc => {
   const id = isRecord(value) ? value.id : null;
   if (
     !isRecord(value) ||
-    typeof id !== "number" ||
+    typeof id !== 'number' ||
     !Number.isInteger(id) ||
     id <= 0 ||
-    typeof value.name !== "string" ||
-    typeof value.description !== "string" ||
-    typeof value.bio !== "string"
+    typeof value.name !== 'string' ||
+    typeof value.description !== 'string' ||
+    typeof value.bio !== 'string'
   ) {
-    throw new Error("NPC generation response included an invalid NPC record.");
+    throw new Error('NPC generation response included an invalid NPC record.');
   }
 
   const npc = {
@@ -291,7 +291,7 @@ const readGeneratedNpc = (value: unknown): GeneratedNpc => {
     bio: value.bio.trim()
   };
   if (npc.name.length === 0 || npc.description.length === 0 || npc.bio.length === 0) {
-    throw new Error("NPC generation response included an empty NPC field.");
+    throw new Error('NPC generation response included an empty NPC field.');
   }
 
   return npc;
@@ -299,7 +299,7 @@ const readGeneratedNpc = (value: unknown): GeneratedNpc => {
 
 const formatEvidenceForNpcPrompt = (results: RetrievalResult[]): string => {
   if (results.length === 0) {
-    return "No relevant retrieval results were found. Use general Eberron lore only when it is reasonable.";
+    return 'No relevant retrieval results were found. Use general Eberron lore only when it is reasonable.';
   }
 
   return results
@@ -308,9 +308,9 @@ const formatEvidenceForNpcPrompt = (results: RetrievalResult[]): string => {
         `[${index + 1}] ${formatCitation(result)}`,
         `Match: ${result.matchKind}, score=${result.score.toFixed(3)}`,
         result.content
-      ].join("\n")
+      ].join('\n')
     )
-    .join("\n\n");
+    .join('\n\n');
 };
 
 const readNpcList = (npcs: GeneratedNpc[]): GeneratedNpc[] =>
@@ -322,7 +322,7 @@ const readNpcList = (npcs: GeneratedNpc[]): GeneratedNpc[] =>
     name: npc.name
   }));
 
-const OPTIONAL_NPC_DETAIL_KEYS = ["species", "ethnicity", "gender", "role", "age"] as const;
+const OPTIONAL_NPC_DETAIL_KEYS = ['species', 'ethnicity', 'gender', 'role', 'age'] as const;
 type OptionalNpcDetailKey = (typeof OPTIONAL_NPC_DETAIL_KEYS)[number];
 
 const readOptionalNpcDetails = (value: Partial<Record<OptionalNpcDetailKey, unknown>>): Partial<GeneratedNpc> => {
@@ -333,8 +333,8 @@ const readOptionalNpcDetails = (value: Partial<Record<OptionalNpcDetailKey, unkn
     if (detail === undefined) {
       continue;
     }
-    if (typeof detail !== "string") {
-      throw new Error("NPC generation response included an invalid NPC record.");
+    if (typeof detail !== 'string') {
+      throw new Error('NPC generation response included an invalid NPC record.');
     }
 
     const normalized = detail.trim();
@@ -355,18 +355,18 @@ const stripJsonCodeFence = (response: string): string => {
 };
 
 const buildNpcJsonRepairPrompt = (): string => [
-  "Your previous response was not valid final NPC JSON.",
-  "Return the same final NPC result again as strict JSON only.",
-  "Use the exact shape {\"npcs\":[...]} with no Markdown fences and no commentary."
-].join("\n");
+  'Your previous response was not valid final NPC JSON.',
+  'Return the same final NPC result again as strict JSON only.',
+  'Use the exact shape {"npcs":[...]} with no Markdown fences and no commentary.'
+].join('\n');
 
 const isMalformedNpcJsonError = (error: unknown): boolean => {
   return error instanceof SyntaxError || (
     error instanceof Error &&
-    error.message === "NPC generation response must be JSON with an npcs array."
+    error.message === 'NPC generation response must be JSON with an npcs array.'
   );
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null;
+  return typeof value === 'object' && value !== null;
 };

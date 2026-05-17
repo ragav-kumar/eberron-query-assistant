@@ -1,5 +1,5 @@
-import type { RuntimeConfig, RuntimeOptions, SourceInventoryResult } from "@/types.js";
-import type { RuntimeState } from "../state/index.js";
+import type { RuntimeConfig, RuntimeOptions, SourceInventoryResult } from '@/types.js';
+import type { RuntimeState } from '../state/index.js';
 
 export interface SourceDiscoverySummary {
   inventories: SourceInventoryResult[];

@@ -1,21 +1,21 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
-import { getAppVersion } from "@/app-version.js";
-import { createTaggedError, hasErrorCode, isRecord } from "@/errors.js";
-import type { RuntimeConfig } from "@/types.js";
+import { getAppVersion } from '@/app-version.js';
+import { createTaggedError, hasErrorCode, isRecord } from '@/errors.js';
+import type { RuntimeConfig } from '@/types.js';
 import {
   createDefaultRuntimeState,
   type ArticleStateRecord,
   type RuntimeState,
   type RuntimeStateLoadResult,
   type StateStore
-} from "./state-store.js";
+} from './state-store.js';
 
-const STATE_FILENAME = "runtime-state.json";
+const STATE_FILENAME = 'runtime-state.json';
 
 export interface InvalidRuntimeStateError {
-  kind: "invalid-runtime-state";
+  kind: 'invalid-runtime-state';
   message: string;
   name: string;
 }
@@ -27,9 +27,9 @@ export const createFilesystemStateStore = (): StateStore => {
 
       let raw: string;
       try {
-        raw = await readFile(statePath, "utf8");
+        raw = await readFile(statePath, 'utf8');
       } catch (error) {
-        if (hasErrorCode(error, "ENOENT")) {
+        if (hasErrorCode(error, 'ENOENT')) {
           return {
             state: createDefaultRuntimeState()
           };
@@ -44,13 +44,13 @@ export const createFilesystemStateStore = (): StateStore => {
 
     async save(config, state) {
       await mkdir(config.stateDir, { recursive: true });
-      await writeFile(getStatePath(config), `${JSON.stringify(normalizeRuntimeState(state), null, 2)}\n`, "utf8");
+      await writeFile(getStatePath(config), `${JSON.stringify(normalizeRuntimeState(state), null, 2)}\n`, 'utf8');
     }
   };
 };
 
 export const isInvalidRuntimeStateError = (value: unknown): value is InvalidRuntimeStateError => {
-  return isRecord(value) && value.kind === "invalid-runtime-state" && typeof value.message === "string";
+  return isRecord(value) && value.kind === 'invalid-runtime-state' && typeof value.message === 'string';
 };
 
 export const getStatePath = (config: RuntimeConfig): string => {
@@ -60,35 +60,35 @@ export const getStatePath = (config: RuntimeConfig): string => {
 const parseRuntimeState = (value: unknown): RuntimeStateLoadResult => {
   const appVersion = getAppVersion();
   if (!isRecord(value)) {
-    throw createInvalidRuntimeStateError("Runtime state file must contain an object.");
+    throw createInvalidRuntimeStateError('Runtime state file must contain an object.');
   }
 
   if (!isRecord(value.foundry)) {
-    throw createInvalidRuntimeStateError("Runtime state field foundry must be an object.");
+    throw createInvalidRuntimeStateError('Runtime state field foundry must be an object.');
   }
 
   if (!isRecord(value.pdf)) {
-    throw createInvalidRuntimeStateError("Runtime state field pdf must be an object.");
+    throw createInvalidRuntimeStateError('Runtime state field pdf must be an object.');
   }
 
   if (!isRecord(value.article)) {
-    throw createInvalidRuntimeStateError("Runtime state field article must be an object.");
+    throw createInvalidRuntimeStateError('Runtime state field article must be an object.');
   }
 
   return {
     state: normalizeRuntimeState({
       appVersion,
       foundry: {
-        appliedExportFilenames: parseStringArray(value.foundry.appliedExportFilenames, "foundry.appliedExportFilenames"),
+        appliedExportFilenames: parseStringArray(value.foundry.appliedExportFilenames, 'foundry.appliedExportFilenames'),
         lastSuccessfulExport: parseFoundryMarker(value.foundry.lastSuccessfulExport)
       },
       pdf: {
-        knownFilenames: parseStringArray(value.pdf.knownFilenames, "pdf.knownFilenames")
+        knownFilenames: parseStringArray(value.pdf.knownFilenames, 'pdf.knownFilenames')
       },
       article: {
         lastSuccessfulIndexScrapeAt: parseNullableString(
           value.article.lastSuccessfulIndexScrapeAt,
-          "article.lastSuccessfulIndexScrapeAt"
+          'article.lastSuccessfulIndexScrapeAt'
         ),
         knownArticles: parseArticleRecords(value.article.knownArticles)
       }
@@ -123,37 +123,37 @@ const normalizeRuntimeState = (state: RuntimeState): RuntimeState => {
   };
 };
 
-const parseFoundryMarker = (value: unknown): RuntimeState["foundry"]["lastSuccessfulExport"] => {
+const parseFoundryMarker = (value: unknown): RuntimeState['foundry']['lastSuccessfulExport'] => {
   if (value === null || value === undefined) {
     return null;
   }
 
   if (!isRecord(value)) {
-    throw createInvalidRuntimeStateError("foundry.lastSuccessfulExport must be an object or null.");
+    throw createInvalidRuntimeStateError('foundry.lastSuccessfulExport must be an object or null.');
   }
 
-  if (typeof value.filename !== "string") {
+  if (typeof value.filename !== 'string') {
     return null;
   }
 
   const deleteCount = value.deleteCount;
-  const filename = parseRequiredString(value.filename, "foundry.lastSuccessfulExport.filename");
-  const generatedAt = parseRequiredString(value.generatedAt, "foundry.lastSuccessfulExport.generatedAt");
-  const runId = parseRequiredString(value.runId, "foundry.lastSuccessfulExport.runId");
+  const filename = parseRequiredString(value.filename, 'foundry.lastSuccessfulExport.filename');
+  const generatedAt = parseRequiredString(value.generatedAt, 'foundry.lastSuccessfulExport.generatedAt');
+  const runId = parseRequiredString(value.runId, 'foundry.lastSuccessfulExport.runId');
   const recordCount = value.recordCount;
-  const schemaVersion = parseRequiredString(value.schemaVersion, "foundry.lastSuccessfulExport.schemaVersion");
+  const schemaVersion = parseRequiredString(value.schemaVersion, 'foundry.lastSuccessfulExport.schemaVersion');
   const upsertCount = value.upsertCount;
 
-  if (typeof recordCount !== "number" || !Number.isInteger(recordCount) || recordCount < 0) {
-    throw createInvalidRuntimeStateError("foundry.lastSuccessfulExport.recordCount must be a non-negative integer.");
+  if (typeof recordCount !== 'number' || !Number.isInteger(recordCount) || recordCount < 0) {
+    throw createInvalidRuntimeStateError('foundry.lastSuccessfulExport.recordCount must be a non-negative integer.');
   }
 
-  if (typeof upsertCount !== "number" || !Number.isInteger(upsertCount) || upsertCount < 0) {
-    throw createInvalidRuntimeStateError("foundry.lastSuccessfulExport.upsertCount must be a non-negative integer.");
+  if (typeof upsertCount !== 'number' || !Number.isInteger(upsertCount) || upsertCount < 0) {
+    throw createInvalidRuntimeStateError('foundry.lastSuccessfulExport.upsertCount must be a non-negative integer.');
   }
 
-  if (typeof deleteCount !== "number" || !Number.isInteger(deleteCount) || deleteCount < 0) {
-    throw createInvalidRuntimeStateError("foundry.lastSuccessfulExport.deleteCount must be a non-negative integer.");
+  if (typeof deleteCount !== 'number' || !Number.isInteger(deleteCount) || deleteCount < 0) {
+    throw createInvalidRuntimeStateError('foundry.lastSuccessfulExport.deleteCount must be a non-negative integer.');
   }
 
   return {
@@ -173,7 +173,7 @@ const parseArticleRecords = (value: unknown): ArticleStateRecord[] => {
   }
 
   if (!Array.isArray(value)) {
-    throw createInvalidRuntimeStateError("article.knownArticles must be an array.");
+    throw createInvalidRuntimeStateError('article.knownArticles must be an array.');
   }
 
   return value.map((record, index) => {
@@ -182,7 +182,7 @@ const parseArticleRecords = (value: unknown): ArticleStateRecord[] => {
     }
 
     const scrapeStatus = record.scrapeStatus;
-    if (scrapeStatus !== "pending" && scrapeStatus !== "succeeded" && scrapeStatus !== "failed" && scrapeStatus !== "inaccessible") {
+    if (scrapeStatus !== 'pending' && scrapeStatus !== 'succeeded' && scrapeStatus !== 'failed' && scrapeStatus !== 'inaccessible') {
       throw createInvalidRuntimeStateError(`article.knownArticles[${index}].scrapeStatus is invalid.`);
     }
 
@@ -201,7 +201,7 @@ const parseStringArray = (value: unknown, fieldName: string): string[] => {
     return [];
   }
 
-  if (!Array.isArray(value) || !value.every((item) => typeof item === "string")) {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) {
     throw createInvalidRuntimeStateError(`${fieldName} must be an array of strings.`);
   }
 
@@ -209,7 +209,7 @@ const parseStringArray = (value: unknown, fieldName: string): string[] => {
 };
 
 const parseRequiredString = (value: unknown, fieldName: string): string => {
-  if (typeof value !== "string" || value.length === 0) {
+  if (typeof value !== 'string' || value.length === 0) {
     throw createInvalidRuntimeStateError(`${fieldName} must be a non-empty string.`);
   }
 
@@ -221,7 +221,7 @@ const parseNullableString = (value: unknown, fieldName: string): string | null =
     return null;
   }
 
-  if (typeof value !== "string") {
+  if (typeof value !== 'string') {
     throw createInvalidRuntimeStateError(`${fieldName} must be a string or null.`);
   }
 
@@ -229,5 +229,5 @@ const parseNullableString = (value: unknown, fieldName: string): string | null =
 };
 
 const createInvalidRuntimeStateError = (message: string): InvalidRuntimeStateError => {
-  return createTaggedError("invalid-runtime-state", message) as InvalidRuntimeStateError;
+  return createTaggedError('invalid-runtime-state', message) as InvalidRuntimeStateError;
 };

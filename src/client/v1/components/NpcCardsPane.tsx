@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef } from 'react';
 
-import type { ApiNpc } from "../api.js";
+import type { ApiNpc } from '../api.js';
 
 interface NpcCardsPaneProps {
   npcs: ApiNpc[];
@@ -18,13 +18,13 @@ export const NpcCardsPane = ({ npcs }: NpcCardsPaneProps) => {
   }, [npcs]);
 
   return (
-    <article className="npc-cards-pane" ref={scrollRef} data-testid="npc-cards-pane">
+    <article className='npc-cards-pane' ref={scrollRef} data-testid='npc-cards-pane'>
       {npcs.length > 0 ? (
-        <div className="npc-card-grid">
+        <div className='npc-card-grid'>
           {npcs.map((npc) => (
-            <section className="npc-card" key={npc.id} aria-labelledby={`npc-card-${npc.id}`}>
-              <div className="npc-card-header">
-                <span className="npc-id">#{npc.id}</span>
+            <section className='npc-card' key={npc.id} aria-labelledby={`npc-card-${npc.id}`}>
+              <div className='npc-card-header'>
+                <span className='npc-id'>#{npc.id}</span>
                 <h2 id={`npc-card-${npc.id}`}>{npc.name}</h2>
               </div>
               <NpcMetadata npc={npc} />
@@ -34,18 +34,18 @@ export const NpcCardsPane = ({ npcs }: NpcCardsPaneProps) => {
           ))}
         </div>
       ) : (
-        <p className="empty-output">Generate NPCs to save cards here.</p>
+        <p className='empty-output'>Generate NPCs to save cards here.</p>
       )}
     </article>
   );
 };
 
 const NPC_METADATA_FIELDS = [
-  ["Species", "species"],
-  ["Ethnicity", "ethnicity"],
-  ["Gender", "gender"],
-  ["Role", "role"],
-  ["Age", "age"]
+  ['Species', 'species'],
+  ['Ethnicity', 'ethnicity'],
+  ['Gender', 'gender'],
+  ['Role', 'role'],
+  ['Age', 'age']
 ] as const;
 
 const NpcMetadata = ({ npc }: { npc: ApiNpc }) => {
@@ -55,9 +55,9 @@ const NpcMetadata = ({ npc }: { npc: ApiNpc }) => {
   });
 
   return details.length > 0 ? (
-    <dl className="npc-card-metadata">
+    <dl className='npc-card-metadata'>
       {details.map((detail) => (
-        <div className="npc-card-metadata-item" key={detail.label}>
+        <div className='npc-card-metadata-item' key={detail.label}>
           <dt>{detail.label}</dt>
           <dd>{detail.value}</dd>
         </div>

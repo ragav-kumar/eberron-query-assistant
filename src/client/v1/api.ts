@@ -41,13 +41,13 @@ export interface ApiLog {
 
 export interface ApiLogExchange {
   assistant: string;
-  kind: "exchange";
+  kind: 'exchange';
   title: string;
   user: string;
 }
 
 export interface ApiLogProgress {
-  kind: "progress";
+  kind: 'progress';
   message: string;
 }
 
@@ -77,7 +77,7 @@ export interface ApiNpcResponse {
   npcs: ApiNpc[];
 }
 
-export type ApiConsoleLevel = "debug" | "error" | "info" | "warn";
+export type ApiConsoleLevel = 'debug' | 'error' | 'info' | 'warn';
 
 export interface ApiConsoleEntry {
   id: string;
@@ -127,7 +127,7 @@ export interface ApiStatus {
 export const getLog = async (options: { filePath?: string; sessionId: string }): Promise<ApiLog> => {
   const params = new URLSearchParams({ sessionId: options.sessionId });
   if (options.filePath !== undefined) {
-    params.set("filePath", options.filePath);
+    params.set('filePath', options.filePath);
   }
   const query = `?${params.toString()}`;
   return requestJson<ApiLog>(`/api/v1/log${query}`);
@@ -135,13 +135,13 @@ export const getLog = async (options: { filePath?: string; sessionId: string }):
 
 /** Reads the current contents of `assistant/additional-context.md` as markdown text. */
 export const getContext = async (): Promise<string> => {
-  const response = await requestJson<{ markdown: string }>("/api/v1/context");
+  const response = await requestJson<{ markdown: string }>('/api/v1/context');
   return response.markdown;
 };
 
 /** Reads the currently persisted generated NPC collection. */
 export const getNpcs = async (): Promise<ApiNpcResponse> => {
-  return requestJson<ApiNpcResponse>("/api/v1/npcs");
+  return requestJson<ApiNpcResponse>('/api/v1/npcs');
 };
 
 /** Reads the current process snapshot, including active operation, Console replay, log, and NPC state. */
@@ -152,8 +152,8 @@ export const getStatus = async (options: { sessionId: string }): Promise<ApiStat
 
 /** Persists the browser-edited additional context markdown back to local disk. */
 export const writeContext = async (markdown: string): Promise<void> => {
-  await requestJson<{ ok: true }>("/api/v1/context", {
-    method: "PUT",
+  await requestJson<{ ok: true }>('/api/v1/context', {
+    method: 'PUT',
     body: JSON.stringify({ markdown })
   });
 };
@@ -165,8 +165,8 @@ export const askAssistant = async (
   includePartyContext: boolean,
   retrievalTurnLimit: number
 ): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>("/api/v1/assistant", {
-    method: "POST",
+  return requestJson<ApiOperationResult>('/api/v1/assistant', {
+    method: 'POST',
     body: JSON.stringify({ prompt, sessionId, includePartyContext, retrievalTurnLimit })
   });
 };
@@ -178,16 +178,16 @@ export const generateNpcs = async (
   includePartyContext: boolean,
   retrievalTurnLimit: number
 ): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>("/api/v1/npcs", {
-    method: "POST",
+  return requestJson<ApiOperationResult>('/api/v1/npcs', {
+    method: 'POST',
     body: JSON.stringify({ prompt, sessionId, includePartyContext, retrievalTurnLimit })
   });
 };
 
 /** Starts a routine refresh or explicit force reingest against the local corpus and retrieval artifacts. */
 export const refresh = async (forceReingest: boolean): Promise<ApiOperationResult> => {
-  return requestJson<ApiOperationResult>("/api/v1/refresh", {
-    method: "POST",
+  return requestJson<ApiOperationResult>('/api/v1/refresh', {
+    method: 'POST',
     body: JSON.stringify({ forceReingest })
   });
 };
@@ -201,13 +201,13 @@ export const refresh = async (forceReingest: boolean): Promise<ApiOperationResul
  * restarted.
  */
 export const subscribeConsole = (onEntry: (entry: ApiConsoleEntry) => void): (() => void) => {
-  if (typeof EventSource === "undefined") {
+  if (typeof EventSource === 'undefined') {
     return () => undefined;
   }
 
-  const events = new EventSource("/api/v1/console/events");
+  const events = new EventSource('/api/v1/console/events');
   events.onmessage = (event) => {
-    if (typeof event.data === "string") {
+    if (typeof event.data === 'string') {
       onEntry(JSON.parse(event.data) as ApiConsoleEntry);
     }
   };
@@ -221,7 +221,7 @@ const requestJson = async <T>(url: string, init: RequestInit = {}): Promise<T> =
   const response = await fetch(url, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      'Content-Type': 'application/json',
       ...init.headers
     }
   });
@@ -250,30 +250,30 @@ export interface ApiRequestError extends Error {
 
 /** Narrows an unknown thrown value to the enriched API error shape used by `requestJson`. */
 export const isApiRequestError = (error: unknown): error is ApiRequestError => {
-  return error instanceof Error && "console" in error;
+  return error instanceof Error && 'console' in error;
 };
 
 const readErrorMessage = (body: unknown): string => {
   if (
-    typeof body === "object" &&
+    typeof body === 'object' &&
     body !== null &&
-    "error" in body &&
-    typeof body.error === "string"
+    'error' in body &&
+    typeof body.error === 'string'
   ) {
     return body.error;
   }
 
-  return "Request failed.";
+  return 'Request failed.';
 };
 
 const readErrorConsole = (body: unknown): ApiConsole | undefined => {
   if (
-    typeof body === "object" &&
+    typeof body === 'object' &&
     body !== null &&
-    "console" in body &&
-    typeof body.console === "object" &&
+    'console' in body &&
+    typeof body.console === 'object' &&
     body.console !== null &&
-    "entries" in body.console &&
+    'entries' in body.console &&
     Array.isArray(body.console.entries)
   ) {
     return body.console as ApiConsole;
@@ -284,9 +284,9 @@ const readErrorConsole = (body: unknown): ApiConsole | undefined => {
 
 const readProviderDebug = (body: unknown): ApiProviderDebugEntry[] | undefined => {
   if (
-    typeof body === "object" &&
+    typeof body === 'object' &&
     body !== null &&
-    "providerDebug" in body &&
+    'providerDebug' in body &&
     Array.isArray(body.providerDebug)
   ) {
     return body.providerDebug as ApiProviderDebugEntry[];

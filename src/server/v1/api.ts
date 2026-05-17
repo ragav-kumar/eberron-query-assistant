@@ -1,81 +1,81 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
+import type { IncomingMessage, ServerResponse } from 'node:http';
 
-import type { WebApp } from "./app.js";
+import type { WebApp } from './app.js';
 
 export const handleV1ApiRequest = async (
   app: WebApp,
   request: IncomingMessage,
   response: ServerResponse
 ): Promise<void> => {
-  const url = new URL(request.url ?? "/", "http://localhost");
+  const url = new URL(request.url ?? '/', 'http://localhost');
 
-  if (request.method === "GET" && url.pathname === "/api/v1/console/events") {
+  if (request.method === 'GET' && url.pathname === '/api/v1/console/events') {
     writeConsoleEvents(app, request, response);
     return;
   }
 
-  if (request.method === "GET" && url.pathname === "/api/v1/log") {
-    const filePath = url.searchParams.get("filePath");
+  if (request.method === 'GET' && url.pathname === '/api/v1/log') {
+    const filePath = url.searchParams.get('filePath');
     writeJson(response, 200, await app.getLog({
       ...(filePath === null ? {} : { filePath }),
-      sessionId: url.searchParams.get("sessionId") ?? ""
+      sessionId: url.searchParams.get('sessionId') ?? ''
     }));
     return;
   }
 
-  if (request.method === "GET" && url.pathname === "/api/v1/context") {
+  if (request.method === 'GET' && url.pathname === '/api/v1/context') {
     writeJson(response, 200, { markdown: await app.getContext() });
     return;
   }
 
-  if (request.method === "GET" && url.pathname === "/api/v1/npcs") {
+  if (request.method === 'GET' && url.pathname === '/api/v1/npcs') {
     writeJson(response, 200, await app.getNpcs());
     return;
   }
 
-  if (request.method === "GET" && url.pathname === "/api/v1/status") {
+  if (request.method === 'GET' && url.pathname === '/api/v1/status') {
     writeJson(response, 200, await app.getStatus({
-      sessionId: url.searchParams.get("sessionId") ?? ""
+      sessionId: url.searchParams.get('sessionId') ?? ''
     }));
     return;
   }
 
-  if (request.method === "PUT" && url.pathname === "/api/v1/context") {
+  if (request.method === 'PUT' && url.pathname === '/api/v1/context') {
     const body = await readJsonBody(request);
-    await app.writeContext(readStringField(body, "markdown"));
+    await app.writeContext(readStringField(body, 'markdown'));
     writeJson(response, 200, { ok: true });
     return;
   }
 
-  if (request.method === "POST" && url.pathname === "/api/v1/assistant") {
+  if (request.method === 'POST' && url.pathname === '/api/v1/assistant') {
     const body = await readJsonBody(request);
     writeJson(response, 200, await app.askAssistant(
-      readStringField(body, "prompt"),
-      readOptionalStringField(body, "sessionId"),
-      readOptionalBooleanField(body, "includePartyContext", true),
-      readOptionalNumberField(body, "retrievalTurnLimit", 1)
+      readStringField(body, 'prompt'),
+      readOptionalStringField(body, 'sessionId'),
+      readOptionalBooleanField(body, 'includePartyContext', true),
+      readOptionalNumberField(body, 'retrievalTurnLimit', 1)
     ));
     return;
   }
 
-  if (request.method === "POST" && url.pathname === "/api/v1/npcs") {
+  if (request.method === 'POST' && url.pathname === '/api/v1/npcs') {
     const body = await readJsonBody(request);
     writeJson(response, 200, await app.generateNpcs(
-      readStringField(body, "prompt"),
-      readOptionalStringField(body, "sessionId"),
-      readOptionalBooleanField(body, "includePartyContext", true),
-      readOptionalNumberField(body, "retrievalTurnLimit", 1)
+      readStringField(body, 'prompt'),
+      readOptionalStringField(body, 'sessionId'),
+      readOptionalBooleanField(body, 'includePartyContext', true),
+      readOptionalNumberField(body, 'retrievalTurnLimit', 1)
     ));
     return;
   }
 
-  if (request.method === "POST" && url.pathname === "/api/v1/refresh") {
+  if (request.method === 'POST' && url.pathname === '/api/v1/refresh') {
     const body = await readJsonBody(request);
-    writeJson(response, 200, await app.refresh(readBooleanField(body, "forceReingest")));
+    writeJson(response, 200, await app.refresh(readBooleanField(body, 'forceReingest')));
     return;
   }
 
-  writeJson(response, 404, { error: "Unknown API route." });
+  writeJson(response, 404, { error: 'Unknown API route.' });
 };
 
 const readJsonBody = async (request: IncomingMessage): Promise<unknown> => {
@@ -88,11 +88,11 @@ const readJsonBody = async (request: IncomingMessage): Promise<unknown> => {
     return {};
   }
 
-  return JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown;
+  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
 };
 
 const readStringField = (body: unknown, field: string): string => {
-  if (!isRecord(body) || typeof body[field] !== "string") {
+  if (!isRecord(body) || typeof body[field] !== 'string') {
     throw new Error(`Expected JSON string field: ${field}.`);
   }
 
@@ -101,9 +101,9 @@ const readStringField = (body: unknown, field: string): string => {
 
 const readOptionalStringField = (body: unknown, field: string): string => {
   if (!isRecord(body) || body[field] === undefined) {
-    return "";
+    return '';
   }
-  if (typeof body[field] === "string") {
+  if (typeof body[field] === 'string') {
     return body[field];
   }
 
@@ -111,7 +111,7 @@ const readOptionalStringField = (body: unknown, field: string): string => {
 };
 
 const readBooleanField = (body: unknown, field: string): boolean => {
-  if (!isRecord(body) || typeof body[field] !== "boolean") {
+  if (!isRecord(body) || typeof body[field] !== 'boolean') {
     return false;
   }
 
@@ -122,7 +122,7 @@ const readOptionalBooleanField = (body: unknown, field: string, defaultValue: bo
   if (!isRecord(body) || body[field] === undefined) {
     return defaultValue;
   }
-  if (typeof body[field] === "boolean") {
+  if (typeof body[field] === 'boolean') {
     return body[field];
   }
 
@@ -133,7 +133,7 @@ const readOptionalNumberField = (body: unknown, field: string, defaultValue: num
   if (!isRecord(body) || body[field] === undefined) {
     return defaultValue;
   }
-  if (typeof body[field] === "number" && Number.isFinite(body[field])) {
+  if (typeof body[field] === 'number' && Number.isFinite(body[field])) {
     return body[field];
   }
 
@@ -142,28 +142,28 @@ const readOptionalNumberField = (body: unknown, field: string, defaultValue: num
 
 const writeJson = (response: ServerResponse, statusCode: number, body: unknown): void => {
   response.statusCode = statusCode;
-  response.setHeader("Content-Type", "application/json; charset=utf-8");
+  response.setHeader('Content-Type', 'application/json; charset=utf-8');
   response.end(JSON.stringify(body));
 };
 
 const writeConsoleEvents = (app: WebApp, request: IncomingMessage, response: ServerResponse): void => {
   response.statusCode = 200;
-  response.setHeader("Content-Type", "text/event-stream; charset=utf-8");
-  response.setHeader("Cache-Control", "no-cache, no-transform");
-  response.setHeader("Connection", "keep-alive");
+  response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  response.setHeader('Cache-Control', 'no-cache, no-transform');
+  response.setHeader('Connection', 'keep-alive');
   response.flushHeaders?.();
-  response.write(": connected\n\n");
+  response.write(': connected\n\n');
 
   const unsubscribe = app.subscribeConsole((entry) => {
     response.write(`data: ${JSON.stringify(entry)}\n\n`);
   });
 
-  request.on("close", () => {
+  request.on('close', () => {
     unsubscribe();
     response.end();
   });
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null;
+  return typeof value === 'object' && value !== null;
 };

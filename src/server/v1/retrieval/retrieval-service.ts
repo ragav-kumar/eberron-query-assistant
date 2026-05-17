@@ -1,30 +1,30 @@
-import { createHash } from "node:crypto";
-import { access, mkdir, rm, stat } from "node:fs/promises";
-import path from "node:path";
+import { createHash } from 'node:crypto';
+import { access, mkdir, rm, stat } from 'node:fs/promises';
+import path from 'node:path';
 
-import Database from "better-sqlite3";
+import Database from 'better-sqlite3';
 
-import { throwIfAborted } from "@/errors.js";
-import { getCorpusDatabasePath } from "../ingestion/index.js";
-import type { EmbeddingAdapter } from "../provider/index.js";
-import type { ProgressReporter } from "../progress/reporter.js";
-import { createNoopTimingReporter } from "@/timing.js";
+import { throwIfAborted } from '@/errors.js';
+import { getCorpusDatabasePath } from '../ingestion/index.js';
+import type { EmbeddingAdapter } from '../provider/index.js';
+import type { ProgressReporter } from '../progress/reporter.js';
+import { createNoopTimingReporter } from '@/timing.js';
 import type {
   CitationMetadata,
   RetrievalResult,
   RetrievalSearchRequest,
   RuntimeConfig,
   SourceType
-} from "@/types.js";
+} from '@/types.js';
 
-const VECTOR_INDEX_FILENAME = "vector-index.json";
+const VECTOR_INDEX_FILENAME = 'vector-index.json';
 const DEFAULT_LIMIT = 8;
 const EMBEDDING_BATCH_SIZE = 64;
 const REFRESH_CHUNK_BATCH_SIZE = 256;
 const VECTOR_SCAN_BATCH_SIZE = 256;
 const MAX_VECTOR_CACHE_DATABASE_BYTES = 256 * 1024 * 1024;
 const MAX_EMBEDDING_INPUT_CHARACTERS = 6_000;
-const VECTOR_STORE_SCHEMA_VERSION = "sqlite-json-v1";
+const VECTOR_STORE_SCHEMA_VERSION = 'sqlite-json-v1';
 
 export interface RetrievalSyncSummary {
   chunkCount: number;
@@ -103,7 +103,7 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
 
   const openDatabase = (): Database.Database => {
     if (!config) {
-      throw new Error("Retrieval service must be refreshed before search.");
+      throw new Error('Retrieval service must be refreshed before search.');
     }
 
     return new Database(getCorpusDatabasePath(config), { readonly: true });
@@ -121,13 +121,13 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
 
     const database = new Database(getCorpusDatabasePath(nextConfig));
     try {
-      database.pragma("foreign_keys = ON");
+      database.pragma('foreign_keys = ON');
       throwIfAborted(options.abortSignal);
       rebuildFts(database);
       initializeVectorStore(database);
 
       if (options.forceRebuild) {
-        database.prepare("DELETE FROM chunk_vectors").run();
+        database.prepare('DELETE FROM chunk_vectors').run();
       }
 
       deleteStaleVectorRows(database);
@@ -138,7 +138,7 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
       );
       if (!shouldCacheVectorRows) {
         dependencies.reporter.info(
-          "Retrieval vector cache disabled for large corpus database; searches will stream vectors directly from SQLite."
+          'Retrieval vector cache disabled for large corpus database; searches will stream vectors directly from SQLite.'
         );
       }
 
@@ -163,13 +163,13 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
 
     const database = openDatabase();
     const timing = request.timing ?? {
-      operation: "retrieval",
-      operationId: "untracked",
+      operation: 'retrieval',
+      operationId: 'untracked',
       reporter: createNoopTimingReporter()
     };
 
     try {
-      const lexicalResults = await timing.reporter.time(timing, "retrieval.lexical", () =>
+      const lexicalResults = await timing.reporter.time(timing, 'retrieval.lexical', () =>
         searchLexical(database, request, limit)
       );
       if (!shouldCacheVectorRows && lexicalResults.length > 0) {
@@ -181,11 +181,11 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
 
       if (!shouldCacheVectorRows) {
         dependencies.reporter.info(
-          "Large corpus retrieval found no lexical matches; starting direct semantic vector scan from SQLite."
+          'Large corpus retrieval found no lexical matches; starting direct semantic vector scan from SQLite.'
         );
       }
 
-      const semanticResults = await timing.reporter.time(timing, "retrieval.vector", () =>
+      const semanticResults = await timing.reporter.time(timing, 'retrieval.vector', () =>
         searchVector(database, request, limit, dependencies.embeddingAdapter, {
           canCache() {
             return shouldCacheVectorRows;
@@ -205,7 +205,7 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
         })
       );
 
-      return await timing.reporter.time(timing, "retrieval.merge", () =>
+      return await timing.reporter.time(timing, 'retrieval.merge', () =>
         mergeResults(lexicalResults, semanticResults, limit)
       );
     } finally {
@@ -231,7 +231,7 @@ const deleteLegacyVectorIndex = async (config: RuntimeConfig, reporter: Progress
   }
 
   await rm(legacyIndexPath, { force: true });
-  reporter.info("Deleted legacy vector-index.json; missing embeddings will be regenerated into SQLite.");
+  reporter.info('Deleted legacy vector-index.json; missing embeddings will be regenerated into SQLite.');
 };
 
 const rebuildFts = (database: Database.Database): void => {
@@ -270,7 +270,7 @@ const initializeVectorStore = (database: Database.Database): void => {
 };
 
 const readFilteredChunks = (database: Database.Database, request: RetrievalSearchRequest): StoredChunk[] => {
-  const filters = buildSqlFilters(request, "s");
+  const filters = buildSqlFilters(request, 's');
 
   return (
     database
@@ -322,7 +322,7 @@ const searchLexical = (
     return [];
   }
 
-  const filters = buildSqlFilters(request, "s");
+  const filters = buildSqlFilters(request, 's');
   const rows = database
     .prepare(
       `SELECT
@@ -361,7 +361,7 @@ const searchLexical = (
     content: row.content,
     citation: JSON.parse(row.citationJson) as CitationMetadata,
     score: 1 / (1 + Math.max(0, row.rank)),
-    matchKind: "lexical"
+    matchKind: 'lexical'
   }));
 };
 
@@ -377,22 +377,22 @@ const searchVector = async (
   }
 ): Promise<RetrievalResult[]> => {
   const timing = request.timing ?? {
-    operation: "retrieval",
-    operationId: "untracked",
+    operation: 'retrieval',
+    operationId: 'untracked',
     reporter: createNoopTimingReporter()
   };
 
-  const queryEmbedding = await timing.reporter.time(timing, "retrieval.vector.embed_query", () =>
+  const queryEmbedding = await timing.reporter.time(timing, 'retrieval.vector.embed_query', () =>
     embeddingAdapter.embed(toEmbeddingInput(request.query))
   );
 
   if (!vectorCache.canCache()) {
-    return timing.reporter.time(timing, "retrieval.vector.stream_vectors", () =>
+    return timing.reporter.time(timing, 'retrieval.vector.stream_vectors', () =>
       searchVectorStreaming(database, request, limit, embeddingAdapter, queryEmbedding)
     );
   }
 
-  const chunks = await timing.reporter.time(timing, "retrieval.vector.read_chunks", () =>
+  const chunks = await timing.reporter.time(timing, 'retrieval.vector.read_chunks', () =>
     readFilteredChunks(database, request)
   );
   if (chunks.length === 0) {
@@ -400,7 +400,7 @@ const searchVector = async (
   }
 
   const chunkById = new Map(chunks.map((chunk) => [chunk.chunkId, chunk]));
-  const compatibleRows = await timing.reporter.time(timing, "retrieval.vector.read_vectors", () => {
+  const compatibleRows = await timing.reporter.time(timing, 'retrieval.vector.read_vectors', () => {
     const cachedRows = vectorCache.read();
     if (cachedRows) {
       return cachedRows;
@@ -411,7 +411,7 @@ const searchVector = async (
     return rows;
   });
 
-  return timing.reporter.time(timing, "retrieval.vector.score_sort", () =>
+  return timing.reporter.time(timing, 'retrieval.vector.score_sort', () =>
     scoreVectorEntries(chunkById, compatibleRows, queryEmbedding, limit)
   );
 };
@@ -433,7 +433,7 @@ const mergeResults = (
     merged.set(result.chunkId, {
       ...existing,
       score: Math.max(existing.score, result.score),
-      matchKind: existing.matchKind === result.matchKind ? existing.matchKind : "hybrid"
+      matchKind: existing.matchKind === result.matchKind ? existing.matchKind : 'hybrid'
     });
   }
 
@@ -533,11 +533,11 @@ const reportProgress = (reporter: ProgressReporter, message: string): void => {
 };
 
 const deleteStaleVectorRows = (database: Database.Database): void => {
-  database.prepare("DELETE FROM chunk_vectors WHERE chunk_id NOT IN (SELECT chunk_id FROM chunks)").run();
+  database.prepare('DELETE FROM chunk_vectors WHERE chunk_id NOT IN (SELECT chunk_id FROM chunks)').run();
 };
 
 const countChunks = (database: Database.Database): number => {
-  const result = database.prepare("SELECT COUNT(*) AS count FROM chunks").get() as { count: number };
+  const result = database.prepare('SELECT COUNT(*) AS count FROM chunks').get() as { count: number };
   return result.count;
 };
 
@@ -626,7 +626,7 @@ const readCompatibleVectorRowsForChunkIds = (
       FROM chunk_vectors
       WHERE embedding_model_id = ?
         AND embedding_schema_version = ?
-        AND chunk_id IN (${chunkIds.map(() => "?").join(", ")})`
+        AND chunk_id IN (${chunkIds.map(() => '?').join(', ')})`
     )
     .all(embeddingAdapter.modelId, embeddingAdapter.schemaVersion, ...chunkIds) as Array<{
     chunkId: string;
@@ -657,7 +657,7 @@ const searchVectorStreaming = (
   embeddingAdapter: EmbeddingAdapter,
   queryEmbedding: number[]
 ): Promise<RetrievalResult[]> => {
-  const filters = buildSqlFilters(request, "s");
+  const filters = buildSqlFilters(request, 's');
   const results: RetrievalResult[] = [];
   let lastRowId = 0;
 
@@ -717,7 +717,7 @@ const searchVectorStreaming = (
           content: row.content,
           citation: JSON.parse(row.citationJson) as CitationMetadata,
           score,
-          matchKind: "vector"
+          matchKind: 'vector'
         },
         limit
       );
@@ -760,7 +760,7 @@ const scoreVectorEntries = (
       content: chunk.content,
       citation: chunk.citation,
       score,
-      matchKind: "vector"
+      matchKind: 'vector'
     }));
 };
 
@@ -783,7 +783,7 @@ const insertSortedResult = (results: RetrievalResult[], result: RetrievalResult,
 const parseEmbedding = (embeddingJson: string): number[] | null => {
   try {
     const embedding = JSON.parse(embeddingJson) as unknown;
-    return Array.isArray(embedding) && embedding.every((value) => typeof value === "number") ? embedding : null;
+    return Array.isArray(embedding) && embedding.every((value) => typeof value === 'number') ? embedding : null;
   } catch {
     return null;
   }
@@ -792,7 +792,7 @@ const parseEmbedding = (embeddingJson: string): number[] | null => {
 const createVectorCacheKey = (
   config: RuntimeConfig,
   embeddingAdapter: EmbeddingAdapter
-): Omit<VectorCacheEntry, "entries"> => ({
+): Omit<VectorCacheEntry, 'entries'> => ({
   dbPath: getCorpusDatabasePath(config),
   embeddingModelId: embeddingAdapter.modelId,
   embeddingSchemaVersion: embeddingAdapter.schemaVersion
@@ -873,17 +873,17 @@ const buildSqlFilters = (
   const values: string[] = [];
 
   if (request.sourceTypes && request.sourceTypes.length > 0) {
-    clauses.push(`${sourceAlias}.source_type IN (${request.sourceTypes.map(() => "?").join(", ")})`);
+    clauses.push(`${sourceAlias}.source_type IN (${request.sourceTypes.map(() => '?').join(', ')})`);
     values.push(...request.sourceTypes);
   }
 
   if (request.sourceKeys && request.sourceKeys.length > 0) {
-    clauses.push(`${sourceAlias}.source_key IN (${request.sourceKeys.map(() => "?").join(", ")})`);
+    clauses.push(`${sourceAlias}.source_key IN (${request.sourceKeys.map(() => '?').join(', ')})`);
     values.push(...request.sourceKeys);
   }
 
   return {
-    sql: clauses.length === 0 ? "" : ` AND ${clauses.join(" AND ")}`,
+    sql: clauses.length === 0 ? '' : ` AND ${clauses.join(' AND ')}`,
     values
   };
 };
@@ -894,11 +894,11 @@ const toFtsQuery = (query: string): string | null => {
     return null;
   }
 
-  return tokens.map((token) => `"${token.replaceAll('"', '""')}"`).join(" OR ");
+  return tokens.map((token) => `"${token.replaceAll('"', '""')}"`).join(' OR ');
 };
 
 const hashContent = (content: string): string => {
-  return createHash("sha256").update(content).digest("hex");
+  return createHash('sha256').update(content).digest('hex');
 };
 
 const toEmbeddingInput = (content: string): string => {

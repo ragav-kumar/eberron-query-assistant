@@ -2,24 +2,24 @@ import type {
   ChatAdapter,
   ChatCompletionDiagnostic,
   ChatMessage
-} from "../provider/index.js";
-import type { RetrievalService } from "../retrieval/index.js";
-import { createNoopTimingReporter, type TimingContext } from "@/timing.js";
-import type { AssistantConfig, RetrievalResult, RuntimeConfig } from "@/types.js";
+} from '../provider/index.js';
+import type { RetrievalService } from '../retrieval/index.js';
+import { createNoopTimingReporter, type TimingContext } from '@/timing.js';
+import type { AssistantConfig, RetrievalResult, RuntimeConfig } from '@/types.js';
 import {
   buildAssistantMessages,
   loadAssistantPromptAssets,
   type AssistantPromptAssets
-} from "./assistant-prompts.js";
-import { createSqlitePartyContextService, type PartyContextService } from "./party-context.js";
+} from './assistant-prompts.js';
+import { createSqlitePartyContextService, type PartyContextService } from './party-context.js';
 import {
   buildRetrievalToolInstructions,
   clampRetrievalTurnLimit,
   completeStructured,
   RETRIEVAL_TOOL,
   runRetrievalToolLoop
-} from "./retrieval-tool.js";
-import type { SessionLogExchange, SessionLogProgress } from "./session-log.js";
+} from './retrieval-tool.js';
+import type { SessionLogExchange, SessionLogProgress } from './session-log.js';
 
 export interface AssistantSession {
   ask(question: string, options?: AssistantAskOptions): Promise<AssistantSessionAnswer>;
@@ -37,7 +37,7 @@ export interface AssistantAskOptions {
   timing?: TimingContext;
 }
 
-export interface AssistantSessionLogExchange extends Omit<SessionLogExchange, "kind"> {
+export interface AssistantSessionLogExchange extends Omit<SessionLogExchange, 'kind'> {
   sessionTitle: string;
 }
 
@@ -70,17 +70,17 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
     async ask(question, askOptions = {}) {
       const normalizedQuestion = question.trim();
       if (normalizedQuestion.length === 0) {
-        throw new Error("Assistant prompt cannot be empty.");
+        throw new Error('Assistant prompt cannot be empty.');
       }
 
       const includePartyContext = askOptions.includePartyContext ?? true;
       const retrievalTurnLimit = clampRetrievalTurnLimit(askOptions.retrievalTurnLimit ?? 1);
       const timing = askOptions.timing ?? {
-        operation: "assistant",
-        operationId: "untracked",
+        operation: 'assistant',
+        operationId: 'untracked',
         reporter: createNoopTimingReporter()
       };
-      const evidence = await timing.reporter.time(timing, "assistant.retrieval.search", () =>
+      const evidence = await timing.reporter.time(timing, 'assistant.retrieval.search', () =>
         options.retrieval.search({
           query: normalizedQuestion,
           timing,
@@ -88,9 +88,9 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
         })
       );
       const partyContextText = includePartyContext
-        ? await timing.reporter.time(timing, "assistant.party_context", () => partyContext.build(options.config))
-        : "";
-      const promptAssets = await timing.reporter.time(timing, "assistant.prompt_assets", () => loadPromptAssets());
+        ? await timing.reporter.time(timing, 'assistant.party_context', () => partyContext.build(options.config))
+        : '';
+      const promptAssets = await timing.reporter.time(timing, 'assistant.prompt_assets', () => loadPromptAssets());
       const messages = buildAssistantMessages({
         evidence,
         history,
@@ -101,11 +101,11 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
         retrievalToolInstructions: buildRetrievalToolInstructions(retrievalTurnLimit),
         requestSessionTitle: shouldRequestSessionTitle
       });
-      const response = await timing.reporter.time(timing, "assistant.chat.complete", () => completeStructured(options.chat, messages, {
+      const response = await timing.reporter.time(timing, 'assistant.chat.complete', () => completeStructured(options.chat, messages, {
         debug: {
           operation: timing.operation,
           operationId: timing.operationId,
-          purpose: "assistant"
+          purpose: 'assistant'
         },
         onDiagnostic: askOptions.onProviderDiagnostic,
         ...(retrievalTurnLimit > 0 ? { tools: [RETRIEVAL_TOOL] } : {})
@@ -115,7 +115,7 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
         initialMessages: messages,
         initialResponse: response,
         onProviderDiagnostic: askOptions.onProviderDiagnostic,
-        purpose: "assistant",
+        purpose: 'assistant',
         ...(options.reportStatus ? { reportStatus: (message: string) => options.reportStatus?.(message) } : {}),
         retrieval: options.retrieval,
         retrievalTurnLimit,
@@ -124,34 +124,34 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
           requestProgressAppend((progressEntry) => options.appendProgress(progressEntry), timing, entry.message)
       });
       const parsedResponse = parseAssistantResponse(completion.responseText, shouldRequestSessionTitle) ??
-        await timing.reporter.time(timing, "assistant.chat.repair_metadata", async () => {
+        await timing.reporter.time(timing, 'assistant.chat.repair_metadata', async () => {
           const repairedResponse = await options.chat.complete([
             ...completion.messages,
-            { role: "assistant", content: completion.responseText },
-            { role: "user", content: buildMetadataRepairPrompt(shouldRequestSessionTitle) }
+            { role: 'assistant', content: completion.responseText },
+            { role: 'user', content: buildMetadataRepairPrompt(shouldRequestSessionTitle) }
           ], {
             debug: {
               operation: timing.operation,
               operationId: timing.operationId,
-              purpose: "assistant-metadata-repair"
+              purpose: 'assistant-metadata-repair'
             },
             onDiagnostic: askOptions.onProviderDiagnostic
           });
           return parseAssistantResponse(repairedResponse, shouldRequestSessionTitle);
         });
       if (!parsedResponse) {
-        throw new Error("Assistant response did not include required title metadata.");
+        throw new Error('Assistant response did not include required title metadata.');
       }
       const answer = parsedResponse.answer;
       shouldRequestSessionTitle = false;
 
-      await timing.reporter.time(timing, "assistant.log.append_exchange", () => options.appendExchange({
+      await timing.reporter.time(timing, 'assistant.log.append_exchange', () => options.appendExchange({
         assistant: answer,
         sessionTitle: parsedResponse.sessionTitle,
         title: parsedResponse.responseTitle,
         user: normalizedQuestion
       }));
-      history.push({ role: "user", content: normalizedQuestion }, { role: "assistant", content: answer });
+      history.push({ role: 'user', content: normalizedQuestion }, { role: 'assistant', content: answer });
       history.splice(0, Math.max(0, history.length - MAX_HISTORY_MESSAGES));
 
       return {
@@ -169,9 +169,9 @@ interface ParsedAssistantResponse {
 }
 
 const parseAssistantResponse = (response: string, expectSessionTitle: boolean): ParsedAssistantResponse | null => {
-  const sessionTitle = readTag(response, "session-title");
-  const responseTitle = readTag(response, "response-title");
-  const answer = readTag(response, "answer");
+  const sessionTitle = readTag(response, 'session-title');
+  const responseTitle = readTag(response, 'response-title');
+  const answer = readTag(response, 'answer');
 
   if (!responseTitle || !answer) {
     return null;
@@ -185,28 +185,28 @@ const parseAssistantResponse = (response: string, expectSessionTitle: boolean): 
 };
 
 const readTag = (text: string, tagName: string): string | null => {
-  const match = new RegExp(`<${tagName}>\\s*([\\s\\S]*?)\\s*<\\/${tagName}>`, "i").exec(text);
+  const match = new RegExp(`<${tagName}>\\s*([\\s\\S]*?)\\s*<\\/${tagName}>`, 'i').exec(text);
   const content = match?.[1]?.trim();
   return content && content.length > 0 ? content : null;
 };
 
 const buildMetadataRepairPrompt = (requestSessionTitle: boolean): string => [
-  "Your previous response was missing required title metadata.",
-  "Return the same answer content again, but wrap it exactly in the required XML-like metadata tags.",
+  'Your previous response was missing required title metadata.',
+  'Return the same answer content again, but wrap it exactly in the required XML-like metadata tags.',
   requestSessionTitle
-    ? "Include <session-title>, <response-title>, and <answer>."
-    : "Include <response-title> and <answer>. Do not include <session-title>.",
-  "Do not add commentary outside the tags."
-].join("\n");
+    ? 'Include <session-title>, <response-title>, and <answer>.'
+    : 'Include <response-title> and <answer>. Do not include <session-title>.',
+  'Do not add commentary outside the tags.'
+].join('\n');
 
 const requestProgressAppend = async (
-  appendProgress: AssistantSessionOptions["appendProgress"],
+  appendProgress: AssistantSessionOptions['appendProgress'],
   timing: TimingContext,
   message: string
 ): Promise<void> => {
-  await timing.reporter.time(timing, "assistant.log.append_progress", () =>
+  await timing.reporter.time(timing, 'assistant.log.append_progress', () =>
     appendProgress({
-      kind: "progress",
+      kind: 'progress',
       message
     })
   );

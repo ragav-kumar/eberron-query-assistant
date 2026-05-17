@@ -1,12 +1,12 @@
-import { createHash } from "node:crypto";
+import { createHash } from 'node:crypto';
 
-import * as cheerio from "cheerio";
+import * as cheerio from 'cheerio';
 
-import type { ArticleStateRecord } from "../state/index.js";
-import type { CorpusChunk, CorpusSource } from "@/types.js";
-import { chunkText, normalizeText } from "./chunking.js";
+import type { ArticleStateRecord } from '../state/index.js';
+import type { CorpusChunk, CorpusSource } from '@/types.js';
+import { chunkText, normalizeText } from './chunking.js';
 
-export const KEITH_BAKER_INDEX_URL = "https://keith-baker.com/eberron-index/";
+export const KEITH_BAKER_INDEX_URL = 'https://keith-baker.com/eberron-index/';
 
 export interface ArticleFetcher {
   fetchText(url: string, options?: { signal?: AbortSignal | undefined }): Promise<string>;
@@ -16,7 +16,7 @@ const FETCH_TIMEOUT_MS = 30_000;
 const PERMANENTLY_INACCESSIBLE_STATUSES = new Set([403, 404]);
 
 export interface HttpFetchFailedError {
-  kind: "http-fetch-failed";
+  kind: 'http-fetch-failed';
   message: string;
   name: string;
   status: number;
@@ -31,7 +31,7 @@ export const createFetchArticleFetcher = (): ArticleFetcher => {
       const abortFromCaller = (): void => {
         abortController.abort();
       };
-      options.signal?.addEventListener("abort", abortFromCaller, { once: true });
+      options.signal?.addEventListener('abort', abortFromCaller, { once: true });
       if (options.signal?.aborted) {
         abortController.abort();
       }
@@ -41,15 +41,15 @@ export const createFetchArticleFetcher = (): ArticleFetcher => {
       try {
         response = await fetch(url, { signal: abortController.signal });
       } finally {
-        options.signal?.removeEventListener("abort", abortFromCaller);
+        options.signal?.removeEventListener('abort', abortFromCaller);
         clearTimeout(timeout);
       }
 
       if (!response.ok) {
         throw {
-          kind: "http-fetch-failed",
+          kind: 'http-fetch-failed',
           message: `GET ${url} failed with ${response.status} ${response.statusText}`,
-          name: "http-fetch-failed",
+          name: 'http-fetch-failed',
           status: response.status,
           statusText: response.statusText,
           url
@@ -61,14 +61,14 @@ export const createFetchArticleFetcher = (): ArticleFetcher => {
 };
 
 export const isPermanentlyInaccessibleArticleFetch = (value: unknown): value is HttpFetchFailedError => {
-  if (!value || typeof value !== "object") {
+  if (!value || typeof value !== 'object') {
     return false;
   }
 
   const candidate = value as Partial<HttpFetchFailedError>;
   return (
-    candidate.kind === "http-fetch-failed" &&
-    typeof candidate.status === "number" &&
+    candidate.kind === 'http-fetch-failed' &&
+    typeof candidate.status === 'number' &&
     PERMANENTLY_INACCESSIBLE_STATUSES.has(candidate.status)
   );
 };
@@ -84,15 +84,15 @@ export const discoverArticleLinks = (
   now: string
 ): ArticleDiscoveryResult => {
   const $ = cheerio.load(indexHtml);
-  const content = $("main, article, .entry-content, #content").first();
-  const root = content.length > 0 ? content : $("body");
+  const content = $('main, article, .entry-content, #content').first();
+  const root = content.length > 0 ? content : $('body');
   const previous = new Map(previousArticles.map((article) => [article.canonicalUrl, article]));
   const discoveredUrls = [
     ...new Set(
       root
-        .find("a[href]")
+        .find('a[href]')
         .toArray()
-        .map((element) => canonicalArticleUrl($(element).attr("href")))
+        .map((element) => canonicalArticleUrl($(element).attr('href')))
         .filter((url): url is string => url !== null)
     )
   ].sort((a, b) => a.localeCompare(b));
@@ -105,7 +105,7 @@ export const discoverArticleLinks = (
         title: null,
         firstSeenAt: now,
         lastIngestedAt: null,
-        scrapeStatus: "pending"
+        scrapeStatus: 'pending'
       });
     }
   }
@@ -127,30 +127,30 @@ export const normalizeArticle = (
   chunks: CorpusChunk[];
 } => {
   const $ = cheerio.load(html);
-  const articleElement = $("article, main, .entry-content, #content").first();
-  const root = articleElement.length > 0 ? articleElement : $("body");
-  root.find("script, style, nav, footer, form, noscript").remove();
+  const articleElement = $('article, main, .entry-content, #content').first();
+  const root = articleElement.length > 0 ? articleElement : $('body');
+  root.find('script, style, nav, footer, form, noscript').remove();
 
   const title =
-    normalizeText($(".entry-title").first().text()) ||
-    normalizeText($("article h1, main h1").first().text()) ||
-    normalizeText($('meta[property="og:title"]').attr("content") ?? "") ||
-    normalizeText($("h1").first().text()) ||
-    normalizeTitleElement($("title").first().text()) ||
+    normalizeText($('.entry-title').first().text()) ||
+    normalizeText($('article h1, main h1').first().text()) ||
+    normalizeText($('meta[property="og:title"]').attr('content') ?? '') ||
+    normalizeText($('h1').first().text()) ||
+    normalizeTitleElement($('title').first().text()) ||
     previous?.title ||
     url;
   const headings = root
-    .find("h2, h3")
+    .find('h2, h3')
     .toArray()
     .map((element) => normalizeText($(element).text()))
     .filter((heading) => heading.length > 0);
   const bodyText = normalizeText(
     root
-      .find("p, li, h2, h3, blockquote")
+      .find('p, li, h2, h3, blockquote')
       .toArray()
       .map((element) => normalizeText($(element).text()))
       .filter((text) => text.length > 0)
-      .join("\n\n")
+      .join('\n\n')
   );
 
   const sourceKey = url;
@@ -158,12 +158,12 @@ export const normalizeArticle = (
   const contentHash = hashText(bodyText);
   const source: CorpusSource = {
     sourceId,
-    sourceType: "article",
+    sourceType: 'article',
     sourceKey,
     title,
-    status: "succeeded",
+    status: 'succeeded',
     metadata: {
-      sourceType: "article",
+      sourceType: 'article',
       url,
       title,
       headings,
@@ -177,13 +177,13 @@ export const normalizeArticle = (
     chunkIndex,
     text: chunk.text,
     citation: {
-      sourceType: "article",
+      sourceType: 'article',
       label: title,
       locator: null,
       url
     },
     metadata: {
-      sourceType: "article",
+      sourceType: 'article',
       url,
       title,
       headings,
@@ -198,7 +198,7 @@ export const normalizeArticle = (
       title,
       firstSeenAt: previous?.firstSeenAt ?? now,
       lastIngestedAt: now,
-      scrapeStatus: "succeeded"
+      scrapeStatus: 'succeeded'
     },
     source,
     chunks
@@ -217,14 +217,14 @@ const canonicalArticleUrl = (href: string | undefined): string | null => {
     return null;
   }
 
-  if (url.hostname !== "keith-baker.com") {
+  if (url.hostname !== 'keith-baker.com') {
     return null;
   }
 
-  url.hash = "";
-  url.search = "";
+  url.hash = '';
+  url.search = '';
   const value = url.toString();
-  if (value === KEITH_BAKER_INDEX_URL || !value.startsWith("https://keith-baker.com/")) {
+  if (value === KEITH_BAKER_INDEX_URL || !value.startsWith('https://keith-baker.com/')) {
     return null;
   }
   return value;
@@ -232,11 +232,11 @@ const canonicalArticleUrl = (href: string | undefined): string | null => {
 
 const normalizeTitleElement = (title: string): string => {
   return normalizeText(title)
-    .replace(/\s*[-|]\s*Keith Baker'?s Blog$/i, "")
-    .replace(/\s*[-|]\s*Keith Baker.*$/i, "")
+    .replace(/\s*[-|]\s*Keith Baker'?s Blog$/i, '')
+    .replace(/\s*[-|]\s*Keith Baker.*$/i, '')
     .trim();
 };
 
 const hashText = (text: string): string => {
-  return createHash("sha256").update(text).digest("hex").slice(0, 24);
+  return createHash('sha256').update(text).digest('hex').slice(0, 24);
 };

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   createOpenAiChatAdapter,
@@ -9,100 +9,100 @@ import {
 import type { ProviderConfig } from '@/types.js';
 
 const config: ProviderConfig = {
-  apiKey: "sk-test-secret",
-  baseUrl: "https://provider.example/v1",
-  chatModel: "gpt-test-chat",
+  apiKey: 'sk-test-secret',
+  baseUrl: 'https://provider.example/v1',
+  chatModel: 'gpt-test-chat',
   debug: false,
-  embeddingModel: "text-embedding-test"
+  embeddingModel: 'text-embedding-test'
 };
 
-describe("OpenAI-compatible provider adapters", () => {
-  it("sends chat completions without exposing the API key in errors", async () => {
+describe('OpenAI-compatible provider adapters', () => {
+  it('sends chat completions without exposing the API key in errors', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({
         choices: [
           {
             message: {
-              content: "Aerenal uses deathless ancestors."
+              content: 'Aerenal uses deathless ancestors.'
             }
           }
         ]
       })
     );
-    const messages: ChatMessage[] = [{ role: "user", content: "What is Aerenal known for?" }];
+    const messages: ChatMessage[] = [{ role: 'user', content: 'What is Aerenal known for?' }];
 
     await expect(createOpenAiChatAdapter(config, { fetchImpl }).complete(messages)).resolves.toBe(
-      "Aerenal uses deathless ancestors."
+      'Aerenal uses deathless ancestors.'
     );
 
     const requestUrl = fetchImpl.mock.calls[0]?.[0];
     const request = fetchImpl.mock.calls[0]?.[1];
-    expect(requestUrl).toBe("https://provider.example/v1/chat/completions");
-    expect(request?.method).toBe("POST");
+    expect(requestUrl).toBe('https://provider.example/v1/chat/completions');
+    expect(request?.method).toBe('POST');
     expect(request?.headers).toEqual({
-      Authorization: "Bearer sk-test-secret",
-      "Content-Type": "application/json"
+      Authorization: 'Bearer sk-test-secret',
+      'Content-Type': 'application/json'
     });
     expect(readRequestBody(fetchImpl)).toEqual({
-      model: "gpt-test-chat",
+      model: 'gpt-test-chat',
       messages
     });
   });
 
-  it("captures successful chat diagnostics only when provider debug is enabled", async () => {
+  it('captures successful chat diagnostics only when provider debug is enabled', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({
         choices: [
           {
             message: {
-              content: "Debug answer."
+              content: 'Debug answer.'
             }
           }
         ]
       })
     );
     const onDiagnostic = vi.fn();
-    const messages: ChatMessage[] = [{ role: "user", content: "Debug this." }];
+    const messages: ChatMessage[] = [{ role: 'user', content: 'Debug this.' }];
 
     await expect(createOpenAiChatAdapter({ ...config, debug: true }, { fetchImpl }).complete(messages, {
       debug: {
-        operation: "assistant",
-        operationId: "operation-1",
-        purpose: "assistant"
+        operation: 'assistant',
+        operationId: 'operation-1',
+        purpose: 'assistant'
       },
       onDiagnostic
-    })).resolves.toBe("Debug answer.");
+    })).resolves.toBe('Debug answer.');
 
     expect(onDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
-      assistantContent: "Debug answer.",
-      endpoint: "https://provider.example/v1/chat/completions",
+      assistantContent: 'Debug answer.',
+      endpoint: 'https://provider.example/v1/chat/completions',
       ok: true,
-      operation: "assistant",
-      operationId: "operation-1",
-      purpose: "assistant",
+      operation: 'assistant',
+      operationId: 'operation-1',
+      purpose: 'assistant',
       requestBody: {
-        model: "gpt-test-chat",
+        model: 'gpt-test-chat',
         messages
       },
       status: 200
     }));
-    expect(JSON.stringify(onDiagnostic.mock.calls[0]?.[0])).not.toContain("sk-test-secret");
+    expect(JSON.stringify(onDiagnostic.mock.calls[0]?.[0])).not.toContain('sk-test-secret');
   });
 
-  it("sends tool definitions and parses tool calls from structured chat completions", async () => {
+  it('sends tool definitions and parses tool calls from structured chat completions', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({
         choices: [
           {
             message: {
-              content: "",
+              content: '',
               tool_calls: [
                 {
-                  id: "tool-call-1",
-                  type: "function",
+                  id: 'tool-call-1',
+                  type: 'function',
                   function: {
-                    name: "search_corpus",
-                    arguments: "{\"query\":\"aerenal rites\",\"userMessage\":\"Checking article evidence.\"}"
+                    name: 'search_corpus',
+                    arguments: '{"query":"aerenal rites","userMessage":"Checking article evidence."}'
                   }
                 }
               ]
@@ -111,59 +111,59 @@ describe("OpenAI-compatible provider adapters", () => {
         ]
       })
     );
-    const messages: ChatMessage[] = [{ role: "user", content: "Find more on Aerenal rites." }];
+    const messages: ChatMessage[] = [{ role: 'user', content: 'Find more on Aerenal rites.' }];
     const tools: ChatToolDefinition[] = [{
-      description: "Search the local corpus.",
-      name: "search_corpus",
+      description: 'Search the local corpus.',
+      name: 'search_corpus',
       parameters: {
-        type: "object",
+        type: 'object',
         properties: {
-          query: { type: "string" },
-          userMessage: { type: "string" }
+          query: { type: 'string' },
+          userMessage: { type: 'string' }
         },
-        required: ["query", "userMessage"]
+        required: ['query', 'userMessage']
       }
     }];
 
     const adapter = createOpenAiChatAdapter(config, { fetchImpl });
     if (!adapter.completeStructured) {
-      throw new Error("Expected structured chat support.");
+      throw new Error('Expected structured chat support.');
     }
 
     await expect(adapter.completeStructured(messages, { tools })).resolves.toEqual({
-      content: "",
-      kind: "tool-calls",
+      content: '',
+      kind: 'tool-calls',
       toolCalls: [
         {
-          arguments: "{\"query\":\"aerenal rites\",\"userMessage\":\"Checking article evidence.\"}",
-          id: "tool-call-1",
-          name: "search_corpus"
+          arguments: '{"query":"aerenal rites","userMessage":"Checking article evidence."}',
+          id: 'tool-call-1',
+          name: 'search_corpus'
         }
       ]
     });
 
     expect(readRequestBody(fetchImpl)).toMatchObject({
-      model: "gpt-test-chat",
+      model: 'gpt-test-chat',
       messages,
       tools: [
         {
-          type: "function",
+          type: 'function',
           function: {
-            description: "Search the local corpus.",
-            name: "search_corpus"
+            description: 'Search the local corpus.',
+            name: 'search_corpus'
           }
         }
       ]
     });
   });
 
-  it("does not capture chat diagnostics when provider debug is disabled", async () => {
+  it('does not capture chat diagnostics when provider debug is disabled', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({
         choices: [
           {
             message: {
-              content: "Debug answer."
+              content: 'Debug answer.'
             }
           }
         ]
@@ -171,11 +171,11 @@ describe("OpenAI-compatible provider adapters", () => {
     );
     const onDiagnostic = vi.fn();
 
-    await createOpenAiChatAdapter(config, { fetchImpl }).complete([{ role: "user", content: "Debug this." }], {
+    await createOpenAiChatAdapter(config, { fetchImpl }).complete([{ role: 'user', content: 'Debug this.' }], {
       debug: {
-        operation: "assistant",
-        operationId: "operation-1",
-        purpose: "assistant"
+        operation: 'assistant',
+        operationId: 'operation-1',
+        purpose: 'assistant'
       },
       onDiagnostic
     });
@@ -183,15 +183,15 @@ describe("OpenAI-compatible provider adapters", () => {
     expect(onDiagnostic).not.toHaveBeenCalled();
   });
 
-  it("retries transient chat failures", async () => {
+  it('retries transient chat failures', async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(jsonResponse({ error: { message: "rate limit" } }, 429))
+      .mockResolvedValueOnce(jsonResponse({ error: { message: 'rate limit' } }, 429))
       .mockResolvedValueOnce(jsonResponse({
         choices: [
           {
             message: {
-              content: "Retry answer."
+              content: 'Retry answer.'
             }
           }
         ]
@@ -201,16 +201,16 @@ describe("OpenAI-compatible provider adapters", () => {
       fetchImpl,
       maxRetries: 1,
       retryDelayMs: 0
-    }).complete([{ role: "user", content: "Retry this." }])).resolves.toBe("Retry answer.");
+    }).complete([{ role: 'user', content: 'Retry this.' }])).resolves.toBe('Retry answer.');
 
     expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
-  it("times out stalled chat requests", async () => {
+  it('times out stalled chat requests', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockImplementation((_url, init) => {
       return new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener("abort", () => {
-          reject(new DOMException("The operation was aborted.", "AbortError"));
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted.', 'AbortError'));
         });
       });
     });
@@ -219,14 +219,14 @@ describe("OpenAI-compatible provider adapters", () => {
       fetchImpl,
       maxRetries: 0,
       requestTimeoutMs: 1
-    }).complete([{ role: "user", content: "Timeout." }])).rejects.toMatchObject({
-      name: "AbortError"
+    }).complete([{ role: 'user', content: 'Timeout.' }])).rejects.toMatchObject({
+      name: 'AbortError'
     });
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("returns embedding vectors from the embeddings endpoint", async () => {
+  it('returns embedding vectors from the embeddings endpoint', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({
         data: [
@@ -239,17 +239,17 @@ describe("OpenAI-compatible provider adapters", () => {
     );
     const adapter = createOpenAiEmbeddingAdapter(config, { fetchImpl });
 
-    await expect(adapter.embed("deathless")).resolves.toEqual([0.1, 0.2, 0.3]);
-    expect(adapter.modelId).toBe("text-embedding-test");
-    expect(adapter.schemaVersion).toBe("openai-compatible:text-embedding-test");
+    await expect(adapter.embed('deathless')).resolves.toEqual([0.1, 0.2, 0.3]);
+    expect(adapter.modelId).toBe('text-embedding-test');
+    expect(adapter.schemaVersion).toBe('openai-compatible:text-embedding-test');
     expect(readRequestBody(fetchImpl)).toMatchObject({
-      model: "text-embedding-test",
-      input: ["deathless"],
-      encoding_format: "float"
+      model: 'text-embedding-test',
+      input: ['deathless'],
+      encoding_format: 'float'
     });
   });
 
-  it("sends batched embedding requests and preserves response order", async () => {
+  it('sends batched embedding requests and preserves response order', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse({
         data: [
@@ -260,17 +260,17 @@ describe("OpenAI-compatible provider adapters", () => {
     );
     const adapter = createOpenAiEmbeddingAdapter(config, { fetchImpl });
 
-    await expect(adapter.embedBatch(["first", "second"])).resolves.toEqual([[0.1], [0.2]]);
+    await expect(adapter.embedBatch(['first', 'second'])).resolves.toEqual([[0.1], [0.2]]);
     expect(readRequestBody(fetchImpl)).toMatchObject({
-      model: "text-embedding-test",
-      input: ["first", "second"]
+      model: 'text-embedding-test',
+      input: ['first', 'second']
     });
   });
 
-  it("retries transient embedding failures", async () => {
+  it('retries transient embedding failures', async () => {
     const fetchImpl = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(jsonResponse({ error: { message: "rate limit" } }, 429))
+      .mockResolvedValueOnce(jsonResponse({ error: { message: 'rate limit' } }, 429))
       .mockResolvedValueOnce(jsonResponse({ data: [{ index: 0, embedding: [0.4] }] }));
     const adapter = createOpenAiEmbeddingAdapter(config, {
       fetchImpl,
@@ -278,7 +278,7 @@ describe("OpenAI-compatible provider adapters", () => {
       retryDelayMs: 0
     });
 
-    await expect(adapter.embed("retry me")).resolves.toEqual([0.4]);
+    await expect(adapter.embed('retry me')).resolves.toEqual([0.4]);
     expect(fetchImpl).toHaveBeenCalledTimes(2);
     expect(adapter.failedRetries).toBe(1);
   });
@@ -286,7 +286,7 @@ describe("OpenAI-compatible provider adapters", () => {
   it("keeps provider retry timers ref'd so top-level runtime awaits can settle", async () => {
     const timeoutHandles: Array<{ unref?: ReturnType<typeof vi.fn> }> = [];
     const originalSetTimeout = globalThis.setTimeout;
-    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout").mockImplementation((handler: () => void, timeout?: number) => {
+    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout').mockImplementation((handler: () => void, timeout?: number) => {
       const handle = originalSetTimeout(handler, timeout) as ReturnType<typeof originalSetTimeout> & {
         unref?: ReturnType<typeof vi.fn>;
       };
@@ -296,7 +296,7 @@ describe("OpenAI-compatible provider adapters", () => {
     });
     const fetchImpl = vi
       .fn<typeof fetch>()
-      .mockResolvedValueOnce(jsonResponse({ error: { message: "rate limit" } }, 429))
+      .mockResolvedValueOnce(jsonResponse({ error: { message: 'rate limit' } }, 429))
       .mockResolvedValueOnce(jsonResponse({ data: [{ index: 0, embedding: [0.4] }] }));
 
     try {
@@ -306,7 +306,7 @@ describe("OpenAI-compatible provider adapters", () => {
         retryDelayMs: 1
       });
 
-      await expect(adapter.embed("retry me")).resolves.toEqual([0.4]);
+      await expect(adapter.embed('retry me')).resolves.toEqual([0.4]);
       expect(timeoutHandles.length).toBeGreaterThan(0);
       expect(timeoutHandles.every((handle) => handle.unref && handle.unref.mock.calls.length === 0)).toBe(true);
     } finally {
@@ -314,25 +314,25 @@ describe("OpenAI-compatible provider adapters", () => {
     }
   });
 
-  it("does not retry non-retryable embedding failures", async () => {
-    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ error: { message: "bad key" } }, 401));
+  it('does not retry non-retryable embedding failures', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ error: { message: 'bad key' } }, 401));
     const adapter = createOpenAiEmbeddingAdapter(config, {
       fetchImpl,
       maxRetries: 3,
       retryDelayMs: 0
     });
 
-    await expect(adapter.embed("auth failure")).rejects.toMatchObject({
-      message: "Embedding request failed: bad key"
+    await expect(adapter.embed('auth failure')).rejects.toMatchObject({
+      message: 'Embedding request failed: bad key'
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("times out stalled embedding requests", async () => {
+  it('times out stalled embedding requests', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockImplementation((_url, init) => {
       return new Promise<Response>((_resolve, reject) => {
-        init?.signal?.addEventListener("abort", () => {
-          reject(new DOMException("The operation was aborted.", "AbortError"));
+        init?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted.', 'AbortError'));
         });
       });
     });
@@ -342,27 +342,27 @@ describe("OpenAI-compatible provider adapters", () => {
       requestTimeoutMs: 1
     });
 
-    await expect(adapter.embed("timeout")).rejects.toMatchObject({
-      name: "AbortError"
+    await expect(adapter.embed('timeout')).rejects.toMatchObject({
+      name: 'AbortError'
     });
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it("requires an API key before making provider requests", () => {
+  it('requires an API key before making provider requests', () => {
     const fetchImpl = vi.fn<typeof fetch>();
 
     expect(() => createOpenAiChatAdapter({ ...config, apiKey: null }, { fetchImpl })).toThrow(
-      "OPENAI_API_KEY is required for provider-backed chat."
+      'OPENAI_API_KEY is required for provider-backed chat.'
     );
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
-  it("formats provider failures without leaking request secrets", async () => {
+  it('formats provider failures without leaking request secrets', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse(
         {
           error: {
-            message: "model unavailable"
+            message: 'model unavailable'
           }
         },
         400
@@ -372,19 +372,19 @@ describe("OpenAI-compatible provider adapters", () => {
     const failure = createOpenAiChatAdapter(config, { fetchImpl }).complete([]);
 
     await expect(failure).rejects.toMatchObject({
-      message: "Chat completion failed: model unavailable"
+      message: 'Chat completion failed: model unavailable'
     });
     await failure.catch((error: unknown) => {
-      expect(JSON.stringify(error)).not.toContain("sk-test-secret");
+      expect(JSON.stringify(error)).not.toContain('sk-test-secret');
     });
   });
 
-  it("captures failed chat diagnostics without leaking request secrets", async () => {
+  it('captures failed chat diagnostics without leaking request secrets', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
       jsonResponse(
         {
           error: {
-            message: "model unavailable"
+            message: 'model unavailable'
           }
         },
         400
@@ -394,26 +394,26 @@ describe("OpenAI-compatible provider adapters", () => {
 
     await expect(createOpenAiChatAdapter({ ...config, debug: true }, { fetchImpl }).complete([], {
       debug: {
-        operation: "assistant",
-        operationId: "operation-2",
-        purpose: "assistant"
+        operation: 'assistant',
+        operationId: 'operation-2',
+        purpose: 'assistant'
       },
       onDiagnostic
     })).rejects.toMatchObject({
-      message: "Chat completion failed: model unavailable"
+      message: 'Chat completion failed: model unavailable'
     });
 
     expect(onDiagnostic).toHaveBeenCalledWith(expect.objectContaining({
-      error: "Chat completion failed: model unavailable",
+      error: 'Chat completion failed: model unavailable',
       ok: false,
       responseBody: {
         error: {
-          message: "model unavailable"
+          message: 'model unavailable'
         }
       },
       status: 400
     }));
-    expect(JSON.stringify(onDiagnostic.mock.calls[0]?.[0])).not.toContain("sk-test-secret");
+    expect(JSON.stringify(onDiagnostic.mock.calls[0]?.[0])).not.toContain('sk-test-secret');
   });
 });
 
@@ -421,15 +421,15 @@ const jsonResponse = (body: unknown, status = 200): Response => {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      "Content-Type": "application/json"
+      'Content-Type': 'application/json'
     }
   });
 };
 
 const readRequestBody = (fetchImpl: ReturnType<typeof vi.fn<typeof fetch>>): unknown => {
   const body = fetchImpl.mock.calls[0]?.[1]?.body;
-  if (typeof body !== "string") {
-    throw new Error("Expected request body to be a string.");
+  if (typeof body !== 'string') {
+    throw new Error('Expected request body to be a string.');
   }
 
   return JSON.parse(body) as unknown;

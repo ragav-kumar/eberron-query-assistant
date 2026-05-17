@@ -88,7 +88,7 @@ const shouldRewriteProgress = (): boolean => {
 
 const countRenderedRows = (value: string, columns: number | undefined): number => {
   const terminalColumns = columns && columns > 0 ? columns : 80;
-  const visibleLines = stripAnsiCodes(value).split("\n");
+  const visibleLines = stripAnsiCodes(value).split('\n');
 
   return visibleLines.reduce((rows, line) => {
     return rows + Math.max(1, Math.ceil(line.length / terminalColumns));
@@ -96,37 +96,37 @@ const countRenderedRows = (value: string, columns: number | undefined): number =
 };
 
 const stripAnsiCodes = (value: string): string => {
-  return value.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g"), "");
+  return value.replace(new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g'), '');
 };
 
 const formatInfoMessage = (message: string, colorsEnabled: boolean): string => {
   const styled = createStyle(colorsEnabled);
 
-  if (message === "Starting source inventory checks.") {
-    return `\n${styled.bold(styled.cyan("Checking sources"))}`;
+  if (message === 'Starting source inventory checks.') {
+    return `\n${styled.bold(styled.cyan('Checking sources'))}`;
   }
 
-  if (message === "Ingestion refresh complete.") {
-    return styled.green("Ingestion refresh complete.");
+  if (message === 'Ingestion refresh complete.') {
+    return styled.green('Ingestion refresh complete.');
   }
 
-  if (message === "Refreshing retrieval indexes.") {
-    return `\n${styled.bold(styled.cyan("Refreshing retrieval indexes"))}`;
+  if (message === 'Refreshing retrieval indexes.') {
+    return `\n${styled.bold(styled.cyan('Refreshing retrieval indexes'))}`;
   }
 
-  if (message === "Retrieval indexes ready.") {
-    return styled.green("Retrieval indexes ready.");
+  if (message === 'Retrieval indexes ready.') {
+    return styled.green('Retrieval indexes ready.');
   }
 
-  if (message.startsWith("Startup refresh complete")) {
+  if (message.startsWith('Startup refresh complete')) {
     return `\n${styled.bold(styled.green(message))}`;
   }
 
-  if (message.startsWith("Retrieval debug refresh complete.")) {
+  if (message.startsWith('Retrieval debug refresh complete.')) {
     return `\n${styled.bold(styled.green(message))}`;
   }
 
-  if (message.startsWith("Results for ")) {
+  if (message.startsWith('Results for ')) {
     return styled.bold(message);
   }
 
@@ -152,19 +152,19 @@ const createStyle = (enabled: boolean) => {
 
   return {
     bold(value: string) {
-      return wrap("\u001b[1m", "\u001b[22m", value);
+      return wrap('\u001b[1m', '\u001b[22m', value);
     },
     cyan(value: string) {
-      return wrap("\u001b[36m", "\u001b[39m", value);
+      return wrap('\u001b[36m', '\u001b[39m', value);
     },
     dim(value: string) {
-      return wrap("\u001b[2m", "\u001b[22m", value);
+      return wrap('\u001b[2m', '\u001b[22m', value);
     },
     green(value: string) {
-      return wrap("\u001b[32m", "\u001b[39m", value);
+      return wrap('\u001b[32m', '\u001b[39m', value);
     },
     yellow(value: string) {
-      return wrap("\u001b[33m", "\u001b[39m", value);
+      return wrap('\u001b[33m', '\u001b[39m', value);
     }
   };
 };

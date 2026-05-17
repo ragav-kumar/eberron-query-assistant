@@ -9,7 +9,7 @@ import {
   type Dispatch,
   type ReactNode,
   type SetStateAction
-} from "react";
+} from 'react';
 
 import {
   askAssistant,
@@ -27,8 +27,8 @@ import {
   type ApiNpcResponse,
   type ApiOperationResult,
   type ApiStatus
-} from "./api.js";
-import type { InputMode, LeftTab, OutputTab } from "./components/ui-types.js";
+} from './api.js';
+import type { InputMode, LeftTab, OutputTab } from './components/ui-types.js';
 
 const SAVE_DELAY_MS = 500;
 const RECOVERY_POLL_MS = 1_000;
@@ -43,7 +43,7 @@ const EMPTY_NPCS: ApiNpcResponse = {
   npcs: []
 };
 
-type SessionMode = "npcs" | "standard";
+type SessionMode = 'npcs' | 'standard';
 
 interface BusyState {
   busy: boolean;
@@ -92,20 +92,20 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 export const useAppState = (): AppState => {
   const state = useContext(AppStateContext);
   if (!state) {
-    throw new Error("useAppState must be used inside AppStateProvider.");
+    throw new Error('useAppState must be used inside AppStateProvider.');
   }
   return state;
 };
 
 const useCreateAppState = (): AppState => {
   const sessionCounter = useRef(1);
-  const [standardSessionId, setStandardSessionId] = useState("standard-1");
-  const initialStandardSessionId = useRef("standard-1");
-  const [npcSessionId, setNpcSessionId] = useState("npcs-1");
-  const [assistantPrompt, setAssistantPrompt] = useState("");
-  const [nameGeneratorPrompt, setNameGeneratorPrompt] = useState("");
-  const [contextMarkdown, setContextMarkdown] = useState("");
-  const [lastSavedContext, setLastSavedContext] = useState("");
+  const [standardSessionId, setStandardSessionId] = useState('standard-1');
+  const initialStandardSessionId = useRef('standard-1');
+  const [npcSessionId, setNpcSessionId] = useState('npcs-1');
+  const [assistantPrompt, setAssistantPrompt] = useState('');
+  const [nameGeneratorPrompt, setNameGeneratorPrompt] = useState('');
+  const [contextMarkdown, setContextMarkdown] = useState('');
+  const [lastSavedContext, setLastSavedContext] = useState('');
   const [contextLoaded, setContextLoaded] = useState(false);
   const [consoleOutput, setConsoleOutput] = useState<ApiConsole>({ entries: [] });
   const [log, setLog] = useState<ApiLog>(EMPTY_LOG);
@@ -113,11 +113,11 @@ const useCreateAppState = (): AppState => {
   const [status, setStatus] = useState<BusyState>({ busy: false, operation: null });
   const [isRecoveringOperation, setIsRecoveringOperation] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [leftTab, setLeftTab] = useState<LeftTab>("input");
-  const [inputMode, setInputMode] = useState<InputMode>("standard");
+  const [leftTab, setLeftTab] = useState<LeftTab>('input');
+  const [inputMode, setInputMode] = useState<InputMode>('standard');
   const [includePartyContext, setIncludePartyContext] = useState(true);
   const [retrievalTurnLimit, setRetrievalTurnLimit] = useState(1);
-  const [outputTab, setOutputTab] = useState<OutputTab>("log");
+  const [outputTab, setOutputTab] = useState<OutputTab>('log');
 
   const nextSessionId = useCallback((mode: SessionMode): string => {
     sessionCounter.current += 1;
@@ -234,7 +234,7 @@ const useCreateAppState = (): AppState => {
   }, [contextLoaded, contextMarkdown, lastSavedContext]);
 
   const contextSaveState = useMemo(
-    () => (contextMarkdown === lastSavedContext ? "Saved" : "Saving"),
+    () => (contextMarkdown === lastSavedContext ? 'Saved' : 'Saving'),
     [contextMarkdown, lastSavedContext]
   );
 
@@ -273,12 +273,12 @@ const useCreateAppState = (): AppState => {
     if (prompt.length === 0 || status.busy) {
       return;
     }
-    setOutputTab("log");
+    setOutputTab('log');
     void runOperation(
-      "assistant",
+      'assistant',
       () => askAssistant(prompt, standardSessionId, includePartyContext, retrievalTurnLimit),
       (result) => {
-        setAssistantPrompt("");
+        setAssistantPrompt('');
         setLog(result.log);
       }
     );
@@ -289,12 +289,12 @@ const useCreateAppState = (): AppState => {
     if (prompt.length === 0 || status.busy) {
       return;
     }
-    setOutputTab("npcs");
+    setOutputTab('npcs');
     void runOperation(
-      "npcs",
+      'npcs',
       () => generateNpcs(prompt, npcSessionId, includePartyContext, retrievalTurnLimit),
       (result) => {
-        setNameGeneratorPrompt("");
+        setNameGeneratorPrompt('');
         clearLogSelection();
         setNpcs(result.npcs);
       }
@@ -304,29 +304,29 @@ const useCreateAppState = (): AppState => {
   const runRefresh = useCallback(
     (forceReingest: boolean) => {
       if (status.busy) {
-        if (!(forceReingest && status.operation === "startup-refresh")) {
+        if (!(forceReingest && status.operation === 'startup-refresh')) {
           return;
         }
       }
-      if (status.busy && forceReingest && status.operation === "startup-refresh") {
+      if (status.busy && forceReingest && status.operation === 'startup-refresh') {
         setError(null);
       }
       if (
         forceReingest &&
         !window.confirm(
-          status.operation === "startup-refresh"
-            ? "Force reingest will cancel startup refresh, then clear and rebuild app-owned corpus and retrieval artifacts. Continue?"
-            : "Force reingest clears and rebuilds app-owned corpus and retrieval artifacts. Continue?"
+          status.operation === 'startup-refresh'
+            ? 'Force reingest will cancel startup refresh, then clear and rebuild app-owned corpus and retrieval artifacts. Continue?'
+            : 'Force reingest clears and rebuilds app-owned corpus and retrieval artifacts. Continue?'
         )
       ) {
         return;
       }
-      setOutputTab("console");
+      setOutputTab('console');
       void runOperation(
-        forceReingest ? "force-reingest" : "refresh",
+        forceReingest ? 'force-reingest' : 'refresh',
         () => refresh(forceReingest),
         () => undefined,
-        { allowWhileBusy: forceReingest && status.operation === "startup-refresh" }
+        { allowWhileBusy: forceReingest && status.operation === 'startup-refresh' }
       );
     },
     [runOperation, status.busy, status.operation]
@@ -350,15 +350,15 @@ const useCreateAppState = (): AppState => {
         return;
       }
 
-      const enteringNpcMode = mode === "name-generator";
+      const enteringNpcMode = mode === 'name-generator';
       setInputMode(mode);
 
       if (enteringNpcMode) {
-        setStandardSessionId(nextSessionId("standard"));
+        setStandardSessionId(nextSessionId('standard'));
         clearLogSelection();
       }
-      if (inputMode === "name-generator" && mode !== "name-generator") {
-        setNpcSessionId(nextSessionId("npcs"));
+      if (inputMode === 'name-generator' && mode !== 'name-generator') {
+        setNpcSessionId(nextSessionId('npcs'));
       }
     },
     [clearLogSelection, inputMode, nextSessionId]
@@ -370,12 +370,12 @@ const useCreateAppState = (): AppState => {
         return;
       }
       setError(null);
-      if (mode === "npcs") {
-        setNpcSessionId(nextSessionId("npcs"));
+      if (mode === 'npcs') {
+        setNpcSessionId(nextSessionId('npcs'));
         return;
       }
 
-      setStandardSessionId(nextSessionId("standard"));
+      setStandardSessionId(nextSessionId('standard'));
       clearLogSelection();
     },
     [clearLogSelection, nextSessionId, status.busy]
@@ -448,7 +448,7 @@ const applyStatusSnapshot = (
   if (snapshot.activeOperation) {
     options.setStatus({ busy: true, operation: snapshot.activeOperation });
     options.setIsRecoveringOperation(options.recoverActiveOperation);
-    options.setOutputTab("console");
+    options.setOutputTab('console');
     return;
   }
 

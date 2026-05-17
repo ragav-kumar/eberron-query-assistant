@@ -1,8 +1,8 @@
-import Database from "better-sqlite3";
-import { mkdir, readFile, rm } from "node:fs/promises";
-import path from "node:path";
+import Database from 'better-sqlite3';
+import { mkdir, readFile, rm } from 'node:fs/promises';
+import path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
 import { isRecord } from '@/errors.js';
@@ -13,10 +13,10 @@ import { createSqliteRetrievalService, getVectorIndexPath } from '@/server/v1/re
 import type { TimingContext } from '@/timing.js';
 import type { CorpusChunk, CorpusSource, RuntimeConfig, SourceType } from '@/types.js';
 
-const TEST_ROOT = path.resolve(".test-tmp", "retrieval");
+const TEST_ROOT = path.resolve('.test-tmp', 'retrieval');
 const stores: CorpusStore[] = [];
 
-describe("Phase 4 retrieval", () => {
+describe('Phase 4 retrieval', () => {
   beforeEach(async () => {
     await rm(TEST_ROOT, { force: true, recursive: true });
   });
@@ -28,51 +28,51 @@ describe("Phase 4 retrieval", () => {
     await rm(TEST_ROOT, { force: true, recursive: true });
   });
 
-  it("searches mixed source chunks with citation metadata", async () => {
+  it('searches mixed source chunks with citation metadata', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = await seedCorpus(config);
     const retrieval = createRetrieval();
 
     await retrieval.refresh(config);
-    const results = await retrieval.search({ query: "deathless aerenal", limit: 3 });
+    const results = await retrieval.search({ query: 'deathless aerenal', limit: 3 });
 
     expect(results[0]).toMatchObject({
-      sourceType: "pdf",
-      sourceKey: "eberron.pdf",
-      sourceTitle: "Eberron Rising",
+      sourceType: 'pdf',
+      sourceKey: 'eberron.pdf',
+      sourceTitle: 'Eberron Rising',
       citation: {
-        label: "Eberron Rising",
-        locator: "page 4"
+        label: 'Eberron Rising',
+        locator: 'page 4'
       }
     });
-    expect(results[0]?.content).toContain("Aerenal");
+    expect(results[0]?.content).toContain('Aerenal');
     store.close();
   });
 
-  it("filters retrieval by source type and source key", async () => {
+  it('filters retrieval by source type and source key', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config);
     const retrieval = createRetrieval();
 
     await retrieval.refresh(config);
     const articleResults = await retrieval.search({
-      query: "deathless gnomes",
-      sourceTypes: ["article"],
+      query: 'deathless gnomes',
+      sourceTypes: ['article'],
       limit: 5
     });
     const foundryResults = await retrieval.search({
-      query: "aerenal",
-      sourceKeys: ["actor-ashana"],
+      query: 'aerenal',
+      sourceKeys: ['actor-ashana'],
       limit: 5
     });
 
     expect(articleResults).toHaveLength(1);
-    expect(articleResults[0]?.sourceType).toBe("article");
+    expect(articleResults[0]?.sourceType).toBe('article');
     expect(foundryResults).toHaveLength(1);
-    expect(foundryResults[0]?.sourceKey).toBe("actor-ashana");
+    expect(foundryResults[0]?.sourceKey).toBe('actor-ashana');
   });
 
-  it("can search after prepare without running a full retrieval refresh", async () => {
+  it('can search after prepare without running a full retrieval refresh', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = await seedCorpus(config);
     const firstRetrieval = createRetrieval();
@@ -80,30 +80,30 @@ describe("Phase 4 retrieval", () => {
 
     await firstRetrieval.refresh(config);
     await secondRetrieval.prepare(config);
-    const results = await secondRetrieval.search({ query: "deathless aerenal", limit: 3 });
+    const results = await secondRetrieval.search({ query: 'deathless aerenal', limit: 3 });
 
-    expect(results[0]?.sourceKey).toBe("eberron.pdf");
+    expect(results[0]?.sourceKey).toBe('eberron.pdf');
     store.close();
   });
 
-  it("removes stale source chunks from retrieval results", async () => {
+  it('removes stale source chunks from retrieval results', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = await seedCorpus(config);
     const retrieval = createRetrieval();
 
     await retrieval.refresh(config);
-    await expect(retrieval.search({ query: "deathless", sourceKeys: ["eberron.pdf"] })).resolves.toHaveLength(1);
+    await expect(retrieval.search({ query: 'deathless', sourceKeys: ['eberron.pdf'] })).resolves.toHaveLength(1);
 
-    await store.removeSource(config, "pdf", "eberron.pdf");
+    await store.removeSource(config, 'pdf', 'eberron.pdf');
     await retrieval.refresh(config, { forceRebuild: true });
 
-    await expect(retrieval.search({ query: "deathless", sourceKeys: ["eberron.pdf"] })).resolves.toHaveLength(0);
+    await expect(retrieval.search({ query: 'deathless', sourceKeys: ['eberron.pdf'] })).resolves.toHaveLength(0);
   });
 
-  it("reuses compatible embeddings and regenerates incompatible embeddings", async () => {
+  it('reuses compatible embeddings and regenerates incompatible embeddings', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config);
-    const counted = countingAdapter("model-a", "schema-a");
+    const counted = countingAdapter('model-a', 'schema-a');
     const retrieval = createRetrieval(counted.adapter);
 
     const first = await retrieval.refresh(config);
@@ -113,7 +113,7 @@ describe("Phase 4 retrieval", () => {
     expect(second).toMatchObject({ chunkCount: 3, reusedEmbeddings: 3, regeneratedEmbeddings: 0 });
     expect(counted.embedBatch).toHaveBeenCalledTimes(1);
 
-    const incompatible = createRetrieval(countingAdapter("model-b", "schema-a").adapter);
+    const incompatible = createRetrieval(countingAdapter('model-b', 'schema-a').adapter);
     await expect(incompatible.refresh(config)).resolves.toMatchObject({
       chunkCount: 3,
       reusedEmbeddings: 0,
@@ -121,69 +121,69 @@ describe("Phase 4 retrieval", () => {
     });
   });
 
-  it("rejects incompatible SQLite artifacts without explicit reset", async () => {
+  it('rejects incompatible SQLite artifacts without explicit reset', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await mkdir(config.retrievalDir, { recursive: true });
     const database = new Database(getCorpusDatabasePath(config));
-    database.exec("CREATE TABLE sources (legacy_id TEXT PRIMARY KEY)");
+    database.exec('CREATE TABLE sources (legacy_id TEXT PRIMARY KEY)');
     database.close();
 
     const store = createStore();
     await expect(store.initialize(config)).rejects.toSatisfy((error: unknown) => {
-      expect(error).toMatchObject({ kind: "incompatible-corpus-schema" });
-      expect(isRecord(error) && typeof error.message === "string" ? error.message : "").toContain(
-        "browser force-reingest control"
+      expect(error).toMatchObject({ kind: 'incompatible-corpus-schema' });
+      expect(isRecord(error) && typeof error.message === 'string' ? error.message : '').toContain(
+        'browser force-reingest control'
       );
       return true;
     });
   });
 
-  it("recreates incompatible SQLite artifacts only when explicit reset is allowed", async () => {
+  it('recreates incompatible SQLite artifacts only when explicit reset is allowed', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await mkdir(config.retrievalDir, { recursive: true });
     const database = new Database(getCorpusDatabasePath(config));
-    database.exec("CREATE TABLE sources (legacy_id TEXT PRIMARY KEY)");
+    database.exec('CREATE TABLE sources (legacy_id TEXT PRIMARY KEY)');
     database.close();
 
     const store = createStore();
     await store.initialize(config, { allowIncompatibleReset: true });
-    await store.replaceSource(config, source("pdf", "eberron.pdf", "Eberron Rising"), [
-      chunk("pdf:eberron.pdf:0", "pdf:eberron.pdf", 0, "Aerenal keeps deathless counselors.", {
-        sourceType: "pdf",
-        label: "Eberron Rising",
-        locator: "page 4",
+    await store.replaceSource(config, source('pdf', 'eberron.pdf', 'Eberron Rising'), [
+      chunk('pdf:eberron.pdf:0', 'pdf:eberron.pdf', 0, 'Aerenal keeps deathless counselors.', {
+        sourceType: 'pdf',
+        label: 'Eberron Rising',
+        locator: 'page 4',
         url: null
       })
     ]);
 
-    const rows = readRows(config, "SELECT source_key FROM sources");
-    expect(rows).toEqual([{ source_key: "eberron.pdf" }]);
+    const rows = readRows(config, 'SELECT source_key FROM sources');
+    expect(rows).toEqual([{ source_key: 'eberron.pdf' }]);
   });
 
-  it("stores vector embeddings in SQLite instead of rewriting a JSON artifact", async () => {
+  it('stores vector embeddings in SQLite instead of rewriting a JSON artifact', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config);
     const retrieval = createRetrieval();
 
     await retrieval.refresh(config);
 
-    await expect(readFile(getVectorIndexPath(config), "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(readFile(getVectorIndexPath(config), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     expect(readVectorRows(config)).toHaveLength(3);
 
     const second = await retrieval.refresh(config);
     expect(second).toMatchObject({ chunkCount: 3, reusedEmbeddings: 3, regeneratedEmbeddings: 0 });
   });
 
-  it("checkpoints generated embeddings so an interrupted refresh can resume", async () => {
+  it('checkpoints generated embeddings so an interrupted refresh can resume', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config, 65);
     const interrupted = interruptingBatchAdapter(1);
     const firstRetrieval = createRetrieval(interrupted.adapter);
 
-    await expect(firstRetrieval.refresh(config)).rejects.toThrow("simulated embedding interruption");
+    await expect(firstRetrieval.refresh(config)).rejects.toThrow('simulated embedding interruption');
     expect(readVectorRows(config)).toHaveLength(64);
 
-    const resumed = countingAdapter("checkpoint-model", "checkpoint-schema");
+    const resumed = countingAdapter('checkpoint-model', 'checkpoint-schema');
     const secondRetrieval = createRetrieval(resumed.adapter);
     const summary = await secondRetrieval.refresh(config);
 
@@ -191,7 +191,7 @@ describe("Phase 4 retrieval", () => {
     expect(resumed.embedBatch).toHaveBeenCalledTimes(1);
   });
 
-  it("reports embedding sync start, progress, and final summary", async () => {
+  it('reports embedding sync start, progress, and final summary', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config, 65);
     const reporter = createMemoryProgressReporter();
@@ -199,20 +199,20 @@ describe("Phase 4 retrieval", () => {
 
     await retrieval.refresh(config);
 
-    expect(reporter.messages.some((message) => message.startsWith("Retrieval embedding sync started:"))).toBe(true);
-    expect(reporter.messages.some((message) => message.startsWith("Retrieval embedding sync progress:"))).toBe(true);
-    expect(reporter.messages.some((message) => message.startsWith("Retrieval vector index synchronized:"))).toBe(true);
+    expect(reporter.messages.some((message) => message.startsWith('Retrieval embedding sync started:'))).toBe(true);
+    expect(reporter.messages.some((message) => message.startsWith('Retrieval embedding sync progress:'))).toBe(true);
+    expect(reporter.messages.some((message) => message.startsWith('Retrieval vector index synchronized:'))).toBe(true);
   });
 
-  it("bounds oversized chunk text before requesting embeddings", async () => {
+  it('bounds oversized chunk text before requesting embeddings', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = createStore();
     await store.initialize(config);
-    await store.replaceSource(config, source("pdf", "oversized.pdf", "Oversized"), [
-      chunk("pdf:oversized.pdf:0", "pdf:oversized.pdf", 0, "a".repeat(30_000), {
-        sourceType: "pdf",
-        label: "Oversized",
-        locator: "page 1",
+    await store.replaceSource(config, source('pdf', 'oversized.pdf', 'Oversized'), [
+      chunk('pdf:oversized.pdf:0', 'pdf:oversized.pdf', 0, 'a'.repeat(30_000), {
+        sourceType: 'pdf',
+        label: 'Oversized',
+        locator: 'page 1',
         url: null
       })
     ]);
@@ -224,19 +224,19 @@ describe("Phase 4 retrieval", () => {
     expect(adapter.inputs[0]?.[0]).toHaveLength(6_000);
   });
 
-  it("bounds oversized query text before requesting query embeddings", async () => {
+  it('bounds oversized query text before requesting query embeddings', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config);
     const adapter = captureEmbeddingInputAdapter();
     const retrieval = createRetrieval(adapter.adapter);
 
     await retrieval.refresh(config);
-    await retrieval.search({ query: "query-token ".repeat(2_000), limit: 1 });
+    await retrieval.search({ query: 'query-token '.repeat(2_000), limit: 1 });
 
     expect(adapter.singleInputs[0]).toHaveLength(6_000);
   });
 
-  it("deletes stale vector rows when chunks are removed", async () => {
+  it('deletes stale vector rows when chunks are removed', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = await seedCorpus(config);
     const retrieval = createRetrieval();
@@ -244,87 +244,87 @@ describe("Phase 4 retrieval", () => {
     await retrieval.refresh(config);
     expect(readVectorRows(config)).toHaveLength(3);
 
-    await store.removeSource(config, "pdf", "eberron.pdf");
+    await store.removeSource(config, 'pdf', 'eberron.pdf');
     await retrieval.refresh(config);
 
-    expect(readVectorRows(config).map((row) => row.chunk_id)).not.toContain("pdf:eberron.pdf:0");
+    expect(readVectorRows(config).map((row) => row.chunk_id)).not.toContain('pdf:eberron.pdf:0');
     expect(readVectorRows(config)).toHaveLength(2);
   });
 
-  it("reuses cached compatible vectors on later searches without reading mutated SQLite vector JSON", async () => {
+  it('reuses cached compatible vectors on later searches without reading mutated SQLite vector JSON', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config);
     const retrieval = createRetrieval();
     const timing = createCapturingTimingContext();
 
     await retrieval.refresh(config);
-    const first = await retrieval.search({ query: "deathless aerenal", limit: 3, timing });
-    rewriteVectorJson(config, "not-json");
-    const second = await retrieval.search({ query: "deathless aerenal", limit: 3, timing });
+    const first = await retrieval.search({ query: 'deathless aerenal', limit: 3, timing });
+    rewriteVectorJson(config, 'not-json');
+    const second = await retrieval.search({ query: 'deathless aerenal', limit: 3, timing });
 
     expect(second).toEqual(first);
-    expect(timing.labels).toContain("retrieval.vector.read_vectors");
+    expect(timing.labels).toContain('retrieval.vector.read_vectors');
   });
 
-  it("invalidates and repopulates cached vectors after routine refresh", async () => {
+  it('invalidates and repopulates cached vectors after routine refresh', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = await seedCorpus(config);
-    const retrieval = createRetrieval(keywordEmbeddingAdapter("aerenal", "mror"));
+    const retrieval = createRetrieval(keywordEmbeddingAdapter('aerenal', 'mror'));
 
     await retrieval.refresh(config);
-    const first = await retrieval.search({ query: "aerenal", limit: 1 });
+    const first = await retrieval.search({ query: 'aerenal', limit: 1 });
     rewriteVectorJson(config, JSON.stringify([0, 1]));
 
-    await store.replaceSource(config, source("pdf", "eberron.pdf", "Eberron Rising"), [
-      chunk("pdf:eberron.pdf:0", "pdf:eberron.pdf", 0, "Mror dwarves study the Holds.", {
-        sourceType: "pdf",
-        label: "Eberron Rising",
-        locator: "page 5",
+    await store.replaceSource(config, source('pdf', 'eberron.pdf', 'Eberron Rising'), [
+      chunk('pdf:eberron.pdf:0', 'pdf:eberron.pdf', 0, 'Mror dwarves study the Holds.', {
+        sourceType: 'pdf',
+        label: 'Eberron Rising',
+        locator: 'page 5',
         url: null
       })
     ]);
     await retrieval.refresh(config);
-    rewriteVectorJson(config, JSON.stringify([1, 0]), "pdf:eberron.pdf:0");
-    const second = await retrieval.search({ query: "mror", limit: 1 });
+    rewriteVectorJson(config, JSON.stringify([1, 0]), 'pdf:eberron.pdf:0');
+    const second = await retrieval.search({ query: 'mror', limit: 1 });
 
-    expect(first[0]?.chunkId).toBe("pdf:eberron.pdf:0");
-    expect(first[0]?.content).toContain("Aerenal");
-    expect(second[0]?.chunkId).toBe("pdf:eberron.pdf:0");
-    expect(second[0]?.content).toContain("Mror");
+    expect(first[0]?.chunkId).toBe('pdf:eberron.pdf:0');
+    expect(first[0]?.content).toContain('Aerenal');
+    expect(second[0]?.chunkId).toBe('pdf:eberron.pdf:0');
+    expect(second[0]?.content).toContain('Mror');
   });
 
-  it("invalidates and repopulates cached vectors after force rebuild", async () => {
+  it('invalidates and repopulates cached vectors after force rebuild', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config);
-    const adapter = countingAdapter("force-cache-model", "force-cache-schema");
+    const adapter = countingAdapter('force-cache-model', 'force-cache-schema');
     const retrieval = createRetrieval(adapter.adapter);
 
     await retrieval.refresh(config);
-    rewriteVectorJson(config, "not-json");
+    rewriteVectorJson(config, 'not-json');
     await retrieval.refresh(config, { forceRebuild: true });
-    rewriteVectorJson(config, "not-json");
+    rewriteVectorJson(config, 'not-json');
 
-    await expect(retrieval.search({ query: "deathless aerenal", limit: 1 })).resolves.toHaveLength(1);
+    await expect(retrieval.search({ query: 'deathless aerenal', limit: 1 })).resolves.toHaveLength(1);
     expect(adapter.embedBatch).toHaveBeenCalledTimes(2);
   });
 
-  it("streams vector searches from SQLite when the in-memory vector cache is disabled", async () => {
+  it('streams vector searches from SQLite when the in-memory vector cache is disabled', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     await seedCorpus(config);
-    const retrieval = createRetrieval(keywordEmbeddingAdapter("aerenal", "mror"), undefined, {
+    const retrieval = createRetrieval(keywordEmbeddingAdapter('aerenal', 'mror'), undefined, {
       maxVectorCacheDatabaseBytes: 0
     });
     const timing = createCapturingTimingContext();
 
     await retrieval.refresh(config);
-    const first = await retrieval.search({ query: "aerenal", limit: 1, timing });
-    rewriteVectorJson(config, JSON.stringify([0, 1]), "pdf:eberron.pdf:0");
-    const second = await retrieval.search({ query: "mror", limit: 1, timing });
+    const first = await retrieval.search({ query: 'aerenal', limit: 1, timing });
+    rewriteVectorJson(config, JSON.stringify([0, 1]), 'pdf:eberron.pdf:0');
+    const second = await retrieval.search({ query: 'mror', limit: 1, timing });
 
-    expect(first[0]?.chunkId).toBe("pdf:eberron.pdf:0");
-    expect(second[0]?.chunkId).toBe("pdf:eberron.pdf:0");
-    expect(second[0]?.content).toContain("Aerenal");
-    expect(timing.labels).toContain("retrieval.vector.stream_vectors");
+    expect(first[0]?.chunkId).toBe('pdf:eberron.pdf:0');
+    expect(second[0]?.chunkId).toBe('pdf:eberron.pdf:0');
+    expect(second[0]?.content).toContain('Aerenal');
+    expect(timing.labels).toContain('retrieval.vector.stream_vectors');
   });
 });
 
@@ -333,33 +333,33 @@ const seedCorpus = async (config: RuntimeConfig, chunkCount = 3): Promise<Corpus
   await store.initialize(config);
 
   if (chunkCount === 3) {
-    await store.replaceSource(config, source("pdf", "eberron.pdf", "Eberron Rising"), [
-      chunk("pdf:eberron.pdf:0", "pdf:eberron.pdf", 0, "Aerenal keeps deathless counselors.", {
-        sourceType: "pdf",
-        label: "Eberron Rising",
-        locator: "page 4",
+    await store.replaceSource(config, source('pdf', 'eberron.pdf', 'Eberron Rising'), [
+      chunk('pdf:eberron.pdf:0', 'pdf:eberron.pdf', 0, 'Aerenal keeps deathless counselors.', {
+        sourceType: 'pdf',
+        label: 'Eberron Rising',
+        locator: 'page 4',
         url: null
       })
     ]);
-    await store.replaceSource(config, source("article", "https://keith-baker.com/aerenal/", "Aerenal Notes"), [
+    await store.replaceSource(config, source('article', 'https://keith-baker.com/aerenal/', 'Aerenal Notes'), [
       chunk(
-        "article:https://keith-baker.com/aerenal/:0",
-        "article:https://keith-baker.com/aerenal/",
+        'article:https://keith-baker.com/aerenal/:0',
+        'article:https://keith-baker.com/aerenal/',
         0,
-        "Keith Baker writes about gnomes and the Trust.",
+        'Keith Baker writes about gnomes and the Trust.',
         {
-          sourceType: "article",
-          label: "Aerenal Notes",
+          sourceType: 'article',
+          label: 'Aerenal Notes',
           locator: null,
-          url: "https://keith-baker.com/aerenal/"
+          url: 'https://keith-baker.com/aerenal/'
         }
       )
     ]);
-    await store.replaceSource(config, source("foundry", "actor-ashana", "Ashana"), [
-      chunk("foundry:actor-ashana:0", "foundry:actor-ashana", 0, "Ashana has a contact in Aerenal.", {
-        sourceType: "foundry",
-        label: "Ashana",
-        locator: "Actor",
+    await store.replaceSource(config, source('foundry', 'actor-ashana', 'Ashana'), [
+      chunk('foundry:actor-ashana:0', 'foundry:actor-ashana', 0, 'Ashana has a contact in Aerenal.', {
+        sourceType: 'foundry',
+        label: 'Ashana',
+        locator: 'Actor',
         url: null
       })
     ]);
@@ -369,19 +369,19 @@ const seedCorpus = async (config: RuntimeConfig, chunkCount = 3): Promise<Corpus
   const chunks = Array.from({ length: chunkCount }, (_, index) => {
     return chunk(
       `pdf:eberron.pdf:${index}`,
-      "pdf:eberron.pdf",
+      'pdf:eberron.pdf',
       index,
       `Aerenal chunk ${index} keeps deathless counselors.`,
       {
-        sourceType: "pdf",
-        label: "Eberron Rising",
+        sourceType: 'pdf',
+        label: 'Eberron Rising',
         locator: `page ${index + 1}`,
         url: null
       }
     );
   });
 
-  await store.replaceSource(config, source("pdf", "eberron.pdf", "Eberron Rising"), chunks);
+  await store.replaceSource(config, source('pdf', 'eberron.pdf', 'Eberron Rising'), chunks);
   return store;
 };
 
@@ -415,7 +415,7 @@ const source = (sourceType: SourceType, sourceKey: string, title: string): Corpu
     sourceKey,
     title,
     metadata: {},
-    status: "succeeded"
+    status: 'succeeded'
   };
 };
 
@@ -424,7 +424,7 @@ const chunk = (
   sourceId: string,
   chunkIndex: number,
   text: string,
-  citation: CorpusChunk["citation"]
+  citation: CorpusChunk['citation']
 ): CorpusChunk => {
   return {
     chunkId,
@@ -463,12 +463,12 @@ const interruptingBatchAdapter = (failAfterSuccessfulBatches: number): { adapter
   return {
     adapter: {
       failedRetries: 0,
-      modelId: "checkpoint-model",
-      schemaVersion: "checkpoint-schema",
+      modelId: 'checkpoint-model',
+      schemaVersion: 'checkpoint-schema',
       embed: (input) => base.embed(input),
       async embedBatch(inputs) {
         if (successfulBatches >= failAfterSuccessfulBatches) {
-          throw new Error("simulated embedding interruption");
+          throw new Error('simulated embedding interruption');
         }
         successfulBatches += 1;
         return base.embedBatch(inputs);
@@ -485,8 +485,8 @@ const captureEmbeddingInputAdapter = (): { adapter: EmbeddingAdapter; inputs: st
   return {
     adapter: {
       failedRetries: 0,
-      modelId: "capture-model",
-      schemaVersion: "capture-schema",
+      modelId: 'capture-model',
+      schemaVersion: 'capture-schema',
       embed(input) {
         singleInputs.push(input);
         return base.embed(input);
@@ -510,8 +510,8 @@ const keywordEmbeddingAdapter = (...keywords: string[]): EmbeddingAdapter => {
 
   return {
     failedRetries: 0,
-    modelId: `keyword-${keywords.join("-")}`,
-    schemaVersion: "keyword-v1",
+    modelId: `keyword-${keywords.join('-')}`,
+    schemaVersion: 'keyword-v1',
     embed(input) {
       return Promise.resolve(embedKeywordVector(input));
     },
@@ -525,8 +525,8 @@ const createCapturingTimingContext = (): TimingContext & { labels: string[] } =>
   const labels: string[] = [];
   return {
     labels,
-    operation: "test",
-    operationId: "test",
+    operation: 'test',
+    operationId: 'test',
     reporter: {
       async time(_context, label, task) {
         labels.push(label);
@@ -548,7 +548,7 @@ const readRows = (config: RuntimeConfig, sql: string): Array<Record<string, unkn
 const readVectorRows = (config: RuntimeConfig): Array<Record<string, unknown>> => {
   return readRows(
     config,
-    "SELECT chunk_id, content_hash, embedding_model_id, embedding_schema_version, embedding_json FROM chunk_vectors ORDER BY chunk_id"
+    'SELECT chunk_id, content_hash, embedding_model_id, embedding_schema_version, embedding_json FROM chunk_vectors ORDER BY chunk_id'
   );
 };
 
@@ -556,10 +556,10 @@ const rewriteVectorJson = (config: RuntimeConfig, embeddingJson: string, chunkId
   const database = new Database(getCorpusDatabasePath(config));
   try {
     if (chunkId) {
-      database.prepare("UPDATE chunk_vectors SET embedding_json = ? WHERE chunk_id = ?").run(embeddingJson, chunkId);
+      database.prepare('UPDATE chunk_vectors SET embedding_json = ? WHERE chunk_id = ?').run(embeddingJson, chunkId);
       return;
     }
-    database.prepare("UPDATE chunk_vectors SET embedding_json = ?").run(embeddingJson);
+    database.prepare('UPDATE chunk_vectors SET embedding_json = ?').run(embeddingJson);
   } finally {
     database.close();
   }

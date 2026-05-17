@@ -1,17 +1,17 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
 import { createFilesystemStateStore, getStatePath } from '@/server/v1/state/index.js';
 import type { RuntimeState } from '@/server/v1/state/index.js';
 import { getAppVersion } from '@/app-version.js';
 
-const TEST_ROOT = path.resolve(".test-tmp", "state-store");
+const TEST_ROOT = path.resolve('.test-tmp', 'state-store');
 const APP_VERSION = getAppVersion();
 
-describe("FilesystemStateStore", () => {
+describe('FilesystemStateStore', () => {
   beforeEach(async () => {
     await rm(TEST_ROOT, { force: true, recursive: true });
   });
@@ -20,7 +20,7 @@ describe("FilesystemStateStore", () => {
     await rm(TEST_ROOT, { force: true, recursive: true });
   });
 
-  it("loads default state when no state file exists", async () => {
+  it('loads default state when no state file exists', async () => {
     const store = createFilesystemStateStore();
 
     await expect(store.load(loadDefaultConfig(TEST_ROOT))).resolves.toEqual({
@@ -41,38 +41,38 @@ describe("FilesystemStateStore", () => {
     });
   });
 
-  it("creates the state directory and round-trips deterministic state", async () => {
+  it('creates the state directory and round-trips deterministic state', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = createFilesystemStateStore();
     const articleA = {
-      canonicalUrl: "https://keith-baker.com/a",
-      title: "A",
-      firstSeenAt: "2026-04-20T10:00:00.000Z",
-      lastIngestedAt: "2026-04-20T11:00:00.000Z",
-      scrapeStatus: "succeeded" as const
+      canonicalUrl: 'https://keith-baker.com/a',
+      title: 'A',
+      firstSeenAt: '2026-04-20T10:00:00.000Z',
+      lastIngestedAt: '2026-04-20T11:00:00.000Z',
+      scrapeStatus: 'succeeded' as const
     };
     const articleB = {
-      canonicalUrl: "https://keith-baker.com/b",
-      title: "B",
-      firstSeenAt: "2026-04-20T10:00:00.000Z",
+      canonicalUrl: 'https://keith-baker.com/b',
+      title: 'B',
+      firstSeenAt: '2026-04-20T10:00:00.000Z',
       lastIngestedAt: null,
-      scrapeStatus: "pending" as const
+      scrapeStatus: 'pending' as const
     };
     const state: RuntimeState = {
       appVersion: APP_VERSION,
       foundry: {
         appliedExportFilenames: [
-          "20260424T110000000Z-foundry-export.ndjson",
-          "20260424T100000000Z-foundry-export.ndjson",
-          "20260424T100000000Z-foundry-export.ndjson"
+          '20260424T110000000Z-foundry-export.ndjson',
+          '20260424T100000000Z-foundry-export.ndjson',
+          '20260424T100000000Z-foundry-export.ndjson'
         ],
-        lastSuccessfulExport: createMarker("20260424T100000000Z-foundry-export.ndjson", "run-1", 2)
+        lastSuccessfulExport: createMarker('20260424T100000000Z-foundry-export.ndjson', 'run-1', 2)
       },
       pdf: {
-        knownFilenames: ["z.pdf", "a.pdf", "a.pdf"]
+        knownFilenames: ['z.pdf', 'a.pdf', 'a.pdf']
       },
       article: {
-        lastSuccessfulIndexScrapeAt: "2026-04-20T10:00:00.000Z",
+        lastSuccessfulIndexScrapeAt: '2026-04-20T10:00:00.000Z',
         knownArticles: [articleB, articleA]
       }
     };
@@ -85,12 +85,12 @@ describe("FilesystemStateStore", () => {
         foundry: {
           ...state.foundry,
           appliedExportFilenames: [
-            "20260424T100000000Z-foundry-export.ndjson",
-            "20260424T110000000Z-foundry-export.ndjson"
+            '20260424T100000000Z-foundry-export.ndjson',
+            '20260424T110000000Z-foundry-export.ndjson'
           ]
         },
         pdf: {
-          knownFilenames: ["a.pdf", "z.pdf"]
+          knownFilenames: ['a.pdf', 'z.pdf']
         },
         article: {
           ...state.article,
@@ -99,10 +99,10 @@ describe("FilesystemStateStore", () => {
       }
     });
 
-    await expect(mkdir(path.dirname(getStatePath(config)))).rejects.toMatchObject({ code: "EEXIST" });
+    await expect(mkdir(path.dirname(getStatePath(config)))).rejects.toMatchObject({ code: 'EEXIST' });
   });
 
-  it("rejects invalid delta export marker fields", async () => {
+  it('rejects invalid delta export marker fields', async () => {
     const config = loadDefaultConfig(TEST_ROOT);
     const store = createFilesystemStateStore();
 
@@ -114,19 +114,19 @@ describe("FilesystemStateStore", () => {
         foundry: {
           appliedExportFilenames: [],
           lastSuccessfulExport: {
-            ...createMarker("20260424T100000000Z-foundry-export.ndjson", "run-1", 2),
+            ...createMarker('20260424T100000000Z-foundry-export.ndjson', 'run-1', 2),
             deleteCount: -1
           }
         },
         pdf: { knownFilenames: [] },
         article: { lastSuccessfulIndexScrapeAt: null, knownArticles: [] }
       })}\n`,
-      "utf8"
+      'utf8'
     );
 
     await expect(store.load(config)).rejects.toMatchObject({
-      kind: "invalid-runtime-state",
-      message: "foundry.lastSuccessfulExport.deleteCount must be a non-negative integer."
+      kind: 'invalid-runtime-state',
+      message: 'foundry.lastSuccessfulExport.deleteCount must be a non-negative integer.'
     });
   });
 
@@ -135,9 +135,9 @@ describe("FilesystemStateStore", () => {
 const createMarker = (filename: string, runId: string, recordCount: number) => ({
   deleteCount: 0,
   filename,
-  generatedAt: "2026-04-24T10:00:00.000Z",
+  generatedAt: '2026-04-24T10:00:00.000Z',
   recordCount,
   runId,
-  schemaVersion: "2.0.0",
+  schemaVersion: '2.0.0',
   upsertCount: recordCount
 });

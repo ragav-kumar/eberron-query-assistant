@@ -1,7 +1,7 @@
-import type { SourceDiscoverySummary } from "../source-discovery/index.js";
-import type { RuntimeState } from "../state/index.js";
-import type { IngestionSummary, RuntimeConfig, RuntimeOptions } from "@/types.js";
-import type { IngestionService } from "./ingestion-service.js";
+import type { SourceDiscoverySummary } from '../source-discovery/index.js';
+import type { RuntimeState } from '../state/index.js';
+import type { IngestionSummary, RuntimeConfig, RuntimeOptions } from '@/types.js';
+import type { IngestionService } from './ingestion-service.js';
 
 export const createPlaceholderIngestionService = (): IngestionService => {
   return {
@@ -17,7 +17,7 @@ export const createPlaceholderIngestionService = (): IngestionService => {
           corpusSourceCount: 1,
           sourceSummaries: discovery.inventories.map((inventory) => ({
             sourceType: inventory.sourceType,
-            status: inventory.status === "failed" ? "failed" : "skipped",
+            status: inventory.status === 'failed' ? 'failed' : 'skipped',
             discovered: inventory.discovered,
             ingested: 0,
             removed: 0,

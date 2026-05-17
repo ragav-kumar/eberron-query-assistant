@@ -1,12 +1,12 @@
-import { createTaggedError, formatThrownValue, isRecord } from "@/errors.js";
-import type { ProviderConfig } from "@/types.js";
+import { createTaggedError, formatThrownValue, isRecord } from '@/errors.js';
+import type { ProviderConfig } from '@/types.js';
 
 const DEFAULT_PROVIDER_TIMEOUT_MS = 60_000;
 const DEFAULT_PROVIDER_MAX_RETRIES = 3;
 const DEFAULT_PROVIDER_RETRY_DELAY_MS = 500;
 
 export interface ChatMessage {
-  role: "system" | "user" | "assistant" | "tool";
+  role: 'system' | 'user' | 'assistant' | 'tool';
   content: string;
   name?: string;
   toolCallId?: string;
@@ -27,12 +27,12 @@ export interface ChatToolCall {
 
 export interface ChatStructuredTextResult {
   content: string;
-  kind: "text";
+  kind: 'text';
 }
 
 export interface ChatStructuredToolCallResult {
   content: string;
-  kind: "tool-calls";
+  kind: 'tool-calls';
   toolCalls: ChatToolCall[];
 }
 
@@ -106,7 +106,7 @@ export const createOpenAiChatAdapter = (
         ? { tools: completionOptions.tools.map(serializeToolDefinition) }
         : {})
     };
-    const emitDiagnostic = (diagnostic: Omit<ChatCompletionDiagnostic, "endpoint" | "operation" | "operationId" | "purpose" | "requestBody" | "timestamp">): void => {
+    const emitDiagnostic = (diagnostic: Omit<ChatCompletionDiagnostic, 'endpoint' | 'operation' | 'operationId' | 'purpose' | 'requestBody' | 'timestamp'>): void => {
       if (!config.debug || !completionOptions.debug || !completionOptions.onDiagnostic) {
         return;
       }
@@ -125,7 +125,7 @@ export const createOpenAiChatAdapter = (
       response = await fetchWithRetry(
         endpoint,
         {
-          method: "POST",
+          method: 'POST',
           headers: provider.headers,
           body: JSON.stringify(requestBody)
         },
@@ -141,29 +141,29 @@ export const createOpenAiChatAdapter = (
 
     const body = await readJsonResponse(response);
     if (!response.ok) {
-      const message = formatProviderError("Chat completion failed", body);
+      const message = formatProviderError('Chat completion failed', body);
       emitDiagnostic({
         error: message,
         ok: false,
         responseBody: body,
         status: response.status
       });
-      throw createTaggedError("provider-chat-failed", message);
+      throw createTaggedError('provider-chat-failed', message);
     }
 
     const result = readChatCompletionResult(body);
     if (!result) {
       emitDiagnostic({
-        error: "Chat completion response did not include assistant content.",
+        error: 'Chat completion response did not include assistant content.',
         ok: false,
         responseBody: body,
         status: response.status
       });
-      throw createTaggedError("provider-chat-empty", "Chat completion response did not include assistant content.");
+      throw createTaggedError('provider-chat-empty', 'Chat completion response did not include assistant content.');
     }
 
     emitDiagnostic({
-      ...(result.kind === "text" ? { assistantContent: result.content } : {}),
+      ...(result.kind === 'text' ? { assistantContent: result.content } : {}),
       ok: true,
       responseBody: body,
       status: response.status
@@ -174,8 +174,8 @@ export const createOpenAiChatAdapter = (
   return {
     async complete(messages, completionOptions = {}) {
       const response = await completeStructured(messages, completionOptions);
-      if (response.kind !== "text") {
-        throw createTaggedError("provider-chat-tool-calls-unexpected", "Chat completion returned tool calls unexpectedly.");
+      if (response.kind !== 'text') {
+        throw createTaggedError('provider-chat-tool-calls-unexpected', 'Chat completion returned tool calls unexpectedly.');
       }
       return response.content;
     },
@@ -198,12 +198,12 @@ export const createOpenAiEmbeddingAdapter = (
     const response = await fetchWithRetry(
       `${provider.baseUrl}/embeddings`,
       {
-        method: "POST",
+        method: 'POST',
         headers: provider.headers,
         body: JSON.stringify({
           model: config.embeddingModel,
           input: inputs,
-          encoding_format: "float"
+          encoding_format: 'float'
         })
       },
       {
@@ -216,12 +216,12 @@ export const createOpenAiEmbeddingAdapter = (
 
     const body = await readJsonResponse(response);
     if (!response.ok) {
-      throw createTaggedError("provider-embedding-failed", formatProviderError("Embedding request failed", body));
+      throw createTaggedError('provider-embedding-failed', formatProviderError('Embedding request failed', body));
     }
 
     const embeddings = readEmbeddings(body);
     if (embeddings.length !== inputs.length) {
-      throw createTaggedError("provider-embedding-empty", "Embedding response did not include every requested vector.");
+      throw createTaggedError('provider-embedding-empty', 'Embedding response did not include every requested vector.');
     }
 
     return embeddings;
@@ -236,7 +236,7 @@ export const createOpenAiEmbeddingAdapter = (
     async embed(input) {
       const [embedding] = await embedBatch([input]);
       if (!embedding) {
-        throw createTaggedError("provider-embedding-empty", "Embedding response did not include a numeric vector.");
+        throw createTaggedError('provider-embedding-empty', 'Embedding response did not include a numeric vector.');
       }
       return embedding;
     },
@@ -260,8 +260,8 @@ export const createDeterministicEmbeddingAdapter = (): EmbeddingAdapter => {
 
   return {
     failedRetries: 0,
-    modelId: "local-deterministic-v1",
-    schemaVersion: "local-vector-8",
+    modelId: 'local-deterministic-v1',
+    schemaVersion: 'local-vector-8',
     embed,
     embedBatch(inputs) {
       return Promise.all(inputs.map((input) => embed(input)));
@@ -280,14 +280,14 @@ const stableWordIndex = (word: string, modulo: number): number => {
 
 const createOpenAiRequestConfig = (config: ProviderConfig): { baseUrl: string; headers: Record<string, string> } => {
   if (!config.apiKey) {
-    throw createTaggedError("provider-api-key-missing", "OPENAI_API_KEY is required for provider-backed chat.");
+    throw createTaggedError('provider-api-key-missing', 'OPENAI_API_KEY is required for provider-backed chat.');
   }
 
   return {
     baseUrl: config.baseUrl,
     headers: {
-      "Authorization": `Bearer ${config.apiKey}`,
-      "Content-Type": "application/json"
+      'Authorization': `Bearer ${config.apiKey}`,
+      'Content-Type': 'application/json'
     }
   };
 };
@@ -301,7 +301,7 @@ const readJsonResponse = async (response: Response): Promise<unknown> => {
   try {
     return JSON.parse(text) as unknown;
   } catch (error) {
-    throw createTaggedError("provider-invalid-json", `Provider returned invalid JSON: ${formatThrownValue(error)}`);
+    throw createTaggedError('provider-invalid-json', `Provider returned invalid JSON: ${formatThrownValue(error)}`);
   }
 };
 
@@ -315,13 +315,13 @@ const readChatCompletionResult = (body: unknown): ChatStructuredResult | null =>
     return null;
   }
 
-  const content = typeof first.message.content === "string" ? first.message.content.trim() : "";
+  const content = typeof first.message.content === 'string' ? first.message.content.trim() : '';
   const toolCalls = readToolCalls(first.message.tool_calls);
 
   if (toolCalls.length > 0) {
     return {
       content,
-      kind: "tool-calls",
+      kind: 'tool-calls',
       toolCalls
     };
   }
@@ -329,7 +329,7 @@ const readChatCompletionResult = (body: unknown): ChatStructuredResult | null =>
   return content.length > 0
     ? {
       content,
-      kind: "text"
+      kind: 'text'
     }
     : null;
 };
@@ -342,10 +342,10 @@ const readToolCalls = (value: unknown): ChatToolCall[] => {
   return value.flatMap((entry) => {
     if (
       !isRecord(entry) ||
-      typeof entry.id !== "string" ||
+      typeof entry.id !== 'string' ||
       !isRecord(entry.function) ||
-      typeof entry.function.name !== "string" ||
-      typeof entry.function.arguments !== "string"
+      typeof entry.function.name !== 'string' ||
+      typeof entry.function.arguments !== 'string'
     ) {
       return [];
     }
@@ -364,18 +364,18 @@ const serializeChatMessage = (message: ChatMessage): Record<string, unknown> => 
     role: message.role
   };
 
-  if (message.role === "assistant" && message.toolCalls && message.toolCalls.length > 0) {
+  if (message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0) {
     serialized.tool_calls = message.toolCalls.map((toolCall) => ({
       function: {
         arguments: toolCall.arguments,
         name: toolCall.name
       },
       id: toolCall.id,
-      type: "function"
+      type: 'function'
     }));
   }
 
-  if (message.role === "tool") {
+  if (message.role === 'tool') {
     serialized.name = message.name;
     serialized.tool_call_id = message.toolCallId;
   }
@@ -389,7 +389,7 @@ const serializeToolDefinition = (tool: ChatToolDefinition): Record<string, unkno
     name: tool.name,
     parameters: tool.parameters
   },
-  type: "function"
+  type: 'function'
 });
 
 const readEmbeddings = (body: unknown): number[][] => {
@@ -404,12 +404,12 @@ const readEmbeddings = (body: unknown): number[][] => {
       }
 
       const embedding = item.embedding;
-      if (!embedding.every((value) => typeof value === "number")) {
+      if (!embedding.every((value) => typeof value === 'number')) {
         return null;
       }
 
       return {
-        index: typeof item.index === "number" ? item.index : fallbackIndex,
+        index: typeof item.index === 'number' ? item.index : fallbackIndex,
         embedding
       };
     })
@@ -419,7 +419,7 @@ const readEmbeddings = (body: unknown): number[][] => {
 };
 
 const formatProviderError = (fallback: string, body: unknown): string => {
-  if (isRecord(body) && isRecord(body.error) && typeof body.error.message === "string") {
+  if (isRecord(body) && isRecord(body.error) && typeof body.error.message === 'string') {
     return `${fallback}: ${body.error.message}`;
   }
 
@@ -441,7 +441,7 @@ const fetchWithRetry = async (
       if (!isRetryableStatus(response.status) || attempt === maxRetries) {
         return response;
       }
-      lastError = createTaggedError("provider-retryable-status", `Provider returned retryable status ${response.status}.`);
+      lastError = createTaggedError('provider-retryable-status', `Provider returned retryable status ${response.status}.`);
     } catch (error) {
       if (!isRetryableFetchError(error) || attempt === maxRetries) {
         throw error;
@@ -453,7 +453,7 @@ const fetchWithRetry = async (
     await delay(retryDelayMs * 2 ** attempt);
   }
 
-  throw lastError ?? createTaggedError("provider-request-failed", "Provider request failed.");
+  throw lastError ?? createTaggedError('provider-request-failed', 'Provider request failed.');
 };
 
 const fetchWithTimeout = async (
@@ -483,7 +483,7 @@ const isRetryableFetchError = (error: unknown): boolean => {
     return false;
   }
 
-  return error.name === "AbortError" || error.name === "TimeoutError" || error.name === "TypeError";
+  return error.name === 'AbortError' || error.name === 'TimeoutError' || error.name === 'TypeError';
 };
 
 const delay = async (durationMs: number): Promise<void> => {

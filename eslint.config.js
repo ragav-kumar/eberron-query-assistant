@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import react from 'eslint-plugin-react';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -13,9 +14,15 @@ export default tseslint.config(
             ecmaVersion: 2022,
             globals: globals.node,
             parserOptions: {
+                ecmaFeatures: {
+                    jsx: true
+                },
                 projectService: true,
                 tsconfigRootDir: import.meta.dirname
             }
+        },
+        plugins: {
+            react
         },
         rules: {
             '@typescript-eslint/consistent-type-imports': 'off',
@@ -30,7 +37,11 @@ export default tseslint.config(
                 }
             ],
             '@typescript-eslint/only-throw-error': 'off',
-            'func-style': ['error', 'expression', {'allowArrowFunctions': true}]
+            'func-style': ['error', 'expression', {'allowArrowFunctions': true}],
+            'jsx-quotes': ['error', 'prefer-single'],
+            quotes: ['error', 'single', {'avoidEscape': true}],
+            'react/jsx-indent-props': ['error', 4],
+            semi: ['error', 'always']
         }
     },
     {

@@ -1,20 +1,20 @@
-import { StrictMode } from "react";
-import { createRoot } from "react-dom/client";
-import type { ComponentType } from "react";
-import { ErrorBoundary } from "react-error-boundary";
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import type { ComponentType } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 
 const loadV1App = async (): Promise<ComponentType> => {
-  const module = await import("./v1/App.js");
+  const module = await import('./v1/App.js');
   return module.App;
 };
 
 const loadV2App = async (): Promise<ComponentType> => {
-  const module = await import("./v2/App.js");
+  const module = await import('./v2/App.js');
   return module.App;
 };
 
 export const resolveAppForPath = (pathname: string) => {
-  return pathname.includes("v2") ? loadV2App : loadV1App;
+  return pathname.includes('v2') ? loadV2App : loadV1App;
 };
 
 export const renderApp = (root: HTMLElement, pathname: string) => {
@@ -29,10 +29,10 @@ export const renderApp = (root: HTMLElement, pathname: string) => {
   });
 };
 
-const root = document.getElementById("root");
+const root = document.getElementById('root');
 
 if (!root) {
-  throw new Error("Missing root element.");
+  throw new Error('Missing root element.');
 }
 
 renderApp(root, window.location.pathname);

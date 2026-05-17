@@ -1,9 +1,11 @@
 import { Npc } from '@/dto/index.js';
 import { getSpeciesIcon } from './speciesIconLookup.js';
 import styles from './NpcCards.module.css';
+import { joinClassNames } from '@/client/v2/utils.js';
 
 interface NpcCardProps {
     npc: Npc;
+    isInSession: boolean;
 }
 
 const npcMetadataFields = [
@@ -14,7 +16,7 @@ const npcMetadataFields = [
     ['Age', 'age'],
 ] as const satisfies ReadonlyArray<readonly [label: string, key: keyof Npc]>;
 
-export const NpcCard = ({npc}: NpcCardProps) => {
+export const NpcCard = ({npc, isInSession}: NpcCardProps) => {
     const speciesIcon = getSpeciesIcon(npc.species);
     const metadata = npcMetadataFields.flatMap(([label, key]) => {
         const value = npc[key];
@@ -22,11 +24,18 @@ export const NpcCard = ({npc}: NpcCardProps) => {
     });
 
     return (
-        <article className={styles.wrap} aria-labelledby={`npc-card-${npc.id}`}>
+        <article
+            id={`npc-card-${npc.id}`}
+            className={joinClassNames(styles.wrap, isInSession ? styles.inSession : null)}
+        >
             <header className={styles.header}>
                 <div className={styles.headerText}>
-                    <span className={styles.id}>#{npc.id}</span>
-                    <h2 id={`npc-card-${npc.id}`} className={styles.name}>{npc.name}</h2>
+                    <span className={styles.id}>
+                        #{npc.id}
+                    </span>
+                    <h2 className={styles.name}>
+                        {npc.name}
+                    </h2>
                 </div>
                 {speciesIcon ? (
                     <img

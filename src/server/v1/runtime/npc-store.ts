@@ -1,17 +1,17 @@
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
-import { hasErrorCode } from "@/errors.js";
-import type { RuntimeConfig } from "@/types.js";
-import type { GeneratedNpc } from "./npc-session.js";
+import { hasErrorCode } from '@/errors.js';
+import type { RuntimeConfig } from '@/types.js';
+import type { GeneratedNpc } from './npc-session.js';
 
 export interface StoredGeneratedNpc extends GeneratedNpc {
   createdAt: string;
   updatedAt: string;
 }
 
-const GENERATED_NPCS_STATE_FILE = "generated-npcs.json";
-const LEGACY_GENERATED_NPCS_LOG_FILE = "generated_npcs.md";
+const GENERATED_NPCS_STATE_FILE = 'generated-npcs.json';
+const LEGACY_GENERATED_NPCS_LOG_FILE = 'generated_npcs.md';
 
 export const readGeneratedNpcState = async (config: RuntimeConfig): Promise<GeneratedNpc[]> => {
   return sortStoredNpcsForDisplay(await readStoredGeneratedNpcState(config));
@@ -37,7 +37,7 @@ export const updateGeneratedNpcState = async (
 
   const next = sortStoredNpcsForStorage([...existing.values()]);
   await mkdir(config.stateDir, { recursive: true });
-  await writeFile(getGeneratedNpcStatePath(config), `${JSON.stringify(next, null, 2)}\n`, "utf8");
+  await writeFile(getGeneratedNpcStatePath(config), `${JSON.stringify(next, null, 2)}\n`, 'utf8');
   return sortStoredNpcsForDisplay(next);
 };
 
@@ -48,9 +48,9 @@ export const getGeneratedNpcStatePath = (config: RuntimeConfig): string => {
 const readStoredGeneratedNpcState = async (config: RuntimeConfig): Promise<StoredGeneratedNpc[]> => {
   const statePath = getGeneratedNpcStatePath(config);
   try {
-    return readStoredNpcArray(JSON.parse(await readFile(statePath, "utf8")));
+    return readStoredNpcArray(JSON.parse(await readFile(statePath, 'utf8')));
   } catch (error) {
-    if (!hasErrorCode(error, "ENOENT")) {
+    if (!hasErrorCode(error, 'ENOENT')) {
       throw error;
     }
   }
@@ -64,13 +64,13 @@ const migrateLegacyGeneratedNpcLog = async (config: RuntimeConfig): Promise<Stor
   let timestamp: string;
   try {
     const [legacyText, legacyStat] = await Promise.all([
-      readFile(legacyPath, "utf8"),
+      readFile(legacyPath, 'utf8'),
       stat(legacyPath)
     ]);
     markdown = legacyText;
     timestamp = legacyStat.mtime.toISOString();
   } catch (error) {
-    if (hasErrorCode(error, "ENOENT")) {
+    if (hasErrorCode(error, 'ENOENT')) {
       return [];
     }
     throw error;
@@ -82,7 +82,7 @@ const migrateLegacyGeneratedNpcLog = async (config: RuntimeConfig): Promise<Stor
   }
 
   await mkdir(config.stateDir, { recursive: true });
-  await writeFile(getGeneratedNpcStatePath(config), `${JSON.stringify(sortStoredNpcsForStorage(migrated), null, 2)}\n`, "utf8");
+  await writeFile(getGeneratedNpcStatePath(config), `${JSON.stringify(sortStoredNpcsForStorage(migrated), null, 2)}\n`, 'utf8');
   return migrated;
 };
 
@@ -96,7 +96,7 @@ export const parseLegacyGeneratedNpcMarkdown = (markdown: string, timestamp: str
     const bioMatch = body.match(/\r?\n\r?\nBio:\s*(?<bio>[\s\S]*?)(?=\r?\n\r?\n## NPC Generation|\s*$)/);
 
     if (!groups || !descriptionMatch?.groups || !bioMatch?.groups) {
-      throw new Error("Legacy generated NPC Markdown contains a malformed NPC card.");
+      throw new Error('Legacy generated NPC Markdown contains a malformed NPC card.');
     }
 
     return readStoredNpcRecord({
@@ -115,7 +115,7 @@ export const parseLegacyGeneratedNpcMarkdown = (markdown: string, timestamp: str
 
 const readStoredNpcArray = (value: unknown): StoredGeneratedNpc[] => {
   if (!Array.isArray(value)) {
-    throw new Error("Generated NPC state file must contain a JSON array.");
+    throw new Error('Generated NPC state file must contain a JSON array.');
   }
 
   const npcs = value.map(readStoredNpcRecord);
@@ -127,16 +127,16 @@ const readStoredNpcRecord = (value: unknown): StoredGeneratedNpc => {
   const id = isRecord(value) ? value.id : null;
   if (
     !isRecord(value) ||
-    typeof id !== "number" ||
+    typeof id !== 'number' ||
     !Number.isInteger(id) ||
     id <= 0 ||
-    typeof value.name !== "string" ||
-    typeof value.description !== "string" ||
-    typeof value.bio !== "string" ||
-    typeof value.createdAt !== "string" ||
-    typeof value.updatedAt !== "string"
+    typeof value.name !== 'string' ||
+    typeof value.description !== 'string' ||
+    typeof value.bio !== 'string' ||
+    typeof value.createdAt !== 'string' ||
+    typeof value.updatedAt !== 'string'
   ) {
-    throw new Error("Generated NPC state file contains an invalid NPC record.");
+    throw new Error('Generated NPC state file contains an invalid NPC record.');
   }
 
   const npc = {
@@ -155,13 +155,13 @@ const readStoredNpcRecord = (value: unknown): StoredGeneratedNpc => {
     !isValidIsoDate(npc.createdAt) ||
     !isValidIsoDate(npc.updatedAt)
   ) {
-    throw new Error("Generated NPC state file contains an invalid NPC record.");
+    throw new Error('Generated NPC state file contains an invalid NPC record.');
   }
 
   return npc;
 };
 
-const OPTIONAL_STORED_NPC_DETAIL_KEYS = ["species", "ethnicity", "gender", "role", "age"] as const;
+const OPTIONAL_STORED_NPC_DETAIL_KEYS = ['species', 'ethnicity', 'gender', 'role', 'age'] as const;
 type OptionalStoredNpcDetailKey = (typeof OPTIONAL_STORED_NPC_DETAIL_KEYS)[number];
 
 const readOptionalStoredNpcDetails = (
@@ -174,8 +174,8 @@ const readOptionalStoredNpcDetails = (
     if (detail === undefined) {
       continue;
     }
-    if (typeof detail !== "string") {
-      throw new Error("Generated NPC state file contains an invalid NPC record.");
+    if (typeof detail !== 'string') {
+      throw new Error('Generated NPC state file contains an invalid NPC record.');
     }
 
     const normalized = detail.trim();
@@ -189,7 +189,7 @@ const readOptionalStoredNpcDetails = (
 
 const assertUniqueNpcIds = (npcs: StoredGeneratedNpc[]): void => {
   if (new Set(npcs.map((npc) => npc.id)).size !== npcs.length) {
-    throw new Error("Generated NPC state file contains duplicate NPC ids.");
+    throw new Error('Generated NPC state file contains duplicate NPC ids.');
   }
 };
 
@@ -209,5 +209,5 @@ const isValidIsoDate = (value: string): boolean => {
 };
 
 const isRecord = (value: unknown): value is Record<string, unknown> => {
-  return typeof value === "object" && value !== null;
+  return typeof value === 'object' && value !== null;
 };

@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ChangeEvent } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ChangeEvent } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { App } from "@/client/v1/App.js";
-import * as api from "@/client/v1/api.js";
+import { App } from '@/client/v1/App.js';
+import * as api from '@/client/v1/api.js';
 
-vi.mock("@mdxeditor/editor", () => ({
+vi.mock('@mdxeditor/editor', () => ({
   BoldItalicUnderlineToggles: () => null,
   MDXEditor: (props: {
     markdown: string;
@@ -16,7 +16,7 @@ vi.mock("@mdxeditor/editor", () => ({
       props.onChange(event.currentTarget.value);
     };
 
-    return <textarea aria-label="Additional Context Editor" value={props.markdown} onChange={handleChange} />;
+    return <textarea aria-label='Additional Context Editor' value={props.markdown} onChange={handleChange} />;
   },
   UndoRedo: () => null,
   headingsPlugin: () => ({}),
@@ -26,7 +26,7 @@ vi.mock("@mdxeditor/editor", () => ({
   toolbarPlugin: () => ({})
 }));
 
-vi.mock("../src/client/v1/api.js", () => ({
+vi.mock('../src/client/v1/api.js', () => ({
   askAssistant: vi.fn(),
   generateNpcs: vi.fn(),
   getContext: vi.fn(),
@@ -34,39 +34,39 @@ vi.mock("../src/client/v1/api.js", () => ({
   getNpcs: vi.fn(),
   getStatus: vi.fn(),
   refresh: vi.fn(),
-  isApiRequestError: vi.fn((error: unknown) => error instanceof Error && "console" in error),
+  isApiRequestError: vi.fn((error: unknown) => error instanceof Error && 'console' in error),
   subscribeConsole: vi.fn(),
   writeContext: vi.fn()
 }));
 
 const logExchange = (user: string, title: string, assistant: string): api.ApiLogExchange => ({
   assistant,
-  kind: "exchange",
+  kind: 'exchange',
   title,
   user
 });
 
 const initialLog = {
-  activeFilePath: "logs/session.json" as string | null,
-  exchanges: [logExchange("Initial prompt", "GUI Session", "Ready.")],
+  activeFilePath: 'logs/session.json' as string | null,
+  exchanges: [logExchange('Initial prompt', 'GUI Session', 'Ready.')],
   files: [
     {
       active: true,
-      filePath: "logs/session.json",
-      label: "session"
+      filePath: 'logs/session.json',
+      label: 'session'
     }
   ],
-  filePath: "logs/session.json" as string | null,
+  filePath: 'logs/session.json' as string | null,
   readOnly: false
 };
 
 const initialConsole = {
   entries: [
     {
-      id: "1",
-      level: "info" as const,
-      message: "Ready",
-      timestamp: "2026-05-02T12:00:00.000Z"
+      id: '1',
+      level: 'info' as const,
+      message: 'Ready',
+      timestamp: '2026-05-02T12:00:00.000Z'
     }
   ]
 };
@@ -86,7 +86,7 @@ const operationResult = (overrides: Partial<api.ApiOperationResult> = {}): api.A
 beforeEach(() => {
   vi.useRealTimers();
   vi.clearAllMocks();
-  vi.mocked(api.getContext).mockResolvedValue("");
+  vi.mocked(api.getContext).mockResolvedValue('');
   vi.mocked(api.getLog).mockResolvedValue(initialLog);
   vi.mocked(api.getNpcs).mockResolvedValue(emptyNpcs());
   vi.mocked(api.getStatus).mockResolvedValue({
@@ -99,7 +99,7 @@ beforeEach(() => {
   vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
     log: {
       ...initialLog,
-      exchanges: [logExchange("What about Aerenal?", "Aerenal Overview", "Answer")]
+      exchanges: [logExchange('What about Aerenal?', 'Aerenal Overview', 'Answer')]
     }
   }));
   vi.mocked(api.generateNpcs).mockResolvedValue(operationResult({
@@ -108,13 +108,13 @@ beforeEach(() => {
         {
           id: 1,
           name: "Jala ir'Wynarn",
-          species: "Human",
-          ethnicity: "Aundairian",
-          gender: "woman",
-          role: "envoy",
-          age: "about 40",
-          description: "A sharp-eyed Aundairian envoy in travel-stained blue.",
-          bio: "She trades favors along the border."
+          species: 'Human',
+          ethnicity: 'Aundairian',
+          gender: 'woman',
+          role: 'envoy',
+          age: 'about 40',
+          description: 'A sharp-eyed Aundairian envoy in travel-stained blue.',
+          bio: 'She trades favors along the border.'
         }
       ]
     }
@@ -123,10 +123,10 @@ beforeEach(() => {
     console: {
       entries: [
         {
-          id: "3",
-          level: "info",
-          message: "Refresh complete.",
-          timestamp: "2026-05-02T12:00:02.000Z"
+          id: '3',
+          level: 'info',
+          message: 'Refresh complete.',
+          timestamp: '2026-05-02T12:00:02.000Z'
         }
       ]
     }
@@ -139,108 +139,108 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("App", () => {
-  it("renders input and output tabs with their default selections", async () => {
+describe('App', () => {
+  it('renders input and output tabs with their default selections', async () => {
     render(<App />);
 
-    expect((await screen.findByRole("tab", { name: "Input" })).getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("tab", { name: "Additional Context" }).getAttribute("aria-selected")).toBe("false");
-    expect(screen.getByRole("tab", { name: "Console" }).getAttribute("aria-selected")).toBe("false");
-    expect(screen.getByRole("tab", { name: "Log" }).getAttribute("aria-selected")).toBe("true");
-    expect(screen.getByRole("tab", { name: "NPCs" }).getAttribute("aria-selected")).toBe("false");
-    expect(screen.getByRole("checkbox", { name: "Include party info" })).toHaveProperty("checked", true);
-    expect(screen.getByText("Extra retrieval turns: 1")).toBeTruthy();
-    expect(screen.getByRole("slider")).toHaveProperty("value", "1");
+    expect((await screen.findByRole('tab', { name: 'Input' })).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'Additional Context' }).getAttribute('aria-selected')).toBe('false');
+    expect(screen.getByRole('tab', { name: 'Console' }).getAttribute('aria-selected')).toBe('false');
+    expect(screen.getByRole('tab', { name: 'Log' }).getAttribute('aria-selected')).toBe('true');
+    expect(screen.getByRole('tab', { name: 'NPCs' }).getAttribute('aria-selected')).toBe('false');
+    expect(screen.getByRole('checkbox', { name: 'Include party info' })).toHaveProperty('checked', true);
+    expect(screen.getByText('Extra retrieval turns: 1')).toBeTruthy();
+    expect(screen.getByRole('slider')).toHaveProperty('value', '1');
   });
 
-  it("submits the selected retrieval turn limit for standard and NPC requests", async () => {
+  it('submits the selected retrieval turn limit for standard and NPC requests', async () => {
     render(<App />);
 
-    fireEvent.change(await screen.findByRole("slider"), { target: { value: "3" } });
-    expect(screen.getByText("Extra retrieval turns: 3")).toBeTruthy();
+    fireEvent.change(await screen.findByRole('slider'), { target: { value: '3' } });
+    expect(screen.getByText('Extra retrieval turns: 3')).toBeTruthy();
 
     fireEvent.change(screen.getByPlaceholderText(/Ask about Eberron/i), {
-      target: { value: "What about Aerenal?" }
+      target: { value: 'What about Aerenal?' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String), true, 3);
+      expect(api.askAssistant).toHaveBeenCalledWith('What about Aerenal?', expect.any(String), true, 3);
     });
 
-    fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
+    fireEvent.click(screen.getByRole('radio', { name: 'NPC Generator' }));
     fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
-      target: { value: "Generate one envoy" }
+      target: { value: 'Generate one envoy' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
     await waitFor(() => {
-      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one envoy", expect.any(String), true, 3);
+      expect(api.generateNpcs).toHaveBeenCalledWith('Generate one envoy', expect.any(String), true, 3);
     });
   });
 
-  it("uses one shared party info checkbox for standard and NPC submissions", async () => {
+  it('uses one shared party info checkbox for standard and NPC submissions', async () => {
     render(<App />);
 
-    const checkbox = await screen.findByRole("checkbox", { name: "Include party info" });
+    const checkbox = await screen.findByRole('checkbox', { name: 'Include party info' });
     fireEvent.click(checkbox);
-    expect(checkbox).toHaveProperty("checked", false);
+    expect(checkbox).toHaveProperty('checked', false);
 
     fireEvent.change(screen.getByPlaceholderText(/Ask about Eberron/i), {
-      target: { value: "What about Aundair?" }
+      target: { value: 'What about Aundair?' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Aundair?", expect.any(String), false, 1);
+      expect(api.askAssistant).toHaveBeenCalledWith('What about Aundair?', expect.any(String), false, 1);
     });
 
-    fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
-    expect(screen.getByRole("checkbox", { name: "Include party info" })).toHaveProperty("checked", false);
+    fireEvent.click(screen.getByRole('radio', { name: 'NPC Generator' }));
+    expect(screen.getByRole('checkbox', { name: 'Include party info' })).toHaveProperty('checked', false);
     fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
-      target: { value: "Generate one envoy" }
+      target: { value: 'Generate one envoy' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
     await waitFor(() => {
-      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one envoy", expect.any(String), false, 1);
+      expect(api.generateNpcs).toHaveBeenCalledWith('Generate one envoy', expect.any(String), false, 1);
     });
   });
 
-  it("switches input modes with the radio group", async () => {
+  it('switches input modes with the radio group', async () => {
     render(<App />);
 
-    expect(await screen.findByRole("radio", { name: "Standard" })).toHaveProperty("checked", true);
+    expect(await screen.findByRole('radio', { name: 'Standard' })).toHaveProperty('checked', true);
     expect(screen.getByPlaceholderText(/Ask about Eberron/i)).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
+    fireEvent.click(screen.getByRole('radio', { name: 'NPC Generator' }));
     expect(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i)).toBeTruthy();
     expect(screen.queryByPlaceholderText(/Ask about Eberron/i)).toBeNull();
   });
 
-  it("submits assistant prompts and renders the returned log", async () => {
+  it('submits assistant prompts and renders the returned log', async () => {
     render(<App />);
 
     fireEvent.change(screen.getByPlaceholderText(/Ask about Eberron/i), {
-      target: { value: "What about Aerenal?" }
+      target: { value: 'What about Aerenal?' }
     });
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Ask" })).toHaveProperty("disabled", false);
+      expect(screen.getByRole('button', { name: 'Ask' })).toHaveProperty('disabled', false);
     });
-    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String), true, 1);
+      expect(api.askAssistant).toHaveBeenCalledWith('What about Aerenal?', expect.any(String), true, 1);
     });
-    expect(await screen.findByText("Answer")).toBeTruthy();
+    expect(await screen.findByText('Answer')).toBeTruthy();
   });
 
-  it("keeps saved NPC cards after standard assistant prompts and mode switches", async () => {
+  it('keeps saved NPC cards after standard assistant prompts and mode switches', async () => {
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
       npcs: {
         npcs: [
           {
             id: 1,
-            name: "Saved NPC",
-            description: "A saved generated NPC.",
-            bio: "They persist outside the prompt mode."
+            name: 'Saved NPC',
+            description: 'A saved generated NPC.',
+            bio: 'They persist outside the prompt mode.'
           }
         ]
       }
@@ -248,15 +248,15 @@ describe("App", () => {
     vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
       log: {
         ...initialLog,
-        exchanges: [logExchange("What about Aerenal?", "Aerenal Overview", "Answer")]
+        exchanges: [logExchange('What about Aerenal?', 'Aerenal Overview', 'Answer')]
       },
       npcs: {
         npcs: [
           {
             id: 1,
-            name: "Saved NPC",
-            description: "A saved generated NPC.",
-            bio: "They persist outside the prompt mode."
+            name: 'Saved NPC',
+            description: 'A saved generated NPC.',
+            bio: 'They persist outside the prompt mode.'
           }
         ]
       }
@@ -265,75 +265,75 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.change(await screen.findByPlaceholderText(/Ask about Eberron/i), {
-      target: { value: "What about Aerenal?" }
+      target: { value: 'What about Aerenal?' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Aerenal?", expect.any(String), true, 1);
+      expect(api.askAssistant).toHaveBeenCalledWith('What about Aerenal?', expect.any(String), true, 1);
     });
-    fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
-    fireEvent.click(screen.getByRole("radio", { name: "Standard" }));
-    fireEvent.click(screen.getByRole("tab", { name: "NPCs" }));
+    fireEvent.click(screen.getByRole('radio', { name: 'NPC Generator' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'Standard' }));
+    fireEvent.click(screen.getByRole('tab', { name: 'NPCs' }));
 
-    expect(await screen.findByText("Saved NPC")).toBeTruthy();
+    expect(await screen.findByText('Saved NPC')).toBeTruthy();
   });
 
-  it("submits assistant prompts with Enter", async () => {
+  it('submits assistant prompts with Enter', async () => {
     render(<App />);
 
     const prompt = screen.getByPlaceholderText(/Ask about Eberron/i);
     fireEvent.change(prompt, {
-      target: { value: "What about Sharn?" }
+      target: { value: 'What about Sharn?' }
     });
-    fireEvent.keyDown(prompt, { key: "Enter" });
+    fireEvent.keyDown(prompt, { key: 'Enter' });
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("What about Sharn?", expect.any(String), true, 1);
+      expect(api.askAssistant).toHaveBeenCalledWith('What about Sharn?', expect.any(String), true, 1);
     });
   });
 
-  it("submits NPC generator prompts and renders NPC cards", async () => {
+  it('submits NPC generator prompts and renders NPC cards', async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'NPC Generator' }));
     fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
-      target: { value: "Generate one Aundairian envoy" }
+      target: { value: 'Generate one Aundairian envoy' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
     await waitFor(() => {
-      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one Aundairian envoy", expect.any(String), true, 1);
+      expect(api.generateNpcs).toHaveBeenCalledWith('Generate one Aundairian envoy', expect.any(String), true, 1);
     });
     expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
-    expect(screen.getByText("Species")).toBeTruthy();
-    expect(screen.getByText("Human")).toBeTruthy();
-    expect(screen.getByText("Ethnicity")).toBeTruthy();
-    expect(screen.getByText("Aundairian")).toBeTruthy();
-    expect(screen.getByText("Gender")).toBeTruthy();
-    expect(screen.getByText("woman")).toBeTruthy();
-    expect(screen.getByText("Role")).toBeTruthy();
-    expect(screen.getByText("envoy")).toBeTruthy();
-    expect(screen.getByText("Age")).toBeTruthy();
-    expect(screen.getByText("about 40")).toBeTruthy();
-    expect(screen.getByText("#1")).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "NPCs" }).getAttribute("aria-selected")).toBe("true");
+    expect(screen.getByText('Species')).toBeTruthy();
+    expect(screen.getByText('Human')).toBeTruthy();
+    expect(screen.getByText('Ethnicity')).toBeTruthy();
+    expect(screen.getByText('Aundairian')).toBeTruthy();
+    expect(screen.getByText('Gender')).toBeTruthy();
+    expect(screen.getByText('woman')).toBeTruthy();
+    expect(screen.getByText('Role')).toBeTruthy();
+    expect(screen.getByText('envoy')).toBeTruthy();
+    expect(screen.getByText('Age')).toBeTruthy();
+    expect(screen.getByText('about 40')).toBeTruthy();
+    expect(screen.getByText('#1')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'NPCs' }).getAttribute('aria-selected')).toBe('true');
   });
 
-  it("loads saved NPC cards on startup", async () => {
+  it('loads saved NPC cards on startup', async () => {
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
       npcs: {
         npcs: [
           {
             id: 2,
-            name: "Newer NPC",
-            description: "A recently updated NPC.",
-            bio: "They should render first."
+            name: 'Newer NPC',
+            description: 'A recently updated NPC.',
+            bio: 'They should render first.'
           },
           {
             id: 1,
-            name: "Older NPC",
-            description: "An older saved NPC.",
-            bio: "They should render second."
+            name: 'Older NPC',
+            description: 'An older saved NPC.',
+            bio: 'They should render second.'
           }
         ]
       }
@@ -341,39 +341,39 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("tab", { name: "NPCs" }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'NPCs' }));
 
-    expect(await screen.findByText("Newer NPC")).toBeTruthy();
-    expect(await screen.findByText("Older NPC")).toBeTruthy();
-    expect(screen.getByText("2 NPCs saved")).toBeTruthy();
-    expect(screen.queryByText("Species")).toBeNull();
-    expect(screen.queryByText("Unknown")).toBeNull();
+    expect(await screen.findByText('Newer NPC')).toBeTruthy();
+    expect(await screen.findByText('Older NPC')).toBeTruthy();
+    expect(screen.getByText('2 NPCs saved')).toBeTruthy();
+    expect(screen.queryByText('Species')).toBeNull();
+    expect(screen.queryByText('Unknown')).toBeNull();
   });
 
-  it("submits NPC generator prompts with Enter", async () => {
+  it('submits NPC generator prompts with Enter', async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'NPC Generator' }));
     const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
     fireEvent.change(prompt, {
-      target: { value: "Generate one goblin" }
+      target: { value: 'Generate one goblin' }
     });
-    fireEvent.keyDown(prompt, { key: "Enter" });
+    fireEvent.keyDown(prompt, { key: 'Enter' });
 
     await waitFor(() => {
-      expect(api.generateNpcs).toHaveBeenCalledWith("Generate one goblin", expect.any(String), true, 1);
+      expect(api.generateNpcs).toHaveBeenCalledWith('Generate one goblin', expect.any(String), true, 1);
     });
   });
 
-  it("starts a new NPC generation context from the NPCs tab without clearing saved cards", async () => {
+  it('starts a new NPC generation context from the NPCs tab without clearing saved cards', async () => {
     vi.mocked(api.generateNpcs).mockResolvedValue(operationResult({
       npcs: {
         npcs: [
           {
             id: 1,
             name: "Jala ir'Wynarn",
-            description: "A sharp-eyed Aundairian envoy.",
-            bio: "She trades favors."
+            description: 'A sharp-eyed Aundairian envoy.',
+            bio: 'She trades favors.'
           }
         ]
       }
@@ -381,43 +381,43 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'NPC Generator' }));
     fireEvent.change(screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i), {
-      target: { value: "Generate one Aundairian envoy" }
+      target: { value: 'Generate one Aundairian envoy' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
-    fireEvent.click(await screen.findByRole("tab", { name: "NPCs" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+    fireEvent.click(await screen.findByRole('tab', { name: 'NPCs' }));
     expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "New session" }));
+    fireEvent.click(screen.getByRole('button', { name: 'New session' }));
 
     expect(await screen.findByText("Jala ir'Wynarn")).toBeTruthy();
-    expect(screen.getByText("1 NPC saved")).toBeTruthy();
+    expect(screen.getByText('1 NPC saved')).toBeTruthy();
   });
 
-  it("persists additional context edits", async () => {
+  it('persists additional context edits', async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Additional Context" }));
-    fireEvent.change(await screen.findByLabelText("Additional Context Editor"), {
-      target: { value: "Campaign fact" }
+    fireEvent.click(await screen.findByRole('tab', { name: 'Additional Context' }));
+    fireEvent.change(await screen.findByLabelText('Additional Context Editor'), {
+      target: { value: 'Campaign fact' }
     });
 
     await waitFor(() => {
-      expect(api.writeContext).toHaveBeenCalledWith("Campaign fact");
+      expect(api.writeContext).toHaveBeenCalledWith('Campaign fact');
     }, { timeout: 1_500 });
   });
 
-  it("preloads existing additional context into the editor", async () => {
-    vi.mocked(api.getContext).mockResolvedValue("Existing campaign context");
+  it('preloads existing additional context into the editor', async () => {
+    vi.mocked(api.getContext).mockResolvedValue('Existing campaign context');
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("tab", { name: "Additional Context" }));
-    const editor = await screen.findByLabelText("Additional Context Editor");
-    expect(editor).toHaveProperty("value", "Existing campaign context");
+    fireEvent.click(await screen.findByRole('tab', { name: 'Additional Context' }));
+    const editor = await screen.findByLabelText('Additional Context Editor');
+    expect(editor).toHaveProperty('value', 'Existing campaign context');
   });
 
-  it("disables operations while a client-owned operation is busy", async () => {
+  it('disables operations while a client-owned operation is busy', async () => {
     let resolveAsk: ((value: api.ApiOperationResult) => void) | undefined;
     vi.mocked(api.askAssistant).mockReturnValue(
       new Promise((resolve) => {
@@ -428,21 +428,21 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.change(await screen.findByPlaceholderText(/Ask about Eberron/i), {
-      target: { value: "What about Sharn?" }
+      target: { value: 'What about Sharn?' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
 
-    expect(await screen.findByRole("button", { name: "Ask" })).toHaveProperty("disabled", true);
-    expect(screen.getByRole("checkbox", { name: "Include party info" })).toHaveProperty("disabled", true);
-    expect(screen.getByRole("status", { name: "Loading output" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("radio", { name: "NPC Generator" }));
-    expect(screen.getByRole("button", { name: "Generate" })).toHaveProperty("disabled", true);
-    expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
+    expect(await screen.findByRole('button', { name: 'Ask' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('checkbox', { name: 'Include party info' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('status', { name: 'Loading output' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: 'NPC Generator' }));
+    expect(screen.getByRole('button', { name: 'Generate' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Refresh' })).toHaveProperty('disabled', true);
 
     resolveAsk?.(operationResult());
   });
 
-  it("keeps the submitted assistant prompt visible until the request succeeds", async () => {
+  it('keeps the submitted assistant prompt visible until the request succeeds', async () => {
     let resolveAsk: ((value: api.ApiOperationResult) => void) | undefined;
     vi.mocked(api.askAssistant).mockReturnValue(
       new Promise((resolve) => {
@@ -454,35 +454,35 @@ describe("App", () => {
 
     const prompt = await screen.findByPlaceholderText(/Ask about Eberron/i);
     fireEvent.change(prompt, {
-      target: { value: "What about Sharn?" }
+      target: { value: 'What about Sharn?' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
 
-    expect(prompt).toHaveProperty("value", "What about Sharn?");
+    expect(prompt).toHaveProperty('value', 'What about Sharn?');
 
     resolveAsk?.(operationResult());
 
     await waitFor(() => {
-      expect(prompt).toHaveProperty("value", "");
+      expect(prompt).toHaveProperty('value', '');
     });
   });
 
-  it("keeps the submitted assistant prompt visible when the request fails", async () => {
-    vi.mocked(api.askAssistant).mockRejectedValue(new Error("provider failed"));
+  it('keeps the submitted assistant prompt visible when the request fails', async () => {
+    vi.mocked(api.askAssistant).mockRejectedValue(new Error('provider failed'));
 
     render(<App />);
 
     const prompt = await screen.findByPlaceholderText(/Ask about Eberron/i);
     fireEvent.change(prompt, {
-      target: { value: "What about Sharn?" }
+      target: { value: 'What about Sharn?' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
 
-    expect(await screen.findByText("provider failed")).toBeTruthy();
-    expect(prompt).toHaveProperty("value", "What about Sharn?");
+    expect(await screen.findByText('provider failed')).toBeTruthy();
+    expect(prompt).toHaveProperty('value', 'What about Sharn?');
   });
 
-  it("clears NPC generator prompts only after success", async () => {
+  it('clears NPC generator prompts only after success', async () => {
     let resolveGenerate: ((value: api.ApiOperationResult) => void) | undefined;
     vi.mocked(api.generateNpcs).mockReturnValue(
       new Promise((resolve) => {
@@ -492,14 +492,14 @@ describe("App", () => {
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'NPC Generator' }));
     const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
     fireEvent.change(prompt, {
-      target: { value: "Generate one envoy" }
+      target: { value: 'Generate one envoy' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
-    expect(prompt).toHaveProperty("value", "Generate one envoy");
+    expect(prompt).toHaveProperty('value', 'Generate one envoy');
 
     resolveGenerate?.(operationResult({
       npcs: {
@@ -507,35 +507,35 @@ describe("App", () => {
           {
             id: 1,
             name: "Jala ir'Wynarn",
-            description: "A sharp-eyed Aundairian envoy.",
-            bio: "She trades favors."
+            description: 'A sharp-eyed Aundairian envoy.',
+            bio: 'She trades favors.'
           }
         ]
       }
     }));
 
     await waitFor(() => {
-      expect(prompt).toHaveProperty("value", "");
+      expect(prompt).toHaveProperty('value', '');
     });
   });
 
-  it("keeps NPC generator prompts visible when the request fails", async () => {
-    vi.mocked(api.generateNpcs).mockRejectedValue(new Error("generation failed"));
+  it('keeps NPC generator prompts visible when the request fails', async () => {
+    vi.mocked(api.generateNpcs).mockRejectedValue(new Error('generation failed'));
 
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("radio", { name: "NPC Generator" }));
+    fireEvent.click(await screen.findByRole('radio', { name: 'NPC Generator' }));
     const prompt = screen.getByPlaceholderText(/Generate three Aundairian goblin NPCs/i);
     fireEvent.change(prompt, {
-      target: { value: "Generate one envoy" }
+      target: { value: 'Generate one envoy' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Generate" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
 
-    expect(await screen.findByText("generation failed")).toBeTruthy();
-    expect(prompt).toHaveProperty("value", "Generate one envoy");
+    expect(await screen.findByText('generation failed')).toBeTruthy();
+    expect(prompt).toHaveProperty('value', 'Generate one envoy');
   });
 
-  it("renders streamed console entries before an operation result returns", async () => {
+  it('renders streamed console entries before an operation result returns', async () => {
     let onConsoleEntry: ((entry: api.ApiConsoleEntry) => void) | undefined;
     vi.mocked(api.subscribeConsole).mockImplementation((listener) => {
       onConsoleEntry = listener;
@@ -546,30 +546,30 @@ describe("App", () => {
     render(<App />);
 
     fireEvent.change(await screen.findByPlaceholderText(/Ask about Eberron/i), {
-      target: { value: "What about Sharn?" }
+      target: { value: 'What about Sharn?' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
     onConsoleEntry?.({
-      id: "stream-1",
-      level: "info",
-      message: "No completed refresh found for this server session; running routine refresh before continuing.",
-      timestamp: "2026-05-02T12:00:03.000Z"
+      id: 'stream-1',
+      level: 'info',
+      message: 'No completed refresh found for this server session; running routine refresh before continuing.',
+      timestamp: '2026-05-02T12:00:03.000Z'
     });
-    fireEvent.click(screen.getByRole("tab", { name: "Console" }));
+    fireEvent.click(screen.getByRole('tab', { name: 'Console' }));
 
     expect(await screen.findByText(/No completed refresh found/)).toBeTruthy();
   });
 
-  it("restores active operation state and console output on startup", async () => {
+  it('restores active operation state and console output on startup', async () => {
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
-      activeOperation: "force-reingest",
+      activeOperation: 'force-reingest',
       console: {
         entries: [
           {
-            id: "replay-1",
-            level: "info",
-            message: "Force re-ingest requested; source inventory will schedule all available sources.",
-            timestamp: "2026-05-02T12:00:04.000Z"
+            id: 'replay-1',
+            level: 'info',
+            message: 'Force re-ingest requested; source inventory will schedule all available sources.',
+            timestamp: '2026-05-02T12:00:04.000Z'
           }
         ]
       }
@@ -577,22 +577,22 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("Running force-reingest")).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Console" }).getAttribute("aria-selected")).toBe("true");
+    expect(await screen.findByText('Running force-reingest')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Console' }).getAttribute('aria-selected')).toBe('true');
     expect(await screen.findByText(/Force re-ingest requested/)).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole('button', { name: 'Refresh' })).toHaveProperty('disabled', true);
   });
 
-  it("displays startup refresh status and console output", async () => {
+  it('displays startup refresh status and console output', async () => {
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
-      activeOperation: "startup-refresh",
+      activeOperation: 'startup-refresh',
       console: {
         entries: [
           {
-            id: "startup-1",
-            level: "info",
-            message: "Starting source inventory checks.",
-            timestamp: "2026-05-02T12:00:04.000Z"
+            id: 'startup-1',
+            level: 'info',
+            message: 'Starting source inventory checks.',
+            timestamp: '2026-05-02T12:00:04.000Z'
           }
         ]
       }
@@ -600,51 +600,51 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("Running startup-refresh")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Refresh" })).toHaveProperty("disabled", true);
-    expect(screen.getByRole("button", { name: "Force reingest" })).toHaveProperty("disabled", false);
-    fireEvent.click(screen.getByRole("tab", { name: "Console" }));
+    expect(await screen.findByText('Running startup-refresh')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Refresh' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Force reingest' })).toHaveProperty('disabled', false);
+    fireEvent.click(screen.getByRole('tab', { name: 'Console' }));
     expect(await screen.findByText(/Starting source inventory checks/)).toBeTruthy();
   });
 
-  it("allows force reingest to replace a recovered startup refresh", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  it('allows force reingest to replace a recovered startup refresh', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
-      activeOperation: "startup-refresh",
+      activeOperation: 'startup-refresh',
       console: {
         entries: [
           {
-            id: "startup-1",
-            level: "info",
-            message: "Starting source inventory checks.",
-            timestamp: "2026-05-02T12:00:04.000Z"
+            id: 'startup-1',
+            level: 'info',
+            message: 'Starting source inventory checks.',
+            timestamp: '2026-05-02T12:00:04.000Z'
           }
         ]
       }
     }));
 
     render(<App />);
-    fireEvent.click(await screen.findByRole("button", { name: "Force reingest" }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Force reingest' }));
 
     await waitFor(() => {
       expect(confirm).toHaveBeenCalledWith(
-        "Force reingest will cancel startup refresh, then clear and rebuild app-owned corpus and retrieval artifacts. Continue?"
+        'Force reingest will cancel startup refresh, then clear and rebuild app-owned corpus and retrieval artifacts. Continue?'
       );
       expect(api.refresh).toHaveBeenCalledWith(true);
     });
   });
 
-  it("polls recovered operations until final output is available", async () => {
+  it('polls recovered operations until final output is available', async () => {
     vi.mocked(api.getStatus)
       .mockResolvedValueOnce(statusResponse({
-        activeOperation: "force-reingest",
+        activeOperation: 'force-reingest',
         console: {
           entries: [
             {
-              id: "replay-1",
-              level: "info",
-              message: "Force re-ingest requested.",
-              timestamp: "2026-05-02T12:00:04.000Z"
+              id: 'replay-1',
+              level: 'info',
+              message: 'Force re-ingest requested.',
+              timestamp: '2026-05-02T12:00:04.000Z'
             }
           ]
         }
@@ -654,16 +654,16 @@ describe("App", () => {
         console: {
           entries: [
             {
-              id: "replay-1",
-              level: "info",
-              message: "Force re-ingest requested.",
-              timestamp: "2026-05-02T12:00:04.000Z"
+              id: 'replay-1',
+              level: 'info',
+              message: 'Force re-ingest requested.',
+              timestamp: '2026-05-02T12:00:04.000Z'
             },
             {
-              id: "replay-2",
-              level: "info",
-              message: "Refresh complete. Force reingest: true.",
-              timestamp: "2026-05-02T12:00:05.000Z"
+              id: 'replay-2',
+              level: 'info',
+              message: 'Refresh complete. Force reingest: true.',
+              timestamp: '2026-05-02T12:00:05.000Z'
             }
           ]
         }
@@ -671,53 +671,53 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("Running force-reingest")).toBeTruthy();
-    expect(await screen.findByText("Refresh complete. Force reingest: true.")).toBeTruthy();
-    expect(await screen.findByText("Ready")).toBeTruthy();
+    expect(await screen.findByText('Running force-reingest')).toBeTruthy();
+    expect(await screen.findByText('Refresh complete. Force reingest: true.')).toBeTruthy();
+    expect(await screen.findByText('Ready')).toBeTruthy();
     expect(api.getStatus).toHaveBeenCalledTimes(2);
   });
 
-  it("renders the active log Markdown", async () => {
+  it('renders the active log Markdown', async () => {
     render(<App />);
 
-    expect(await screen.findByText("Contents")).toBeTruthy();
-    expect(await screen.findAllByText("GUI Session")).toHaveLength(2);
-    expect(await screen.findByText("Initial prompt")).toBeTruthy();
-    expect(await screen.findByText("Ready.")).toBeTruthy();
+    expect(await screen.findByText('Contents')).toBeTruthy();
+    expect(await screen.findAllByText('GUI Session')).toHaveLength(2);
+    expect(await screen.findByText('Initial prompt')).toBeTruthy();
+    expect(await screen.findByText('Ready.')).toBeTruthy();
   });
 
-  it("renders persisted progress entries inline in the log", async () => {
+  it('renders persisted progress entries inline in the log', async () => {
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({
       log: {
         ...initialLog,
         exchanges: [
-          { kind: "progress", message: "Checking article evidence about Aerenal." },
-          logExchange("What about Aerenal?", "Aerenal Overview", "Answer")
+          { kind: 'progress', message: 'Checking article evidence about Aerenal.' },
+          logExchange('What about Aerenal?', 'Aerenal Overview', 'Answer')
         ]
       }
     }));
 
     render(<App />);
 
-    expect(await screen.findByText("Progress")).toBeTruthy();
-    expect(await screen.findByText("Checking article evidence about Aerenal.")).toBeTruthy();
-    expect(await screen.findAllByText("Aerenal Overview")).toHaveLength(2);
+    expect(await screen.findByText('Progress')).toBeTruthy();
+    expect(await screen.findByText('Checking article evidence about Aerenal.')).toBeTruthy();
+    expect(await screen.findAllByText('Aerenal Overview')).toHaveLength(2);
   });
 
-  it("renders an empty log state before a log exists", async () => {
+  it('renders an empty log state before a log exists', async () => {
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({ log: emptyLog() }));
 
     render(<App />);
 
-    expect(await screen.findByText("No log selected")).toBeTruthy();
-    expect(await screen.findByText("Submit an assistant prompt to start the log.")).toBeTruthy();
+    expect(await screen.findByText('No log selected')).toBeTruthy();
+    expect(await screen.findByText('Submit an assistant prompt to start the log.')).toBeTruthy();
   });
 
-  it("browses historical logs as read-only selections", async () => {
+  it('browses historical logs as read-only selections', async () => {
     const historicalLog = {
       ...initialLog,
-      filePath: "logs/old.json",
-      exchanges: [logExchange("Past question", "Old Session", "Past answer.")],
+      filePath: 'logs/old.json',
+      exchanges: [logExchange('Past question', 'Old Session', 'Past answer.')],
       readOnly: true
     };
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({ log: {
@@ -726,8 +726,8 @@ describe("App", () => {
         ...(initialLog.files ?? []),
         {
           active: false,
-          filePath: "logs/old.json",
-          label: "old"
+          filePath: 'logs/old.json',
+          label: 'old'
         }
       ]
     } }));
@@ -735,129 +735,129 @@ describe("App", () => {
 
     render(<App />);
 
-    const select = await screen.findByLabelText("Log file");
-    expect(screen.getByRole("option", { name: "old" })).toBeTruthy();
-    fireEvent.change(select, { target: { value: "logs/old.json" } });
+    const select = await screen.findByLabelText('Log file');
+    expect(screen.getByRole('option', { name: 'old' })).toBeTruthy();
+    fireEvent.change(select, { target: { value: 'logs/old.json' } });
 
     await waitFor(() => {
       expect(
         vi.mocked(api.getLog).mock.calls.some(([options]) => (
-          options.filePath === "logs/old.json"
+          options.filePath === 'logs/old.json'
         ))
       ).toBe(true);
     });
-    expect(await screen.findByText("Read only: logs/old.json")).toBeTruthy();
-    expect(await screen.findAllByText("Old Session")).toHaveLength(2);
-    expect(await screen.findByText("Past question")).toBeTruthy();
-    expect(await screen.findByText("Past answer.")).toBeTruthy();
+    expect(await screen.findByText('Read only: logs/old.json')).toBeTruthy();
+    expect(await screen.findAllByText('Old Session')).toHaveLength(2);
+    expect(await screen.findByText('Past question')).toBeTruthy();
+    expect(await screen.findByText('Past answer.')).toBeTruthy();
   });
 
-  it("starts a new lazy log session", async () => {
+  it('starts a new lazy log session', async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "New session" }));
+    fireEvent.click(await screen.findByRole('button', { name: 'New session' }));
 
-    expect(await screen.findByText("No log selected")).toBeTruthy();
-    expect(await screen.findByText("Submit an assistant prompt to start the log.")).toBeTruthy();
+    expect(await screen.findByText('No log selected')).toBeTruthy();
+    expect(await screen.findByText('Submit an assistant prompt to start the log.')).toBeTruthy();
   });
 
-  it("switches back to the active log after submitting while browsing history", async () => {
+  it('switches back to the active log after submitting while browsing history', async () => {
     vi.mocked(api.getStatus).mockResolvedValue(statusResponse({ log: {
       ...initialLog,
       files: [
         ...(initialLog.files ?? []),
         {
           active: false,
-          filePath: "logs/old.json",
-          label: "old"
+          filePath: 'logs/old.json',
+          label: 'old'
         }
       ]
     } }));
     vi.mocked(api.getLog).mockResolvedValueOnce({
       ...initialLog,
-      filePath: "logs/old.json",
-      exchanges: [logExchange("Old prompt", "Old Session", "Old answer.")],
+      filePath: 'logs/old.json',
+      exchanges: [logExchange('Old prompt', 'Old Session', 'Old answer.')],
       readOnly: true
     });
     vi.mocked(api.askAssistant).mockResolvedValue(operationResult({
       log: {
         ...initialLog,
-        exchanges: [logExchange("Write to active session", "New Session Answer", "New answer.")]
+        exchanges: [logExchange('Write to active session', 'New Session Answer', 'New answer.')]
       }
     }));
 
     render(<App />);
 
-    const select = await screen.findByLabelText("Log file");
-    fireEvent.change(select, { target: { value: "logs/old.json" } });
-    expect(await screen.findAllByText("Old Session")).toHaveLength(2);
+    const select = await screen.findByLabelText('Log file');
+    fireEvent.change(select, { target: { value: 'logs/old.json' } });
+    expect(await screen.findAllByText('Old Session')).toHaveLength(2);
 
     fireEvent.change(screen.getByPlaceholderText(/Ask about Eberron/i), {
-      target: { value: "Write to active session" }
+      target: { value: 'Write to active session' }
     });
-    fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+    fireEvent.click(screen.getByRole('button', { name: 'Ask' }));
 
     await waitFor(() => {
-      expect(api.askAssistant).toHaveBeenCalledWith("Write to active session", expect.any(String), true, 1);
+      expect(api.askAssistant).toHaveBeenCalledWith('Write to active session', expect.any(String), true, 1);
     });
-    expect(await screen.findByText("Current session: logs/session.json")).toBeTruthy();
-    expect(await screen.findAllByText("New Session Answer")).toHaveLength(2);
-    expect(await screen.findByText("New answer.")).toBeTruthy();
+    expect(await screen.findByText('Current session: logs/session.json')).toBeTruthy();
+    expect(await screen.findAllByText('New Session Answer')).toHaveLength(2);
+    expect(await screen.findByText('New answer.')).toBeTruthy();
   });
 
-  it("renders refresh output as console feed text", async () => {
+  it('renders refresh output as console feed text', async () => {
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Refresh" }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Refresh' }));
 
     await waitFor(() => {
       expect(api.refresh).toHaveBeenCalledWith(false);
     });
-    expect(await screen.findByText("Refresh complete.")).toBeTruthy();
-    expect(screen.getByTestId("console-feed").querySelector(".console-level")?.textContent).toBe("INFO");
+    expect(await screen.findByText('Refresh complete.')).toBeTruthy();
+    expect(screen.getByTestId('console-feed').querySelector('.console-level')?.textContent).toBe('INFO');
   });
 
-  it("auto-scrolls console and log panes when output changes", async () => {
-    Object.defineProperty(HTMLElement.prototype, "scrollHeight", {
+  it('auto-scrolls console and log panes when output changes', async () => {
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
       configurable: true,
       value: 500
     });
 
     render(<App />);
 
-    expect(await screen.findByTestId("markdown-output")).toHaveProperty("scrollTop", 500);
-    fireEvent.click(screen.getByRole("tab", { name: "Console" }));
-    expect(await screen.findByTestId("console-feed")).toHaveProperty("scrollTop", 500);
+    expect(await screen.findByTestId('markdown-output')).toHaveProperty('scrollTop', 500);
+    fireEvent.click(screen.getByRole('tab', { name: 'Console' }));
+    expect(await screen.findByTestId('console-feed')).toHaveProperty('scrollTop', 500);
   });
 
-  it("adds tooltips to key controls", async () => {
+  it('adds tooltips to key controls', async () => {
     render(<App />);
 
-    expect((await screen.findByRole("button", { name: "Refresh" })).getAttribute("title")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Force reingest" }).getAttribute("title")).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Input" }).getAttribute("title")).toBeTruthy();
-    expect(screen.getByRole("tab", { name: "Console" }).getAttribute("title")).toBeTruthy();
+    expect((await screen.findByRole('button', { name: 'Refresh' })).getAttribute('title')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Force reingest' }).getAttribute('title')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Input' }).getAttribute('title')).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Console' }).getAttribute('title')).toBeTruthy();
   });
 
-  it("confirms before force reingest", async () => {
-    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+  it('confirms before force reingest', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Force reingest" }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Force reingest' }));
 
     await waitFor(() => {
       expect(confirm).toHaveBeenCalledWith(
-        "Force reingest clears and rebuilds app-owned corpus and retrieval artifacts. Continue?"
+        'Force reingest clears and rebuilds app-owned corpus and retrieval artifacts. Continue?'
       );
       expect(api.refresh).toHaveBeenCalledWith(true);
     });
   });
 
-  it("does not force reingest when confirmation is cancelled", async () => {
-    vi.spyOn(window, "confirm").mockReturnValue(false);
+  it('does not force reingest when confirmation is cancelled', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
     render(<App />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Force reingest" }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Force reingest' }));
 
     await waitFor(() => {
       expect(api.refresh).not.toHaveBeenCalled();

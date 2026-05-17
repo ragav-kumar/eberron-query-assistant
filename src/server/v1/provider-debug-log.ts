@@ -1,7 +1,7 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 
-const PROVIDER_DEBUG_LOG_FILENAME = "provider-debug.jsonl";
+const PROVIDER_DEBUG_LOG_FILENAME = 'provider-debug.jsonl';
 const DEFAULT_MAX_PROVIDER_DEBUG_LOG_LINES = 200;
 
 export interface ProviderDebugLog {
@@ -31,7 +31,7 @@ export const createProviderDebugLog = (
           maxLines <= 0
             ? []
             : [...existingLines, line].slice(-maxLines);
-        await writeFile(filePath, nextLines.length > 0 ? `${nextLines.join("\n")}\n` : "", "utf8");
+        await writeFile(filePath, nextLines.length > 0 ? `${nextLines.join('\n')}\n` : '', 'utf8');
       })
       .catch(() => undefined);
   };
@@ -46,7 +46,7 @@ export const createProviderDebugLog = (
 
 const readExistingLines = async (filePath: string): Promise<string[]> => {
   try {
-    const file = await readFile(filePath, "utf8");
+    const file = await readFile(filePath, 'utf8');
     return file
       .split(/\r?\n/)
       .map((line) => line.trim())
@@ -60,5 +60,5 @@ const readExistingLines = async (filePath: string): Promise<string[]> => {
 };
 
 const isMissingFileError = (error: unknown): boolean => {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT";
+  return typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT';
 };

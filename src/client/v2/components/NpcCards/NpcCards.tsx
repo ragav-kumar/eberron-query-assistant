@@ -1,27 +1,29 @@
 import styles from './NpcCards.module.css';
 import { NpcCard } from './NpcCard.js';
 import { useSessionContext } from '../SessionContext/index.js';
+import { useNpcsQuery } from '@/client/v2/api/index.js';
 
 export const NpcCards = () => {
-    const { activeSession } = useSessionContext();
+    const { activeSessions } = useSessionContext();
+    const activeSessionId = activeSessions.npc?.id;
+    const npcQuery = useNpcsQuery();
 
-    if (activeSession?.mode !== 'npc') {
-        // TODO: Replace with empty session output
-        return null;
-    }
-
-    if (activeSession.npcs.length === 0) {
+    if (npcQuery.isLoading || npcQuery.isPending || !npcQuery.data?.npcs.length) {
         return (
             <p className={styles.empty}>
-                Generate NPCs to save cards here.
+                Loading...
             </p>
         );
     }
 
     return (
         <div className={styles.grid}>
-            {activeSession.npcs.map(npc => (
-                <NpcCard key={npc.id} npc={npc}/>
+            {npcQuery.data?.npcs.map(npc => (
+                <NpcCard
+                    key={npc.id}
+                    npc={npc}
+                    isInSession={activeSessionId === npc.sessionId}
+                />
             ))}
         </div>
     );

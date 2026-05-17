@@ -1,8 +1,8 @@
-import type { SourceType } from "@/types.js";
-import type { RuntimeState } from "../state/index.js";
-import type { SourceDiscoveryService, SourceDiscoverySummary } from "./source-discovery-service.js";
+import type { SourceType } from '@/types.js';
+import type { RuntimeState } from '../state/index.js';
+import type { SourceDiscoveryService, SourceDiscoverySummary } from './source-discovery-service.js';
 
-const SOURCE_TYPES: SourceType[] = ["foundry", "pdf", "article"];
+const SOURCE_TYPES: SourceType[] = ['foundry', 'pdf', 'article'];
 
 export const createPlaceholderSourceDiscoveryService = (): SourceDiscoveryService => {
   return {
@@ -15,7 +15,7 @@ export const createPlaceholderSourceDiscoveryService = (): SourceDiscoveryServic
           updated: 0,
           removed: 0,
           failed: 0,
-          status: "skipped",
+          status: 'skipped',
           message: `${sourceType}: placeholder inventory skipped.`,
           details: []
         })),

@@ -22,7 +22,7 @@ export const chunkText = (text: string, targetCharacters = TARGET_CHUNK_CHARACTE
     for (const segment of splitOversizedParagraph(paragraph, targetCharacters)) {
       if (current.length > 0 && currentLength + segment.length + 2 > targetCharacters) {
         chunks.push({
-          text: current.join("\n\n"),
+          text: current.join('\n\n'),
           startParagraph: currentStart,
           endParagraph: currentEnd
         });
@@ -44,7 +44,7 @@ export const chunkText = (text: string, targetCharacters = TARGET_CHUNK_CHARACTE
 
   if (current.length > 0) {
     chunks.push({
-      text: current.join("\n\n"),
+      text: current.join('\n\n'),
       startParagraph: currentStart,
       endParagraph: currentEnd
     });
@@ -62,7 +62,7 @@ const splitOversizedParagraph = (paragraph: string, targetCharacters: number): s
   let remaining = paragraph;
 
   while (remaining.length > targetCharacters) {
-    const whitespaceIndex = remaining.lastIndexOf(" ", targetCharacters);
+    const whitespaceIndex = remaining.lastIndexOf(' ', targetCharacters);
     const splitIndex =
       whitespaceIndex >= Math.floor(targetCharacters * 0.6) ? whitespaceIndex : targetCharacters;
     const segment = remaining.slice(0, splitIndex).trim();
@@ -81,9 +81,9 @@ const splitOversizedParagraph = (paragraph: string, targetCharacters: number): s
 
 export const normalizeText = (text: string): string => {
   return text
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 };

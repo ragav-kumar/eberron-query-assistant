@@ -4,9 +4,10 @@ import remarkGfm from 'remark-gfm';
 import { useSessionContext } from './SessionContext/index.js';
 
 export const Assistant = () => {
-    const { activeSession } = useSessionContext();
+    const { activeSessions } = useSessionContext();
+    const activeSession = activeSessions.assistant;
 
-    if (activeSession?.mode !== 'assistant') {
+    if (activeSession == null) {
         // TODO: Replace with empty session output
         return null;
     }
