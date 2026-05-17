@@ -1,6 +1,4 @@
-import type { SessionMode } from './sessions.js';
-
-export type RunStatus = 'pending' | 'running' | 'completed' | 'failed';
+import type { RunStatus, SessionMode } from '@/types.js';
 
 export interface Run {
     id: string;

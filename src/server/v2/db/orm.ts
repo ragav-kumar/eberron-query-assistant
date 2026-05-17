@@ -6,10 +6,11 @@ import { createAppDatabase } from './database.js';
 import type { V2Orm } from './contract.js';
 import { createLoaders } from './loaders.js';
 import { createSchema } from './schemaDefinition.js';
+import { createConsoleEntriesRepository } from './repositories/consoleEntriesRepository.js';
 import { createNpcRepository } from './repositories/npcsRepository.js';
-import { createRunAuditLogsRepository } from './repositories/runAuditLogsRepository.js';
+import { createRefreshStateRepository } from './repositories/refreshStateRepository.js';
 import { createRunsRepository } from './repositories/runsRepository.js';
-import { createSessionEntriesRepository } from './repositories/sessionEntriesRepository.js';
+import { createSessionExchangesRepository } from './repositories/sessionExchangesRepository.js';
 import { createSessionsRepository } from './repositories/sessionsRepository.js';
 import { createSettingsRepository } from './repositories/settingsRepository.js';
 
@@ -32,10 +33,11 @@ const createV2Orm = (config: RuntimeConfig): V2Orm => {
         close: () => {
             appDatabase.close();
         },
-        npcs: createNpcRepository(repositoryDependencies, loaders),
-        runAuditLogs: createRunAuditLogsRepository(repositoryDependencies, loaders),
+        consoleEntries: createConsoleEntriesRepository(repositoryDependencies),
+        npcs: createNpcRepository(repositoryDependencies),
+        refreshState: createRefreshStateRepository(repositoryDependencies),
         runs: createRunsRepository(repositoryDependencies, loaders),
-        sessionEntries: createSessionEntriesRepository(repositoryDependencies, loaders),
+        sessionExchanges: createSessionExchangesRepository(repositoryDependencies),
         sessions: createSessionsRepository(repositoryDependencies, loaders),
         settings: createSettingsRepository(repositoryDependencies),
     };

@@ -9,7 +9,7 @@ type SessionsRepository = V2Orm['sessions'];
 
 export const createSessionsRepository = (
     { getDatabase }: RepositoryDependencies,
-    loaders: Pick<V2Loaders, 'loadRun' | 'loadSession' | 'loadSessionEntries'>,
+    loaders: Pick<V2Loaders, 'loadRun' | 'loadSession' | 'loadSessionExchanges'>,
 ): SessionsRepository => {
     return {
         get: async (id, options) => {
@@ -22,11 +22,11 @@ export const createSessionsRepository = (
                 .prepare(`
                     SELECT
                         id,
-                        kind,
+                        mode,
                         title,
                         active_run_id,
+                        include_party_context,
                         archived_at,
-                        last_entry_at,
                         created_at,
                         updated_at
                     FROM sessions
@@ -35,9 +35,9 @@ export const createSessionsRepository = (
                 .all() as StoredSessionRow[];
 
             return rows.map((row) => {
-                const entries = loaders.loadSessionEntries(database, row.id);
+                const exchanges = loaders.loadSessionExchanges(database, row.id);
                 const activeRun = row.active_run_id ? loaders.loadRun(database, row.active_run_id) : null;
-                return mapSessionRow(row, entries, activeRun);
+                return mapSessionRow(row, exchanges, activeRun);
             });
         },
         save: async session => {
@@ -46,30 +46,30 @@ export const createSessionsRepository = (
                 .prepare(`
                     INSERT INTO sessions (
                         id,
-                        kind,
+                        mode,
                         title,
                         active_run_id,
+                        include_party_context,
                         archived_at,
-                        last_entry_at,
                         created_at,
                         updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
-                        kind = excluded.kind,
+                        mode = excluded.mode,
                         title = excluded.title,
                         active_run_id = excluded.active_run_id,
+                        include_party_context = excluded.include_party_context,
                         archived_at = excluded.archived_at,
-                        last_entry_at = excluded.last_entry_at,
                         created_at = excluded.created_at,
                         updated_at = excluded.updated_at
                 `)
                 .run(
                     session.id,
-                    session.kind,
+                    session.mode,
                     session.title ?? null,
-                    session.activeRunId ?? null,
+                    session.activeRunId,
+                    session.includePartyContext ? 1 : 0,
                     toTimestamp(session.archivedAt),
-                    toTimestamp(session.lastEntryAt),
                     session.createdAt.toISOString(),
                     session.updatedAt.toISOString(),
                 );

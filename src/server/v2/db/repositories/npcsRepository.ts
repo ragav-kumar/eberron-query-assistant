@@ -3,34 +3,38 @@ import type { V2Orm } from '../contract.js';
 import type { Npc as StoredNpcRow } from '../schema.js';
 
 import type { RepositoryDependencies } from './shared.js';
-import type { V2Loaders } from '../loaders.js';
 
 type NpcRepository = V2Orm['npcs'];
 
+const NPC_SELECT = `
+    SELECT
+        id,
+        session_id,
+        run_id,
+        name,
+        bio,
+        description,
+        age,
+        ethnicity,
+        gender,
+        role,
+        species,
+        created_at,
+        updated_at
+    FROM npcs
+`;
+
+const NPC_LIST_ORDER = 'ORDER BY updated_at DESC, id DESC';
+
 export const createNpcRepository = (
     { getDatabase }: RepositoryDependencies,
-    loaders: Pick<V2Loaders, 'loadNpcsByRun'>,
 ): NpcRepository => {
     return {
         get: async id => {
             const database = await getDatabase();
             const row = database
                 .prepare(`
-                    SELECT
-                        id,
-                        session_id,
-                        run_id,
-                        name,
-                        bio,
-                        description,
-                        age,
-                        ethnicity,
-                        gender,
-                        role,
-                        species,
-                        created_at,
-                        modified_at
-                    FROM npcs
+                    ${NPC_SELECT}
                     WHERE id = ?
                 `)
                 .get(id) as StoredNpcRow | undefined;
@@ -40,51 +44,30 @@ export const createNpcRepository = (
             const database = await getDatabase();
             const rows = database
                 .prepare(`
-                    SELECT
-                        id,
-                        session_id,
-                        run_id,
-                        name,
-                        bio,
-                        description,
-                        age,
-                        ethnicity,
-                        gender,
-                        role,
-                        species,
-                        created_at,
-                        modified_at
-                    FROM npcs
-                    ORDER BY id ASC
+                    ${NPC_SELECT}
+                    ${NPC_LIST_ORDER}
                 `)
                 .all() as StoredNpcRow[];
             return rows.map(mapNpcRow);
         },
         listByRun: async runId => {
             const database = await getDatabase();
-            return loaders.loadNpcsByRun(database, runId);
+            const rows = database
+                .prepare(`
+                    ${NPC_SELECT}
+                    WHERE run_id = ?
+                    ${NPC_LIST_ORDER}
+                `)
+                .all(runId) as StoredNpcRow[];
+            return rows.map(mapNpcRow);
         },
         listBySession: async sessionId => {
             const database = await getDatabase();
             const rows = database
                 .prepare(`
-                    SELECT
-                        id,
-                        session_id,
-                        run_id,
-                        name,
-                        bio,
-                        description,
-                        age,
-                        ethnicity,
-                        gender,
-                        role,
-                        species,
-                        created_at,
-                        modified_at
-                    FROM npcs
+                    ${NPC_SELECT}
                     WHERE session_id = ?
-                    ORDER BY id ASC
+                    ${NPC_LIST_ORDER}
                 `)
                 .all(sessionId) as StoredNpcRow[];
             return rows.map(mapNpcRow);
@@ -106,7 +89,7 @@ export const createNpcRepository = (
                         role,
                         species,
                         created_at,
-                        modified_at
+                        updated_at
                     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         session_id = excluded.session_id,
@@ -120,7 +103,7 @@ export const createNpcRepository = (
                         role = excluded.role,
                         species = excluded.species,
                         created_at = excluded.created_at,
-                        modified_at = excluded.modified_at
+                        updated_at = excluded.updated_at
                 `)
                 .run(
                     npc.id,
@@ -135,7 +118,7 @@ export const createNpcRepository = (
                     npc.role ?? null,
                     npc.species ?? null,
                     toTimestamp(npc.createdAt),
-                    toTimestamp(npc.modifiedAt),
+                    toTimestamp(npc.updatedAt),
                 );
         },
     };

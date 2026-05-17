@@ -1,6 +1,4 @@
-import type { RunStatus } from './runs.js';
-
-export type SessionFeedEntryKind = 'user' | 'reasoning' | 'response';
+import type { SessionFeedEntryKind, RunStatus } from '@/types.js';
 
 interface SessionFeedEntryBase {
     id: string;

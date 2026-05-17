@@ -1,147 +1,67 @@
 import type Database from 'better-sqlite3';
 
-import type { RunLoadOptions, SessionLoadOptions } from './contract.js';
-import {
-    mapNpcRow,
-    mapRunAuditLogRow,
-    mapRunRow,
-    mapSessionEntryRow,
-    mapSessionRow,
-} from './mappers.js';
+import type { SessionLoadOptions } from './contract.js';
+import { mapRunRow, mapSessionExchangeRow, mapSessionRow } from './mappers.js';
 import type {
-    Npc as ObjectModelNpc,
     Run as ObjectModelRun,
-    RunAuditLog as ObjectModelRunAuditLog,
     Session as ObjectModelSession,
-    SessionEntry as ObjectModelSessionEntry,
+    SessionExchange as ObjectModelSessionExchange,
 } from './objectModel.js';
 import type {
-    Npc as StoredNpcRow,
     Run as StoredRunRow,
-    RunAuditLog as StoredRunAuditLogRow,
     Session as StoredSessionRow,
-    SessionEntry as StoredSessionEntryRow,
+    SessionExchange as StoredSessionExchangeRow,
 } from './schema.js';
 
 export interface V2Loaders {
-    loadNpcsByRun: (database: Database.Database, runId: string) => ObjectModelNpc[];
-    loadRun: (database: Database.Database, runId: string, options?: RunLoadOptions) => ObjectModelRun | null;
-    loadRunAuditLogs: (database: Database.Database, runId: string) => ObjectModelRunAuditLog[];
+    loadRun: (database: Database.Database, runId: string) => ObjectModelRun | null;
     loadSession: (database: Database.Database, sessionId: string, options?: SessionLoadOptions) => ObjectModelSession | null;
-    loadSessionEntries: (database: Database.Database, sessionId: string) => ObjectModelSessionEntry[];
+    loadSessionExchanges: (database: Database.Database, sessionId: string) => ObjectModelSessionExchange[];
 }
 
 export const createLoaders = (): V2Loaders => {
-    const loadRunAuditLogs = (database: Database.Database, runId: string): ObjectModelRunAuditLog[] => {
-        const rows = database
-            .prepare(`
-                SELECT id, run_id, kind, details, created_at
-                FROM run_audit_logs
-                WHERE run_id = ?
-                ORDER BY created_at ASC, id ASC
-            `)
-            .all(runId) as StoredRunAuditLogRow[];
-        return rows.map(mapRunAuditLogRow);
-    };
-
-    const loadNpcsBySession = (database: Database.Database, sessionId: string): Map<string, ObjectModelNpc[]> => {
+    const loadSessionExchanges = (
+        database: Database.Database,
+        sessionId: string,
+    ): ObjectModelSessionExchange[] => {
         const rows = database
             .prepare(`
                 SELECT
                     id,
                     session_id,
                     run_id,
-                    name,
-                    bio,
-                    description,
-                    age,
-                    ethnicity,
-                    gender,
-                    role,
-                    species,
-                    created_at,
-                    modified_at
-                FROM npcs
-                WHERE session_id = ?
-                ORDER BY id ASC
-            `)
-            .all(sessionId) as StoredNpcRow[];
-        const grouped = new Map<string, ObjectModelNpc[]>();
-
-        for (const row of rows) {
-            const entry = mapNpcRow(row);
-            const existing = grouped.get(entry.runId) ?? [];
-            existing.push(entry);
-            grouped.set(entry.runId, existing);
-        }
-
-        return grouped;
-    };
-
-    const loadSessionEntries = (database: Database.Database, sessionId: string): ObjectModelSessionEntry[] => {
-        const rows = database
-            .prepare(`
-                SELECT
-                    session_id,
-                    entry_index,
-                    run_id,
-                    title,
+                    exchange_id,
+                    sequence_index,
                     kind,
                     content,
+                    title,
+                    tool_call_id,
                     created_at
-                FROM session_entries
+                FROM session_exchanges
                 WHERE session_id = ?
-                ORDER BY entry_index ASC
+                ORDER BY sequence_index ASC, id ASC
             `)
-            .all(sessionId) as StoredSessionEntryRow[];
-        const npcsByRunId = loadNpcsBySession(database, sessionId);
+            .all(sessionId) as StoredSessionExchangeRow[];
 
-        return rows.map((row) => {
-            const npcs = row.run_id ? (npcsByRunId.get(row.run_id) ?? []) : [];
-            return mapSessionEntryRow(row, npcs);
-        });
-    };
-
-    const loadNpcsByRun = (database: Database.Database, runId: string): ObjectModelNpc[] => {
-        const rows = database
-            .prepare(`
-                SELECT
-                    id,
-                    session_id,
-                    run_id,
-                    name,
-                    bio,
-                    description,
-                    age,
-                    ethnicity,
-                    gender,
-                    role,
-                    species,
-                    created_at,
-                    modified_at
-                FROM npcs
-                WHERE run_id = ?
-                ORDER BY id ASC
-            `)
-            .all(runId) as StoredNpcRow[];
-        return rows.map(mapNpcRow);
+        return rows.map(mapSessionExchangeRow);
     };
 
     const loadRun = (
         database: Database.Database,
         runId: string,
-        options?: RunLoadOptions,
     ): ObjectModelRun | null => {
         const row = database
             .prepare(`
                 SELECT
                     id,
                     session_id,
-                    include_party_context,
+                    exchange_id,
+                    mode,
+                    status,
                     prompt,
                     retrieval_turn_limit,
-                    kind,
-                    status,
+                    include_party_context,
+                    error,
                     created_at,
                     updated_at,
                     started_at,
@@ -152,12 +72,7 @@ export const createLoaders = (): V2Loaders => {
             `)
             .get(runId) as StoredRunRow | undefined;
 
-        if (!row) {
-            return null;
-        }
-
-        const auditLogs = options?.includeAuditLogs ? loadRunAuditLogs(database, runId) : undefined;
-        return mapRunRow(row, auditLogs);
+        return row ? mapRunRow(row) : null;
     };
 
     const loadSession = (
@@ -169,11 +84,11 @@ export const createLoaders = (): V2Loaders => {
             .prepare(`
                 SELECT
                     id,
-                    kind,
+                    mode,
                     title,
                     active_run_id,
+                    include_party_context,
                     archived_at,
-                    last_entry_at,
                     created_at,
                     updated_at
                 FROM sessions
@@ -185,22 +100,17 @@ export const createLoaders = (): V2Loaders => {
             return null;
         }
 
-        const entries = loadSessionEntries(database, sessionId);
-        const activeRunOptions = options?.includeRunAuditLogs === undefined
-            ? undefined
-            : { includeAuditLogs: options.includeRunAuditLogs };
+        const exchanges = options?.includeExchanges === false ? [] : loadSessionExchanges(database, sessionId);
         const activeRun = options?.includeActiveRun === false || row.active_run_id === null
             ? null
-            : loadRun(database, row.active_run_id, activeRunOptions);
+            : loadRun(database, row.active_run_id);
 
-        return mapSessionRow(row, entries, activeRun);
+        return mapSessionRow(row, exchanges, activeRun);
     };
 
     return {
-        loadNpcsByRun,
         loadRun,
-        loadRunAuditLogs,
         loadSession,
-        loadSessionEntries,
+        loadSessionExchanges,
     };
 };

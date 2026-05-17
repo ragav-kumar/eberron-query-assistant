@@ -12,9 +12,9 @@ export const createRunsRepository = (
     loaders: Pick<V2Loaders, 'loadRun'>,
 ): RunsRepository => {
     return {
-        get: async (id, options) => {
+        get: async id => {
             const database = await getDatabase();
-            return loaders.loadRun(database, id, options);
+            return loaders.loadRun(database, id);
         },
         listBySession: async sessionId => {
             const database = await getDatabase();
@@ -23,11 +23,13 @@ export const createRunsRepository = (
                     SELECT
                         id,
                         session_id,
-                        include_party_context,
+                        exchange_id,
+                        mode,
+                        status,
                         prompt,
                         retrieval_turn_limit,
-                        kind,
-                        status,
+                        include_party_context,
+                        error,
                         created_at,
                         updated_at,
                         started_at,
@@ -38,7 +40,7 @@ export const createRunsRepository = (
                     ORDER BY created_at ASC, id ASC
                 `)
                 .all(sessionId) as StoredRunRow[];
-            return rows.map((row) => mapRunRow(row));
+            return rows.map(mapRunRow);
         },
         save: async run => {
             const database = await getDatabase();
@@ -47,24 +49,28 @@ export const createRunsRepository = (
                     INSERT INTO runs (
                         id,
                         session_id,
-                        include_party_context,
+                        exchange_id,
+                        mode,
+                        status,
                         prompt,
                         retrieval_turn_limit,
-                        kind,
-                        status,
+                        include_party_context,
+                        error,
                         created_at,
                         updated_at,
                         started_at,
                         completed_at,
                         failed_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         session_id = excluded.session_id,
-                        include_party_context = excluded.include_party_context,
+                        exchange_id = excluded.exchange_id,
+                        mode = excluded.mode,
+                        status = excluded.status,
                         prompt = excluded.prompt,
                         retrieval_turn_limit = excluded.retrieval_turn_limit,
-                        kind = excluded.kind,
-                        status = excluded.status,
+                        include_party_context = excluded.include_party_context,
+                        error = excluded.error,
                         created_at = excluded.created_at,
                         updated_at = excluded.updated_at,
                         started_at = excluded.started_at,
@@ -74,11 +80,13 @@ export const createRunsRepository = (
                 .run(
                     run.id,
                     run.sessionId,
-                    run.includePartyContext ? 1 : 0,
+                    run.exchangeId,
+                    run.mode,
+                    run.status,
                     run.prompt,
                     run.retrievalTurnLimit,
-                    run.kind,
-                    run.status,
+                    run.includePartyContext ? 1 : 0,
+                    run.error ?? null,
                     run.createdAt.toISOString(),
                     run.updatedAt.toISOString(),
                     toTimestamp(run.startedAt),

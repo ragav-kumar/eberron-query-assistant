@@ -1,140 +1,87 @@
-/**
- * Server-side object model for v2 application state.
- *
- * This file sits above the storage schema and below transport DTOs:
- * - `schema.ts` describes raw persisted row shapes.
- * - `objectModel.ts` describes the richer shapes server code works with after
- *   loading, assembling, and relating those records.
- * - DTOs remain transport-specific and should stay separate.
- */
+import type {
+    ConsoleLevel,
+    RefreshOperationKind,
+    RefreshStatus,
+    RunStatus,
+    SessionMode,
+} from '@/types.js';
 
-/**
- * Application setting as used by server code after loading from persistence.
- */
-export interface Setting {
-    key: string;
-    value: string;
-    modifiedAt: Date;
+export interface AdditionalContextDocument {
+    markdown: string;
+    updatedAt: Date;
 }
 
-export type SessionKind = 'assistant' | 'npc';
-export type RunKind = 'assistant' | 'npc';
-export type RunStatus = 'pending' | 'running' | 'completed' | 'failed';
-export type SessionEntryKind =
-    | 'user'
-    | 'assistant-response'
-    | 'assistant-tool'
-    | 'system'
-    | 'assistant-npc';
-
-/**
- * Durable conversation resource as assembled for server-side use.
- *
- * Notes:
- * - `entries` is the canonical ordered session timeline.
- * - `activeRun` is present only when the session currently has a loaded active
- *   run.
- */
-export interface Session {
-    id: string;
-    kind: SessionKind;
-    title?: string;
-    activeRunId?: string | null;
-    activeRun?: Run | null;
-    archivedAt?: Date | null;
-    lastEntryAt?: Date | null;
+export interface RefreshState {
+    activeOperation: RefreshOperationKind | null;
+    refreshStatus: RefreshStatus;
+    reingestStatus: RefreshStatus;
+    lastRefreshAt: Date | null;
+    lastReingestAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
-    entries: SessionEntry[];
 }
 
-interface SessionEntryBase {
-    sessionId: string;
-    entryIndex: number;
-    runId?: string | null;
+export interface Session {
+    id: string;
+    mode: SessionMode;
     title?: string;
+    activeRunId: string | null;
+    activeRun?: Run | null;
+    includePartyContext: boolean;
+    archivedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+    exchanges: SessionExchange[];
+}
+
+interface SessionExchangeBase {
+    id: string;
+    sessionId: string;
+    runId: string;
+    exchangeId: string;
+    sequenceIndex: number;
     createdAt: Date;
 }
 
-export interface UserSessionEntry extends SessionEntryBase {
+export interface UserSessionExchange extends SessionExchangeBase {
     kind: 'user';
     content: string;
 }
 
-export interface AssistantResponseSessionEntry extends SessionEntryBase {
-    kind: 'assistant-response';
+export interface ReasoningSessionExchange extends SessionExchangeBase {
+    kind: 'reasoning';
     content: string;
+    toolCallId: string | null;
 }
 
-export interface AssistantToolSessionEntry extends SessionEntryBase {
-    kind: 'assistant-tool';
+export interface ResponseSessionExchange extends SessionExchangeBase {
+    kind: 'response';
     content: string;
+    title?: string;
 }
 
-export interface SystemSessionEntry extends SessionEntryBase {
-    kind: 'system';
-    content: string;
-}
+export type SessionExchange =
+    | UserSessionExchange
+    | ReasoningSessionExchange
+    | ResponseSessionExchange;
 
-/**
- * Timeline marker for generated NPC output.
- *
- * Notes:
- * - The storage layer links this entry to generated NPC rows indirectly through
- *   session/run provenance.
- * - The assembled object model can attach the resolved NPC list directly so
- *   server logic does not need to re-walk those relations repeatedly.
- */
-export interface AssistantNpcSessionEntry extends SessionEntryBase {
-    kind: 'assistant-npc';
-    npcs: Npc[];
-}
-
-export type SessionEntry =
-    | UserSessionEntry
-    | AssistantResponseSessionEntry
-    | AssistantToolSessionEntry
-    | SystemSessionEntry
-    | AssistantNpcSessionEntry;
-
-/**
- * Execution record as used by server-side orchestration logic.
- *
- * Notes:
- * - Audit logs remain separate from the user-visible session timeline.
- * - `auditLogs` is optional because callers may choose not to materialize them
- *   on every run read.
- */
 export interface Run {
     id: string;
     sessionId: string;
-    includePartyContext: boolean;
+    exchangeId: string;
+    mode: SessionMode;
+    status: RunStatus;
     prompt: string;
     retrievalTurnLimit: number;
-    kind: RunKind;
-    status: RunStatus;
+    includePartyContext: boolean;
+    error?: string;
     createdAt: Date;
     updatedAt: Date;
-    startedAt?: Date | null;
-    completedAt?: Date | null;
-    failedAt?: Date | null;
-    auditLogs?: RunAuditLog[];
+    startedAt: Date | null;
+    completedAt: Date | null;
+    failedAt: Date | null;
 }
 
-/**
- * Run-scoped audit row used for optional debug and execution tracing.
- */
-export interface RunAuditLog {
-    id: string;
-    runId: string;
-    kind: string;
-    details: string;
-    createdAt: Date;
-}
-
-/**
- * Generated NPC as used by server-side application logic.
- */
 export interface Npc {
     id: number;
     sessionId: string;
@@ -147,6 +94,13 @@ export interface Npc {
     gender?: string;
     role?: string;
     species?: string;
-    createdAt?: Date;
-    modifiedAt?: Date;
+    createdAt: Date | null;
+    updatedAt: Date | null;
+}
+
+export interface ConsoleEntry {
+    id: string;
+    level: ConsoleLevel;
+    message: string;
+    createdAt: Date;
 }

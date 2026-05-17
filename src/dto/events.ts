@@ -1,7 +1,6 @@
-import type { RefreshOperationKind, RefreshStatus } from './refresh.js';
-import type { RunStatus } from './runs.js';
+import type { RefreshOperationKind, RefreshStatus, RunStatus, SessionMode } from '@/types.js';
 import type { SessionFeedEntry } from './sessionFeed.js';
-import type { Session, SessionMode } from './sessions.js';
+import type { Session } from './sessions.js';
 
 interface EventBase {
     resource: string;

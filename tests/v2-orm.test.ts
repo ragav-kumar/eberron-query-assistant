@@ -18,7 +18,7 @@ describe('V2 ORM', () => {
         await rm(TEST_ROOT, { force: true, recursive: true });
     });
 
-    it('creates a new app.sqlite with the v2 schema tables', async () => {
+    it('creates the expected v2 schema tables', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
         const orm = createV2Orm(config);
 
@@ -38,10 +38,11 @@ describe('V2 ORM', () => {
                     .map((row) => (row as { name: string }).name);
 
                 expect(tableNames).toEqual([
+                    'console_entries',
                     'npcs',
-                    'run_audit_logs',
+                    'refresh_state',
                     'runs',
-                    'session_entries',
+                    'session_exchanges',
                     'sessions',
                     'settings',
                 ]);
@@ -53,55 +54,43 @@ describe('V2 ORM', () => {
         }
     });
 
-    it('inserts and reads each schema shape successfully', async () => {
+    it('round-trips additional context through settings', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
         const orm = createV2Orm(config);
-        const setting = createSetting();
-        const session = createSession();
-        const run = createRun();
-        const entry = createUserEntry();
-        const auditLog = createRunAuditLog();
-        const npc = createNpc();
+        const document = createAdditionalContext();
 
         try {
             await orm.bootstrap();
-            await orm.settings.save(setting);
-            await orm.sessions.save(session);
-            await orm.runs.save(run);
-            await orm.sessionEntries.save(entry);
-            await orm.runAuditLogs.save(auditLog);
-            await orm.npcs.save(npc);
+            await orm.settings.saveAdditionalContext(document);
 
-            await expect(orm.settings.get(setting.key)).resolves.toMatchObject({
-                key: setting.key,
-                value: setting.value,
-            });
-            await expect(orm.sessions.get(session.id)).resolves.toMatchObject({
-                id: session.id,
-                kind: session.kind,
-            });
-            await expect(orm.runs.get(run.id)).resolves.toMatchObject({
-                id: run.id,
-                prompt: run.prompt,
-            });
-            await expect(orm.sessionEntries.get(entry.sessionId, entry.entryIndex)).resolves.toMatchObject({
-                kind: 'user',
-                content: entry.content,
-            });
-            await expect(orm.runAuditLogs.get(auditLog.id)).resolves.toMatchObject({
-                id: auditLog.id,
-                kind: auditLog.kind,
-            });
-            await expect(orm.npcs.get(npc.id)).resolves.toMatchObject({
-                id: npc.id,
-                name: npc.name,
+            await expect(orm.settings.getAdditionalContext()).resolves.toMatchObject({
+                markdown: document.markdown,
             });
         } finally {
             orm.close();
         }
     });
 
-    it('loads a session with ordered entries and a resolved active run', async () => {
+    it('round-trips refresh state through the singleton repository', async () => {
+        const config = loadDefaultConfig(TEST_ROOT);
+        const orm = createV2Orm(config);
+        const refreshState = createRefreshState();
+
+        try {
+            await orm.bootstrap();
+            await orm.refreshState.save(refreshState);
+
+            await expect(orm.refreshState.get()).resolves.toMatchObject({
+                activeOperation: 'refresh',
+                refreshStatus: 'running',
+                reingestStatus: 'idle',
+            });
+        } finally {
+            orm.close();
+        }
+    });
+
+    it('loads a session with ordered exchanges and a resolved active run', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
         const orm = createV2Orm(config);
         const session = {
@@ -109,32 +98,21 @@ describe('V2 ORM', () => {
             activeRunId: 'run-1',
         };
         const run = createRun();
+        const reasoningExchange = createReasoningExchange();
+        const userExchange = createUserExchange();
+        const responseExchange = createResponseExchange();
 
         try {
+            await orm.bootstrap();
             await orm.sessions.save({
                 ...session,
                 activeRunId: null,
             });
             await orm.runs.save(run);
             await orm.sessions.save(session);
-            await orm.sessionEntries.save({
-                sessionId: session.id,
-                entryIndex: 2,
-                runId: run.id,
-                title: 'Assistant reply',
-                kind: 'assistant-response',
-                content: 'Second entry',
-                createdAt: new Date('2026-05-14T12:02:00.000Z'),
-            });
-            await orm.sessionEntries.save({
-                sessionId: session.id,
-                entryIndex: 1,
-                runId: null,
-                title: 'User prompt',
-                kind: 'user',
-                content: 'First entry',
-                createdAt: new Date('2026-05-14T12:01:00.000Z'),
-            });
+            await orm.sessionExchanges.save(reasoningExchange);
+            await orm.sessionExchanges.save(responseExchange);
+            await orm.sessionExchanges.save(userExchange);
 
             const loaded = await orm.sessions.get(session.id);
 
@@ -142,218 +120,256 @@ describe('V2 ORM', () => {
                 id: session.id,
                 activeRunId: run.id,
                 activeRun: {
+                    exchangeId: run.exchangeId,
                     id: run.id,
-                    prompt: run.prompt,
                 },
+                includePartyContext: true,
             });
-            expect(loaded?.entries.map((entryItem) => entryItem.entryIndex)).toEqual([1, 2]);
-            expect(loaded?.entries[0]).toMatchObject({
-                kind: 'user',
-                content: 'First entry',
-            });
+            expect(loaded?.exchanges.map((exchange) => exchange.sequenceIndex)).toEqual([1, 2, 3]);
+            expect(loaded?.exchanges.map((exchange) => exchange.kind)).toEqual(['user', 'reasoning', 'response']);
         } finally {
             orm.close();
         }
     });
 
-    it('loads a run with optional audit logs', async () => {
+    it('preserves reasoning tool call ids and run exchange ids', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
         const orm = createV2Orm(config);
         const session = createSession();
         const run = createRun();
-        const firstAuditLog = createRunAuditLog();
-        const secondAuditLog = {
-            ...createRunAuditLog(),
-            id: 'audit-2',
-            createdAt: new Date('2026-05-14T12:04:00.000Z'),
-            details: 'Second audit entry',
-        };
+        const reasoningExchange = createReasoningExchange();
 
         try {
+            await orm.bootstrap();
             await orm.sessions.save(session);
             await orm.runs.save(run);
-            await orm.runAuditLogs.save(firstAuditLog);
-            await orm.runAuditLogs.save(secondAuditLog);
+            await orm.sessionExchanges.save(reasoningExchange);
 
-            const withoutAuditLogs = await orm.runs.get(run.id);
-            const withAuditLogs = await orm.runs.get(run.id, { includeAuditLogs: true });
+            const loadedRun = await orm.runs.get(run.id);
+            const loadedExchange = await orm.sessionExchanges.get(reasoningExchange.id);
 
-            expect(withoutAuditLogs?.auditLogs).toBeUndefined();
-            expect(withAuditLogs?.auditLogs).toHaveLength(2);
-            expect(withAuditLogs?.auditLogs?.[0]).toMatchObject({
-                id: firstAuditLog.id,
+            expect(loadedRun).toMatchObject({
+                exchangeId: run.exchangeId,
+                status: run.status,
             });
-            expect(withAuditLogs?.auditLogs?.[1]).toMatchObject({
-                id: secondAuditLog.id,
+            expect(loadedExchange).toMatchObject({
+                id: reasoningExchange.id,
+                kind: 'reasoning',
+                toolCallId: reasoningExchange.toolCallId,
             });
         } finally {
             orm.close();
         }
     });
 
-    it('loads an assistant-npc session entry with resolved NPCs', async () => {
+    it('round-trips failed runs including nullable lifecycle timestamps and error', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
         const orm = createV2Orm(config);
-        const session = {
-            ...createSession(),
-            activeRunId: 'run-1',
+        const session = createSession();
+        const failedRun = {
+            ...createRun(),
+            error: 'Provider request failed.',
+            failedAt: new Date('2026-05-14T12:02:00.000Z'),
+            startedAt: null,
+            status: 'failed' as const,
         };
+
+        try {
+            await orm.bootstrap();
+            await orm.sessions.save(session);
+            await orm.runs.save(failedRun);
+
+            const loaded = await orm.runs.get(failedRun.id);
+
+            expect(loaded).toMatchObject({
+                error: failedRun.error,
+                exchangeId: failedRun.exchangeId,
+                status: 'failed',
+            });
+            expect(loaded?.startedAt).toBeNull();
+            expect(loaded?.completedAt).toBeNull();
+            expect(loaded?.failedAt?.toISOString()).toBe(failedRun.failedAt.toISOString());
+        } finally {
+            orm.close();
+        }
+    });
+
+    it('lists NPC rows newest-first by updatedAt', async () => {
+        const config = loadDefaultConfig(TEST_ROOT);
+        const orm = createV2Orm(config);
+        const session = createSession();
         const run = createRun();
-        const firstNpc = createNpc();
-        const secondNpc = {
+        const olderNpc = createNpc();
+        const newerNpc = {
             ...createNpc(),
             id: 2,
             name: 'Tavin',
+            updatedAt: new Date('2026-05-14T12:05:00.000Z'),
         };
 
         try {
-            await orm.sessions.save({
-                ...session,
-                activeRunId: null,
-            });
-            await orm.runs.save(run);
+            await orm.bootstrap();
             await orm.sessions.save(session);
-            await orm.npcs.save(firstNpc);
-            await orm.npcs.save(secondNpc);
-            await orm.sessionEntries.save({
-                sessionId: session.id,
-                entryIndex: 1,
-                runId: run.id,
-                title: 'NPC output',
-                kind: 'assistant-npc',
-                npcs: [],
-                createdAt: new Date('2026-05-14T12:05:00.000Z'),
-            });
+            await orm.runs.save(run);
+            await orm.npcs.save(olderNpc);
+            await orm.npcs.save(newerNpc);
 
-            const entry = await orm.sessionEntries.get(session.id, 1);
+            const allNpcs = await orm.npcs.list();
+            const runNpcs = await orm.npcs.listByRun(run.id);
 
-            expect(entry).toMatchObject({
-                kind: 'assistant-npc',
-            });
-            if (!entry || entry.kind !== 'assistant-npc') {
-                throw new Error('Expected assistant-npc entry.');
-            }
-            expect(entry.npcs.map((npc) => npc.name)).toEqual(['Ilyra', 'Tavin']);
+            expect(allNpcs.map((npc) => npc.name)).toEqual(['Tavin', 'Ilyra']);
+            expect(runNpcs.map((npc) => npc.name)).toEqual(['Tavin', 'Ilyra']);
         } finally {
             orm.close();
         }
     });
 
-    it('preserves nullable date and foreign-key fields correctly', async () => {
+    it('round-trips console entries independently of sessions and runs', async () => {
         const config = loadDefaultConfig(TEST_ROOT);
         const orm = createV2Orm(config);
-        const session = createSession();
-        const run = createRun();
+        const olderEntry = createConsoleEntry();
+        const newerEntry = {
+            ...createConsoleEntry(),
+            createdAt: new Date('2026-05-14T12:06:00.000Z'),
+            id: 'console-2',
+            level: 'warn' as const,
+            message: 'Later warning.',
+        };
 
         try {
-            await orm.sessions.save(session);
-            await orm.runs.save({
-                ...run,
-                completedAt: null,
-                failedAt: null,
-                startedAt: null,
-            });
-            await orm.sessionEntries.save({
-                sessionId: session.id,
-                entryIndex: 1,
-                runId: null,
-                kind: 'system',
-                content: 'System entry',
-                createdAt: new Date('2026-05-14T12:06:00.000Z'),
-            });
+            await orm.bootstrap();
+            await orm.consoleEntries.save(newerEntry);
+            await orm.consoleEntries.save(olderEntry);
 
-            const loadedSession = await orm.sessions.get(session.id);
-            const loadedRun = await orm.runs.get(run.id);
-            const loadedEntry = await orm.sessionEntries.get(session.id, 1);
+            const loaded = await orm.consoleEntries.list();
 
-            expect(loadedSession?.activeRunId).toBeNull();
-            expect(loadedSession?.archivedAt).toBeNull();
-            expect(loadedSession?.lastEntryAt).toBeNull();
-            expect(loadedRun?.startedAt).toBeNull();
-            expect(loadedRun?.completedAt).toBeNull();
-            expect(loadedRun?.failedAt).toBeNull();
-            expect(loadedEntry?.runId).toBeNull();
+            expect(loaded.map((entry) => entry.id)).toEqual(['console-1', 'console-2']);
+            await expect(orm.consoleEntries.get(olderEntry.id)).resolves.toMatchObject({
+                level: 'info',
+                message: olderEntry.message,
+            });
         } finally {
             orm.close();
         }
     });
 });
 
-const createSetting = () => {
+const createAdditionalContext = () => {
     return {
-        key: 'additionalContext',
-        modifiedAt: new Date('2026-05-14T12:00:00.000Z'),
-        value: 'Keep the tone grounded.',
+        markdown: 'Keep the tone grounded.',
+        updatedAt: new Date('2026-05-14T12:00:00.000Z'),
+    };
+};
+
+const createRefreshState = () => {
+    return {
+        activeOperation: 'refresh' as const,
+        createdAt: new Date('2026-05-14T12:00:00.000Z'),
+        lastRefreshAt: new Date('2026-05-14T12:01:00.000Z'),
+        lastReingestAt: null,
+        refreshStatus: 'running' as const,
+        reingestStatus: 'idle' as const,
+        updatedAt: new Date('2026-05-14T12:01:00.000Z'),
     };
 };
 
 const createSession = () => {
     return {
-        id: 'session-1',
-        kind: 'assistant' as const,
-        title: 'Session One',
+        activeRun: null,
         activeRunId: null,
         archivedAt: null,
-        lastEntryAt: null,
         createdAt: new Date('2026-05-14T12:00:00.000Z'),
+        exchanges: [],
+        id: 'session-1',
+        includePartyContext: true,
+        mode: 'assistant' as const,
+        title: 'Session One',
         updatedAt: new Date('2026-05-14T12:00:00.000Z'),
-        entries: [],
     };
 };
 
 const createRun = () => {
     return {
+        completedAt: null,
+        createdAt: new Date('2026-05-14T12:01:00.000Z'),
+        exchangeId: 'exchange-1',
+        failedAt: null,
         id: 'run-1',
-        sessionId: 'session-1',
         includePartyContext: true,
+        mode: 'assistant' as const,
         prompt: 'Draft a scene.',
         retrievalTurnLimit: 2,
-        kind: 'assistant' as const,
-        status: 'running' as const,
-        createdAt: new Date('2026-05-14T12:01:00.000Z'),
-        updatedAt: new Date('2026-05-14T12:01:00.000Z'),
-        startedAt: new Date('2026-05-14T12:01:05.000Z'),
-        completedAt: null,
-        failedAt: null,
-    };
-};
-
-const createUserEntry = () => {
-    return {
         sessionId: 'session-1',
-        entryIndex: 1,
-        runId: null,
-        title: 'Prompt',
-        kind: 'user' as const,
-        content: 'Tell me about Sharn.',
-        createdAt: new Date('2026-05-14T12:02:00.000Z'),
+        startedAt: new Date('2026-05-14T12:01:05.000Z'),
+        status: 'running' as const,
+        updatedAt: new Date('2026-05-14T12:01:10.000Z'),
     };
 };
 
-const createRunAuditLog = () => {
+const createUserExchange = () => {
     return {
-        id: 'audit-1',
+        content: 'Tell me about Sharn.',
+        createdAt: new Date('2026-05-14T12:01:11.000Z'),
+        exchangeId: 'exchange-1',
+        id: 'exchange-entry-1',
+        kind: 'user' as const,
         runId: 'run-1',
-        kind: 'provider-request',
-        details: 'Sent provider request.',
-        createdAt: new Date('2026-05-14T12:03:00.000Z'),
+        sequenceIndex: 1,
+        sessionId: 'session-1',
+    };
+};
+
+const createReasoningExchange = () => {
+    return {
+        content: 'Checking retrieved notes about districts and tone.',
+        createdAt: new Date('2026-05-14T12:01:12.000Z'),
+        exchangeId: 'exchange-1',
+        id: 'exchange-entry-2',
+        kind: 'reasoning' as const,
+        runId: 'run-1',
+        sequenceIndex: 2,
+        sessionId: 'session-1',
+        toolCallId: 'tool-call-1',
+    };
+};
+
+const createResponseExchange = () => {
+    return {
+        content: 'Sharn rises in layered towers above the Dagger River.',
+        createdAt: new Date('2026-05-14T12:01:13.000Z'),
+        exchangeId: 'exchange-1',
+        id: 'exchange-entry-3',
+        kind: 'response' as const,
+        runId: 'run-1',
+        sequenceIndex: 3,
+        sessionId: 'session-1',
+        title: 'Sharn overview',
     };
 };
 
 const createNpc = () => {
     return {
-        id: 1,
-        sessionId: 'session-1',
-        runId: 'run-1',
-        name: 'Ilyra',
-        bio: 'A quiet scout from Aundair.',
-        description: 'Lean half-elf with a weather-worn cloak.',
         age: '30s',
+        bio: 'A quiet scout from Aundair.',
+        createdAt: new Date('2026-05-14T12:04:00.000Z'),
+        description: 'Lean half-elf with a weather-worn cloak.',
         ethnicity: 'Aundairian',
         gender: 'Woman',
+        id: 1,
+        name: 'Ilyra',
         role: 'Scout',
+        runId: 'run-1',
+        sessionId: 'session-1',
         species: 'Half-elf',
-        createdAt: new Date('2026-05-14T12:04:00.000Z'),
-        modifiedAt: new Date('2026-05-14T12:04:00.000Z'),
+        updatedAt: new Date('2026-05-14T12:04:00.000Z'),
+    };
+};
+
+const createConsoleEntry = () => {
+    return {
+        createdAt: new Date('2026-05-14T12:05:00.000Z'),
+        id: 'console-1',
+        level: 'info' as const,
+        message: 'Refresh complete.',
     };
 };

@@ -1,5 +1,4 @@
-export type RefreshOperationKind = 'refresh' | 'reingest';
-export type RefreshStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed';
+import type { RefreshOperationKind, RefreshStatus } from '@/types.js';
 
 export interface CreateRefresh {
     kind: RefreshOperationKind;

@@ -43,6 +43,17 @@ export interface ProviderConfig {
   embeddingModel: string;
 }
 
+export const sessionModes = ['assistant', 'npc'] as const;
+export type SessionMode = typeof sessionModes[number];
+
+export type RunStatus = 'pending' | 'running' | 'completed' | 'failed';
+
+export type RefreshOperationKind = 'refresh' | 'reingest';
+
+export type RefreshStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed';
+
+export type SessionFeedEntryKind = 'user' | 'reasoning' | 'response';
+
 export type SourceType = 'foundry' | 'pdf' | 'article';
 
 export type SourceInventoryStatus = 'skipped' | 'scheduled' | 'missing' | 'failed';

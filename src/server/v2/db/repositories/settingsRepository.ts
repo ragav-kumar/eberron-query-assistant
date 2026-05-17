@@ -1,4 +1,4 @@
-import { mapSettingRow } from '../mappers.js';
+import { ADDITIONAL_CONTEXT_KEY, mapSettingRow } from '../mappers.js';
 import type { V2Orm } from '../contract.js';
 import type { Setting as StoredSettingRow } from '../schema.js';
 
@@ -8,7 +8,7 @@ type SettingsRepository = V2Orm['settings'];
 
 export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies): SettingsRepository => {
     return {
-        get: async key => {
+        getAdditionalContext: async () => {
             const database = await getDatabase();
             const row = database
                 .prepare(`
@@ -16,21 +16,10 @@ export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies
                     FROM settings
                     WHERE key = ?
                 `)
-                .get(key) as StoredSettingRow | undefined;
+                .get(ADDITIONAL_CONTEXT_KEY) as StoredSettingRow | undefined;
             return row ? mapSettingRow(row) : null;
         },
-        list: async () => {
-            const database = await getDatabase();
-            const rows = database
-                .prepare(`
-                    SELECT key, value, modified_at
-                    FROM settings
-                    ORDER BY key ASC
-                `)
-                .all() as StoredSettingRow[];
-            return rows.map(mapSettingRow);
-        },
-        save: async setting => {
+        saveAdditionalContext: async document => {
             const database = await getDatabase();
             database
                 .prepare(`
@@ -40,7 +29,7 @@ export const createSettingsRepository = ({ getDatabase }: RepositoryDependencies
                         value = excluded.value,
                         modified_at = excluded.modified_at
                 `)
-                .run(setting.key, setting.value, setting.modifiedAt.toISOString());
+                .run(ADDITIONAL_CONTEXT_KEY, document.markdown, document.updatedAt.toISOString());
         },
     };
 };

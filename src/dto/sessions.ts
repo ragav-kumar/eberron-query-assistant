@@ -1,7 +1,5 @@
+import type { SessionMode } from '@/types.js';
 import { SessionFeedExchange } from './sessionFeed.js';
-
-export const sessionModes = ['assistant', 'npc'] as const;
-export type SessionMode = typeof sessionModes[number];
 
 export interface Session {
     id: string;
