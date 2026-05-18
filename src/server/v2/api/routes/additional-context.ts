@@ -1,6 +1,7 @@
 import type { RouteDefinition } from './shared.js';
 import { readText } from '../request.js';
 import { writeMarkdown } from '../response.js';
+import { settingKeys } from '@/server/v2/db/settingKeys.js';
 
 export const additionalContextRoutes: RouteDefinition[] = [
     {
@@ -11,7 +12,7 @@ export const additionalContextRoutes: RouteDefinition[] = [
             const additionalContext = await context.db
                 .selectFrom('settings')
                 .select('value')
-                .where('key', '=', 'additional-context')
+                .where('key', '=', settingKeys.additionalContext)
                 .execute();
 
             let markdown = '';
@@ -31,7 +32,7 @@ export const additionalContextRoutes: RouteDefinition[] = [
 
             await context.db
                 .insertInto('settings')
-                .values({key: 'additional-context', value: markdown, modifiedAt})
+                .values({key: settingKeys.additionalContext, value: markdown, modifiedAt})
                 .onConflict(conflict => conflict.column('key').doUpdateSet({
                     value: markdown,
                     modifiedAt,
