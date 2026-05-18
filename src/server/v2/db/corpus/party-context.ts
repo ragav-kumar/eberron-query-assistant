@@ -2,8 +2,8 @@ import { access } from 'node:fs/promises';
 
 import Database from 'better-sqlite3';
 
-import { Settings, type AppDb, settingKeys } from '@/server/v2/db-app/index.js';
-import { isRecord } from '@/errors.js';
+import { Settings, type AppDb, settingKeys } from '../app/index.js';
+import { isRecord } from '../../../../errors.js';
 
 import { getCorpusDatabasePath } from './database.js';
 

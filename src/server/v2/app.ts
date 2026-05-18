@@ -1,4 +1,4 @@
-import { AppDb, createAppDb, resolveAppDatabasePath } from './db-app/index.js';
+import { AppDb, createAppDb, resolveAppDatabasePath } from './db/app/index.js';
 import {
     createConsoleEventPublisher,
     createRefreshCoordinator,

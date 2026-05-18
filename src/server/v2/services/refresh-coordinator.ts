@@ -1,6 +1,6 @@
 import type { CreateRefreshDto, RefreshDto } from '@/dto/index.js';
 
-import type { AppDb } from '../db-app/index.js';
+import type { AppDb } from '../db/app/index.js';
 
 export interface RefreshCoordinator {
     /**

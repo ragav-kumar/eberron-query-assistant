@@ -8,8 +8,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { CreateRefreshDto, CreateRunDto } from '@/dto/index.js';
 import { createV2ApiHandler } from '@/server/v2/api/index.js';
 import type { V2AppContext } from '@/server/v2/app.js';
-import { createAppDb, getDefaultAppDatabasePath } from '@/server/v2/db-app/index.js';
-import { settingKeys } from '@/server/v2/db-app/settingKeys.js';
+import { createAppDb, getDefaultAppDatabasePath } from '@/server/v2/db/app/index.js';
+import { settingKeys } from '@/server/v2/db/app/settingKeys.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-api');
 

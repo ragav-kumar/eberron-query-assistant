@@ -6,8 +6,7 @@ import path from 'node:path';
 import type { Insertable, Transaction } from 'kysely';
 
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
-import { createAppDb, getAppDatabasePath, settingKeys } from '@/server/v2/db-app/index.js';
-import type { AppDatabaseSchema, AppDb } from '@/server/v2/db-app/index.js';
+import { createAppDb, getAppDatabasePath, settingKeys, AppDatabaseSchema, AppDb } from './v2/db/app/index.js';
 import type { RuntimeConfig } from '@/types.js';
 
 // Intentional temporary bridge between V1 and V2 while migration logic still spans both server layouts.

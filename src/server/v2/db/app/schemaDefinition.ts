@@ -2,7 +2,7 @@ import { sql, type Kysely } from 'kysely';
 
 import {
     sessionModes,
-} from '@/types.js';
+} from '../../../../types.js';
 
 import type { AppDatabaseSchema } from './schema.js';
 
