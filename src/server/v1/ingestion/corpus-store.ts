@@ -59,7 +59,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
   };
 
   return {
-    async initialize(config, options = {}) {
+    initialize: async (config, options = {}) => {
       let openedDatabase = await open(config);
       if (!isCompatibleSchema(openedDatabase)) {
         if (options.allowIncompatibleReset !== true) {
@@ -76,7 +76,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
       createSchema(openedDatabase);
     },
 
-    async applySourceChanges(config, options) {
+    applySourceChanges: async (config, options) => {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
         if (options.clearSourceType) {
@@ -100,7 +100,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
       })();
     },
 
-    async clear(config) {
+    clear: async (config) => {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
         openedDatabase.prepare('DELETE FROM chunks').run();
@@ -109,7 +109,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
       })();
     },
 
-    async replaceSource(config, source, chunks) {
+    replaceSource: async (config, source, chunks) => {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
         openedDatabase.prepare('DELETE FROM sources WHERE source_type = ? AND source_key = ?').run(source.sourceType, source.sourceKey);
@@ -118,7 +118,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
       })();
     },
 
-    async replaceSourcesByType(config, sourceType, sources) {
+    replaceSourcesByType: async (config, sourceType, sources) => {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
         openedDatabase.prepare('DELETE FROM sources WHERE source_type = ?').run(sourceType);
@@ -129,7 +129,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
       })();
     },
 
-    async removeSource(config, sourceType, sourceKey) {
+    removeSource: async (config, sourceType, sourceKey) => {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
         openedDatabase.prepare('DELETE FROM sources WHERE source_type = ? AND source_key = ?').run(sourceType, sourceKey);
@@ -137,7 +137,7 @@ export const createSqliteCorpusStore = (): CorpusStore => {
       })();
     },
 
-    async removeSourcesByType(config, sourceType) {
+    removeSourcesByType: async (config, sourceType) => {
       const openedDatabase = await open(config);
       openedDatabase.transaction(() => {
         openedDatabase.prepare('DELETE FROM sources WHERE source_type = ?').run(sourceType);
@@ -145,13 +145,13 @@ export const createSqliteCorpusStore = (): CorpusStore => {
       })();
     },
 
-    async countSources(config) {
+    countSources: async (config) => {
       const openedDatabase = await open(config);
       const result = openedDatabase.prepare('SELECT COUNT(*) AS count FROM sources').get() as { count: number };
       return result.count;
     },
 
-    async rebuildSearchIndex(config) {
+    rebuildSearchIndex: async (config) => {
       const openedDatabase = await open(config);
       rebuildFts(openedDatabase);
     },

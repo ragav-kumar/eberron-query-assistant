@@ -458,7 +458,7 @@ const interruptingBatchAdapter = (failAfterSuccessfulBatches: number): { adapter
       modelId: 'checkpoint-model',
       schemaVersion: 'checkpoint-schema',
       embed: (input) => base.embed(input),
-      async embedBatch(inputs) {
+      embedBatch: async (inputs) => {
         if (successfulBatches >= failAfterSuccessfulBatches) {
           throw new Error('simulated embedding interruption');
         }
@@ -479,11 +479,11 @@ const captureEmbeddingInputAdapter = (): { adapter: EmbeddingAdapter; inputs: st
       failedRetries: 0,
       modelId: 'capture-model',
       schemaVersion: 'capture-schema',
-      embed(input) {
+      embed: (input) => {
         singleInputs.push(input);
         return base.embed(input);
       },
-      embedBatch(batchInputs) {
+      embedBatch: (batchInputs) => {
         inputs.push(batchInputs);
         return base.embedBatch(batchInputs);
       }
@@ -504,12 +504,8 @@ const keywordEmbeddingAdapter = (...keywords: string[]): EmbeddingAdapter => {
     failedRetries: 0,
     modelId: `keyword-${keywords.join('-')}`,
     schemaVersion: 'keyword-v1',
-    embed(input) {
-      return Promise.resolve(embedKeywordVector(input));
-    },
-    embedBatch(inputs) {
-      return Promise.resolve(inputs.map(embedKeywordVector));
-    }
+    embed: (input) => Promise.resolve(embedKeywordVector(input)),
+    embedBatch: (inputs) => Promise.resolve(inputs.map(embedKeywordVector))
   };
 };
 
@@ -520,7 +516,7 @@ const createCapturingTimingContext = (): TimingContext & { labels: string[] } =>
     operation: 'test',
     operationId: 'test',
     reporter: {
-      async time(_context, label, task) {
+      time: async (_context, label, task) => {
         labels.push(label);
         return task();
       }

@@ -21,7 +21,7 @@ export interface InvalidRuntimeStateError {
 }
 
 export const createFilesystemStateStore = (): StateStore => ({
-    async load(config) {
+    load: async (config) => {
       const statePath = getStatePath(config);
 
       let raw: string;
@@ -41,7 +41,7 @@ export const createFilesystemStateStore = (): StateStore => ({
       return parseRuntimeState(parsed);
     },
 
-    async save(config, state) {
+    save: async (config, state) => {
       await mkdir(config.stateDir, { recursive: true });
       await writeFile(getStatePath(config), `${JSON.stringify(normalizeRuntimeState(state), null, 2)}\n`, 'utf8');
     }

@@ -34,17 +34,17 @@ export const createConsoleProgressReporter = (): ProgressReporter => {
   };
 
   return {
-    info(message) {
+    info: (message) => {
       clearActiveProgress();
       console.log(formatInfoMessage(message, colorsEnabled));
     },
 
-    warn(message) {
+    warn: (message) => {
       clearActiveProgress();
       console.warn(formatWarningMessage(message, colorsEnabled));
     },
 
-    progress(message) {
+    progress: (message) => {
       const formatted = formatInfoMessage(message, colorsEnabled);
       if (!rewriteProgress) {
         console.log(formatted);
@@ -66,13 +66,13 @@ export const createMemoryProgressReporter = (): MemoryProgressReporter => {
   return {
     messages,
     warnings,
-    info(message) {
+    info: (message) => {
       messages.push(message);
     },
-    progress(message) {
+    progress: (message) => {
       messages.push(message);
     },
-    warn(message) {
+    warn: (message) => {
       warnings.push(message);
     }
   };
@@ -139,20 +139,10 @@ const createStyle = (enabled: boolean) => {
   const wrap = (open: string, close: string, value: string): string => enabled ? `${open}${value}${close}` : value;
 
   return {
-    bold(value: string) {
-      return wrap('\u001b[1m', '\u001b[22m', value);
-    },
-    cyan(value: string) {
-      return wrap('\u001b[36m', '\u001b[39m', value);
-    },
-    dim(value: string) {
-      return wrap('\u001b[2m', '\u001b[22m', value);
-    },
-    green(value: string) {
-      return wrap('\u001b[32m', '\u001b[39m', value);
-    },
-    yellow(value: string) {
-      return wrap('\u001b[33m', '\u001b[39m', value);
-    }
+    bold: (value: string) => wrap('\u001b[1m', '\u001b[22m', value),
+    cyan: (value: string) => wrap('\u001b[36m', '\u001b[39m', value),
+    dim: (value: string) => wrap('\u001b[2m', '\u001b[22m', value),
+    green: (value: string) => wrap('\u001b[32m', '\u001b[39m', value),
+    yellow: (value: string) => wrap('\u001b[33m', '\u001b[39m', value)
   };
 };

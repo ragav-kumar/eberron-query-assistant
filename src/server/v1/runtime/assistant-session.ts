@@ -67,7 +67,7 @@ export const createAssistantSession = (options: AssistantSessionOptions): Assist
   };
 
   return {
-    async ask(question, askOptions = {}) {
+    ask: async (question, askOptions = {}) => {
       const normalizedQuestion = question.trim();
       if (normalizedQuestion.length === 0) {
         throw new Error('Assistant prompt cannot be empty.');

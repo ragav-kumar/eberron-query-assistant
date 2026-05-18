@@ -36,7 +36,7 @@ export const createProviderDebugLog = (
 
   return {
     append,
-    async flush() {
+    flush: async () => {
       await queue;
     }
   };

@@ -25,7 +25,7 @@ export interface HttpFetchFailedError {
 }
 
 export const createFetchArticleFetcher = (): ArticleFetcher => ({
-    async fetchText(url, options = {}) {
+    fetchText: async (url, options = {}) => {
       const abortController = new AbortController();
       const abortFromCaller = (): void => {
         abortController.abort();

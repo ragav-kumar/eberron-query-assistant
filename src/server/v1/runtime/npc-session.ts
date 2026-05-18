@@ -70,7 +70,7 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
   };
 
   return {
-    async generate(prompt, generationOptions = {}) {
+    generate: async (prompt, generationOptions = {}) => {
       const normalizedPrompt = prompt.trim();
       if (normalizedPrompt.length === 0) {
         throw new Error('NPC generation prompt cannot be empty.');
@@ -156,10 +156,8 @@ export const createNpcGenerationSession = (options: NpcGenerationSessionOptions)
         npcs: readNpcList(savedNpcs)
       };
     },
-    async read() {
-      return readNpcList(await readGeneratedNpcState(options.config));
-    },
-    reset() {
+    read: async () => readNpcList(await readGeneratedNpcState(options.config)),
+    reset: () => {
       history.splice(0, history.length);
     }
   };

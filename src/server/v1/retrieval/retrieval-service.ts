@@ -187,13 +187,9 @@ export const createSqliteRetrievalService = (dependencies: RetrievalServiceDepen
 
       const semanticResults = await timing.reporter.time(timing, 'retrieval.vector', () =>
         searchVector(database, request, limit, dependencies.embeddingAdapter, {
-          canCache() {
-            return shouldCacheVectorRows;
-          },
-          read() {
-            return readCachedVectorRows(vectorCache, config, dependencies.embeddingAdapter);
-          },
-          write(entries) {
+          canCache: () => shouldCacheVectorRows,
+          read: () => readCachedVectorRows(vectorCache, config, dependencies.embeddingAdapter),
+          write: (entries) => {
             if (!config) {
               return;
             }

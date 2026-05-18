@@ -28,9 +28,7 @@ interface TimingEntry {
 }
 
 export const createNoopTimingReporter = (): TimingReporter => ({
-  async time(_context, _label, task) {
-    return task();
-  }
+  time: async (_context, _label, task) => task()
 });
 
 export const createJsonlTimingReporter = (options: JsonlTimingReporterOptions): TimingReporter => {
@@ -48,7 +46,7 @@ export const createJsonlTimingReporter = (options: JsonlTimingReporterOptions): 
   };
 
   return {
-    async time(context, label, task) {
+    time: async (context, label, task) => {
       const startedAt = new Date();
       const startedMs = performance.now();
       try {

@@ -394,8 +394,7 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
   };
 
   return {
-    async askAssistant(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true, retrievalTurnLimit = 1) {
-      return runExclusive('assistant', async (timing) => {
+    askAssistant: async (prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true, retrievalTurnLimit = 1) => runExclusive('assistant', async (timing) => {
         const standardSession = readStandardSession(sessionId);
         const providerDebug = createProviderDebugCollector(config, consoleFeed);
         try {
@@ -422,10 +421,8 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           npcs: await readNpcs(),
           providerDebug: providerDebug.entries
         };
-      });
-    },
-    async generateNpcs(prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true, retrievalTurnLimit = 1) {
-      return runExclusive('npcs', async (timing) => {
+      }),
+    generateNpcs: async (prompt, sessionId = DEFAULT_SESSION_ID, includePartyContext = true, retrievalTurnLimit = 1) => runExclusive('npcs', async (timing) => {
         const npcSessionState = readNpcSession(sessionId);
         const providerDebug = createProviderDebugCollector(config, consoleFeed);
         try {
@@ -452,26 +449,20 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           npcs: await readNpcs(sessionId),
           providerDebug: providerDebug.entries
         };
-      });
-    },
-    async getContext() {
+      }),
+    getContext: async () => {
       await ensureAdditionalContextFile(config);
       return readFile(config.assistant.additionalContextPath, 'utf8');
     },
     getLog: readLog,
-    getNpcs() {
-      return readNpcs();
-    },
-    async getStatus(options = {}) {
-      return {
+    getNpcs: () => readNpcs(),
+    getStatus: async (options = {}) => ({
         activeOperation: activeOperation?.name ?? null,
         console: consoleFeed.read(),
         log: await readLog({ sessionId: options.sessionId ?? DEFAULT_SESSION_ID }),
         npcs: await readNpcs()
-      };
-    },
-    async refresh(forceReingest) {
-      return runExclusive(forceReingest ? 'force-reingest' : 'refresh', async (timing, abortSignal) => {
+      }),
+    refresh: async (forceReingest) => runExclusive(forceReingest ? 'force-reingest' : 'refresh', async (timing, abortSignal) => {
         const summary = await timing.reporter.time(timing, 'web.refresh.run', () => runRefreshTask(forceReingest, abortSignal));
         return {
           ok: true,
@@ -480,13 +471,10 @@ export const createWebApp = (dependencies: WebAppDependencies = {}): WebApp => {
           log: emptyLogResponse(await listSessionLogFiles(config.logDir, null)),
           npcs: await readNpcs()
         };
-      }, { cancelStartupRefresh: forceReingest });
-    },
+      }, { cancelStartupRefresh: forceReingest }),
     startStartupRefresh,
-    subscribeConsole(listener) {
-      return consoleFeed.subscribe(listener);
-    },
-    async writeContext(markdown) {
+    subscribeConsole: (listener) => consoleFeed.subscribe(listener),
+    writeContext: async (markdown) => {
       await ensureAdditionalContextFile(config);
       await writeFile(config.assistant.additionalContextPath, markdown, 'utf8');
     }
@@ -552,16 +540,14 @@ const createProviderDebugCollector = (
   const entries: ChatCompletionDiagnostic[] = [];
 
   return {
-    collect(diagnostic) {
+    collect: (diagnostic) => {
       if (config.provider.debug) {
         entries.push(diagnostic);
         consoleFeed.debug(formatProviderDiagnosticMessage(diagnostic));
       }
     },
     entries,
-    flush() {
-      return Promise.resolve();
-    }
+    flush: () => Promise.resolve()
   };
 };
 
@@ -586,14 +572,14 @@ const createCachedPartyContextService = (inner: PartyContextService): CachedPart
   let cached: Promise<string> | null = null;
 
   return {
-    build(config) {
+    build: (config) => {
       cached ??= inner.build(config).catch((error: unknown) => {
         cached = null;
         throw error;
       });
       return cached;
     },
-    clear() {
+    clear: () => {
       cached = null;
     }
   };
@@ -670,21 +656,19 @@ const createMemoryConsoleFeed = (debugLog: ReturnType<typeof createProviderDebug
   };
 
   return {
-    debug(message) {
+    debug: (message) => {
       append('debug', message);
     },
-    error(message) {
+    error: (message) => {
       append('error', message);
     },
-    info(message) {
+    info: (message) => {
       append('info', message);
     },
-    read() {
-      return {
+    read: () => ({
         entries: entries.map((entry) => ({ ...entry }))
-      };
-    },
-    subscribe(listener) {
+      }),
+    subscribe: (listener) => {
       listeners.add(listener);
       for (const entry of entries) {
         listener({ ...entry });
@@ -693,7 +677,7 @@ const createMemoryConsoleFeed = (debugLog: ReturnType<typeof createProviderDebug
         listeners.delete(listener);
       };
     },
-    warn(message) {
+    warn: (message) => {
       append('warn', message);
     }
   };
@@ -708,16 +692,16 @@ const createQueuedConsoleProgressReporter = (consoleFeed: MemoryConsoleFeed): Qu
   };
 
   return {
-    async flush() {
+    flush: async () => {
       await queue;
     },
-    info(message) {
+    info: (message) => {
       append('info', message);
     },
-    progress(message) {
+    progress: (message) => {
       append('info', message);
     },
-    warn(message) {
+    warn: (message) => {
       append('warn', message);
     }
   };

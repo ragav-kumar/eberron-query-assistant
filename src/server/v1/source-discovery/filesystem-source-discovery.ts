@@ -213,11 +213,7 @@ export const createFilesystemSourceDiscoveryService = (
   };
 
   return {
-    async inspectSources(
-    config: RuntimeConfig,
-    options: RuntimeOptions,
-    state: RuntimeState
-    ): Promise<SourceDiscoverySummary> {
+    inspectSources: async (config: RuntimeConfig, options: RuntimeOptions, state: RuntimeState): Promise<SourceDiscoverySummary> => {
       const nextState = cloneRuntimeState(state);
       const [foundryInventory, pdfInventory] = await Promise.all([
         inspectFoundry(config, options, state, nextState),

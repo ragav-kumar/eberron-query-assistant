@@ -11,7 +11,7 @@ export interface ArticleRawCache {
 }
 
 export const createFilesystemArticleRawCache = (): ArticleRawCache => ({
-    async read(config, url) {
+    read: async (config, url) => {
       try {
         return await readFile(getArticleCachePath(config, url), 'utf8');
       } catch (error) {
@@ -21,7 +21,7 @@ export const createFilesystemArticleRawCache = (): ArticleRawCache => ({
         throw error;
       }
     },
-    async write(config, url, html) {
+    write: async (config, url, html) => {
       const cachePath = getArticleCachePath(config, url);
       await mkdir(path.dirname(cachePath), { recursive: true });
       await writeFile(cachePath, html, 'utf8');

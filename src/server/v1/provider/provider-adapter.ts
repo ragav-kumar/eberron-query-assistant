@@ -172,7 +172,7 @@ export const createOpenAiChatAdapter = (
   };
 
   return {
-    async complete(messages, completionOptions = {}) {
+    complete: async (messages, completionOptions = {}) => {
       const response = await completeStructured(messages, completionOptions);
       if (response.kind !== 'text') {
         throw createTaggedError('provider-chat-tool-calls-unexpected', 'Chat completion returned tool calls unexpectedly.');
@@ -233,7 +233,7 @@ export const createOpenAiEmbeddingAdapter = (
     },
     modelId: config.embeddingModel,
     schemaVersion: `openai-compatible:${config.embeddingModel}`,
-    async embed(input) {
+    embed: async (input) => {
       const [embedding] = await embedBatch([input]);
       if (!embedding) {
         throw createTaggedError('provider-embedding-empty', 'Embedding response did not include a numeric vector.');
@@ -263,9 +263,7 @@ export const createDeterministicEmbeddingAdapter = (): EmbeddingAdapter => {
     modelId: 'local-deterministic-v1',
     schemaVersion: 'local-vector-8',
     embed,
-    embedBatch(inputs) {
-      return Promise.all(inputs.map((input) => embed(input)));
-    }
+    embedBatch: (inputs) => Promise.all(inputs.map((input) => embed(input)))
   };
 };
 

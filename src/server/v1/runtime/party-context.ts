@@ -25,7 +25,7 @@ const SESSION_CONTENT_LIMIT = 1_200;
 const QUEST_CONTENT_LIMIT = 600;
 
 export const createSqlitePartyContextService = (): PartyContextService => ({
-  async build(config) {
+  build: async (config) => {
     if (config.campaign.partyActorUuids.length === 0) {
       return [
         'Current party context:',

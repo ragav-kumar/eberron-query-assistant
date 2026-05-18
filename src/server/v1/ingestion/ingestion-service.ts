@@ -302,12 +302,7 @@ export const createFilesystemIngestionService = (dependencies: IngestionServiceD
   };
 
   return {
-    async ingest(
-    config: RuntimeConfig,
-    options: RuntimeOptions,
-    state: RuntimeState,
-    discovery: SourceDiscoverySummary
-    ) {
+    ingest: async (config: RuntimeConfig, options: RuntimeOptions, state: RuntimeState, discovery: SourceDiscoverySummary) => {
       await corpusStore.initialize(config, { allowIncompatibleReset: options.forceReingest });
       throwIfAborted(options.abortSignal);
       if (options.forceReingest) {

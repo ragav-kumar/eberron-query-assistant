@@ -63,7 +63,7 @@ interface V2RuntimeApp {
 
 export const eberronApiPlugin = (): Plugin => ({
     name: 'eberron-api',
-    configureServer(server) {
+    configureServer: (server) => {
       let v1RuntimePromise: Promise<V1Runtime> | null = null;
       let v2RuntimePromise: Promise<V2Runtime> | null = null;
 

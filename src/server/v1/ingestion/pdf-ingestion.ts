@@ -24,7 +24,7 @@ export interface PdfParser {
 }
 
 export const createPdfDataExtractParser = (): PdfParser => ({
-    async parse(filePath) {
+    parse: async (filePath) => {
       const data = await PdfData.extract(await readFile(filePath), {
         sort: true,
         verbosity: VerbosityLevel.ERRORS,

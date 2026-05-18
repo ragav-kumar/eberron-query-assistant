@@ -40,6 +40,13 @@ export default tseslint.config(
             'arrow-body-style': ['error', 'as-needed'],
             'func-style': ['error', 'expression', {'allowArrowFunctions': true}],
             'jsx-quotes': ['error', 'prefer-single'],
+            'no-restricted-syntax': [
+                'error',
+                {
+                    selector: 'Property[method=true]',
+                    message: 'Use a property whose value is an arrow function instead of object method shorthand.'
+                }
+            ],
             quotes: ['error', 'single', {'avoidEscape': true}],
             'react/jsx-indent-props': ['error', 4],
             semi: ['error', 'always']

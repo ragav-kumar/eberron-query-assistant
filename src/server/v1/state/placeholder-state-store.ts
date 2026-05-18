@@ -1,13 +1,9 @@
 import { createDefaultRuntimeState, type RuntimeStateLoadResult, type StateStore } from './state-store.js';
 
 export const createPlaceholderStateStore = (): StateStore => ({
-    load(): Promise<RuntimeStateLoadResult> {
-      return Promise.resolve({
+    load: (): Promise<RuntimeStateLoadResult> => Promise.resolve({
         state: createDefaultRuntimeState()
-      });
-    },
+      }),
 
-    save(): Promise<void> {
-      return Promise.resolve();
-    }
+    save: (): Promise<void> => Promise.resolve()
   });

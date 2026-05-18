@@ -500,7 +500,7 @@ describe('Phase 3 ingestion', () => {
 
     const fetchedUrls: string[] = [];
     const fetcher: ArticleFetcher = {
-      fetchText(url) {
+      fetchText: (url) => {
         fetchedUrls.push(url);
         if (url === 'https://keith-baker.com/eberron-index/') {
           return Promise.resolve('<main><a href="/cached-force/">Cached Force</a></main>');
@@ -914,7 +914,7 @@ const readRows = (config: ReturnType<typeof loadDefaultConfig>, sql: string): Ar
 };
 
 const createMapArticleFetcher = (responses: Map<string, string>, statuses: Map<string, number> = new Map()): ArticleFetcher => ({
-    fetchText(url) {
+    fetchText: (url) => {
       const status = statuses.get(url);
       if (status) {
         throw {

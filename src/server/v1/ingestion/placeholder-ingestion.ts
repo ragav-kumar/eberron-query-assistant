@@ -4,13 +4,7 @@ import type { IngestionSummary, RuntimeConfig, RuntimeOptions } from '@/types.js
 import type { IngestionService } from './ingestion-service.js';
 
 export const createPlaceholderIngestionService = (): IngestionService => ({
-    ingest(
-      _config: RuntimeConfig,
-      _options: RuntimeOptions,
-      _state: RuntimeState,
-      discovery: SourceDiscoverySummary
-    ): Promise<{ summary: IngestionSummary; nextState: RuntimeState }> {
-      return Promise.resolve({
+    ingest: (_config: RuntimeConfig, _options: RuntimeOptions, _state: RuntimeState, discovery: SourceDiscoverySummary): Promise<{ summary: IngestionSummary; nextState: RuntimeState }> => Promise.resolve({
         summary: {
           degraded: false,
           corpusSourceCount: 1,
@@ -26,6 +20,5 @@ export const createPlaceholderIngestionService = (): IngestionService => ({
           }))
         },
         nextState: discovery.nextState
-      });
-    }
+      })
   });

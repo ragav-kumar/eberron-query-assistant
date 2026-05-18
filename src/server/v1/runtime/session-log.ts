@@ -55,12 +55,12 @@ export const createSessionLog = async (request: SessionLogCreateRequest): Promis
     get filePath() {
       return filePath;
     },
-    async append(entry) {
+    append: async (entry) => {
       const entries = await readSessionLogFile(path.dirname(filePath), filePath);
       entries.push(normalizeEntry(entry));
       await writeFile(filePath, `${JSON.stringify(entries, null, 2)}\n`, 'utf8');
     },
-    async rename(title) {
+    rename: async (title) => {
       const nextPath = await createUniqueSessionLogPath(
         path.dirname(filePath),
         startedAt,
