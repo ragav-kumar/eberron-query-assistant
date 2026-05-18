@@ -1,6 +1,7 @@
 # Server rules
 
 ## Scope
+- This file is primarily relevant during `Development`, and secondarily during `Review` when evaluating or making small scoped server changes.
 - The `/src/server/v1` folder and its contents are frozen. They should only be modified if they are blocking compilation, tests, or runtime behavior.
 - During the V2 transition, treat new user-requested server behavior changes as targeting `/src/server/v2` unless the user explicitly says otherwise.
 - Keep the Node layer as thin as practical. Put filesystem access, process/runtime concerns, persistence, and other host-only capabilities in the server layer.

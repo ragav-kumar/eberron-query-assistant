@@ -1,6 +1,6 @@
 # V2 Server TODOs
 
-This note captures the current V2 server gaps based on `docs/flow.md` and the existing `src/server/v2` implementation.
+This note captures the current V2 server gaps based on `docs/fdd-v2.md` and the existing `src/server/v2` implementation.
 
 ## Summary
 
@@ -49,7 +49,7 @@ What is still missing is the rest of the startup-origin work, especially automat
 
 Work still needed:
 
-- Trigger the automatic routine refresh described in `docs/flow.md`.
+- Trigger the automatic routine refresh described in `docs/fdd-v2.md`.
 - Finish live SSE subscriptions for runtime and console events.
 
 Notes:
@@ -124,7 +124,7 @@ Current state:
 
 Additional work:
 
-- Confirm whether this should remain persisted in SQLite or be made process-local, since `docs/flow.md` describes console as fundamentally transient.
+- Confirm whether this should remain persisted in SQLite or be made process-local, since `docs/fdd-v2.md` describes console as fundamentally transient.
 
 ### `POST /api/v2/refresh`
 

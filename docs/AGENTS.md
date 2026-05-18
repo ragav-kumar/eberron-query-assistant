@@ -2,11 +2,16 @@
 
 ## Scope
 - These rules apply to documentation under `/docs`.
+- This file is primarily relevant during `Analysis`.
 
 ## Docs Structure
-- Keep `docs/fdd.md` focused on the theoretical current product behavior and requirements.
-- Treat `docs/fdd.md` as the functional design source of truth for the intended current state of the application.
-- Keep `docs/fdd.md` aligned with intended current behavior, including documentation rules established through direct user discussion, rather than with known implementation bugs.
+- Treat `docs/fdd-v1.md` as the intended design for V1.
+- Treat `docs/fdd-v2.md` as the intended design for V2.
+- Keep each versioned design doc focused on the theoretical intended behavior and requirements for that version.
+- Keep versioned design docs aligned with intended behavior, including documentation rules established through direct user discussion, rather than with known implementation bugs.
+- Treat `docs/agent-modes.md` as the single source of truth for mode behavior unless it becomes hard to scan or meaningfully unbalanced.
+- If `docs/agent-modes.md` grows enough that one mode dominates it, mode-specific examples or edge cases accumulate substantially, or routine edits start touching only one mode section, warn the user that it is time to consider splitting the mode doc.
 
 ## Documentation Changes
-- Do not update files under `/docs` unless the user explicitly requested the documentation change or clearly suggested the change being made.
+- Do not update files under `/docs` outside `Analysis`.
+- Within `Analysis`, only update files under `/docs` when the user explicitly requested the documentation change or clearly suggested the change being made.

@@ -1,6 +1,7 @@
 # Frontend rules
 
 ## Scope
+- This file is primarily relevant during `Development`, and secondarily during `Review` when evaluating or making small scoped client changes.
 - The /src/client/v1 folder and its contents are frozen. They should only be modified if they are blocking compilation or tests.
 - Do not write any tests against the v1 client.
 - All user-requested changes will target the v2 client, /src/client/v2.
