@@ -5,6 +5,10 @@ export interface RuntimeOptions {
   forceReingest: boolean;
 }
 
+/**
+ * @deprecated V2 should not depend on the V1-style global runtime config object.
+ * Prefer narrower V2-specific bootstraps and persisted settings boundaries.
+ */
 export interface RuntimeConfig {
   repoRoot: string;
   assistant: AssistantConfig;
@@ -19,6 +23,10 @@ export interface RuntimeConfig {
   provider: ProviderConfig;
 }
 
+/**
+ * @deprecated V2 should not depend on the V1-style assistant path bundle.
+ * Prefer V2 prompt asset resolution at the call site.
+ */
 export interface AssistantConfig {
   assistantDir: string;
   additionalContextPath: string;
@@ -28,6 +36,10 @@ export interface AssistantConfig {
   worldQueryingModePromptPath: string;
 }
 
+/**
+ * @deprecated V2 should not pass campaign settings through RuntimeConfig.
+ * Prefer persisted V2 settings and narrow runtime readers.
+ */
 export interface CampaignConfig {
   campaignJournalFolder: string | null;
   partyActorUuids: string[];
@@ -35,6 +47,10 @@ export interface CampaignConfig {
   sessionNotesJournal: string;
 }
 
+/**
+ * @deprecated V2 should not pass provider settings through RuntimeConfig.
+ * Prefer persisted V2 settings and provider-specific adapters.
+ */
 export interface ProviderConfig {
   apiKey: string | null;
   baseUrl: string;
@@ -56,8 +72,14 @@ export type SessionFeedEntryKind = 'user' | 'reasoning' | 'response';
 
 export type SourceType = 'foundry' | 'pdf' | 'article';
 
+/**
+ * @deprecated V2 does not use the V1 source-discovery inventory status model.
+ */
 export type SourceInventoryStatus = 'skipped' | 'scheduled' | 'missing' | 'failed';
 
+/**
+ * @deprecated V2 does not use the V1 source-discovery inventory result shape.
+ */
 export interface SourceInventoryResult {
   sourceType: SourceType;
   discovered: number;
@@ -70,6 +92,9 @@ export interface SourceInventoryResult {
   details: string[];
 }
 
+/**
+ * @deprecated V2 does not use the V1 startup refresh summary shape.
+ */
 export interface StartupRefreshSummary {
   forceReingest: boolean;
   inventories: SourceInventoryResult[];
@@ -129,6 +154,9 @@ export interface RetrievalResult {
   matchKind: RetrievalMatchKind;
 }
 
+/**
+ * @deprecated V2 does not use the V1 per-source ingestion summary model.
+ */
 export interface SourceIngestionSummary {
   sourceType: SourceType;
   status: 'skipped' | 'succeeded' | 'failed';
@@ -140,6 +168,9 @@ export interface SourceIngestionSummary {
   details: string[];
 }
 
+/**
+ * @deprecated V2 does not use the V1 ingestion summary shape.
+ */
 export interface IngestionSummary {
   sourceSummaries: SourceIngestionSummary[];
   degraded: boolean;

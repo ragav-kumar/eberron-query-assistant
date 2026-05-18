@@ -1,6 +1,4 @@
-import { loadDefaultConfig } from '@/server/v1/config/index.js';
-
-import { AppDb, createAppDb } from './db-app/index.js';
+import { AppDb, createAppDb, resolveAppDatabaseBootstrap } from './db-app/index.js';
 import {
     createConsoleEventPublisher,
     createRefreshCoordinator,
@@ -28,8 +26,7 @@ export interface V2AppContext extends AppDb {
 
 // noinspection JSUnusedGlobalSymbols
 export const createV2App = async (): Promise<V2AppContext> => {
-    const config = loadDefaultConfig();
-    const appDb = await createAppDb(config);
+    const appDb = await createAppDb(resolveAppDatabaseBootstrap());
     const startupOrchestrator = createStartupOrchestrator(appDb);
 
     await startupOrchestrator.initializeRefreshState();

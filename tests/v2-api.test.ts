@@ -6,10 +6,9 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { CreateRefreshDto, CreateRunDto } from '@/dto/index.js';
-import { loadDefaultConfig } from '@/server/v1/config/index.js';
 import { createV2ApiHandler } from '@/server/v2/api/index.js';
 import type { V2AppContext } from '@/server/v2/app.js';
-import { createAppDb } from '@/server/v2/db-app/index.js';
+import { createAppDb, getDefaultAppDatabasePath } from '@/server/v2/db-app/index.js';
 import { settingKeys } from '@/server/v2/db-app/settingKeys.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-api');
@@ -86,8 +85,7 @@ describe('V2 API router', () => {
     beforeEach(async () => {
         await rm(TEST_ROOT, { force: true, recursive: true });
 
-        const config = loadDefaultConfig(TEST_ROOT);
-        const appDb = await createAppDb(config);
+        const appDb = await createAppDb({ databasePath: getDefaultAppDatabasePath(TEST_ROOT) });
         await initializeRefreshState(appDb);
         app = {
             close: appDb.close,

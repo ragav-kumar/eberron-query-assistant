@@ -5,8 +5,6 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 
 import { throwIfAborted } from '@/errors.js';
-import type { EmbeddingAdapter } from '@/server/v1/provider/index.js';
-import type { ProgressReporter } from '@/server/v1/progress/reporter.js';
 import { createNoopTimingReporter } from '@/timing.js';
 import type {
     CitationMetadata,
@@ -27,6 +25,23 @@ const VECTOR_SCAN_BATCH_SIZE = 256;
 const MAX_VECTOR_CACHE_DATABASE_BYTES = 256 * 1024 * 1024;
 const MAX_EMBEDDING_INPUT_CHARACTERS = 6_000;
 const VECTOR_STORE_SCHEMA_VERSION = 'sqlite-json-v1';
+
+// from v1 runtime, consider culling
+export interface EmbeddingAdapter {
+    embed(input: string): Promise<number[]>;
+    embedBatch(inputs: string[]): Promise<number[][]>;
+    failedRetries?: number;
+    modelId: string;
+    schemaVersion: string;
+}
+
+// from v1 runtime, consider culling
+export interface ProgressReporter {
+    info(message: string): void;
+    progress?(message: string): void;
+    warn(message: string): void;
+}
+
 
 /**
  * Summary of one vector-refresh pass over the corpus.

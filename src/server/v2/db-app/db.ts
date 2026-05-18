@@ -2,7 +2,7 @@ import { Kysely, SqliteDialect } from 'kysely';
 
 import type { RuntimeConfig } from '@/types.js';
 
-import { createAppDatabase } from './database.js';
+import { createAppDatabase, getAppDatabasePath, type AppDatabaseBootstrap } from './database.js';
 import type { AppDatabaseSchema } from './schema.js';
 import { createSchema } from './schemaDefinition.js';
 
@@ -11,9 +11,9 @@ export interface AppDb {
     db: Kysely<AppDatabaseSchema>;
 }
 
-export const createAppDb = async (config: RuntimeConfig): Promise<AppDb> => {
+export const createAppDb = async (bootstrap: AppDatabaseBootstrap | RuntimeConfig): Promise<AppDb> => {
     const appDatabase = createAppDatabase();
-    const database = await appDatabase.open(config);
+    const database = await appDatabase.open(toBootstrap(bootstrap));
 
     const db = new Kysely<AppDatabaseSchema>({
         dialect: new SqliteDialect({
@@ -31,3 +31,9 @@ export const createAppDb = async (config: RuntimeConfig): Promise<AppDb> => {
         db,
     };
 };
+
+const toBootstrap = (bootstrap: AppDatabaseBootstrap | RuntimeConfig): AppDatabaseBootstrap => (
+    'databasePath' in bootstrap
+        ? bootstrap
+        : { databasePath: getAppDatabasePath(bootstrap) }
+);

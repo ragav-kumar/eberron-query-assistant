@@ -39,6 +39,7 @@
 
 ## Development Guardrails
 - During the V2 transition, treat user-requested changes as targeting V2 by default. The V1 client and V1 server are frozen unless changes are required to unblock compilation or runtime behavior.
+- During the V2 transition, `server/v2` and `client/v2` code may not reference V1 code under any circumstances. This prohibition is absolute.
 - If an attempted Vite start reports that the port is already in use, do not change the port. Treat that as a stale-session cleanup failure. You may only attempt to end the conflicting process when it belongs to this repository; if it does not belong to this repository, report that you cannot run the smoke check.
   - Under no circumstances should you ever change the port Vite runs on.
 - Prefer plain functions, hooks, modules, and object literals over project-authored classes.

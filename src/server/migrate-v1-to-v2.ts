@@ -9,6 +9,7 @@ import { createAppDb, settingKeys } from '@/server/v2/db-app/index.js';
 import type { AppDatabaseSchema, AppDb } from '@/server/v2/db-app/index.js';
 import type { RuntimeConfig } from '@/types.js';
 
+// Intentional temporary bridge between V1 and V2 while migration logic still spans both server layouts.
 interface LegacyRuntimeState {
     article: {
         knownArticles: Array<{
