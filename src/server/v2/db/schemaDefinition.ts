@@ -17,7 +17,7 @@ const SESSION_MODE_SQL = quoteSqlStrings(sessionModes);
 const RUN_STATUS_SQL = quoteSqlStrings(runStatuses);
 const REFRESH_OPERATION_SQL = quoteSqlStrings(refreshOperationKinds);
 const REFRESH_STATUS_SQL = quoteSqlStrings(refreshStatuses);
-const SESSION_EXCHANGE_KIND_SQL = quoteSqlStrings(sessionFeedEntryKinds);
+const SESSION_ENTRY_KIND_SQL = quoteSqlStrings(sessionFeedEntryKinds);
 
 export const createSchema = async (db: Kysely<AppDatabaseSchema>): Promise<void> => {
     await db.schema
@@ -77,7 +77,6 @@ export const createSchema = async (db: Kysely<AppDatabaseSchema>): Promise<void>
         .ifNotExists()
         .addColumn('id', 'text', column => column.primaryKey())
         .addColumn('sessionId', 'text', column => column.notNull().references('sessions.id').onDelete('cascade'))
-        .addColumn('exchangeId', 'text', column => column.notNull().unique())
         .addColumn('mode', 'text', column => column.notNull().check(sql`mode in (${sql.raw(SESSION_MODE_SQL)})`))
         .addColumn('status', 'text', column => column.notNull().check(sql`status in (${sql.raw(RUN_STATUS_SQL)})`))
         .addColumn('prompt', 'text', column => column.notNull())
@@ -92,25 +91,17 @@ export const createSchema = async (db: Kysely<AppDatabaseSchema>): Promise<void>
         .execute();
 
     await db.schema
-        .createTable('sessionExchanges')
+        .createTable('sessionEntries')
         .ifNotExists()
         .addColumn('id', 'text', column => column.primaryKey())
         .addColumn('sessionId', 'text', column => column.notNull().references('sessions.id').onDelete('cascade'))
         .addColumn('runId', 'text', column => column.notNull().references('runs.id').onDelete('cascade'))
-        .addColumn('exchangeId', 'text', column => column.notNull())
         .addColumn('sequenceIndex', 'integer', column => column.notNull())
-        .addColumn('kind', 'text', column => column.notNull().check(sql`kind in (${sql.raw(SESSION_EXCHANGE_KIND_SQL)})`))
+        .addColumn('kind', 'text', column => column.notNull().check(sql`kind in (${sql.raw(SESSION_ENTRY_KIND_SQL)})`))
         .addColumn('content', 'text', column => column.notNull())
         .addColumn('title', 'text')
         .addColumn('toolCallId', 'text')
         .addColumn('createdAt', 'text', column => column.notNull())
-        .addForeignKeyConstraint(
-            'sessionExchangesExchangeIdForeign',
-            ['exchangeId'],
-            'runs',
-            ['exchangeId'],
-            constraint => constraint.onDelete('cascade'),
-        )
         .execute();
 
     await db.schema
@@ -141,16 +132,16 @@ export const createSchema = async (db: Kysely<AppDatabaseSchema>): Promise<void>
         .execute();
 
     await db.schema
-        .createIndex('idxSessionExchangesSessionSequence')
+        .createIndex('idxSessionEntriesSessionSequence')
         .ifNotExists()
-        .on('sessionExchanges')
+        .on('sessionEntries')
         .columns(['sessionId', 'sequenceIndex', 'id'])
         .execute();
 
     await db.schema
-        .createIndex('idxSessionExchangesRunSequence')
+        .createIndex('idxSessionEntriesRunSequence')
         .ifNotExists()
-        .on('sessionExchanges')
+        .on('sessionEntries')
         .columns(['runId', 'sequenceIndex', 'id'])
         .execute();
 

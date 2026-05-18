@@ -13,10 +13,10 @@ export const Assistant = () => {
     }
     return (
         <div id='assistant-feed' className={styles.wrap}>
-            {activeSession.exchanges.map(exchange => (
-                <div id={`exchange-${exchange.id}`} className={styles.exchange}>
-                    {exchange.entries.map(entry => (
-                        <div id={`exchange-${exchange.id}-entry-${entry.id}`} className={styles[`entry-${entry.kind}`]}>
+            {activeSession.runs.map(run => (
+                <div key={run.id} id={`run-${run.id}`} className={styles.exchange}>
+                    {run.sessionEntries.map(entry => (
+                        <div key={entry.id} id={`run-${run.id}-entry-${entry.id}`} className={styles[`entry-${entry.kind}`]}>
                             <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                 {entry.content}
                             </ReactMarkdown>

@@ -61,7 +61,7 @@ export interface MigrationSummary {
     envSettings: number;
     foundryFiles: number;
     logRuns: number;
-    logSessionExchanges: number;
+    logSessionEntries: number;
     logSessions: number;
     npcRows: number;
     pdfFiles: number;
@@ -115,7 +115,7 @@ export const migrateV1DiskToV2Db = async (
         const npcRows = await migrateLegacyNpcs(config, trx);
         const {
             logRuns,
-            logSessionExchanges,
+            logSessionEntries,
             logSessions,
         } = await migrateLogFiles(config, trx, warn);
 
@@ -124,7 +124,7 @@ export const migrateV1DiskToV2Db = async (
             envSettings,
             foundryFiles,
             logRuns,
-            logSessionExchanges,
+            logSessionEntries,
             logSessions,
             npcRows,
             pdfFiles,
@@ -321,7 +321,6 @@ const migrateLegacyNpcs = async (config: RuntimeConfig, trx: DbTransaction): Pro
         completedAt: updatedAt,
         createdAt,
         error: null,
-        exchangeId: 'legacy-v1-npc-exchange',
         failedAt: null,
         id: LEGACY_NPC_RUN_ID,
         includePartyContext: 1,
@@ -362,7 +361,7 @@ const migrateLogFiles = async (
     config: RuntimeConfig,
     trx: DbTransaction,
     warn: (message: string) => void,
-): Promise<Pick<MigrationSummary, 'logRuns' | 'logSessionExchanges' | 'logSessions'>> => {
+): Promise<Pick<MigrationSummary, 'logRuns' | 'logSessionEntries' | 'logSessions'>> => {
     const logEntries = await readdirOrEmpty(config.logDir);
     const logFiles = logEntries
         .filter(entry => entry.isFile() && path.extname(entry.name).toLowerCase() === '.json')
@@ -378,7 +377,7 @@ const migrateLogFiles = async (
     }
 
     let logRuns = 0;
-    let logSessionExchanges = 0;
+    let logSessionEntries = 0;
     let logSessions = 0;
 
     for (const logFile of logFiles) {
@@ -412,7 +411,6 @@ const migrateLogFiles = async (
             exchangeOrdinal += 1;
             const runSeed = `${path.relative(config.repoRoot, fullPath)}:${entry.sourceIndex}:${exchangeOrdinal}`;
             const runId = `legacy-run-${stableId(runSeed)}`;
-            const exchangeId = `legacy-exchange-${stableId(runSeed)}`;
             const runCreatedAt = offsetIso(normalizedLog.sessionCreatedAt, (pendingProgress[0]?.sourceIndex ?? entry.sourceIndex) * 1_000);
             const runUpdatedAt = offsetIso(normalizedLog.sessionCreatedAt, entry.sourceIndex * 1_000 + 500);
 
@@ -420,7 +418,6 @@ const migrateLogFiles = async (
                 completedAt: runUpdatedAt,
                 createdAt: runCreatedAt,
                 error: null,
-                exchangeId,
                 failedAt: null,
                 id: runId,
                 includePartyContext: 1,
@@ -434,11 +431,10 @@ const migrateLogFiles = async (
             }).execute();
             logRuns += 1;
 
-            const sessionExchangeRows: Insertable<AppDatabaseSchema['sessionExchanges']>[] = [{
+            const sessionEntryRows: Insertable<AppDatabaseSchema['sessionEntries']>[] = [{
                 content: entry.user,
                 createdAt: runCreatedAt,
-                exchangeId,
-                id: `legacy-session-exchange-${stableId(`${runSeed}:user`)}`,
+                id: `legacy-session-entry-${stableId(`${runSeed}:user`)}`,
                 kind: 'user',
                 runId,
                 sequenceIndex: 1,
@@ -449,11 +445,10 @@ const migrateLogFiles = async (
 
             let sequenceIndex = 2;
             for (const progressEntry of pendingProgress) {
-                sessionExchangeRows.push({
+                sessionEntryRows.push({
                     content: progressEntry.message,
                     createdAt: offsetIso(normalizedLog.sessionCreatedAt, progressEntry.sourceIndex * 1_000 + 100),
-                    exchangeId,
-                    id: `legacy-session-exchange-${stableId(`${runSeed}:progress:${progressEntry.sourceIndex}`)}`,
+                    id: `legacy-session-entry-${stableId(`${runSeed}:progress:${progressEntry.sourceIndex}`)}`,
                     kind: 'reasoning',
                     runId,
                     sequenceIndex,
@@ -465,11 +460,10 @@ const migrateLogFiles = async (
             }
             pendingProgress.length = 0;
 
-            sessionExchangeRows.push({
+            sessionEntryRows.push({
                 content: entry.assistant,
                 createdAt: runUpdatedAt,
-                exchangeId,
-                id: `legacy-session-exchange-${stableId(`${runSeed}:response`)}`,
+                id: `legacy-session-entry-${stableId(`${runSeed}:response`)}`,
                 kind: 'response',
                 runId,
                 sequenceIndex,
@@ -478,8 +472,8 @@ const migrateLogFiles = async (
                 toolCallId: null,
             });
 
-            await trx.insertInto('sessionExchanges').values(sessionExchangeRows).execute();
-            logSessionExchanges += sessionExchangeRows.length;
+            await trx.insertInto('sessionEntries').values(sessionEntryRows).execute();
+            logSessionEntries += sessionEntryRows.length;
         }
 
         for (const progressEntry of pendingProgress) {
@@ -489,7 +483,7 @@ const migrateLogFiles = async (
 
     return {
         logRuns,
-        logSessionExchanges,
+        logSessionEntries,
         logSessions,
     };
 };

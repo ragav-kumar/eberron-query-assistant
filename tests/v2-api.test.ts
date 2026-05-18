@@ -111,7 +111,6 @@ describe('V2 API router', () => {
             completedAt: '2026-05-07T21:10:48.000Z',
             createdAt: '2026-05-07T21:10:42.000Z',
             error: null,
-            exchangeId: 'exchange-dal-quor-1',
             failedAt: null,
             id: 'run-dal-quor-1',
             includePartyContext: 1,
@@ -128,11 +127,10 @@ describe('V2 API router', () => {
             .set({ activeRunId: 'run-dal-quor-1' })
             .where('id', '=', 'session-dal-quor')
             .execute();
-        await app.db.insertInto('sessionExchanges').values([
+        await app.db.insertInto('sessionEntries').values([
             {
                 content: 'Prompt',
                 createdAt: '2026-05-07T21:10:42.000Z',
-                exchangeId: 'exchange-dal-quor-1',
                 id: 'exchange-dal-quor-user-1',
                 kind: 'user',
                 runId: 'run-dal-quor-1',
@@ -144,7 +142,6 @@ describe('V2 API router', () => {
             {
                 content: 'Answer',
                 createdAt: '2026-05-07T21:10:48.000Z',
-                exchangeId: 'exchange-dal-quor-1',
                 id: 'exchange-dal-quor-response-1',
                 kind: 'response',
                 runId: 'run-dal-quor-1',
@@ -189,7 +186,7 @@ describe('V2 API router', () => {
         expect(sessions.every(session => session.mode === 'assistant')).toBe(true);
     });
 
-    it('resolves session feed and run routes with path params', async () => {
+    it('resolves session feed routes with path params', async () => {
         const feedRequest = createRequest('GET', '/api/v2/sessions/session-dal-quor/feed');
         const feedResult = createResponse();
 
@@ -200,17 +197,6 @@ describe('V2 API router', () => {
         expect(JSON.parse(feedResult.record.body)).toMatchObject({
             mode: 'assistant',
             sessionId: 'session-dal-quor',
-        });
-
-        const runRequest = createRequest('GET', '/api/v2/runs/run-dal-quor-1');
-        const runResult = createResponse();
-
-        handleV2ApiRequest(runRequest, runResult.response);
-        await flushAsyncHandlers();
-
-        expect(runResult.record.statusCode).toBe(200);
-        expect(JSON.parse(runResult.record.body)).toMatchObject({
-            id: 'run-dal-quor-1',
         });
     });
 

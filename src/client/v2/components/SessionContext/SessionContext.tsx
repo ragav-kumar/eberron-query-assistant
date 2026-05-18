@@ -1,9 +1,9 @@
 import { createContext, use } from 'react';
 import { TabInputState } from './tabDefinitions.js';
-import { SessionFeedExchange, Session, SessionMode } from '@/dto/index.js';
+import { Run, Session, SessionMode } from '@/dto/index.js';
 
 export type SessionData = Session & {
-    exchanges: SessionFeedExchange[];
+    runs: Run[];
 };
 
 interface SessionContextTabManagement {

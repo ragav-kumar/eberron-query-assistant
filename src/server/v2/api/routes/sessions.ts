@@ -13,7 +13,7 @@ export const sessionRoutes: RouteDefinition[] = [
 
             let query = context.db
                 .selectFrom('sessions')
-                .leftJoin('sessionExchanges', 'sessions.id', 'sessionExchanges.sessionId')
+                .leftJoin('sessionEntries', 'sessions.id', 'sessionEntries.sessionId')
                 .select(({ fn }) => [
                     'sessions.id',
                     'sessions.mode',
@@ -22,7 +22,7 @@ export const sessionRoutes: RouteDefinition[] = [
                     'sessions.includePartyContext',
                     'sessions.createdAt',
                     'sessions.updatedAt',
-                    fn.count('sessionExchanges.id').as('exchangeCount'),
+                    fn.count('sessionEntries.id').as('sessionEntryCount'),
                 ])
                 .groupBy([
                     'sessions.id',
@@ -40,7 +40,7 @@ export const sessionRoutes: RouteDefinition[] = [
 
             const sessionDtos = sessionRows.map<Session>(session => ({
                 ...session,
-                exchangeCount: session.exchangeCount as number,
+                sessionEntryCount: session.sessionEntryCount as number,
                 includePartyContext: !!session.includePartyContext,
             }));
 
@@ -67,7 +67,7 @@ export const sessionRoutes: RouteDefinition[] = [
                 .executeTakeFirstOrThrow();
 
             const feed = await context.db
-                .selectFrom('sessionExchanges')
+                .selectFrom('sessionEntries')
                 .selectAll()
                 .where('sessionId', '=', sessionId)
                 .orderBy('sequenceIndex', 'asc')
@@ -84,16 +84,15 @@ export const sessionRoutes: RouteDefinition[] = [
 So for GET /sessions/:sessionId/feed, the likely construction is:
 
 Read all runs for the session.
-Read all sessionExchanges for the session.
-Group sessionExchanges rows by exchangeId.
-For each run, build one SessionFeedExchange:
-id: probably run.exchangeId or run.id, depending on your intended DTO semantics
-runId: run.id
+Read all sessionEntries for the session.
+Group sessionEntries rows by runId.
+For each run, build one Run:
+id: run.id
 status: run.status
 createdAt / updatedAt: from runs
-entries: grouped sessionExchanges rows for that exchangeId
+sessionEntries: grouped sessionEntries rows for that runId
             */
-            /*const exchangeDtos = feed.map<SessionExchange>(exchange => ({
+            /*const runDtos = feed.map<Run>(run => ({
 
             }));*/
 

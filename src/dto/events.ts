@@ -1,5 +1,5 @@
 import type { RefreshOperationKind, RefreshStatus, RunStatus, SessionMode } from '@/types.js';
-import type { SessionFeedEntry } from './sessionFeed.js';
+import type { SessionEntry } from './runs.js';
 import type { Session } from './sessions.js';
 
 interface EventBase {
@@ -13,7 +13,6 @@ export interface RunOperationEvent extends EventBase {
     resource: 'run';
     action: 'created' | 'updated' | 'completed' | 'failed';
     sessionId: string;
-    exchangeId: string;
     status: RunStatus;
 }
 
@@ -29,8 +28,7 @@ export interface SessionEntryOperationEvent extends EventBase {
     action: 'appended';
     sessionId: string;
     runId: string;
-    exchangeId: string;
-    entry: SessionFeedEntry;
+    entry: SessionEntry;
 }
 
 export interface SessionOperationEvent extends EventBase {

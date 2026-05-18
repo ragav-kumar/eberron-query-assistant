@@ -61,11 +61,10 @@ export interface Session {
     updatedAt: string;
 }
 
-export interface SessionExchange {
+export interface SessionEntry {
     id: string;
     sessionId: string;
     runId: string;
-    exchangeId: string;
     sequenceIndex: number;
     kind: SessionFeedEntryKind;
     content: string;
@@ -77,7 +76,6 @@ export interface SessionExchange {
 export interface Run {
     id: string;
     sessionId: string;
-    exchangeId: string;
     mode: SessionMode;
     status: RunStatus;
     prompt: string;
@@ -121,7 +119,7 @@ export interface AppDatabaseSchema {
     npcs: Npc;
     refreshState: RefreshState;
     runs: Run;
-    sessionExchanges: SessionExchange;
+    sessionEntries: SessionEntry;
     sessions: Session;
     settings: Setting;
 }

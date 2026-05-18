@@ -1,25 +1,13 @@
 import type { Refresh, Run } from '@/dto/index.js';
 
-export const RUNS = new Map<string, Run>([
-    ['run-dal-quor-1', {
-        id: 'run-dal-quor-1',
-        sessionId: 'session-dal-quor',
-        mode: 'assistant',
-        status: 'completed',
-        createdAt: '2026-05-07T21:10:42.000Z',
-        updatedAt: '2026-05-07T21:10:48.000Z',
-        exchangeId: 'exchange-dal-quor-1',
-    }],
-]);
-
 export const DEFAULT_CREATED_RUN: Run = {
     id: 'run-dal-quor-1',
     sessionId: 'session-dal-quor',
     mode: 'assistant',
     status: 'completed',
     createdAt: '2026-05-07T21:10:42.000Z',
+    sessionEntries: [],
     updatedAt: '2026-05-07T21:10:48.000Z',
-    exchangeId: 'exchange-dal-quor-1',
 };
 
 export const REFRESH: Refresh = {

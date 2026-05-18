@@ -1,11 +1,11 @@
 import type { SessionMode } from '@/types.js';
-import { SessionFeedExchange } from './sessionFeed.js';
+import type { Run } from './runs.js';
 
 export interface Session {
     id: string;
     mode: SessionMode;
     title: string;
-    exchangeCount: number;
+    sessionEntryCount: number;
     createdAt: string;
     updatedAt: string;
     activeRunId: string | null;
@@ -15,5 +15,5 @@ export interface Session {
 export interface SessionFeed {
     sessionId: string;
     mode: SessionMode;
-    items: SessionFeedExchange[];
+    items: Run[];
 }

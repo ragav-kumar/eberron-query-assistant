@@ -2,7 +2,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import type { OperationEvent } from '@/dto/index.js';
 import { refreshQueryKey } from './refresh.js';
-import { runQueryKey } from './runs.js';
 import { sessionQueryKey } from './sessions.js';
 
 import { contracts } from '@/contract/index.js';
@@ -21,7 +20,8 @@ export const useRuntimeSubscription = () => {
             const operationEvent = JSON.parse(event.data) as OperationEvent;
             switch (operationEvent.resource) {
                 case 'run':
-                    void queryClient.invalidateQueries({queryKey: [...runQueryKey, operationEvent.resourceId]});
+                    void queryClient.invalidateQueries({queryKey: sessionQueryKey});
+                    void queryClient.invalidateQueries({queryKey: [...sessionQueryKey, operationEvent.sessionId, 'feed']});
                     break;
                 case 'refresh':
                     void queryClient.invalidateQueries({queryKey: refreshQueryKey});
@@ -33,9 +33,14 @@ export const useRuntimeSubscription = () => {
                         throw new Error('session-entry event missing sessionId');
                     }
                     void queryClient.invalidateQueries({queryKey: [...sessionQueryKey, operationEvent.sessionId]});
-                    void queryClient.invalidateQueries({queryKey: [...sessionQueryKey, operationEvent.sessionId, 'entries']});
+                    void queryClient.invalidateQueries({queryKey: [...sessionQueryKey, operationEvent.sessionId, 'feed']});
                     break;
                 case 'session':
+                    void queryClient.invalidateQueries({queryKey: sessionQueryKey});
+                    void queryClient.invalidateQueries({queryKey: [...sessionQueryKey, operationEvent.sessionId, 'feed']});
+                    if (operationEvent.replacedSessionId != null) {
+                        void queryClient.invalidateQueries({queryKey: [...sessionQueryKey, operationEvent.replacedSessionId, 'feed']});
+                    }
                     break;
             }
         };

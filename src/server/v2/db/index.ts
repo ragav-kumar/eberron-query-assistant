@@ -12,7 +12,7 @@ export type {
     Run,
     SelectRow,
     Session,
-    SessionExchange,
+    SessionEntry,
     Setting,
     UpdateRow,
 } from './schema.js';

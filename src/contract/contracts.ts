@@ -67,12 +67,6 @@ export const contracts = {
             method: 'POST',
             path: '/api/v2/runs',
         }),
-        /** Fetches one run resource by id. */
-        get: defineEndpoint<null, Run, { runId: string }>({
-            method: 'GET',
-            path: '/api/v2/runs/:runId',
-            pathParams: ['runId'],
-        }),
     },
 
     /**

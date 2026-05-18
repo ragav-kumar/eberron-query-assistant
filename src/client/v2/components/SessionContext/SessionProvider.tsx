@@ -94,7 +94,7 @@ const constructActiveSessions = (
 
         activeSessions[mode] = {
             ...session,
-            exchanges: feed.items,
+            runs: feed.items,
         };
     }
 

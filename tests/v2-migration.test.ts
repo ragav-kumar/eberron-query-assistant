@@ -63,7 +63,7 @@ describe('migrateV1DiskToV2Db', () => {
                 envSettings: 9,
                 foundryFiles: 2,
                 logRuns: 2,
-                logSessionExchanges: 6,
+                logSessionEntries: 6,
                 logSessions: 1,
                 npcRows: 2,
                 pdfFiles: 2,
@@ -178,13 +178,13 @@ describe('migrateV1DiskToV2Db', () => {
                 }),
             ]));
 
-            const sessionExchanges = await appDb.db
-                .selectFrom('sessionExchanges')
+            const sessionEntries = await appDb.db
+                .selectFrom('sessionEntries')
                 .selectAll()
                 .orderBy('createdAt', 'asc')
                 .execute();
-            expect(sessionExchanges).toHaveLength(6);
-            expect(sessionExchanges.map(entry => entry.kind)).toEqual([
+            expect(sessionEntries).toHaveLength(6);
+            expect(sessionEntries.map(entry => entry.kind)).toEqual([
                 'user',
                 'reasoning',
                 'response',
@@ -232,14 +232,14 @@ describe('migrateV1DiskToV2Db', () => {
                 .selectFrom('runs')
                 .select(ctx => ctx.fn.countAll().as('count'))
                 .executeTakeFirstOrThrow();
-            const sessionExchangeCount = await appDb.db
-                .selectFrom('sessionExchanges')
+            const sessionEntryCount = await appDb.db
+                .selectFrom('sessionEntries')
                 .select(ctx => ctx.fn.countAll().as('count'))
                 .executeTakeFirstOrThrow();
 
             expect(Number(sessionCount.count)).toBe(2);
             expect(Number(runCount.count)).toBe(3);
-            expect(Number(sessionExchangeCount.count)).toBe(6);
+            expect(Number(sessionEntryCount.count)).toBe(6);
         } finally {
             await appDb.close();
         }
