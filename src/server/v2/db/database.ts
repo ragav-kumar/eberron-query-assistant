@@ -1,6 +1,8 @@
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
+
 import Database from 'better-sqlite3';
+
 import type { RuntimeConfig } from '@/types.js';
 
 const APP_DATABASE_FILENAME = 'app.sqlite';
