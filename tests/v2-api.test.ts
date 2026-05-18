@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import type { CreateRefreshDto, CreateRunDto } from '@/dto/index.js';
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
 import { createV2ApiHandler } from '@/server/v2/api/index.js';
 import type { V2AppContext } from '@/server/v2/app.js';
@@ -89,8 +90,73 @@ describe('V2 API router', () => {
         const appDb = await createAppDb(config);
         app = {
             close: appDb.close,
+            consoleEvents: {
+                registerConnection() {
+                    console.warn('GET /api/v2/events/console is not implemented');
+                },
+                warn(message) {
+                    console.warn(message);
+                },
+            },
             db: appDb.db,
+            refreshCoordinator: {
+                async startRefresh(_request: CreateRefreshDto) {
+                    console.warn('POST /api/v2/refresh is not implemented');
+                    const refresh = await appDb.db
+                        .selectFrom('refreshState')
+                        .selectAll()
+                        .executeTakeFirstOrThrow();
+
+                    return {
+                        activeOperation: refresh.activeOperation,
+                        createdAt: refresh.createdAt,
+                        lastRefreshAt: refresh.lastRefreshAt,
+                        lastReingestAt: refresh.lastReingestAt,
+                        refreshStatus: refresh.refreshStatus,
+                        reingestStatus: refresh.reingestStatus,
+                        updatedAt: refresh.updatedAt,
+                    };
+                },
+            },
+            runCoordinator: {
+                startRun(_request: CreateRunDto) {
+                    console.warn('POST /api/v2/runs is not implemented');
+                    throw new Error('POST /api/v2/runs is not implemented');
+                },
+            },
+            startupOrchestrator: {
+                async runStartup() {
+                    const now = '2026-05-17T00:00:00.000Z';
+
+                    await appDb.db
+                        .insertInto('refreshState')
+                        .values({
+                            singletonKey: 1,
+                            activeOperation: null,
+                            refreshStatus: 'idle',
+                            reingestStatus: 'idle',
+                            lastRefreshAt: null,
+                            lastReingestAt: null,
+                            createdAt: now,
+                            updatedAt: now,
+                        })
+                        .onConflict(conflict => conflict.column('singletonKey').doNothing())
+                        .execute();
+
+                    console.warn('V2 startup orchestration is not implemented');
+                },
+            },
+            runtimeEvents: {
+                registerConnection() {
+                    console.warn('GET /api/v2/events/runtime is not implemented');
+                },
+                warn(message) {
+                    console.warn(message);
+                },
+            },
         };
+
+        await app.startupOrchestrator.runStartup();
 
         await app.db.insertInto('settings').values({
             key: settingKeys.additionalContext,

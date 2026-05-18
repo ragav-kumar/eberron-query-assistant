@@ -1,26 +1,45 @@
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
 
 import { AppDb, createAppDb } from './db/index.js';
+import {
+    createConsoleEventPublisher,
+    createRefreshCoordinator,
+    createRunCoordinator,
+    createStartupOrchestrator,
+    createRuntimeEventPublisher,
+} from './services/index.js';
+import type {
+    ConsoleEventPublisher,
+    RefreshCoordinator,
+    RunCoordinator,
+    RuntimeEventPublisher,
+} from './services/index.js';
 
 /**
- * V2 routes should depend on an app-level context rather than on the raw DB handle.
- *
- * Today this only wraps the database lifecycle, but V2 will also need to carry
- * process-local runtime services that do not belong in SQLite itself, such as
- * transient console/event publishers, refresh coordination, and other
- * long-lived server-side orchestration state.
+ * This wraps the database lifecycle plus the process-local runtime
+ * services that do not belong in SQLite itself.
  */
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- will be expanded later
 export interface V2AppContext extends AppDb {
+    consoleEvents: ConsoleEventPublisher;
+    refreshCoordinator: RefreshCoordinator;
+    runCoordinator: RunCoordinator;
+    runtimeEvents: RuntimeEventPublisher;
 }
 
 // noinspection JSUnusedGlobalSymbols
 export const createV2App = async (): Promise<V2AppContext> => {
     const config = loadDefaultConfig();
     const appDb = await createAppDb(config);
+    const startupOrchestrator = createStartupOrchestrator(appDb);
+
+    await startupOrchestrator.initializeRefreshState();
 
     return {
-        close: appDb.close,
         db: appDb.db,
+        close: appDb.close,
+        refreshCoordinator: createRefreshCoordinator(appDb),
+        runCoordinator: createRunCoordinator(),
+        consoleEvents: createConsoleEventPublisher(),
+        runtimeEvents: createRuntimeEventPublisher(),
     };
 };

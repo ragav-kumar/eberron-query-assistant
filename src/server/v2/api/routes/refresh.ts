@@ -1,5 +1,7 @@
 import type { RouteDefinition } from './shared.js';
+import { readJson } from '../request.js';
 import { writeJson } from '../response.js';
+import type { CreateRefreshDto } from '@/dto/index.js';
 
 export const refreshRoutes: RouteDefinition[] = [
     {
@@ -17,15 +19,9 @@ export const refreshRoutes: RouteDefinition[] = [
     {
         method: 'POST',
         path: '/api/v2/refresh',
-        handler: async ({response, context}) => {
-            // TODO: Rework this once refresh POST behavior is implemented.
-            console.warn('POST /api/v2/refresh is not implemented');
-
-            const refresh = await context.db
-                .selectFrom('refreshState')
-                .selectAll()
-                .executeTakeFirstOrThrow();
-
+        handler: async ({request, response, context}) => {
+            const payload = await readJson<CreateRefreshDto>(request);
+            const refresh = await context.refreshCoordinator.startRefresh(payload);
             writeJson(response, refresh);
         },
     },
