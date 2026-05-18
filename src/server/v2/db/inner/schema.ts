@@ -9,10 +9,32 @@ import type {
 
 type NullableRefreshOperationKind = RefreshOperationKind | null;
 
+/**
+ * This is a general-purpose key-value store, not just user settings.
+ */
 export interface Setting {
     key: string;
     value: string;
     modified_at: string;
+}
+
+/**
+ * Used for both foundry and pdf imports. The primary key is the whole row.
+ */
+export interface IngestedFile {
+    source_type: 'foundry' | 'pdf';
+    filename: string;
+}
+
+/**
+ * Used for keith baker article imports. Primary key is canonical_url.
+ */
+export interface IngestedArticle {
+    canonical_url: string;
+    title: string | null;
+    first_seen_at: string;
+    last_ingested_at: string;
+    scrape_status: 'pending' | 'succeeded' | 'failed' | 'inaccessible';
 }
 
 export interface RefreshState {

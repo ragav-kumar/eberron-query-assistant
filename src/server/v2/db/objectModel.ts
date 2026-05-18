@@ -12,6 +12,19 @@ export interface Setting {
     modifiedAt: Date;
 }
 
+export interface IngestedFile {
+    sourceType: 'foundry' | 'pdf';
+    filename: string;
+}
+
+export interface IngestedArticle {
+    canonicalUrl: string;
+    title?: string;
+    firstSeenAt: Date;
+    lastIngestedAt: Date;
+    scrapeStatus: 'pending' | 'succeeded' | 'failed' | 'inaccessible';
+}
+
 export interface RefreshState {
     activeOperation: RefreshOperationKind | null;
     refreshStatus: RefreshStatus;

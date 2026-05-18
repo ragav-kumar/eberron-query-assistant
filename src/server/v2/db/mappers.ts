@@ -1,5 +1,7 @@
 import type {
     ConsoleEntry as ObjectModelConsoleEntry,
+    IngestedArticle as ObjectModelIngestedArticle,
+    IngestedFile as ObjectModelIngestedFile,
     Npc as ObjectModelNpc,
     RefreshState as ObjectModelRefreshState,
     Run as ObjectModelRun,
@@ -9,6 +11,8 @@ import type {
 } from './objectModel.js';
 import type {
     ConsoleEntry as StoredConsoleEntryRow,
+    IngestedArticle as StoredIngestedArticleRow,
+    IngestedFile as StoredIngestedFileRow,
     Npc as StoredNpcRow,
     RefreshState as StoredRefreshStateRow,
     Run as StoredRunRow,
@@ -31,6 +35,32 @@ export const toStoredSettingRow = (setting: ObjectModelSetting): StoredSettingRo
         key: setting.key,
         modified_at: setting.modifiedAt.toISOString(),
         value: setting.value,
+    });
+
+export const mapIngestedFileRow = (row: StoredIngestedFileRow): ObjectModelIngestedFile => ({
+        filename: row.filename,
+        sourceType: row.source_type,
+    });
+
+export const toStoredIngestedFileRow = (file: ObjectModelIngestedFile): StoredIngestedFileRow => ({
+        filename: file.filename,
+        source_type: file.sourceType,
+    });
+
+export const mapIngestedArticleRow = (row: StoredIngestedArticleRow): ObjectModelIngestedArticle => ({
+        canonicalUrl: row.canonical_url,
+        firstSeenAt: new Date(row.first_seen_at),
+        lastIngestedAt: new Date(row.last_ingested_at),
+        scrapeStatus: row.scrape_status,
+        title: row.title ?? undefined,
+    });
+
+export const toStoredIngestedArticleRow = (article: ObjectModelIngestedArticle): StoredIngestedArticleRow => ({
+        canonical_url: article.canonicalUrl,
+        first_seen_at: article.firstSeenAt.toISOString(),
+        last_ingested_at: article.lastIngestedAt.toISOString(),
+        scrape_status: article.scrapeStatus,
+        title: article.title ?? null,
     });
 
 export const mapRefreshStateRow = (row: StoredRefreshStateRow): ObjectModelRefreshState => ({

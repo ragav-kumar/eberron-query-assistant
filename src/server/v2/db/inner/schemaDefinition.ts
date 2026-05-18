@@ -24,6 +24,20 @@ export const createSchema = (database: Database.Database): void => {
             modified_at TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS ingested_files (
+            source_type TEXT NOT NULL CHECK (source_type IN ('foundry', 'pdf')),
+            filename TEXT NOT NULL,
+            PRIMARY KEY (source_type, filename)
+        );
+
+        CREATE TABLE IF NOT EXISTS ingested_articles (
+            canonical_url TEXT PRIMARY KEY,
+            title TEXT,
+            first_seen_at TEXT NOT NULL,
+            last_ingested_at TEXT NOT NULL,
+            scrape_status TEXT NOT NULL CHECK (scrape_status IN ('pending', 'succeeded', 'failed', 'inaccessible'))
+        );
+
         CREATE TABLE IF NOT EXISTS refresh_state (
             singleton_key INTEGER PRIMARY KEY CHECK (singleton_key = 1),
             active_operation TEXT CHECK (active_operation IN (${REFRESH_OPERATION_SQL}) OR active_operation IS NULL),
@@ -117,5 +131,11 @@ export const createSchema = (database: Database.Database): void => {
 
         CREATE INDEX IF NOT EXISTS idx_console_entries_created
             ON console_entries(created_at, id);
+
+        CREATE INDEX IF NOT EXISTS idx_ingested_files_source_type
+            ON ingested_files(source_type, filename);
+
+        CREATE INDEX IF NOT EXISTS idx_ingested_articles_scrape_status
+            ON ingested_articles(scrape_status, canonical_url);
     `);
 };

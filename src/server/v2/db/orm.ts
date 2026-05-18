@@ -7,6 +7,8 @@ import { createSchema } from './inner/schemaDefinition.js';
 import type { Orm } from './contract.js';
 import {
     mapConsoleEntryRow,
+    mapIngestedArticleRow,
+    mapIngestedFileRow,
     mapNpcRow,
     mapRefreshStateRow,
     mapRunRow,
@@ -14,6 +16,8 @@ import {
     mapSessionRow,
     mapSettingRow,
     toStoredConsoleEntryRow,
+    toStoredIngestedArticleRow,
+    toStoredIngestedFileRow,
     toStoredNpcRow,
     toStoredRefreshStateRow,
     toStoredRunRow,
@@ -40,8 +44,10 @@ export const createOrm = (config: RuntimeConfig): Orm => {
     };
 
     const loadSessionExchanges = async (sessionId: string) => {
-        const rows = await repositories.sessionExchanges.listBySession(sessionId);
-        return rows.map(mapSessionExchangeRow);
+        const rows = await repositories.sessionExchanges.list();
+        return rows
+            .filter(row => row.session_id === sessionId)
+            .map(mapSessionExchangeRow);
     };
 
     const loadSession = async (sessionId: string, options?: Parameters<Orm['sessions']['get']>[1]) => {
@@ -75,14 +81,35 @@ export const createOrm = (config: RuntimeConfig): Orm => {
                 await repositories.consoleEntries.save(toStoredConsoleEntryRow(entry));
             },
         },
+        ingestedArticles: {
+            get: async canonicalUrl => {
+                const row = await repositories.ingestedArticles.get(canonicalUrl);
+                return row ? mapIngestedArticleRow(row) : null;
+            },
+            list: async () => (await repositories.ingestedArticles.list()).map(mapIngestedArticleRow),
+            save: async article => {
+                await repositories.ingestedArticles.save(toStoredIngestedArticleRow(article));
+            },
+        },
+        ingestedFiles: {
+            get: async (sourceType, filename) => {
+                const row = await repositories.ingestedFiles.get(sourceType, filename);
+                return row ? mapIngestedFileRow(row) : null;
+            },
+            list: async () => (await repositories.ingestedFiles.list()).map(mapIngestedFileRow),
+            remove: async (sourceType, filename) => {
+                await repositories.ingestedFiles.remove(sourceType, filename);
+            },
+            save: async file => {
+                await repositories.ingestedFiles.save(toStoredIngestedFileRow(file));
+            },
+        },
         npcs: {
             get: async id => {
                 const row = await repositories.npcs.get(id);
                 return row ? mapNpcRow(row) : null;
             },
             list: async () => (await repositories.npcs.list()).map(mapNpcRow),
-            listByRun: async runId => (await repositories.npcs.listByRun(runId)).map(mapNpcRow),
-            listBySession: async sessionId => (await repositories.npcs.listBySession(sessionId)).map(mapNpcRow),
             save: async npc => {
                 await repositories.npcs.save(toStoredNpcRow(npc));
             },
@@ -98,7 +125,7 @@ export const createOrm = (config: RuntimeConfig): Orm => {
         },
         runs: {
             get: async id => loadRun(id),
-            listBySession: async sessionId => (await repositories.runs.listBySession(sessionId)).map(mapRunRow),
+            list: async () => (await repositories.runs.list()).map(mapRunRow),
             save: async run => {
                 await repositories.runs.save(toStoredRunRow(run));
             },
@@ -108,8 +135,7 @@ export const createOrm = (config: RuntimeConfig): Orm => {
                 const row = await repositories.sessionExchanges.get(id);
                 return row ? mapSessionExchangeRow(row) : null;
             },
-            listBySession: async sessionId => (await repositories.sessionExchanges.listBySession(sessionId)).map(mapSessionExchangeRow),
-            listByRun: async runId => (await repositories.sessionExchanges.listByRun(runId)).map(mapSessionExchangeRow),
+            list: async () => (await repositories.sessionExchanges.list()).map(mapSessionExchangeRow),
             save: async exchange => {
                 await repositories.sessionExchanges.save(toStoredSessionExchangeRow(exchange));
             },
@@ -118,6 +144,7 @@ export const createOrm = (config: RuntimeConfig): Orm => {
             get: async (id, options) => loadSession(id, options),
             list: async () => {
                 const rows = await repositories.sessions.list();
+                // TODO: This eager loading in list() is suspicious; review it once more server behavior is implemented.
                 return Promise.all(rows.map(async row => {
                     const exchanges = await loadSessionExchanges(row.id);
                     const activeRun = row.active_run_id ? await loadRun(row.active_run_id) : null;

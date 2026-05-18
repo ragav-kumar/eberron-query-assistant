@@ -30,10 +30,10 @@ export const createRunsRepository = (
                 .get(id);
             return row ?? null;
         },
-        listBySession: async (sessionId: string) => {
+        list: async () => {
             const database = await getDatabase();
             return database
-                .prepare<[string], StoredRunRow>(`
+                .prepare<[], StoredRunRow>(`
                     SELECT
                         id,
                         session_id,
@@ -50,10 +50,9 @@ export const createRunsRepository = (
                         completed_at,
                         failed_at
                     FROM runs
-                    WHERE session_id = ?
                     ORDER BY created_at, id
                 `)
-                .all(sessionId);
+                .all();
         },
         save: async (run: StoredRunRow) => {
             const database = await getDatabase();

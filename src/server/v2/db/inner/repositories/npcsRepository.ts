@@ -44,26 +44,6 @@ export const createNpcRepository = (
                 `)
                 .all();
         },
-        listByRun: async (runId: string) => {
-            const database = await getDatabase();
-            return database
-                .prepare<[string], StoredNpcRow>(`
-                    ${NPC_SELECT}
-                    WHERE run_id = ?
-                    ${NPC_LIST_ORDER}
-                `)
-                .all(runId);
-        },
-        listBySession: async (sessionId: string) => {
-            const database = await getDatabase();
-            return database
-                .prepare<[string], StoredNpcRow>(`
-                    ${NPC_SELECT}
-                    WHERE session_id = ?
-                    ${NPC_LIST_ORDER}
-                `)
-                .all(sessionId);
-        },
         save: async (npc: StoredNpcRow) => {
             const database = await getDatabase();
             database

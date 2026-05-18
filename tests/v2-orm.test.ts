@@ -40,6 +40,8 @@ describe('V2 ORM', () => {
 
                 expect(tableNames).toEqual([
                     'console_entries',
+                    'ingested_articles',
+                    'ingested_files',
                     'npcs',
                     'refresh_state',
                     'runs',
@@ -72,6 +74,66 @@ describe('V2 ORM', () => {
                 key: setting.key,
                 value: setting.value,
             })]);
+        } finally {
+            orm.close();
+        }
+    });
+
+    it('round-trips ingested files through the public ORM surface', async () => {
+        const config = loadDefaultConfig(TEST_ROOT);
+        const orm = createOrm(config);
+        const foundryFile = createIngestedFile();
+        const pdfFile = {
+            ...createIngestedFile(),
+            filename: 'dragonmarked.pdf',
+            sourceType: 'pdf' as const,
+        };
+
+        try {
+            await orm.bootstrap();
+            await orm.ingestedFiles.save(pdfFile);
+            await orm.ingestedFiles.save(foundryFile);
+
+            await expect(orm.ingestedFiles.get(foundryFile.sourceType, foundryFile.filename)).resolves.toEqual(foundryFile);
+            await expect(orm.ingestedFiles.list()).resolves.toEqual([foundryFile, pdfFile]);
+
+            await orm.ingestedFiles.remove(foundryFile.sourceType, foundryFile.filename);
+
+            await expect(orm.ingestedFiles.get(foundryFile.sourceType, foundryFile.filename)).resolves.toBeNull();
+            await expect(orm.ingestedFiles.list()).resolves.toEqual([pdfFile]);
+        } finally {
+            orm.close();
+        }
+    });
+
+    it('round-trips ingested articles through the public ORM surface', async () => {
+        const config = loadDefaultConfig(TEST_ROOT);
+        const orm = createOrm(config);
+        const article = createIngestedArticle();
+
+        try {
+            await orm.bootstrap();
+            await orm.ingestedArticles.save(article);
+            await orm.ingestedArticles.save({
+                ...article,
+                firstSeenAt: new Date('2026-05-15T00:00:00.000Z'),
+                lastIngestedAt: new Date('2026-05-15T00:05:00.000Z'),
+                scrapeStatus: 'failed',
+                title: 'Updated Article',
+            });
+
+            await expect(orm.ingestedArticles.get(article.canonicalUrl)).resolves.toEqual({
+                ...article,
+                lastIngestedAt: new Date('2026-05-15T00:05:00.000Z'),
+                scrapeStatus: 'failed',
+                title: 'Updated Article',
+            });
+            await expect(orm.ingestedArticles.list()).resolves.toEqual([{
+                ...article,
+                lastIngestedAt: new Date('2026-05-15T00:05:00.000Z'),
+                scrapeStatus: 'failed',
+                title: 'Updated Article',
+            }]);
         } finally {
             orm.close();
         }
@@ -221,7 +283,7 @@ describe('V2 ORM', () => {
             await orm.npcs.save(newerNpc);
 
             const allNpcs = await orm.npcs.list();
-            const runNpcs = await orm.npcs.listByRun(run.id);
+            const runNpcs = allNpcs.filter((npc) => npc.runId === run.id);
 
             expect(allNpcs.map((npc) => npc.name)).toEqual(['Tavin', 'Ilyra']);
             expect(runNpcs.map((npc) => npc.name)).toEqual(['Tavin', 'Ilyra']);
@@ -274,6 +336,19 @@ const createRefreshState = () => ({
         refreshStatus: 'running' as const,
         reingestStatus: 'idle' as const,
         updatedAt: new Date('2026-05-14T12:01:00.000Z'),
+    });
+
+const createIngestedFile = () => ({
+        filename: 'export-001.ndjson',
+        sourceType: 'foundry' as const,
+    });
+
+const createIngestedArticle = () => ({
+        canonicalUrl: 'https://keith-baker.com/example-article/',
+        firstSeenAt: new Date('2026-05-14T12:02:00.000Z'),
+        lastIngestedAt: new Date('2026-05-14T12:03:00.000Z'),
+        scrapeStatus: 'succeeded' as const,
+        title: 'Example Article',
     });
 
 const createSession = () => ({

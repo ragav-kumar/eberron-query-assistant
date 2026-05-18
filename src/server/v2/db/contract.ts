@@ -1,5 +1,7 @@
 import type {
     ConsoleEntry,
+    IngestedArticle,
+    IngestedFile,
     Npc,
     RefreshState,
     Run,
@@ -16,6 +18,17 @@ export interface SessionLoadOptions {
 export interface Orm {
     bootstrap: () => Promise<void>;
     close: () => void;
+    ingestedFiles: {
+        get: (sourceType: IngestedFile['sourceType'], filename: string) => Promise<IngestedFile | null>;
+        list: () => Promise<IngestedFile[]>;
+        remove: (sourceType: IngestedFile['sourceType'], filename: string) => Promise<void>;
+        save: (file: IngestedFile) => Promise<void>;
+    };
+    ingestedArticles: {
+        get: (canonicalUrl: string) => Promise<IngestedArticle | null>;
+        list: () => Promise<IngestedArticle[]>;
+        save: (article: IngestedArticle) => Promise<void>;
+    };
     settings: {
         get: (key: string) => Promise<Setting | null>;
         list: () => Promise<Setting[]>;
@@ -32,20 +45,17 @@ export interface Orm {
     };
     sessionExchanges: {
         get: (id: string) => Promise<SessionExchange | null>;
-        listBySession: (sessionId: string) => Promise<SessionExchange[]>;
-        listByRun: (runId: string) => Promise<SessionExchange[]>;
+        list: () => Promise<SessionExchange[]>;
         save: (exchange: SessionExchange) => Promise<void>;
     };
     runs: {
         get: (id: string) => Promise<Run | null>;
-        listBySession: (sessionId: string) => Promise<Run[]>;
+        list: () => Promise<Run[]>;
         save: (run: Run) => Promise<void>;
     };
     npcs: {
         get: (id: number) => Promise<Npc | null>;
         list: () => Promise<Npc[]>;
-        listByRun: (runId: string) => Promise<Npc[]>;
-        listBySession: (sessionId: string) => Promise<Npc[]>;
         save: (npc: Npc) => Promise<void>;
     };
     consoleEntries: {
