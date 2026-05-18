@@ -42,7 +42,7 @@ export const createSchema = async (db: Kysely<AppDatabaseSchema>): Promise<void>
         .addColumn('canonicalUrl', 'text', column => column.primaryKey())
         .addColumn('title', 'text')
         .addColumn('firstSeenAt', 'text', column => column.notNull())
-        .addColumn('lastIngestedAt', 'text', column => column.notNull())
+        .addColumn('lastIngestedAt', 'text')
         .addColumn('scrapeStatus', 'text', column => column.notNull().check(sql`scrapeStatus in ('pending', 'succeeded', 'failed', 'inaccessible')`))
         .execute();
 

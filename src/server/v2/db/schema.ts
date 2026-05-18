@@ -35,7 +35,7 @@ export interface IngestedArticle {
     canonicalUrl: string;
     title: string | null;
     firstSeenAt: string;
-    lastIngestedAt: string;
+    lastIngestedAt: string | null;
     scrapeStatus: 'pending' | 'succeeded' | 'failed' | 'inaccessible';
 }
 
