@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { SessionMode } from '@/types.js';
 
 const promptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 
@@ -17,10 +18,8 @@ const v2PromptAssembly = {
     sessionTitling: v2PromptAssetPaths.sessionTitling,
 } as const;
 
-export type V2PromptMode = 'assistant' | 'npc';
-
 export const listV2PromptAssets = (
-    mode: V2PromptMode,
+    mode: SessionMode,
     isFirstExchange: boolean,
 ): readonly string[] => [
     v2PromptAssembly.shared,
