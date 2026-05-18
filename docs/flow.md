@@ -8,6 +8,7 @@
 
 - SSE. Just always be listening.
 - Fundamentally transient, so don't need to get initial state on launch.
+- However, depending on implementation details, this may still need a GET endpoint? To be examined once everything is in place.
 
 # Corpus management
 
