@@ -11,6 +11,7 @@ import { refreshRoutes } from './routes/refresh.js';
 import { runRoutes } from './routes/runs.js';
 import { sessionRoutes } from './routes/sessions.js';
 import type { RouteDefinition } from './routes/shared.js';
+import { writeGenericJson } from './response.js';
 
 const routes: RouteDefinition[] = [
     ...additionalContextRoutes,
@@ -31,12 +32,27 @@ export const createV2ApiHandler = (app: V2AppContext) => {
 
     for (const route of routes) {
         router.on(route.method, route.path, async (request, response, params) => {
-            await route.handler({
-                context: app,
-                params,
-                request,
-                response,
-            });
+            const url = new URL(request.url ?? '/', 'http://urldoesnotmatter.invalid');
+            const queryParams: Record<string, string> = {};
+            for (const [key, value] of url.searchParams) {
+                queryParams[key] = value;
+            }
+            try {
+                await route.handler({
+                    context: app,
+                    pathParams: params,
+                    queryParams,
+                    request,
+                    response,
+                });
+            } catch (error) {
+                console.error(error);
+                if (!response.headersSent && !response.writableEnded) {
+                    writeGenericJson(response, 500, {
+                        error: 'Internal server error',
+                    });
+                }
+            }
         });
     }
 

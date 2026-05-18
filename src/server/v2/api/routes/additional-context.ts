@@ -1,6 +1,6 @@
 import type { RouteDefinition } from './shared.js';
 import { readText } from '../request.js';
-import { writeText } from '../response.js';
+import { writeMarkdown } from '../response.js';
 
 export const additionalContextRoutes: RouteDefinition[] = [
     {
@@ -19,7 +19,7 @@ export const additionalContextRoutes: RouteDefinition[] = [
                 markdown = additionalContext[0].value;
             }
 
-            writeText(response, 200, markdown, 'text/markdown; charset=utf-8');
+            writeMarkdown(response, markdown);
         },
     },
     {
@@ -38,7 +38,7 @@ export const additionalContextRoutes: RouteDefinition[] = [
                 }))
                 .execute();
 
-            writeText(response, 200, markdown, 'text/markdown; charset=utf-8');
+            writeMarkdown(response, markdown);
         },
     },
 ];

@@ -136,11 +136,11 @@ export const contracts = {
     events: {
         /** Streams transient console entries from the current server process. */
         console: defineSseEndpoint<ConsoleEntry>({
-            path: '/api/v2/console/events',
+            path: '/api/v2/events/console',
         }),
         /** Streams structured runtime/resource events for sessions, runs, and refresh work. */
         runtime: defineSseEndpoint<OperationEvent>({
-            path: '/api/v2/runtime/events',
+            path: '/api/v2/events/runtime',
         }),
     },
 } as const;

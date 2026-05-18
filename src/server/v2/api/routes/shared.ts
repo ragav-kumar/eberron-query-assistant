@@ -7,7 +7,8 @@ export type RouteParams = Record<string, string | undefined>;
 
 export interface RouteHandlerArgs {
     context: V2AppContext;
-    params: RouteParams;
+    pathParams: RouteParams;
+    queryParams: Record<string, string>;
     request: IncomingMessage,
     response: ServerResponse,
 }

@@ -64,7 +64,7 @@ export const createSchema = async (db: Kysely<AppDatabaseSchema>): Promise<void>
         .ifNotExists()
         .addColumn('id', 'text', column => column.primaryKey())
         .addColumn('mode', 'text', column => column.notNull().check(sql`mode in (${sql.raw(SESSION_MODE_SQL)})`))
-        .addColumn('title', 'text')
+        .addColumn('title', 'text', column => column.notNull())
         .addColumn('activeRunId', 'text', column => column.references('runs.id').onDelete('set null'))
         .addColumn('includePartyContext', 'integer', column => column.notNull().check(sql`includePartyContext in (0, 1)`))
         .addColumn('archivedAt', 'text')

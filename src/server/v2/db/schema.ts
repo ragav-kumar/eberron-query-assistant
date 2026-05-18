@@ -53,7 +53,7 @@ export interface RefreshState {
 export interface Session {
     id: string;
     mode: SessionMode;
-    title: string | null;
+    title: string;
     activeRunId: string | null;
     includePartyContext: number;
     archivedAt: string | null;
