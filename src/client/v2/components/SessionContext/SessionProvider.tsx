@@ -2,8 +2,8 @@ import { SessionContext, SessionData } from './SessionContext.js';
 import { ReactNode, useState } from 'react';
 import { tabDefinitions, TabInputState } from './tabDefinitions.js';
 import {
-    Session,
-    SessionFeed,
+    SessionDto,
+    SessionFeedDto,
     SessionMode,
     sessionModes,
     useSessionFeedsQuery,
@@ -21,7 +21,7 @@ export const SessionProvider = ({children}: { children: ReactNode }) => {
     );
     const sessionFeedData = sessionFeedQueries
         .map(query => query.data)
-        .filter((feed): feed is SessionFeed => feed != null);
+        .filter((feed): feed is SessionFeedDto => feed != null);
     const isBusy =
         sessionsQuery.isLoading || sessionsQuery.isPending ||
         sessionFeedQueries.some(q => q.isLoading || q.isPending);
@@ -73,8 +73,8 @@ const initActiveSessionIds = () => ({
 });
 
 const constructActiveSessions = (
-    sessions: Session[] | undefined,
-    sessionFeed: SessionFeed[],
+    sessions: SessionDto[] | undefined,
+    sessionFeed: SessionFeedDto[],
     activeSessionIds: Record<SessionMode, string | undefined>,
 ): Record<SessionMode, SessionData | undefined> => {
     const activeSessions: Partial<Record<SessionMode, SessionData | undefined>> = {};

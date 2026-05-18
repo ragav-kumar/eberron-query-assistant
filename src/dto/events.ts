@@ -1,6 +1,6 @@
 import type { RefreshOperationKind, RefreshStatus, RunStatus, SessionMode } from '@/types.js';
-import type { SessionEntry } from './runs.js';
-import type { Session } from './sessions.js';
+import type { SessionEntryDto } from './runs.js';
+import type { SessionDto } from './sessions.js';
 
 interface EventBase {
     resource: string;
@@ -9,39 +9,39 @@ interface EventBase {
     timestamp: string;
 }
 
-export interface RunOperationEvent extends EventBase {
+export interface RunOperationEventDto extends EventBase {
     resource: 'run';
     action: 'created' | 'updated' | 'completed' | 'failed';
     sessionId: string;
     status: RunStatus;
 }
 
-export interface RefreshOperationEvent extends EventBase {
+export interface RefreshOperationEventDto extends EventBase {
     resource: 'refresh';
     action: 'created' | 'updated' | 'completed' | 'failed';
     kind: RefreshOperationKind;
     status: RefreshStatus;
 }
 
-export interface SessionEntryOperationEvent extends EventBase {
+export interface SessionEntryOperationEventDto extends EventBase {
     resource: 'session-entry';
     action: 'appended';
     sessionId: string;
     runId: string;
-    entry: SessionEntry;
+    entry: SessionEntryDto;
 }
 
-export interface SessionOperationEvent extends EventBase {
+export interface SessionOperationEventDto extends EventBase {
     resource: 'session';
     action: 'promoted' | 'updated';
     sessionId: string;
     replacedSessionId?: string;
     mode: SessionMode;
-    state: Session;
+    state: SessionDto;
 }
 
-export type OperationEvent =
-    | RunOperationEvent
-    | RefreshOperationEvent
-    | SessionEntryOperationEvent
-    | SessionOperationEvent;
+export type OperationEventDto =
+    | RunOperationEventDto
+    | RefreshOperationEventDto
+    | SessionEntryOperationEventDto
+    | SessionOperationEventDto;

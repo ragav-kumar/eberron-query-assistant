@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mutateApi, queryApi } from '@/client/v2/api/utils.js';
-import type { CreateRefresh } from '@/dto/index.js';
+import type { CreateRefreshDto } from '@/dto/index.js';
 
 import { contracts } from '@/contract/index.js';
 
@@ -15,7 +15,7 @@ export const useRefreshMutation = () => {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (refreshRequest: CreateRefresh) => mutateApi(contracts.refresh.post, refreshRequest),
+        mutationFn: (refreshRequest: CreateRefreshDto) => mutateApi(contracts.refresh.post, refreshRequest),
         onSuccess: (refresh) => queryClient.setQueryData(refreshQueryKey, refresh),
     });
 };

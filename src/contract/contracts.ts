@@ -1,14 +1,14 @@
 import type {
-    ConsoleEntry,
-    CreateRefresh,
-    CreateRun,
-    NpcCollection,
-    NpcListQuery,
-    OperationEvent,
-    Refresh,
-    Run,
-    Session,
-    SessionFeed,
+    ConsoleEntryDto,
+    CreateRefreshDto,
+    CreateRunDto,
+    NpcCollectionDto,
+    NpcListQueryDto,
+    OperationEventDto,
+    RefreshDto,
+    RunDto,
+    SessionDto,
+    SessionFeedDto,
     SessionMode,
 } from '@/dto/index.js';
 import { defineEndpoint, defineEndpointWithQuery, defineSseEndpoint, EmptyParams } from './helpers.js';
@@ -45,13 +45,13 @@ export const contracts = {
      */
     sessions: {
         /** Lists sessions. */
-        get: defineEndpointWithQuery<null, Session[], EmptyParams, { mode?: SessionMode }>({
+        get: defineEndpointWithQuery<null, SessionDto[], EmptyParams, { mode?: SessionMode }>({
             method: 'GET',
             path: '/api/v2/sessions',
             queryParams: ['mode'],
         }),
         /** Fetches the exchange feed for one session. */
-        getFeed: defineEndpoint<null, SessionFeed, { sessionId: string }>({
+        getFeed: defineEndpoint<null, SessionFeedDto, { sessionId: string }>({
             method: 'GET',
             path: '/api/v2/sessions/:sessionId/feed',
             pathParams: ['sessionId'],
@@ -63,7 +63,7 @@ export const contracts = {
      */
     runs: {
         /** Starts a run against a session, ore create a new session. */
-        post: defineEndpoint<CreateRun, Run>({
+        post: defineEndpoint<CreateRunDto, RunDto>({
             method: 'POST',
             path: '/api/v2/runs',
         }),
@@ -77,7 +77,7 @@ export const contracts = {
      */
     npcs: {
         /** Lists the saved NPC collection. */
-        get: defineEndpointWithQuery<null, NpcCollection, EmptyParams, NpcListQuery>({
+        get: defineEndpointWithQuery<null, NpcCollectionDto, EmptyParams, NpcListQueryDto>({
             method: 'GET',
             path: '/api/v2/npcs',
             queryParams: ['skip', 'take', 'filter'],
@@ -95,14 +95,14 @@ export const contracts = {
          * Starts refresh work against the singleton refresh state and returns
          * the resulting refresh resource snapshot.
          */
-        post: defineEndpoint<CreateRefresh, Refresh>({
+        post: defineEndpoint<CreateRefreshDto, RefreshDto>({
             method: 'POST',
             path: '/api/v2/refresh',
         }),
         /**
          * Fetches the current singleton refresh state for the app.
          */
-        get: defineEndpoint<null, Refresh>({
+        get: defineEndpoint<null, RefreshDto>({
             method: 'GET',
             path: '/api/v2/refresh',
         }),
@@ -114,7 +114,7 @@ export const contracts = {
      */
     console: {
         /** Reads the current in-memory console snapshot. */
-        get: defineEndpoint<null, ConsoleEntry[]>({
+        get: defineEndpoint<null, ConsoleEntryDto[]>({
             method: 'GET',
             path: '/api/v2/console',
         }),
@@ -129,11 +129,11 @@ export const contracts = {
      */
     events: {
         /** Streams transient console entries from the current server process. */
-        console: defineSseEndpoint<ConsoleEntry>({
+        console: defineSseEndpoint<ConsoleEntryDto>({
             path: '/api/v2/events/console',
         }),
         /** Streams structured runtime/resource events for sessions, runs, and refresh work. */
-        runtime: defineSseEndpoint<OperationEvent>({
+        runtime: defineSseEndpoint<OperationEventDto>({
             path: '/api/v2/events/runtime',
         }),
     },

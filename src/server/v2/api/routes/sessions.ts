@@ -2,7 +2,8 @@ import type { RouteDefinition } from './shared.js';
 import { writeNotFound } from '../not-found.js';
 import { writeJson } from '../response.js';
 import { SessionMode } from '@/types.js';
-import { Session, SessionFeed } from '@/dto/index.js';
+import { RunDto, SessionDto, SessionEntryDto, SessionFeedDto } from '@/dto/index.js';
+import { Run, SessionEntry } from '../../db/index.js';
 
 export const sessionRoutes: RouteDefinition[] = [
     {
@@ -38,7 +39,7 @@ export const sessionRoutes: RouteDefinition[] = [
             }
             const sessionRows = await query.execute();
 
-            const sessionDtos = sessionRows.map<Session>(session => ({
+            const sessionDtos = sessionRows.map<SessionDto>(session => ({
                 ...session,
                 sessionEntryCount: session.sessionEntryCount as number,
                 includePartyContext: !!session.includePartyContext,
@@ -66,41 +67,48 @@ export const sessionRoutes: RouteDefinition[] = [
                 .where('id', '=', sessionId)
                 .executeTakeFirstOrThrow();
 
-            const feed = await context.db
+            const runs = await context.db
+                .selectFrom('runs')
+                .selectAll()
+                .where('sessionId', '=', sessionId)
+                .execute() as Run[];
+
+            const entries = await context.db
                 .selectFrom('sessionEntries')
                 .selectAll()
                 .where('sessionId', '=', sessionId)
                 .orderBy('sequenceIndex', 'asc')
-                .execute();
+                .execute() as SessionEntry[];
 
-            if (!feed.length) {
-                writeNotFound(response);
-                return;
+            const runDtos: RunDto[] = [];
+            for (const run of runs) {
+                runDtos.push({
+                    ...run,
+                    createdAt: run.startedAt ?? undefined,
+                    failedAt: run.failedAt ?? undefined,
+
+                    error: run.error ?? undefined,
+                    sessionEntries: entries
+                        .filter(e => e.runId == run.id)
+                        .sort((a, b) => a.sequenceIndex - b.sequenceIndex)
+                        .map<SessionEntryDto>(e => ({
+                            id: e.id,
+                            sessionId: e.sessionId,
+                            runId: e.runId,
+                            createdAt: e.createdAt,
+                            content: e.content,
+                            kind: e.kind,
+                            toolCallId: e.toolCallId,
+                            title: e.title ?? undefined,
+                        })),
+                });
             }
-
-            /*
-            TODO:
-
-So for GET /sessions/:sessionId/feed, the likely construction is:
-
-Read all runs for the session.
-Read all sessionEntries for the session.
-Group sessionEntries rows by runId.
-For each run, build one Run:
-id: run.id
-status: run.status
-createdAt / updatedAt: from runs
-sessionEntries: grouped sessionEntries rows for that runId
-            */
-            /*const runDtos = feed.map<Run>(run => ({
-
-            }));*/
 
             writeJson(response, {
                 mode: sessionMode.mode,
                 sessionId,
-                items: [],// exchangeDtos,
-            } satisfies SessionFeed);
+                items: runDtos,
+            } satisfies SessionFeedDto);
         },
     },
 ];

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { queryApi } from '../utils.js';
 import { useEffect } from 'react';
-import type { ConsoleEntry } from '@/dto/index.js';
+import type { ConsoleEntryDto } from '@/dto/index.js';
 
 import { contracts } from '@/contract/index.js';
 
@@ -23,8 +23,8 @@ export const useConsoleSubscription = () => {
                 throw new Error('Invalid event data type.');
             }
 
-            const entry = JSON.parse(event.data) as ConsoleEntry;
-            queryClient.setQueryData<ConsoleEntry[]>(queryKey, prev => {
+            const entry = JSON.parse(event.data) as ConsoleEntryDto;
+            queryClient.setQueryData<ConsoleEntryDto[]>(queryKey, prev => {
                 if (prev == null) {
                     return [entry];
                 }

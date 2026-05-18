@@ -1,5 +1,5 @@
 import { useRefreshMutation, useRefreshQuery } from '@/client/v2/api/index.js';
-import type { Refresh } from '@/dto/index.js';
+import type { RefreshDto } from '@/dto/index.js';
 import { Button } from './Button.js';
 import styles from './LeftColumnHeader.module.css';
 
@@ -51,7 +51,7 @@ export const LeftColumnHeader = () => {
 
 const renderRefreshStatus = (
     query: ReturnType<typeof useRefreshQuery>,
-    refresh: Refresh | undefined,
+    refresh: RefreshDto | undefined,
 ): string => {
     if (query.isLoading && refresh == null) {
         return 'Loading refresh status...';
@@ -93,7 +93,7 @@ const renderRefreshStatus = (
     return `Last ${latestOperation} completed at ${formatTimestamp(refresh.updatedAt)}.`;
 };
 
-const getLatestCompletedOperation = (refresh: Refresh): 'refresh' | 'force reingest' => {
+const getLatestCompletedOperation = (refresh: RefreshDto): 'refresh' | 'force reingest' => {
     const lastRefreshAt = parseTimestamp(refresh.lastRefreshAt);
     const lastReingestAt = parseTimestamp(refresh.lastReingestAt);
 

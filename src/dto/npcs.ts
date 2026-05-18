@@ -1,4 +1,4 @@
-export interface Npc {
+export interface NpcDto {
     age?: string;
     bio: string;
     createdAt?: string;
@@ -14,17 +14,17 @@ export interface Npc {
     updatedAt?: string;
 }
 
-export interface NpcListQuery {
+export interface NpcListQueryDto {
     filter?: string;
     skip?: string;
     take?: string;
 }
 
-export interface NpcCollection {
+export interface NpcCollectionDto {
     filter: string;
     skip: number;
     take: number;
 
-    npcs: Npc[];
+    npcs: NpcDto[];
     totalCount: number;
 }

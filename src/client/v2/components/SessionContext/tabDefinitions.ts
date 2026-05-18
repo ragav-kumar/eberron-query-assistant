@@ -1,4 +1,4 @@
-import { CreateRun, SessionMode } from '@/dto/index.js';
+import { CreateRunDto, SessionMode } from '@/dto/index.js';
 import { ComponentType } from 'react';
 import { Assistant } from '../Assistant.js';
 import { NpcCards } from '../NpcCards/NpcCards.js';
@@ -16,7 +16,7 @@ export interface TabDefinition {
     key: SessionMode;
     label: string;
     emptyInput: TabInputState;
-    buildRun: (input: TabInputState) => CreateRun;
+    buildRun: (input: TabInputState) => CreateRunDto;
     component: ComponentType;
 }
 

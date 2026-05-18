@@ -1,9 +1,9 @@
 import { createContext, use } from 'react';
 import { TabInputState } from './tabDefinitions.js';
-import { Run, Session, SessionMode } from '@/dto/index.js';
+import { RunDto, SessionDto, SessionMode } from '@/dto/index.js';
 
-export type SessionData = Session & {
-    runs: Run[];
+export type SessionData = SessionDto & {
+    runs: RunDto[];
 };
 
 interface SessionContextTabManagement {
@@ -14,7 +14,7 @@ interface SessionContextTabManagement {
 
 interface SessionContextSessionData {
     activeSessions: Record<SessionMode, SessionData | undefined>;
-    sessionsByMode: (mode: SessionMode) => Session[];
+    sessionsByMode: (mode: SessionMode) => SessionDto[];
     changeActiveSession: (sessionId: string, mode: SessionMode) => void;
 }
 

@@ -1,6 +1,6 @@
 import type { RouteDefinition } from './shared.js';
 import { writeJson } from '../response.js';
-import { ConsoleEntry } from '@/dto/index.js';
+import { ConsoleEntryDto } from '@/dto/index.js';
 
 export const consoleRoutes: RouteDefinition[] = [
     {
@@ -13,7 +13,7 @@ export const consoleRoutes: RouteDefinition[] = [
                 .orderBy('createdAt', 'asc')
                 .execute();
 
-            const dtos = entries.map<ConsoleEntry>(entry => ({
+            const dtos = entries.map<ConsoleEntryDto>(entry => ({
                 id: entry.id,
                 level: entry.level,
                 message: entry.message,

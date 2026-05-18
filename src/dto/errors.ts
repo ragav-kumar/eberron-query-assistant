@@ -1,6 +1,6 @@
-import type { ConsoleEntry } from './console.js';
+import type { ConsoleEntryDto } from './console.js';
 
-export interface ProviderDebugEntry {
+export interface ProviderDebugEntryDto {
     assistantContent?: string;
     endpoint: string;
     error?: string;
@@ -18,9 +18,9 @@ export interface ProviderDebugEntry {
     timestamp: string;
 }
 
-export interface ApiError {
-    console?: ConsoleEntry[];
+export interface ApiErrorDto {
+    console?: ConsoleEntryDto[];
     error?: string;
     operation?: string;
-    providerDebug?: ProviderDebugEntry[];
+    providerDebug?: ProviderDebugEntryDto[];
 }

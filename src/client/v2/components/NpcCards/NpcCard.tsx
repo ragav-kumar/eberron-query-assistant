@@ -1,10 +1,10 @@
-import { Npc } from '@/dto/index.js';
+import { NpcDto } from '@/dto/index.js';
 import { getSpeciesIcon } from './speciesIconLookup.js';
 import styles from './NpcCards.module.css';
 import { joinClassNames } from '@/client/v2/utils.js';
 
 interface NpcCardProps {
-    npc: Npc;
+    npc: NpcDto;
     isInSession: boolean;
 }
 
@@ -14,7 +14,7 @@ const npcMetadataFields = [
     ['Gender', 'gender'],
     ['Role', 'role'],
     ['Age', 'age'],
-] as const satisfies ReadonlyArray<readonly [label: string, key: keyof Npc]>;
+] as const satisfies ReadonlyArray<readonly [label: string, key: keyof NpcDto]>;
 
 export const NpcCard = ({npc, isInSession}: NpcCardProps) => {
     const speciesIcon = getSpeciesIcon(npc.species);

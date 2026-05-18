@@ -1,7 +1,7 @@
 import type { SessionMode } from '@/types.js';
-import type { Run } from './runs.js';
+import type { RunDto } from './runs.js';
 
-export interface Session {
+export interface SessionDto {
     id: string;
     mode: SessionMode;
     title: string;
@@ -12,8 +12,8 @@ export interface Session {
     includePartyContext: boolean | null;
 }
 
-export interface SessionFeed {
+export interface SessionFeedDto {
     sessionId: string;
     mode: SessionMode;
-    items: Run[];
+    items: RunDto[];
 }

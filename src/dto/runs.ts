@@ -1,6 +1,6 @@
 import type { RunStatus, SessionMode } from '@/types.js';
 
-interface SessionEntryBase {
+export interface SessionEntryDtoBase {
     id: string;
     kind: 'user' | 'reasoning' | 'response';
     sessionId: string;
@@ -9,38 +9,38 @@ interface SessionEntryBase {
     content: string;
 }
 
-export interface SessionEntryUser extends SessionEntryBase {
+export interface SessionEntryUserDto extends SessionEntryDtoBase {
     kind: 'user';
 }
 
-export interface SessionEntryReasoning extends SessionEntryBase {
+export interface SessionEntryReasoningDto extends SessionEntryDtoBase {
     kind: 'reasoning';
     toolCallId: string | null;
 }
 
-export interface SessionEntryResponse extends SessionEntryBase {
+export interface SessionEntryResponseDto extends SessionEntryDtoBase {
     kind: 'response';
     title?: string;
 }
 
-export type SessionEntry =
-    | SessionEntryUser
-    | SessionEntryReasoning
-    | SessionEntryResponse;
+export type SessionEntryDto =
+    | SessionEntryUserDto
+    | SessionEntryReasoningDto
+    | SessionEntryResponseDto;
 
-export interface Run {
+export interface RunDto {
     id: string;
     sessionId: string;
     mode: SessionMode;
     status: RunStatus;
-    createdAt: string;
+    createdAt?: string;
     updatedAt: string;
-    sessionEntries: SessionEntry[];
+    sessionEntries: SessionEntryDto[];
     failedAt?: string;
     error?: string;
 }
 
-export interface CreateRun {
+export interface CreateRunDto {
     // If not set, create a temporary session in memory
     sessionId?: string | undefined | null;
     mode: SessionMode;

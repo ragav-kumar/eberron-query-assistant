@@ -8,6 +8,7 @@ Follow these rules unless a later instruction in the repo or task explicitly ove
 ## Critical Rules
 These are the highest-priority repo rules. Check them before making edits or running verification.
 
+- Do not expand the scope of a task without asking the user first. If you decide scope should expand, stop and ask before making the broader change. This applies even outside plan mode.
 - If an attempted Vite start reports that the port is already in use, do not change the port. Treat that as a stale-session cleanup failure. You may only attempt to end the conflicting process when it belongs to this repository; if it does not belong to this repository, report that you cannot run the smoke check.
   - Under no circumstances should you ever change the port vite runs on.
 - If you ask the user a question, and they provide a custom option which is either a question or a request for more information, prioritize responding to that.

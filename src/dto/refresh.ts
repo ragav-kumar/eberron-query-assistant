@@ -1,10 +1,10 @@
 import type { RefreshOperationKind, RefreshStatus } from '@/types.js';
 
-export interface CreateRefresh {
+export interface CreateRefreshDto {
     kind: RefreshOperationKind;
 }
 
-export interface Refresh {
+export interface RefreshDto {
     activeOperation: RefreshOperationKind | null;
     lastRefreshAt: string | null;
     lastReingestAt: string | null;

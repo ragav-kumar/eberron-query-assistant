@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import type { OperationEvent } from '@/dto/index.js';
+import type { OperationEventDto } from '@/dto/index.js';
 import { refreshQueryKey } from './refresh.js';
 import { sessionQueryKey } from './sessions.js';
 
@@ -17,7 +17,7 @@ export const useRuntimeSubscription = () => {
                 throw new Error('Invalid event data type.');
             }
 
-            const operationEvent = JSON.parse(event.data) as OperationEvent;
+            const operationEvent = JSON.parse(event.data) as OperationEventDto;
             switch (operationEvent.resource) {
                 case 'run':
                     void queryClient.invalidateQueries({queryKey: sessionQueryKey});

@@ -1,6 +1,6 @@
 import type { RouteDefinition } from './shared.js';
 import { writeJson } from '../response.js';
-import { Npc, NpcCollection } from '@/dto/index.js';
+import { NpcCollectionDto, NpcDto } from '@/dto/index.js';
 
 export const npcRoutes: RouteDefinition[] = [
     {
@@ -26,7 +26,7 @@ export const npcRoutes: RouteDefinition[] = [
                 .where('name', 'like', `%${filter}%`)
                 .executeTakeFirstOrThrow();
 
-            const npcDtos = npcRows.map<Npc>(npc => ({
+            const npcDtos = npcRows.map<NpcDto>(npc => ({
                 ...npc,
                 age: npc.age ?? undefined,
                 createdAt: npc.createdAt ?? undefined,
@@ -43,7 +43,7 @@ export const npcRoutes: RouteDefinition[] = [
                 skip,
                 take,
                 totalCount: count.totalCount as number,
-            } satisfies NpcCollection);
+            } satisfies NpcCollectionDto);
         },
     },
 ];
