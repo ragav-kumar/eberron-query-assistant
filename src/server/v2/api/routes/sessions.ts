@@ -8,7 +8,7 @@ export const sessionRoutes: RouteDefinition[] = [
     {
         method: 'GET',
         path: '/api/v2/sessions',
-        handler: (request, response) => {
+        handler: ({request, response}) => {
             const url = new URL(request.url ?? '/', 'http://localhost');
             const mode = url.searchParams.get('mode');
             writeJson(
@@ -21,7 +21,7 @@ export const sessionRoutes: RouteDefinition[] = [
     {
         method: 'GET',
         path: '/api/v2/sessions/:sessionId/feed',
-        handler: (_request, response, params) => {
+        handler: ({response, params}) => {
             if (params.sessionId == null) {
                 writeNotFound(response);
                 return;

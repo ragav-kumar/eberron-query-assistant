@@ -3,7 +3,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { describe, expect, it } from 'vitest';
 
-import { handleV2ApiRequest } from '@/server/v2/api/index.js';
+import { createV2ApiHandler } from '@/server/v2/api/index.js';
+import type { V2AppContext } from '@/server/v2/app.js';
 
 class MockRequest extends EventEmitter {
     method?: string;
@@ -65,6 +66,13 @@ const createRequest = (method: string, url: string): IncomingMessage => {
     request.url = url;
     return request as IncomingMessage;
 };
+
+const testApp: V2AppContext = {
+    close: () => Promise.resolve(),
+    db: {} as V2AppContext['db'],
+};
+
+const handleV2ApiRequest = createV2ApiHandler(testApp);
 
 describe('V2 API router', () => {
     it('returns additional context markdown unchanged', () => {

@@ -8,14 +8,14 @@ export const runRoutes: RouteDefinition[] = [
     {
         method: 'POST',
         path: '/api/v2/runs',
-        handler: (_request, response) => {
+        handler: ({response}) => {
             writeJson(response, 200, DEFAULT_CREATED_RUN);
         },
     },
     {
         method: 'GET',
         path: '/api/v2/runs/:runId',
-        handler: (_request, response, params) => {
+        handler: ({response, params}) => {
             if (params.runId == null) {
                 writeNotFound(response);
                 return;

@@ -1,20 +1,5 @@
 import type { ConsoleEntry, NpcCollection, Refresh, Run, Session, SessionFeed } from '@/dto/index.js';
 
-export const ADDITIONAL_CONTEXT_MARKDOWN = `# Campaign Context
-
-Use this context as local campaign guidance. It is not retrieved evidence, so do not cite it as a source. When it conflicts with retrieved session notes, prefer the session notes for what has actually happened in play.
-
-## Canon And Source Weighting
-
-* The campaign setting is Eberron. Adventures or modules written for other campaign settings should be interpreted as adapted into Eberron.
-
-## Player-Facing Guidance
-
-* Peanunt's player enjoys drama, aura farming, and roleplay. Peanunt is being played as deliberately edgy. He's also played as counter cultural vis-a-vis the Sovereign Host and the Dark Six, while being a fundamentally good person who wants to help people.
-* Spark's player is leaning into the creator/inventor role and the warforged-as-POC-stand-in theme. He plays Spark as a bit awkward and introverted. His primary narrative thread appears to be his Haunted by the Mourning secret.
-* Durotan's player tends to focus on the immediate scene and combat. Keep lore concise and concrete, without too much player-facing complexity, when Durotan is the focus. Complex information that the GM has to track is okay.
-`;
-
 export const SESSIONS: Session[] = [
     {
         id: 'session-dragonshards',

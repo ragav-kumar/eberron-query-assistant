@@ -6,14 +6,14 @@ export const eventRoutes: RouteDefinition[] = [
     {
         method: 'GET',
         path: '/api/v2/console/events',
-        handler: (request, response) => {
+        handler: ({request, response}) => {
             writeSse(response, request);
         },
     },
     {
         method: 'GET',
         path: '/api/v2/runtime/events',
-        handler: (request, response) => {
+        handler: ({request, response}) => {
             writeSse(response, request);
         },
     },

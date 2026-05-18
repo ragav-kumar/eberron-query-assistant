@@ -1,13 +1,18 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { HTTPMethod } from 'find-my-way';
 
+import type { V2AppContext } from '../../app.js';
+
 export type RouteParams = Record<string, string | undefined>;
 
-export type RouteHandler = (
+export interface RouteHandlerArgs {
+    context: V2AppContext;
+    params: RouteParams;
     request: IncomingMessage,
     response: ServerResponse,
-    params: RouteParams,
-) => void;
+}
+
+export type RouteHandler = (args: RouteHandlerArgs) => Promise<void> | void;
 
 export interface RouteDefinition {
     handler: RouteHandler;

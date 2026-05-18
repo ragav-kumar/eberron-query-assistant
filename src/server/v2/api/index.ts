@@ -1,6 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import FindMyWay from 'find-my-way';
+import type { V2AppContext } from '../app.js';
 import { writeNotFound } from './not-found.js';
 import { additionalContextRoutes } from './routes/additional-context.js';
 import { consoleRoutes } from './routes/console.js';
@@ -10,12 +11,6 @@ import { refreshRoutes } from './routes/refresh.js';
 import { runRoutes } from './routes/runs.js';
 import { sessionRoutes } from './routes/sessions.js';
 import type { RouteDefinition } from './routes/shared.js';
-
-const router = FindMyWay({
-    defaultRoute: (_request, response) => {
-        writeNotFound(response);
-    },
-});
 
 const routes: RouteDefinition[] = [
     ...additionalContextRoutes,
@@ -27,19 +22,25 @@ const routes: RouteDefinition[] = [
     ...eventRoutes,
 ];
 
-for (const route of routes) {
-    router.on(route.method, route.path, (request, response, params) => {
-        route.handler(
-            request,
-            response,
-            params,
-        );
+export const createV2ApiHandler = (app: V2AppContext) => {
+    const router = FindMyWay({
+        defaultRoute: (_request, response) => {
+            writeNotFound(response);
+        },
     });
-}
 
-export const handleV2ApiRequest = (
-    request: IncomingMessage,
-    response: ServerResponse,
-): void => {
-    router.lookup(request, response);
+    for (const route of routes) {
+        router.on(route.method, route.path, async (request, response, params) => {
+            await route.handler({
+                context: app,
+                params,
+                request,
+                response,
+            });
+        });
+    }
+
+    return (request: IncomingMessage, response: ServerResponse): void => {
+        router.lookup(request, response);
+    };
 };

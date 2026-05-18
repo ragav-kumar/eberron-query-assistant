@@ -7,7 +7,7 @@ export const npcRoutes: RouteDefinition[] = [
     {
         method: 'GET',
         path: '/api/v2/npcs',
-        handler: (_request, response) => {
+        handler: ({response}) => {
             writeJson(response, 200, NPCS);
         },
     },

@@ -7,7 +7,7 @@ export const consoleRoutes: RouteDefinition[] = [
     {
         method: 'GET',
         path: '/api/v2/console',
-        handler: (_request, response) => {
+        handler: ({response}) => {
             writeJson(response, 200, CONSOLE_ENTRIES);
         },
     },

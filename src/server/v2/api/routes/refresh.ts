@@ -7,14 +7,14 @@ export const refreshRoutes: RouteDefinition[] = [
     {
         method: 'GET',
         path: '/api/v2/refresh',
-        handler: (_request, response) => {
+        handler: ({response}) => {
             writeJson(response, 200, REFRESH);
         },
     },
     {
         method: 'POST',
         path: '/api/v2/refresh',
-        handler: (_request, response) => {
+        handler: ({response}) => {
             writeJson(response, 200, REFRESH);
         },
     },

@@ -36,6 +36,7 @@ interface V1Runtime {
 }
 
 interface V2Runtime {
+  close: () => Promise<void>;
   handleV2ApiRequest: HandleV2ApiRequest;
 }
 
@@ -48,11 +49,16 @@ interface V1ApiModule {
 }
 
 interface V2ApiModule {
-  handleV2ApiRequest: HandleV2ApiRequest;
+  createV2ApiHandler: (app: V2RuntimeApp) => HandleV2ApiRequest;
 }
 
 interface V2AppModule {
-  initializeV2App: () => Promise<void>;
+  createV2App: () => Promise<V2RuntimeApp>;
+}
+
+interface V2RuntimeApp {
+  close: () => Promise<void>;
+  db: unknown;
 }
 
 export const eberronApiPlugin = (): Plugin => ({
@@ -93,10 +99,11 @@ export const eberronApiPlugin = (): Plugin => ({
           server.ssrLoadModule('/src/server/v2/api/index.ts')
         ]).then(async (loadedModules) => {
           const [appModule, apiModule] = loadedModules as [V2AppModule, V2ApiModule];
-          await appModule.initializeV2App();
+          const app = await appModule.createV2App();
 
           return {
-            handleV2ApiRequest: apiModule.handleV2ApiRequest
+            close: app.close,
+            handleV2ApiRequest: apiModule.createV2ApiHandler(app)
           };
         });
 
