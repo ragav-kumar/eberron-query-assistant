@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-deprecated */
 import { describe, expect, it, vi } from 'vitest';
 
 import {

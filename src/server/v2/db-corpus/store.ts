@@ -3,7 +3,7 @@ import { rm } from 'node:fs/promises';
 import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
 
 import { createTaggedError } from '@/errors.js';
-import type { CorpusChunk, CorpusSource, RuntimeConfig, SourceType } from '@/types.js';
+import type { CorpusChunk, CorpusSource, SourceType } from '@/types.js';
 
 import { createCorpusDatabase, getCorpusDatabasePath } from './database.js';
 import { createCorpusSchema, isCompatibleCorpusSchema, rebuildCorpusFts } from './schema.js';
@@ -29,7 +29,7 @@ export interface CorpusStore {
      * changes and want one atomic write with a single FTS rebuild.
      */
     applySourceChanges(
-        config: RuntimeConfig,
+        retrievalDir: string,
         options: {
             changes: Array<
                 | { kind: 'delete'; sourceKey: string; sourceType: SourceType }
@@ -45,7 +45,7 @@ export interface CorpusStore {
      * Reserve this for explicit rebuild flows. Routine refresh should prefer
      * scoped mutations so durable state is preserved wherever possible.
      */
-    clear(config: RuntimeConfig): Promise<void>;
+    clear(retrievalDir: string): Promise<void>;
 
     /**
      * Releases the cached writable SQLite handle.
@@ -60,7 +60,7 @@ export interface CorpusStore {
      * Useful for diagnostics, tests, and refresh decisions that need a cheap
      * corpus-population signal.
      */
-    countSources(config: RuntimeConfig): Promise<number>;
+    countSources(retrievalDir: string): Promise<number>;
 
     /**
      * Creates the corpus schema if needed and validates schema compatibility.
@@ -70,7 +70,7 @@ export interface CorpusStore {
      * `allowIncompatibleReset: true` only in explicit rebuild flows where it is
      * acceptable to discard and recreate the database file.
      */
-    initialize(config: RuntimeConfig, options?: { allowIncompatibleReset?: boolean }): Promise<void>;
+    initialize(retrievalDir: string, options?: { allowIncompatibleReset?: boolean }): Promise<void>;
 
     /**
      * Forces a full lexical-index rebuild from the stored chunks.
@@ -79,10 +79,10 @@ export interface CorpusStore {
      * for recovery or migration cases where the caller needs to repair FTS state
      * without changing source rows.
      */
-    rebuildSearchIndex(config: RuntimeConfig): Promise<void>;
+    rebuildSearchIndex(retrievalDir: string): Promise<void>;
 
     /** Deletes exactly one source row, keyed by source type and source key. */
-    removeSource(config: RuntimeConfig, sourceType: SourceType, sourceKey: string): Promise<void>;
+    removeSource(retrievalDir: string, sourceType: SourceType, sourceKey: string): Promise<void>;
 
     /**
      * Deletes every source of a given type.
@@ -90,7 +90,7 @@ export interface CorpusStore {
      * This is appropriate for explicit source-scope rebuilds such as replaying
      * one source family from discovery results or export history.
      */
-    removeSourcesByType(config: RuntimeConfig, sourceType: SourceType): Promise<void>;
+    removeSourcesByType(retrievalDir: string, sourceType: SourceType): Promise<void>;
 
     /**
      * Replaces one source and all of its chunks atomically.
@@ -98,7 +98,7 @@ export interface CorpusStore {
      * This is the simplest mutation for callers that already have a complete
      * source payload ready to persist.
      */
-    replaceSource(config: RuntimeConfig, source: CorpusSource, chunks: CorpusChunk[]): Promise<void>;
+    replaceSource(retrievalDir: string, source: CorpusSource, chunks: CorpusChunk[]): Promise<void>;
 
     /**
      * Replaces the full set of sources for a source type atomically.
@@ -107,7 +107,7 @@ export interface CorpusStore {
      * source family and wants the corpus to match it exactly.
      */
     replaceSourcesByType(
-        config: RuntimeConfig,
+        retrievalDir: string,
         sourceType: SourceType,
         sources: Array<{ chunks: CorpusChunk[]; source: CorpusSource }>,
     ): Promise<void>;
@@ -124,11 +124,9 @@ export interface CorpusStore {
 export const createCorpusStore = (): CorpusStore => {
     const corpusDatabase = createCorpusDatabase();
 
-    const open = async (config: RuntimeConfig) => corpusDatabase.open(config);
-
     return {
-        initialize: async (config, options = {}) => {
-            let database = await open(config);
+        initialize: async (retrievalDir, options = {}) => {
+            let database = await corpusDatabase.open(retrievalDir);
             if (!isCompatibleCorpusSchema(database)) {
                 if (options.allowIncompatibleReset !== true) {
                     throw createTaggedError(
@@ -137,15 +135,15 @@ export const createCorpusStore = (): CorpusStore => {
                     );
                 }
                 corpusDatabase.close();
-                await rm(getCorpusDatabasePath(config), { force: true });
-                database = await open(config);
+                await rm(getCorpusDatabasePath(retrievalDir), { force: true });
+                database = await corpusDatabase.open(retrievalDir);
             }
 
             createCorpusSchema(database);
         },
 
-        applySourceChanges: async (config, options) => {
-            const database = await open(config);
+        applySourceChanges: async (retrievalDir, options) => {
+            const database = await corpusDatabase.open(retrievalDir);
             database.transaction(() => {
                 if (options.clearSourceType) {
                     database.prepare('DELETE FROM sources WHERE source_type = ?').run(options.clearSourceType);
@@ -168,8 +166,8 @@ export const createCorpusStore = (): CorpusStore => {
             })();
         },
 
-        clear: async (config) => {
-            const database = await open(config);
+        clear: async (retrievalDir) => {
+            const database = await corpusDatabase.open(retrievalDir);
             database.transaction(() => {
                 database.prepare('DELETE FROM chunks').run();
                 database.prepare('DELETE FROM sources').run();
@@ -177,8 +175,8 @@ export const createCorpusStore = (): CorpusStore => {
             })();
         },
 
-        replaceSource: async (config, source, chunks) => {
-            const database = await open(config);
+        replaceSource: async (retrievalDir, source, chunks) => {
+            const database = await corpusDatabase.open(retrievalDir);
             database.transaction(() => {
                 database.prepare('DELETE FROM sources WHERE source_type = ? AND source_key = ?').run(source.sourceType, source.sourceKey);
                 insertSource(database, source, chunks);
@@ -186,8 +184,8 @@ export const createCorpusStore = (): CorpusStore => {
             })();
         },
 
-        replaceSourcesByType: async (config, sourceType, sources) => {
-            const database = await open(config);
+        replaceSourcesByType: async (retrievalDir, sourceType, sources) => {
+            const database = await corpusDatabase.open(retrievalDir);
             database.transaction(() => {
                 database.prepare('DELETE FROM sources WHERE source_type = ?').run(sourceType);
                 for (const source of sources) {
@@ -197,30 +195,30 @@ export const createCorpusStore = (): CorpusStore => {
             })();
         },
 
-        removeSource: async (config, sourceType, sourceKey) => {
-            const database = await open(config);
+        removeSource: async (retrievalDir, sourceType, sourceKey) => {
+            const database = await corpusDatabase.open(retrievalDir);
             database.transaction(() => {
                 database.prepare('DELETE FROM sources WHERE source_type = ? AND source_key = ?').run(sourceType, sourceKey);
                 rebuildCorpusFts(database);
             })();
         },
 
-        removeSourcesByType: async (config, sourceType) => {
-            const database = await open(config);
+        removeSourcesByType: async (retrievalDir, sourceType) => {
+            const database = await corpusDatabase.open(retrievalDir);
             database.transaction(() => {
                 database.prepare('DELETE FROM sources WHERE source_type = ?').run(sourceType);
                 rebuildCorpusFts(database);
             })();
         },
 
-        countSources: async (config) => {
-            const database = await open(config);
+        countSources: async (retrievalDir) => {
+            const database = await corpusDatabase.open(retrievalDir);
             const result = database.prepare('SELECT COUNT(*) AS count FROM sources').get() as { count: number };
             return result.count;
         },
 
-        rebuildSearchIndex: async (config) => {
-            const database = await open(config);
+        rebuildSearchIndex: async (retrievalDir) => {
+            const database = await corpusDatabase.open(retrievalDir);
             rebuildCorpusFts(database);
         },
 

@@ -2,8 +2,9 @@ import { access } from 'node:fs/promises';
 
 import Database from 'better-sqlite3';
 
+import type { AppDb } from '@/server/v2/db-app/index.js';
+import { settingKeys } from '@/server/v2/db-app/index.js';
 import { isRecord } from '@/errors.js';
-import type { RuntimeConfig } from '@/types.js';
 
 import { getCorpusDatabasePath } from './database.js';
 
@@ -16,13 +17,13 @@ import { getCorpusDatabasePath } from './database.js';
  */
 export interface PartyContextService {
     /**
-     * Produces a formatted party-context string for the current campaign config.
+     * Produces a formatted party-context string from app-db campaign settings.
      *
      * The method is intentionally resilient: when actor UUIDs, journals, or the
      * corpus DB are missing, it returns explanatory fallback text instead of
      * throwing, so the broader assistant workflow can continue.
      */
-    build: (config: RuntimeConfig) => Promise<string>;
+    build: (retrievalDir: string) => Promise<string>;
 }
 
 interface FoundrySourceRow {
@@ -31,6 +32,13 @@ interface FoundrySourceRow {
     sourceId: string;
     sourceKey: string;
     title: string;
+}
+
+interface PartyContextSettings {
+    campaignJournalFolder: string | null;
+    partyActorUuids: string[];
+    questsJournal: string;
+    sessionNotesJournal: string;
 }
 
 const ACTOR_CONTENT_LIMIT = 900;
@@ -43,35 +51,36 @@ const QUEST_CONTENT_LIMIT = 600;
  * Creates the default party-context reader.
  *
  * Call this from runtime code that wants to enrich prompts with current party,
- * session-note, and quest context derived from the corpus's foundry rows.
+ * session-note, and quest context derived from app-db settings plus corpus rows.
  */
-export const createPartyContextService = (): PartyContextService => ({
-    build: async (config) => {
-        if (config.campaign.partyActorUuids.length === 0) {
+export const createPartyContextService = (appDb: AppDb): PartyContextService => ({
+    build: async (retrievalDir) => {
+        const settings = await readPartyContextSettings(appDb);
+        if (settings.partyActorUuids.length === 0) {
             return [
                 'Current party context:',
                 '- Party actor UUIDs are not configured. Set EQA_PARTY_ACTOR_UUIDS to enable automatic party context.',
             ].join('\n');
         }
 
-        const databasePath = getCorpusDatabasePath(config);
+        const databasePath = getCorpusDatabasePath(retrievalDir);
         if (!(await fileExists(databasePath))) {
             return ['Current party context:', '- Party context unavailable: corpus.sqlite has not been created.'].join('\n');
         }
 
         const database = new Database(databasePath, { readonly: true });
         try {
-            const actors = readPartyActors(database, config.campaign.partyActorUuids);
-            const sessionPages = readJournalPages(database, config.campaign.sessionNotesJournal, LATEST_SESSION_PAGE_LIMIT);
-            const questPages = readJournalPages(database, config.campaign.questsJournal, QUEST_PAGE_LIMIT);
+            const actors = readPartyActors(database, settings.partyActorUuids);
+            const sessionPages = readJournalPages(database, settings.sessionNotesJournal, LATEST_SESSION_PAGE_LIMIT);
+            const questPages = readJournalPages(database, settings.questsJournal, QUEST_PAGE_LIMIT);
             const exportGeneratedAt = readExportGeneratedAt([...actors, ...sessionPages, ...questPages]);
 
             return formatPartyContext({
                 actors,
-                config,
                 exportGeneratedAt,
                 questPages,
                 sessionPages,
+                settings,
             });
         } finally {
             database.close();
@@ -81,21 +90,21 @@ export const createPartyContextService = (): PartyContextService => ({
 
 interface FormatPartyContextRequest {
     actors: FoundrySourceRow[];
-    config: RuntimeConfig;
     exportGeneratedAt: string | null;
     questPages: FoundrySourceRow[];
     sessionPages: FoundrySourceRow[];
+    settings: PartyContextSettings;
 }
 
 /** Formats the final prompt-ready party-context block from raw foundry rows. */
 const formatPartyContext = (request: FormatPartyContextRequest): string => {
-    const missingActorUuids = request.config.campaign.partyActorUuids.filter(
+    const missingActorUuids = request.settings.partyActorUuids.filter(
         uuid => !request.actors.some(actor => actor.metadata.sourceUuid === uuid),
     );
     const lines = [
         'Current party context:',
         `- Foundry export freshness: ${request.exportGeneratedAt ?? 'unknown'}.`,
-        `- Configured campaign journal folder: ${request.config.campaign.campaignJournalFolder ?? 'none'}. Journal matching uses configured journal names when folder metadata is unavailable.`,
+        `- Configured campaign journal folder: ${request.settings.campaignJournalFolder ?? 'none'}. Journal matching uses configured journal names when folder metadata is unavailable.`,
         '- Source weighting: Session Notes are authoritative for events that happened in play. Quests are authoritative for active or expected quest threads. Actor-sheet mechanics describe the character sheet. Actor backstory describes what the character believes happened, but may include player error, incomplete knowledge, or unreliable narration.',
         '',
         'Party actors:',
@@ -111,21 +120,42 @@ const formatPartyContext = (request: FormatPartyContextRequest): string => {
         lines.push(`- Missing configured actor UUIDs: ${missingActorUuids.join(', ')}.`);
     }
 
-    lines.push('', `Latest ${request.config.campaign.sessionNotesJournal} pages:`);
+    lines.push('', `Latest ${request.settings.sessionNotesJournal} pages:`);
     if (request.sessionPages.length === 0) {
-        lines.push(`- No pages found for journal "${request.config.campaign.sessionNotesJournal}".`);
+        lines.push(`- No pages found for journal "${request.settings.sessionNotesJournal}".`);
     } else {
         lines.push(...request.sessionPages.map(page => formatSourceBullet(page, SESSION_CONTENT_LIMIT)));
     }
 
-    lines.push('', `${request.config.campaign.questsJournal} pages:`);
+    lines.push('', `${request.settings.questsJournal} pages:`);
     if (request.questPages.length === 0) {
-        lines.push(`- No pages found for journal "${request.config.campaign.questsJournal}".`);
+        lines.push(`- No pages found for journal "${request.settings.questsJournal}".`);
     } else {
         lines.push(...request.questPages.map(page => formatSourceBullet(page, QUEST_CONTENT_LIMIT)));
     }
 
     return lines.join('\n');
+};
+
+const readPartyContextSettings = async (appDb: AppDb): Promise<PartyContextSettings> => {
+    const rows = await appDb.db
+        .selectFrom('settings')
+        .select(['key', 'value'])
+        .where('key', 'in', [
+            settingKeys.campaignJournalFolder,
+            settingKeys.partyActorUuids,
+            settingKeys.questsJournal,
+            settingKeys.sessionNotesJournal,
+        ])
+        .execute();
+
+    const values = new Map(rows.map(row => [row.key, row.value]));
+    return {
+        campaignJournalFolder: readOptionalSetting(values.get(settingKeys.campaignJournalFolder)),
+        partyActorUuids: readStringArraySetting(values.get(settingKeys.partyActorUuids)),
+        questsJournal: readOptionalSetting(values.get(settingKeys.questsJournal)) ?? 'Quests',
+        sessionNotesJournal: readOptionalSetting(values.get(settingKeys.sessionNotesJournal)) ?? 'Session Notes',
+    };
 };
 
 /**
@@ -254,6 +284,23 @@ const readString = (value: unknown): string => {
 };
 
 const readStringArray = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [];
+
+const readOptionalSetting = (value: string | undefined): string | null => {
+    const normalized = value?.trim();
+    return normalized && normalized.length > 0 ? normalized : null;
+};
+
+const readStringArraySetting = (value: string | undefined): string[] => {
+    if (!value) {
+        return [];
+    }
+
+    try {
+        return readStringArray(JSON.parse(value));
+    } catch {
+        return [];
+    }
+};
 
 const fileExists = async (filePath: string): Promise<boolean> => {
     try {

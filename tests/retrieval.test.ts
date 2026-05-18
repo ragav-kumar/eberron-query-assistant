@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-deprecated */
 import Database from 'better-sqlite3';
 import { mkdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';

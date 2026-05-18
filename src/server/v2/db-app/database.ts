@@ -4,33 +4,25 @@ import path from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import type { RuntimeConfig } from '@/types.js';
-
 const APP_DATABASE_FILENAME = 'app.sqlite';
 const APP_DATABASE_ENV_KEY = 'EQA_APP_DB_PATH';
 
-export interface AppDatabaseBootstrap {
-    databasePath: string;
-}
-
 export interface AppDatabase {
     close: () => void;
-    open: (bootstrap: AppDatabaseBootstrap) => Promise<Database.Database>;
+    open: (databasePath: string) => Promise<Database.Database>;
 }
 
-export const getAppDatabasePath = (config: RuntimeConfig): string => path.join(config.runtimeDir, APP_DATABASE_FILENAME);
+export const getAppDatabasePath = (runtimeDir: string): string => path.join(runtimeDir, APP_DATABASE_FILENAME);
 
 export const getDefaultAppDatabasePath = (repoRoot = process.cwd()): string => path.join(repoRoot, '.eberron-query-assistant', APP_DATABASE_FILENAME);
 
-export const resolveAppDatabaseBootstrap = (repoRoot = process.cwd()): AppDatabaseBootstrap => {
+export const resolveAppDatabasePath = (repoRoot = process.cwd()): string => {
     const envFile = parseEnvFile(path.join(repoRoot, '.env'));
     const configuredPath = readEnvValue(APP_DATABASE_ENV_KEY, envFile);
 
-    return {
-        databasePath: configuredPath == null
-            ? getDefaultAppDatabasePath(repoRoot)
-            : resolveConfiguredPath(repoRoot, configuredPath),
-    };
+    return configuredPath == null
+        ? getDefaultAppDatabasePath(repoRoot)
+        : resolveConfiguredPath(repoRoot, configuredPath);
 };
 
 export const createAppDatabase = (): AppDatabase => {
@@ -43,8 +35,7 @@ export const createAppDatabase = (): AppDatabase => {
         databasePath = null;
     };
 
-    const open = async (bootstrap: AppDatabaseBootstrap): Promise<Database.Database> => {
-        const nextDatabasePath = bootstrap.databasePath;
+    const open = async (nextDatabasePath: string): Promise<Database.Database> => {
         if (database && databasePath === nextDatabasePath) {
             return database;
         }

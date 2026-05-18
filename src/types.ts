@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-deprecated */
 import type { TimingContext } from './timing.js';
 
 export interface RuntimeOptions {

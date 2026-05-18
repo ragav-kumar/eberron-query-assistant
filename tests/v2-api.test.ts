@@ -85,7 +85,7 @@ describe('V2 API router', () => {
     beforeEach(async () => {
         await rm(TEST_ROOT, { force: true, recursive: true });
 
-        const appDb = await createAppDb({ databasePath: getDefaultAppDatabasePath(TEST_ROOT) });
+        const appDb = await createAppDb(getDefaultAppDatabasePath(TEST_ROOT));
         await initializeRefreshState(appDb);
         app = {
             close: appDb.close,

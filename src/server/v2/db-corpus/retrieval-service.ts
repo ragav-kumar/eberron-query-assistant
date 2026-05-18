@@ -10,7 +10,6 @@ import type {
     CitationMetadata,
     RetrievalResult,
     RetrievalSearchRequest,
-    RuntimeConfig,
     SourceType,
 } from '@/types.js';
 
@@ -60,7 +59,7 @@ export interface RetrievalSyncSummary {
  * Read-side retrieval API backed by the corpus database.
  *
  * Use this from assistant or NPC runtime flows that need to:
- * - prepare retrieval state for a runtime config
+ * - prepare retrieval state for a corpus database location
  * - refresh or rebuild vector rows stored beside the corpus chunks
  * - execute lexical / semantic / hybrid corpus searches
  *
@@ -70,11 +69,11 @@ export interface RetrievalSyncSummary {
  * 3. call `search()` during interactive model runs
  *
  * `search()` assumes `refresh()` or `prepare()` has already established the
- * runtime config for the current process.
+ * corpus database paths for the current process.
  */
 export interface CorpusRetrievalService {
-    /** Binds the service to a runtime config and clears any in-memory vector cache. */
-    prepare(config: RuntimeConfig): Promise<void>;
+    /** Binds the service to a corpus database location and clears any in-memory vector cache. */
+    prepare(retrievalDir: string): Promise<void>;
 
     /**
      * Synchronizes SQLite vector rows with the current corpus chunks.
@@ -82,7 +81,7 @@ export interface CorpusRetrievalService {
      * Use `forceRebuild` only for explicit rebuild paths. Routine refresh should
      * normally preserve compatible embeddings and only regenerate what changed.
      */
-    refresh(config: RuntimeConfig, options?: { abortSignal?: AbortSignal; forceRebuild?: boolean }): Promise<RetrievalSyncSummary>;
+    refresh(retrievalDir: string, options?: { abortSignal?: AbortSignal; forceRebuild?: boolean }): Promise<RetrievalSyncSummary>;
 
     /**
      * Searches the corpus for relevant chunks.
@@ -168,30 +167,30 @@ interface VectorCandidateRow {
 export const createCorpusRetrievalService = (
     dependencies: CorpusRetrievalServiceDependencies,
 ): CorpusRetrievalService => {
-    let config: RuntimeConfig | null = null;
+    let retrievalDir: string | null = null;
     let shouldCacheVectorRows = true;
     let vectorCache: VectorCacheEntry | null = null;
     const vectorCacheByteLimit = dependencies.maxVectorCacheDatabaseBytes ?? MAX_VECTOR_CACHE_DATABASE_BYTES;
 
     const openDatabase = (): Database.Database => {
-        if (!config) {
+        if (!retrievalDir) {
             throw new Error('Retrieval service must be refreshed before search.');
         }
 
-        return new Database(getCorpusDatabasePath(config), { readonly: true });
+        return new Database(getCorpusDatabasePath(retrievalDir), { readonly: true });
     };
 
     const refresh = async (
-        nextConfig: RuntimeConfig,
+        nextRetrievalDir: string,
         options: { abortSignal?: AbortSignal; forceRebuild?: boolean } = {},
     ): Promise<RetrievalSyncSummary> => {
-        await prepare(nextConfig);
+        await prepare(nextRetrievalDir);
         throwIfAborted(options.abortSignal);
         if (options.forceRebuild) {
-            await deleteLegacyVectorIndex(nextConfig, dependencies.reporter);
+            await deleteLegacyVectorIndex(nextRetrievalDir, dependencies.reporter);
         }
 
-        const database = new Database(getCorpusDatabasePath(nextConfig));
+        const database = new Database(getCorpusDatabasePath(nextRetrievalDir));
         try {
             database.pragma('foreign_keys = ON');
             throwIfAborted(options.abortSignal);
@@ -220,10 +219,10 @@ export const createCorpusRetrievalService = (
         }
     };
 
-    const prepare = async (nextConfig: RuntimeConfig): Promise<void> => {
-        config = nextConfig;
-        await mkdir(nextConfig.retrievalDir, { recursive: true });
-        shouldCacheVectorRows = await shouldUseVectorCache(nextConfig, vectorCacheByteLimit);
+    const prepare = async (nextRetrievalDir: string): Promise<void> => {
+        retrievalDir = nextRetrievalDir;
+        await mkdir(nextRetrievalDir, { recursive: true });
+        shouldCacheVectorRows = await shouldUseVectorCache(nextRetrievalDir, vectorCacheByteLimit);
         vectorCache = null;
     };
 
@@ -259,13 +258,13 @@ export const createCorpusRetrievalService = (
             const semanticResults = await timing.reporter.time(timing, 'retrieval.vector', () =>
                 searchVector(database, request, limit, dependencies.embeddingAdapter, {
                     canCache: () => shouldCacheVectorRows,
-                    read: () => readCachedVectorRows(vectorCache, config, dependencies.embeddingAdapter),
+                    read: () => readCachedVectorRows(vectorCache, retrievalDir, dependencies.embeddingAdapter),
                     write: (entries) => {
-                        if (!config) {
+                        if (!retrievalDir) {
                             return;
                         }
                         vectorCache = {
-                            ...createVectorCacheKey(config, dependencies.embeddingAdapter),
+                            ...createVectorCacheKey(retrievalDir, dependencies.embeddingAdapter),
                             entries,
                         };
                     },
@@ -291,10 +290,10 @@ export const createCorpusRetrievalService = (
  * Vectors are stored in SQLite, but the path remains useful for cleanup and
  * test coverage around migration away from the old sidecar file.
  */
-export const getVectorIndexPath = (config: RuntimeConfig): string => path.join(config.retrievalDir, VECTOR_INDEX_FILENAME);
+export const getVectorIndexPath = (retrievalDir: string): string => path.join(retrievalDir, VECTOR_INDEX_FILENAME);
 
-const deleteLegacyVectorIndex = async (config: RuntimeConfig, reporter: ProgressReporter): Promise<void> => {
-    const legacyIndexPath = getVectorIndexPath(config);
+const deleteLegacyVectorIndex = async (retrievalDir: string, reporter: ProgressReporter): Promise<void> => {
+    const legacyIndexPath = getVectorIndexPath(retrievalDir);
     if (!(await fileExists(legacyIndexPath))) {
         return;
     }
@@ -879,24 +878,24 @@ const parseEmbedding = (embeddingJson: string): number[] | null => {
 };
 
 const createVectorCacheKey = (
-    config: RuntimeConfig,
+    retrievalDir: string,
     embeddingAdapter: EmbeddingAdapter,
 ): Omit<VectorCacheEntry, 'entries'> => ({
-    dbPath: getCorpusDatabasePath(config),
+    dbPath: getCorpusDatabasePath(retrievalDir),
     embeddingModelId: embeddingAdapter.modelId,
     embeddingSchemaVersion: embeddingAdapter.schemaVersion,
 });
 
 const readCachedVectorRows = (
     cache: VectorCacheEntry | null,
-    config: RuntimeConfig | null,
+    retrievalDir: string | null,
     embeddingAdapter: EmbeddingAdapter,
 ): StoredVectorEntry[] | null => {
-    if (!cache || !config) {
+    if (!cache || !retrievalDir) {
         return null;
     }
 
-    const key = createVectorCacheKey(config, embeddingAdapter);
+    const key = createVectorCacheKey(retrievalDir, embeddingAdapter);
     return cache.dbPath === key.dbPath &&
         cache.embeddingModelId === key.embeddingModelId &&
         cache.embeddingSchemaVersion === key.embeddingSchemaVersion
@@ -1017,13 +1016,13 @@ const cosineSimilarity = (left: number[], right: number[]): number => {
     return magnitude === 0 ? 0 : dot / magnitude;
 };
 
-const shouldUseVectorCache = async (config: RuntimeConfig, maxDatabaseBytes: number): Promise<boolean> => {
+const shouldUseVectorCache = async (retrievalDir: string, maxDatabaseBytes: number): Promise<boolean> => {
     if (maxDatabaseBytes <= 0) {
         return false;
     }
 
     try {
-        const databaseStats = await stat(getCorpusDatabasePath(config));
+        const databaseStats = await stat(getCorpusDatabasePath(retrievalDir));
         return databaseStats.size <= maxDatabaseBytes;
     } catch {
         return false;

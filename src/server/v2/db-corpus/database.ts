@@ -3,11 +3,7 @@ import path from 'node:path';
 
 import Database from 'better-sqlite3';
 
-import type { RuntimeConfig } from '@/types.js';
-
 const CORPUS_DATABASE_FILENAME = 'corpus.sqlite';
-
-const getCorpusDirectory = (config: RuntimeConfig): string => config.retrievalDir;
 
 /**
  * Small connection manager for the corpus database file.
@@ -28,13 +24,13 @@ export interface CorpusDatabase {
     close: () => void;
 
     /**
-     * Opens the corpus database for the given runtime config.
+     * Opens the corpus database for the given retrieval directory.
      *
      * Reuses the cached handle when the path and readonly mode match the prior
      * call. The method also ensures the configured corpus directory exists and
      * enables SQLite foreign keys on every opened connection.
      */
-    open: (config: RuntimeConfig, options?: { readonly?: boolean }) => Promise<Database.Database>;
+    open: (retrievalDir: string, options?: { readonly?: boolean }) => Promise<Database.Database>;
 }
 
 /**
@@ -48,7 +44,7 @@ export interface CorpusDatabase {
  * the corpus storage root can move later without changing the callers that
  * depend on this path function.
  */
-export const getCorpusDatabasePath = (config: RuntimeConfig): string => path.join(getCorpusDirectory(config), CORPUS_DATABASE_FILENAME);
+export const getCorpusDatabasePath = (retrievalDir: string): string => path.join(retrievalDir, CORPUS_DATABASE_FILENAME);
 
 /**
  * Creates a reusable connection manager for the corpus database file.
@@ -69,15 +65,15 @@ export const createCorpusDatabase = (): CorpusDatabase => {
         readonly = false;
     };
 
-    const open = async (config: RuntimeConfig, options: { readonly?: boolean } = {}): Promise<Database.Database> => {
-        const nextDatabasePath = getCorpusDatabasePath(config);
+    const open = async (retrievalDir: string, options: { readonly?: boolean } = {}): Promise<Database.Database> => {
+        const nextDatabasePath = getCorpusDatabasePath(retrievalDir);
         const nextReadonly = options.readonly === true;
         if (database && databasePath === nextDatabasePath && readonly === nextReadonly) {
             return database;
         }
 
         close();
-        await mkdir(getCorpusDirectory(config), { recursive: true });
+        await mkdir(retrievalDir, { recursive: true });
         database = new Database(nextDatabasePath, nextReadonly ? { readonly: true } : undefined);
         databasePath = nextDatabasePath;
         readonly = nextReadonly;

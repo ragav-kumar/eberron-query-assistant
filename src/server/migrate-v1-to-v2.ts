@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-deprecated */
 import { createHash } from 'node:crypto';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
@@ -5,7 +6,7 @@ import path from 'node:path';
 import type { Insertable, Transaction } from 'kysely';
 
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
-import { createAppDb, settingKeys } from '@/server/v2/db-app/index.js';
+import { createAppDb, getAppDatabasePath, settingKeys } from '@/server/v2/db-app/index.js';
 import type { AppDatabaseSchema, AppDb } from '@/server/v2/db-app/index.js';
 import type { RuntimeConfig } from '@/types.js';
 
@@ -701,7 +702,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 
 export const runMigrationCli = async (): Promise<void> => {
     const config = loadDefaultConfig();
-    const appDb = await createAppDb(config);
+    const appDb = await createAppDb(getAppDatabasePath(config.runtimeDir));
 
     try {
         await migrateV1DiskToV2Db(config, appDb);

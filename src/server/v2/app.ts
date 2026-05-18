@@ -1,4 +1,4 @@
-import { AppDb, createAppDb, resolveAppDatabaseBootstrap } from './db-app/index.js';
+import { AppDb, createAppDb, resolveAppDatabasePath } from './db-app/index.js';
 import {
     createConsoleEventPublisher,
     createRefreshCoordinator,
@@ -26,7 +26,7 @@ export interface V2AppContext extends AppDb {
 
 // noinspection JSUnusedGlobalSymbols
 export const createV2App = async (): Promise<V2AppContext> => {
-    const appDb = await createAppDb(resolveAppDatabaseBootstrap());
+    const appDb = await createAppDb(resolveAppDatabasePath());
     const startupOrchestrator = createStartupOrchestrator(appDb);
 
     await startupOrchestrator.initializeRefreshState();

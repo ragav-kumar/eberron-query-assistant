@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-deprecated */
 import { rm } from 'node:fs/promises';
 import path from 'node:path';
 
