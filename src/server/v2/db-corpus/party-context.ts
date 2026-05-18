@@ -22,7 +22,7 @@ export interface PartyContextService {
      * corpus DB are missing, it returns explanatory fallback text instead of
      * throwing, so the broader assistant workflow can continue.
      */
-    build(config: RuntimeConfig): Promise<string>;
+    build: (config: RuntimeConfig) => Promise<string>;
 }
 
 interface FoundrySourceRow {
