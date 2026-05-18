@@ -1,0 +1,716 @@
+import { createHash } from 'node:crypto';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import path from 'node:path';
+
+import type { Insertable, Transaction } from 'kysely';
+
+import { loadDefaultConfig } from '@/server/v1/config/index.js';
+import { createAppDb, settingKeys } from '@/server/v2/db/index.js';
+import type { AppDatabaseSchema, AppDb } from '@/server/v2/db/index.js';
+import type { RuntimeConfig } from '@/types.js';
+
+interface LegacyRuntimeState {
+    article: {
+        knownArticles: Array<{
+            canonicalUrl: string;
+            firstSeenAt: string;
+            lastIngestedAt: string | null;
+            scrapeStatus: 'pending' | 'succeeded' | 'failed' | 'inaccessible';
+            title: string | null;
+        }>;
+        lastSuccessfulIndexScrapeAt: string | null;
+    };
+    foundry: {
+        appliedExportFilenames: string[];
+        lastSuccessfulExport: {
+            deleteCount: number;
+            filename: string;
+            generatedAt: string;
+            recordCount: number;
+            runId: string;
+            schemaVersion: string;
+            upsertCount: number;
+        } | null;
+    };
+    pdf: {
+        knownFilenames: string[];
+    };
+}
+
+interface LegacyStoredNpc {
+    age?: string;
+    bio: string;
+    createdAt: string;
+    description: string;
+    ethnicity?: string;
+    gender?: string;
+    id: number;
+    name: string;
+    role?: string;
+    species?: string;
+    updatedAt: string;
+}
+
+interface MigrationLogger {
+    info: (message: string) => void;
+    warn: (message: string) => void;
+}
+
+export interface MigrationSummary {
+    articles: number;
+    envSettings: number;
+    foundryFiles: number;
+    logRuns: number;
+    logSessionExchanges: number;
+    logSessions: number;
+    npcRows: number;
+    pdfFiles: number;
+    singletonSettings: number;
+    warnings: number;
+}
+
+type DbTransaction = Transaction<AppDatabaseSchema>;
+
+type NormalizedLogEntry =
+    | {
+        assistant: string;
+        kind: 'exchange';
+        sourceIndex: number;
+        title: string;
+        user: string;
+    }
+    | {
+        kind: 'progress';
+        message: string;
+        sourceIndex: number;
+    };
+
+interface NormalizedLogFile {
+    entries: NormalizedLogEntry[];
+    sessionCreatedAt: Date;
+    sessionTitle: string;
+}
+
+const LEGACY_LOG_SESSION_ID_PREFIX = 'legacy-log-';
+const LEGACY_NPC_RUN_ID = 'legacy-v1-npc-run';
+const LEGACY_NPC_SESSION_ID = 'legacy-v1-npc-session';
+const LEGACY_RESPONSE_TITLE = 'Untitled Response';
+const LEGACY_LOG_FILENAME_PATTERN = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s+(.+)$/;
+
+export const migrateV1DiskToV2Db = async (
+    config: RuntimeConfig,
+    appDb: AppDb,
+    logger: MigrationLogger = console,
+): Promise<MigrationSummary> => {
+    let warningCount = 0;
+    const warn = (message: string) => {
+        warningCount += 1;
+        logger.warn(message);
+    };
+
+    const summary = await appDb.db.transaction().execute(async trx => {
+        const singletonSettings = await migrateSingletonSettings(config, trx);
+        const envSettings = await migrateEnvSettings(config, trx);
+        const { articles, foundryFiles, pdfFiles } = await migrateRuntimeState(config, trx);
+        const npcRows = await migrateLegacyNpcs(config, trx);
+        const {
+            logRuns,
+            logSessionExchanges,
+            logSessions,
+        } = await migrateLogFiles(config, trx, warn);
+
+        return {
+            articles,
+            envSettings,
+            foundryFiles,
+            logRuns,
+            logSessionExchanges,
+            logSessions,
+            npcRows,
+            pdfFiles,
+            singletonSettings,
+        };
+    });
+
+    const result: MigrationSummary = {
+        ...summary,
+        warnings: warningCount,
+    };
+    logger.info(`V1->V2 migration complete: ${JSON.stringify(result)}`);
+    return result;
+};
+
+const migrateSingletonSettings = async (config: RuntimeConfig, trx: DbTransaction): Promise<number> => {
+    const currentTime = new Date().toISOString();
+    let written = 0;
+
+    const additionalContextStat = await statOrNull(config.assistant.additionalContextPath);
+    const additionalContextText = await readTextOrNull(config.assistant.additionalContextPath);
+    if (additionalContextText !== null) {
+        await upsertSetting(
+            trx,
+            settingKeys.additionalContext,
+            additionalContextText,
+            additionalContextStat?.mtime.toISOString() ?? currentTime,
+        );
+        written += 1;
+    }
+
+    return written;
+};
+
+const migrateEnvSettings = async (config: RuntimeConfig, trx: DbTransaction): Promise<number> => {
+    const modifiedAt = new Date().toISOString();
+    const entries: Array<readonly [string, string]> = [
+        [settingKeys.campaignJournalFolder, config.campaign.campaignJournalFolder ?? ''],
+        [settingKeys.partyActorUuids, JSON.stringify(config.campaign.partyActorUuids)],
+        [settingKeys.questsJournal, config.campaign.questsJournal],
+        [settingKeys.sessionNotesJournal, config.campaign.sessionNotesJournal],
+        [settingKeys.providerApiKey, config.provider.apiKey ?? ''],
+        [settingKeys.providerBaseUrl, config.provider.baseUrl],
+        [settingKeys.providerChatModel, config.provider.chatModel],
+        [settingKeys.providerDebug, String(config.provider.debug)],
+        [settingKeys.providerEmbeddingModel, config.provider.embeddingModel],
+    ];
+
+    for (const [key, value] of entries) {
+        await upsertSetting(trx, key, value, modifiedAt);
+    }
+
+    return entries.length;
+};
+
+const migrateRuntimeState = async (
+    config: RuntimeConfig,
+    trx: DbTransaction,
+): Promise<Pick<MigrationSummary, 'articles' | 'foundryFiles' | 'pdfFiles'> & { singletonSettings: number }> => {
+    const runtimeStatePath = path.join(config.stateDir, 'runtime-state.json');
+    const runtimeStateText = await readTextOrNull(runtimeStatePath);
+    if (runtimeStateText === null) {
+        await trx.deleteFrom('ingestedFiles').where('sourceType', 'in', ['foundry', 'pdf']).execute();
+        await trx.deleteFrom('ingestedArticles').execute();
+        return {
+            articles: 0,
+            foundryFiles: 0,
+            pdfFiles: 0,
+            singletonSettings: 0,
+        };
+    }
+
+    const runtimeState = JSON.parse(runtimeStateText) as LegacyRuntimeState;
+    const modifiedAt = (await stat(runtimeStatePath)).mtime.toISOString();
+
+    await upsertNullableSetting(
+        trx,
+        settingKeys.articleLastSuccessfulIndexScrapeAt,
+        runtimeState.article.lastSuccessfulIndexScrapeAt,
+        modifiedAt,
+    );
+    await upsertNullableSetting(
+        trx,
+        settingKeys.foundryLastSuccessfulExportFilename,
+        runtimeState.foundry.lastSuccessfulExport?.filename ?? null,
+        modifiedAt,
+    );
+    await upsertNullableSetting(
+        trx,
+        settingKeys.foundryLastSuccessfulExportGeneratedAt,
+        runtimeState.foundry.lastSuccessfulExport?.generatedAt ?? null,
+        modifiedAt,
+    );
+    await upsertNullableSetting(
+        trx,
+        settingKeys.foundryLastSuccessfulExportRunId,
+        runtimeState.foundry.lastSuccessfulExport?.runId ?? null,
+        modifiedAt,
+    );
+    await upsertNullableSetting(
+        trx,
+        settingKeys.foundryLastSuccessfulExportSchemaVersion,
+        runtimeState.foundry.lastSuccessfulExport?.schemaVersion ?? null,
+        modifiedAt,
+    );
+    await upsertNullableSetting(
+        trx,
+        settingKeys.foundryLastSuccessfulExportRecordCount,
+        runtimeState.foundry.lastSuccessfulExport == null ? null : String(runtimeState.foundry.lastSuccessfulExport.recordCount),
+        modifiedAt,
+    );
+    await upsertNullableSetting(
+        trx,
+        settingKeys.foundryLastSuccessfulExportUpsertCount,
+        runtimeState.foundry.lastSuccessfulExport == null ? null : String(runtimeState.foundry.lastSuccessfulExport.upsertCount),
+        modifiedAt,
+    );
+    await upsertNullableSetting(
+        trx,
+        settingKeys.foundryLastSuccessfulExportDeleteCount,
+        runtimeState.foundry.lastSuccessfulExport == null ? null : String(runtimeState.foundry.lastSuccessfulExport.deleteCount),
+        modifiedAt,
+    );
+
+    await trx.deleteFrom('ingestedFiles').where('sourceType', 'in', ['foundry', 'pdf']).execute();
+    const foundryFiles = dedupeStrings(runtimeState.foundry.appliedExportFilenames);
+    const pdfFiles = dedupeStrings(runtimeState.pdf.knownFilenames);
+
+    if (foundryFiles.length > 0) {
+        await trx
+            .insertInto('ingestedFiles')
+            .values(foundryFiles.map(filename => ({
+                filename,
+                sourceType: 'foundry' as const,
+            })))
+            .execute();
+    }
+
+    if (pdfFiles.length > 0) {
+        await trx
+            .insertInto('ingestedFiles')
+            .values(pdfFiles.map(filename => ({
+                filename,
+                sourceType: 'pdf' as const,
+            })))
+            .execute();
+    }
+
+    await trx.deleteFrom('ingestedArticles').execute();
+    const articles = dedupeArticles(runtimeState.article.knownArticles);
+    if (articles.length > 0) {
+        await trx
+            .insertInto('ingestedArticles')
+            .values(articles)
+            .execute();
+    }
+
+    return {
+        articles: articles.length,
+        foundryFiles: foundryFiles.length,
+        pdfFiles: pdfFiles.length,
+        singletonSettings: 9,
+    };
+};
+
+const migrateLegacyNpcs = async (config: RuntimeConfig, trx: DbTransaction): Promise<number> => {
+    const npcStatePath = path.join(config.stateDir, 'generated-npcs.json');
+    const npcStateText = await readTextOrNull(npcStatePath);
+
+    await deleteSessionIfPresent(trx, LEGACY_NPC_SESSION_ID);
+    if (npcStateText === null) {
+        return 0;
+    }
+
+    const legacyNpcs = JSON.parse(npcStateText) as LegacyStoredNpc[];
+    if (legacyNpcs.length === 0) {
+        return 0;
+    }
+
+    const createdAt = minimumIsoDate(legacyNpcs.map(npc => npc.createdAt)) ?? new Date().toISOString();
+    const updatedAt = maximumIsoDate(legacyNpcs.map(npc => npc.updatedAt)) ?? createdAt;
+
+    const session: Insertable<AppDatabaseSchema['sessions']> = {
+        activeRunId: null,
+        archivedAt: null,
+        createdAt,
+        id: LEGACY_NPC_SESSION_ID,
+        includePartyContext: 1,
+        mode: 'npc',
+        title: 'Legacy NPC Imports',
+        updatedAt,
+    };
+    const run: Insertable<AppDatabaseSchema['runs']> = {
+        completedAt: updatedAt,
+        createdAt,
+        error: null,
+        exchangeId: 'legacy-v1-npc-exchange',
+        failedAt: null,
+        id: LEGACY_NPC_RUN_ID,
+        includePartyContext: 1,
+        mode: 'npc',
+        prompt: 'Migrated from .eberron-query-assistant/state/generated-npcs.json',
+        retrievalTurnLimit: 0,
+        sessionId: LEGACY_NPC_SESSION_ID,
+        startedAt: createdAt,
+        status: 'completed',
+        updatedAt,
+    };
+
+    await trx.insertInto('sessions').values(session).execute();
+    await trx.insertInto('runs').values(run).execute();
+    await trx
+        .insertInto('npcs')
+        .values(legacyNpcs.map<Insertable<AppDatabaseSchema['npcs']>>(npc => ({
+            age: npc.age ?? null,
+            bio: npc.bio,
+            createdAt: npc.createdAt,
+            description: npc.description,
+            ethnicity: npc.ethnicity ?? null,
+            gender: npc.gender ?? null,
+            id: npc.id,
+            name: npc.name,
+            role: npc.role ?? null,
+            runId: LEGACY_NPC_RUN_ID,
+            sessionId: LEGACY_NPC_SESSION_ID,
+            species: npc.species ?? null,
+            updatedAt: npc.updatedAt,
+        })))
+        .execute();
+
+    return legacyNpcs.length;
+};
+
+const migrateLogFiles = async (
+    config: RuntimeConfig,
+    trx: DbTransaction,
+    warn: (message: string) => void,
+): Promise<Pick<MigrationSummary, 'logRuns' | 'logSessionExchanges' | 'logSessions'>> => {
+    const logEntries = await readdirOrEmpty(config.logDir);
+    const logFiles = logEntries
+        .filter(entry => entry.isFile() && path.extname(entry.name).toLowerCase() === '.json')
+        .sort((left, right) => left.name.localeCompare(right.name));
+
+    const existingLegacySessions = await trx
+        .selectFrom('sessions')
+        .select('id')
+        .where('id', 'like', `${LEGACY_LOG_SESSION_ID_PREFIX}%`)
+        .execute();
+    for (const session of existingLegacySessions) {
+        await deleteSessionIfPresent(trx, session.id);
+    }
+
+    let logRuns = 0;
+    let logSessionExchanges = 0;
+    let logSessions = 0;
+
+    for (const logFile of logFiles) {
+        const fullPath = path.join(config.logDir, logFile.name);
+        const statResult = await stat(fullPath);
+        const normalizedLog = normalizeLogFile(fullPath, statResult, JSON.parse(await readFile(fullPath, 'utf8')) as unknown, warn);
+        const sessionId = `${LEGACY_LOG_SESSION_ID_PREFIX}${stableId(path.relative(config.repoRoot, fullPath))}`;
+        const sessionUpdatedAt = statResult.mtime.toISOString();
+
+        await trx.insertInto('sessions').values({
+            activeRunId: null,
+            archivedAt: null,
+            createdAt: normalizedLog.sessionCreatedAt.toISOString(),
+            id: sessionId,
+            includePartyContext: 1,
+            mode: 'assistant',
+            title: normalizedLog.sessionTitle,
+            updatedAt: sessionUpdatedAt,
+        }).execute();
+        logSessions += 1;
+
+        const pendingProgress: Array<Extract<NormalizedLogEntry, { kind: 'progress' }>> = [];
+        let exchangeOrdinal = 0;
+
+        for (const entry of normalizedLog.entries) {
+            if (entry.kind === 'progress') {
+                pendingProgress.push(entry);
+                continue;
+            }
+
+            exchangeOrdinal += 1;
+            const runSeed = `${path.relative(config.repoRoot, fullPath)}:${entry.sourceIndex}:${exchangeOrdinal}`;
+            const runId = `legacy-run-${stableId(runSeed)}`;
+            const exchangeId = `legacy-exchange-${stableId(runSeed)}`;
+            const runCreatedAt = offsetIso(normalizedLog.sessionCreatedAt, (pendingProgress[0]?.sourceIndex ?? entry.sourceIndex) * 1_000);
+            const runUpdatedAt = offsetIso(normalizedLog.sessionCreatedAt, entry.sourceIndex * 1_000 + 500);
+
+            await trx.insertInto('runs').values({
+                completedAt: runUpdatedAt,
+                createdAt: runCreatedAt,
+                error: null,
+                exchangeId,
+                failedAt: null,
+                id: runId,
+                includePartyContext: 1,
+                mode: 'assistant',
+                prompt: entry.user,
+                retrievalTurnLimit: 1,
+                sessionId,
+                startedAt: runCreatedAt,
+                status: 'completed',
+                updatedAt: runUpdatedAt,
+            }).execute();
+            logRuns += 1;
+
+            const sessionExchangeRows: Insertable<AppDatabaseSchema['sessionExchanges']>[] = [{
+                content: entry.user,
+                createdAt: runCreatedAt,
+                exchangeId,
+                id: `legacy-session-exchange-${stableId(`${runSeed}:user`)}`,
+                kind: 'user',
+                runId,
+                sequenceIndex: 1,
+                sessionId,
+                title: null,
+                toolCallId: null,
+            }];
+
+            let sequenceIndex = 2;
+            for (const progressEntry of pendingProgress) {
+                sessionExchangeRows.push({
+                    content: progressEntry.message,
+                    createdAt: offsetIso(normalizedLog.sessionCreatedAt, progressEntry.sourceIndex * 1_000 + 100),
+                    exchangeId,
+                    id: `legacy-session-exchange-${stableId(`${runSeed}:progress:${progressEntry.sourceIndex}`)}`,
+                    kind: 'reasoning',
+                    runId,
+                    sequenceIndex,
+                    sessionId,
+                    title: null,
+                    toolCallId: null,
+                });
+                sequenceIndex += 1;
+            }
+            pendingProgress.length = 0;
+
+            sessionExchangeRows.push({
+                content: entry.assistant,
+                createdAt: runUpdatedAt,
+                exchangeId,
+                id: `legacy-session-exchange-${stableId(`${runSeed}:response`)}`,
+                kind: 'response',
+                runId,
+                sequenceIndex,
+                sessionId,
+                title: entry.title,
+                toolCallId: null,
+            });
+
+            await trx.insertInto('sessionExchanges').values(sessionExchangeRows).execute();
+            logSessionExchanges += sessionExchangeRows.length;
+        }
+
+        for (const progressEntry of pendingProgress) {
+            warn(`Skipping orphaned progress entry in ${fullPath} at index ${progressEntry.sourceIndex}: no following exchange.`);
+        }
+    }
+
+    return {
+        logRuns,
+        logSessionExchanges,
+        logSessions,
+    };
+};
+
+const normalizeLogFile = (
+    filePath: string,
+    fileStat: Awaited<ReturnType<typeof stat>>,
+    raw: unknown,
+    warn: (message: string) => void,
+): NormalizedLogFile => {
+    const basename = path.basename(filePath, path.extname(filePath));
+    const filenameMatch = LEGACY_LOG_FILENAME_PATTERN.exec(basename);
+    const sessionTitle = filenameMatch?.[7]?.trim() || basename;
+    const sessionCreatedAt = filenameMatch
+        ? new Date(
+            Number(filenameMatch[1]),
+            Number(filenameMatch[2]) - 1,
+            Number(filenameMatch[3]),
+            Number(filenameMatch[4]),
+            Number(filenameMatch[5]),
+            Number(filenameMatch[6]),
+        )
+        : fileStat.mtime;
+
+    if (!Array.isArray(raw)) {
+        warn(`Skipping invalid log file ${filePath}: expected a JSON array.`);
+        return {
+            entries: [],
+            sessionCreatedAt,
+            sessionTitle,
+        };
+    }
+
+    const entries: NormalizedLogEntry[] = [];
+    for (const [index, rawEntry] of raw.entries()) {
+        const normalizedEntry = normalizeLogEntry(rawEntry, index, filePath, warn);
+        if (normalizedEntry !== null) {
+            entries.push(normalizedEntry);
+        }
+    }
+
+    return {
+        entries,
+        sessionCreatedAt,
+        sessionTitle,
+    };
+};
+
+const normalizeLogEntry = (
+    rawEntry: unknown,
+    index: number,
+    filePath: string,
+    warn: (message: string) => void,
+): NormalizedLogEntry | null => {
+    if (!isRecord(rawEntry)) {
+        warn(`Skipping invalid log entry in ${filePath} at index ${index}: entry is not an object.`);
+        return null;
+    }
+
+    if (rawEntry.kind === 'progress') {
+        if (typeof rawEntry.message !== 'string' || rawEntry.message.trim().length === 0) {
+            warn(`Skipping invalid progress entry in ${filePath} at index ${index}: missing message.`);
+            return null;
+        }
+        return {
+            kind: 'progress',
+            message: rawEntry.message.trim(),
+            sourceIndex: index,
+        };
+    }
+
+    const user = typeof rawEntry.user === 'string' ? rawEntry.user.trim() : null;
+    const assistant = typeof rawEntry.assistant === 'string' ? rawEntry.assistant.trim() : null;
+    const hasUser = user !== null && user.length > 0;
+    const hasAssistant = assistant !== null && assistant.length > 0;
+
+    if (rawEntry.kind === 'exchange') {
+        if (!hasUser || !hasAssistant) {
+            warn(`Skipping invalid exchange entry in ${filePath} at index ${index}: missing user or assistant.`);
+            return null;
+        }
+        return {
+            assistant,
+            kind: 'exchange',
+            sourceIndex: index,
+            title: typeof rawEntry.title === 'string' && rawEntry.title.trim().length > 0
+                ? rawEntry.title.trim()
+                : LEGACY_RESPONSE_TITLE,
+            user,
+        };
+    }
+
+    if (!('kind' in rawEntry)) {
+        if (!hasUser || !hasAssistant) {
+            warn(`Skipping invalid legacy exchange entry in ${filePath} at index ${index}: missing user or assistant.`);
+            return null;
+        }
+        return {
+            assistant,
+            kind: 'exchange',
+            sourceIndex: index,
+            title: typeof rawEntry.title === 'string' && rawEntry.title.trim().length > 0
+                ? rawEntry.title.trim()
+                : LEGACY_RESPONSE_TITLE,
+            user,
+        };
+    }
+
+    warn(`Skipping unsupported log entry in ${filePath} at index ${index}.`);
+    return null;
+};
+
+const upsertSetting = async (
+    trx: DbTransaction,
+    key: string,
+    value: string,
+    modifiedAt: string,
+): Promise<void> => {
+    await trx
+        .insertInto('settings')
+        .values({ key, modifiedAt, value })
+        .onConflict(conflict => conflict.column('key').doUpdateSet({
+            modifiedAt,
+            value,
+        }))
+        .execute();
+};
+
+const upsertNullableSetting = async (
+    trx: DbTransaction,
+    key: string,
+    value: string | null,
+    modifiedAt: string,
+): Promise<void> => {
+    await upsertSetting(trx, key, value ?? '', modifiedAt);
+};
+
+const deleteSessionIfPresent = async (trx: DbTransaction, sessionId: string): Promise<void> => {
+    await trx.deleteFrom('sessions').where('id', '=', sessionId).execute();
+};
+
+const readTextOrNull = async (filePath: string): Promise<string | null> => {
+    try {
+        return await readFile(filePath, 'utf8');
+    } catch (error) {
+        if (hasNodeErrorCode(error, 'ENOENT')) {
+            return null;
+        }
+        throw error;
+    }
+};
+
+const statOrNull = async (filePath: string): Promise<Awaited<ReturnType<typeof stat>> | null> => {
+    try {
+        return await stat(filePath);
+    } catch (error) {
+        if (hasNodeErrorCode(error, 'ENOENT')) {
+            return null;
+        }
+        throw error;
+    }
+};
+
+const readdirOrEmpty = async (directoryPath: string) => {
+    try {
+        return await readdir(directoryPath, { withFileTypes: true });
+    } catch (error) {
+        if (hasNodeErrorCode(error, 'ENOENT')) {
+            return [];
+        }
+        throw error;
+    }
+};
+
+const dedupeStrings = (values: string[]): string[] => [...new Set(values)].sort((left, right) => left.localeCompare(right));
+
+const dedupeArticles = (
+    articles: LegacyRuntimeState['article']['knownArticles'],
+): Array<Insertable<AppDatabaseSchema['ingestedArticles']>> => {
+    const byUrl = new Map<string, Insertable<AppDatabaseSchema['ingestedArticles']>>();
+    for (const article of articles) {
+        byUrl.set(article.canonicalUrl, {
+            canonicalUrl: article.canonicalUrl,
+            firstSeenAt: article.firstSeenAt,
+            lastIngestedAt: article.lastIngestedAt,
+            scrapeStatus: article.scrapeStatus,
+            title: article.title,
+        });
+    }
+    return [...byUrl.values()].sort((left, right) => left.canonicalUrl.localeCompare(right.canonicalUrl));
+};
+
+const minimumIsoDate = (values: string[]): string | null => values.length === 0
+    ? null
+    : values.reduce((minimum, value) => value.localeCompare(minimum) < 0 ? value : minimum);
+
+const maximumIsoDate = (values: string[]): string | null => values.length === 0
+    ? null
+    : values.reduce((maximum, value) => value.localeCompare(maximum) > 0 ? value : maximum);
+
+const stableId = (value: string): string => createHash('sha1').update(value).digest('hex').slice(0, 16);
+
+const offsetIso = (baseDate: Date, milliseconds: number): string => new Date(baseDate.getTime() + milliseconds).toISOString();
+
+const hasNodeErrorCode = (error: unknown, code: string): boolean => (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string' &&
+    error.code === code
+);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+export const runMigrationCli = async (): Promise<void> => {
+    const config = loadDefaultConfig();
+    const appDb = await createAppDb(config);
+
+    try {
+        await migrateV1DiskToV2Db(config, appDb);
+    } finally {
+        await appDb.close();
+    }
+};

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "lint": "eslint .",
+    "migrate:v1-to-v2": "vite-node src/server/v2/migrate-v1-to-v2.cli.ts",
     "prestart": "tsc --noEmit",
     "start": "vite",
     "test": "vitest run",
