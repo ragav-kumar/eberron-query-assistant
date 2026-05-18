@@ -2,8 +2,7 @@ import { access } from 'node:fs/promises';
 
 import Database from 'better-sqlite3';
 
-import type { AppDb } from '@/server/v2/db-app/index.js';
-import { settingKeys } from '@/server/v2/db-app/index.js';
+import { Settings, type AppDb, settingKeys } from '@/server/v2/db-app/index.js';
 import { isRecord } from '@/errors.js';
 
 import { getCorpusDatabasePath } from './database.js';
@@ -138,18 +137,13 @@ const formatPartyContext = (request: FormatPartyContextRequest): string => {
 };
 
 const readPartyContextSettings = async (appDb: AppDb): Promise<PartyContextSettings> => {
-    const rows = await appDb.db
-        .selectFrom('settings')
-        .select(['key', 'value'])
-        .where('key', 'in', [
-            settingKeys.campaignJournalFolder,
-            settingKeys.partyActorUuids,
-            settingKeys.questsJournal,
-            settingKeys.sessionNotesJournal,
-        ])
-        .execute();
+    const values = await Settings.readMany(appDb.db, [
+        settingKeys.campaignJournalFolder,
+        settingKeys.partyActorUuids,
+        settingKeys.questsJournal,
+        settingKeys.sessionNotesJournal,
+    ]);
 
-    const values = new Map(rows.map(row => [row.key, row.value]));
     return {
         campaignJournalFolder: readOptionalSetting(values.get(settingKeys.campaignJournalFolder)),
         partyActorUuids: readStringArraySetting(values.get(settingKeys.partyActorUuids)),
@@ -219,7 +213,7 @@ const readAllFoundrySources = (database: Database.Database): FoundrySourceRow[] 
        FROM sources s
        LEFT JOIN chunks c ON c.source_id = s.source_id
        WHERE s.source_type = 'foundry'
-       GROUP BY s.source_id
+       GROUP BY s.source_id, s.source_key, s.title, s.metadata_json
        ORDER BY s.title`,
         )
         .all() as Array<{
