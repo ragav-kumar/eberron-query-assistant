@@ -1,3 +1,5 @@
+> This document is intentionally brief. Its purpose is to capture the V2-specific product and interaction rules that should guide implementation and prompting, while relying on `docs/fdd-v1.md` for behavior that is truly unchanged.
+
 # Additional context
 
 - There is only one additional context
