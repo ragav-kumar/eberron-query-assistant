@@ -1,7 +1,6 @@
-import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ConsoleEntry, NpcCollection, Refresh, Run, Session, SessionFeed } from '@/dto/index.js';
 
-const ADDITIONAL_CONTEXT_MARKDOWN = `# Campaign Context
+export const ADDITIONAL_CONTEXT_MARKDOWN = `# Campaign Context
 
 Use this context as local campaign guidance. It is not retrieved evidence, so do not cite it as a source. When it conflicts with retrieved session notes, prefer the session notes for what has actually happened in play.
 
@@ -16,7 +15,7 @@ Use this context as local campaign guidance. It is not retrieved evidence, so do
 * Durotan's player tends to focus on the immediate scene and combat. Keep lore concise and concrete, without too much player-facing complexity, when Durotan is the focus. Complex information that the GM has to track is okay.
 `;
 
-const SESSIONS: Session[] = [
+export const SESSIONS: Session[] = [
     {
         id: 'session-dragonshards',
         mode: 'assistant',
@@ -59,7 +58,7 @@ const SESSIONS: Session[] = [
     },
 ];
 
-const SESSION_FEEDS = new Map<string, SessionFeed>([
+export const SESSION_FEEDS = new Map<string, SessionFeed>([
     ['session-dragonshards', {
         sessionId: 'session-dragonshards',
         mode: 'assistant',
@@ -120,7 +119,7 @@ const SESSION_FEEDS = new Map<string, SessionFeed>([
     }],
 ]);
 
-const RUNS = new Map<string, Run>([
+export const RUNS = new Map<string, Run>([
     ['run-dal-quor-1', {
         id: 'run-dal-quor-1',
         sessionId: 'session-dal-quor',
@@ -132,7 +131,7 @@ const RUNS = new Map<string, Run>([
     }],
 ]);
 
-const DEFAULT_CREATED_RUN: Run = {
+export const DEFAULT_CREATED_RUN: Run = {
     id: 'run-dal-quor-1',
     sessionId: 'session-dal-quor',
     mode: 'assistant',
@@ -142,7 +141,7 @@ const DEFAULT_CREATED_RUN: Run = {
     exchangeId: 'exchange-dal-quor-1',
 };
 
-const NPCS: NpcCollection = {
+export const NPCS: NpcCollection = {
     filter: '',
     npcs: [
         {
@@ -207,7 +206,7 @@ const NPCS: NpcCollection = {
     totalCount: 4,
 };
 
-const REFRESH: Refresh = {
+export const REFRESH: Refresh = {
     activeOperation: null,
     lastRefreshAt: '2026-05-08T17:49:08.127Z',
     lastReingestAt: null,
@@ -217,7 +216,7 @@ const REFRESH: Refresh = {
     updatedAt: '2026-05-08T17:49:08.127Z',
 };
 
-const CONSOLE_ENTRIES: ConsoleEntry[] = [
+export const CONSOLE_ENTRIES: ConsoleEntry[] = [
     {
         id: 'console-1',
         level: 'info',
@@ -249,109 +248,3 @@ const CONSOLE_ENTRIES: ConsoleEntry[] = [
         timestamp: '2026-05-08T17:49:08.127Z',
     },
 ];
-
-export const handleV2ApiRequest = (
-    request: IncomingMessage,
-    response: ServerResponse,
-): void => {
-    const url = new URL(request.url ?? '/', 'http://localhost');
-
-    if (request.method === 'GET' && url.pathname === '/api/v2/additional-context') {
-        writeText(response, 200, ADDITIONAL_CONTEXT_MARKDOWN, 'text/markdown; charset=utf-8');
-        return;
-    }
-
-    if (request.method === 'PUT' && url.pathname === '/api/v2/additional-context') {
-        writeText(response, 200, ADDITIONAL_CONTEXT_MARKDOWN, 'text/markdown; charset=utf-8');
-        return;
-    }
-
-    if (request.method === 'GET' && url.pathname === '/api/v2/sessions') {
-        const mode = url.searchParams.get('mode');
-        writeJson(
-            response,
-            200,
-            mode == null ? SESSIONS : SESSIONS.filter(session => session.mode === mode),
-        );
-        return;
-    }
-
-    if (request.method === 'GET' && url.pathname.startsWith('/api/v2/sessions/') && url.pathname.endsWith('/feed')) {
-        const sessionId = url.pathname.slice('/api/v2/sessions/'.length, -'/feed'.length);
-        const feed = SESSION_FEEDS.get(sessionId);
-        if (feed != null) {
-            writeJson(response, 200, feed);
-            return;
-        }
-    }
-
-    if (request.method === 'POST' && url.pathname === '/api/v2/runs') {
-        writeJson(response, 200, DEFAULT_CREATED_RUN);
-        return;
-    }
-
-    if (request.method === 'GET' && url.pathname.startsWith('/api/v2/runs/')) {
-        const runId = url.pathname.slice('/api/v2/runs/'.length);
-        const run = RUNS.get(runId);
-        if (run != null) {
-            writeJson(response, 200, run);
-            return;
-        }
-    }
-
-    if (request.method === 'GET' && url.pathname === '/api/v2/npcs') {
-        writeJson(response, 200, NPCS);
-        return;
-    }
-
-    if (request.method === 'GET' && url.pathname === '/api/v2/refresh') {
-        writeJson(response, 200, REFRESH);
-        return;
-    }
-
-    if (request.method === 'POST' && url.pathname === '/api/v2/refresh') {
-        writeJson(response, 200, REFRESH);
-        return;
-    }
-
-    if (request.method === 'GET' && url.pathname === '/api/v2/console') {
-        writeJson(response, 200, CONSOLE_ENTRIES);
-        return;
-    }
-
-    if (request.method === 'GET' && url.pathname === '/api/v2/console/events') {
-        writeSse(response, request);
-        return;
-    }
-
-    if (request.method === 'GET' && url.pathname === '/api/v2/runtime/events') {
-        writeSse(response, request);
-        return;
-    }
-
-    writeJson(response, 404, {error: 'Unknown API route.'});
-};
-
-const writeJson = (response: ServerResponse, statusCode: number, body: unknown): void => {
-    response.statusCode = statusCode;
-    response.setHeader('Content-Type', 'application/json; charset=utf-8');
-    response.end(JSON.stringify(body));
-};
-
-const writeText = (response: ServerResponse, statusCode: number, body: string, contentType: string): void => {
-    response.statusCode = statusCode;
-    response.setHeader('Content-Type', contentType);
-    response.end(body);
-};
-
-const writeSse = (response: ServerResponse, request: IncomingMessage): void => {
-    response.statusCode = 200;
-    response.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
-    response.setHeader('Cache-Control', 'no-cache, no-transform');
-    response.setHeader('Connection', 'keep-alive');
-    response.flushHeaders?.();
-    response.write?.(': connected\n\n');
-    request.on('close', () => {
-        response.end();
-    });
-};

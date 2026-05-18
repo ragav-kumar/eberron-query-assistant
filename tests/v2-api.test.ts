@@ -124,6 +124,16 @@ describe('V2 API router', () => {
         expect(JSON.parse(record.body)).toEqual({error: 'Unknown API route.'});
     });
 
+    it('does not match incomplete session feed paths', () => {
+        const request = createRequest('GET', '/api/v2/sessions/session-dal-quor');
+        const {record, response} = createResponse();
+
+        handleV2ApiRequest(request, response);
+
+        expect(record.statusCode).toBe(404);
+        expect(JSON.parse(record.body)).toEqual({error: 'Unknown API route.'});
+    });
+
     it('preserves SSE headers and connection prelude', () => {
         const request = createRequest('GET', '/api/v2/console/events');
         const {record, response} = createResponse();

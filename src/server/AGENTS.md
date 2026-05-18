@@ -18,6 +18,6 @@
 - Add or update automated tests alongside behavior changes when the change involves the server.
 - Design ingestion and retrieval logic so most tests can run without network access or live model calls. Use mocks or fixtures for provider interactions and remote content wherever practical.
 - Use `npm run verify` as the final acceptance command for changes that involve the server. Targeted test runs may be used during iteration, but they do not replace the final full-suite gate.
-- For startup, source-discovery, state, API bridge, and user-visible runtime behavior changes, do not stop at unit tests. Attempt to run the start command and inspect the terminal output for the expected Vite startup behavior.
+- Temporary V2 transition rule: do not run Vite startup smoke checks for server work until the transition ends, even for startup, source-discovery, state, API bridge, or other user-visible runtime behavior changes.
 - When starting the dev server from PowerShell for verification, invoke the Windows npm shim (`npm.cmd`), not `npm`.
 - After startup verification on Windows, explicitly tear down every Vite process started for the check and verify teardown by confirming both that no repo-local `vite.js` child process remains and that no listener remains on each tested port.

@@ -90,7 +90,7 @@ export const eberronApiPlugin = (): Plugin => ({
 
         v2RuntimePromise = Promise.all([
           server.ssrLoadModule('/src/server/v2/app.ts'),
-          server.ssrLoadModule('/src/server/v2/api.ts')
+          server.ssrLoadModule('/src/server/v2/api/index.ts')
         ]).then(async (loadedModules) => {
           const [appModule, apiModule] = loadedModules as [V2AppModule, V2ApiModule];
           await appModule.initializeV2App();
