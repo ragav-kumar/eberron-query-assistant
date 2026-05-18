@@ -11,7 +11,7 @@ import {
     createCorpusStore,
     createPartyContextService,
     getCorpusDatabasePath,
-} from '@/server/v2/corpus/index.js';
+} from '@/server/v2/db-corpus/index.js';
 import type { CorpusChunk, CorpusSource, RuntimeConfig } from '@/types.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-corpus');

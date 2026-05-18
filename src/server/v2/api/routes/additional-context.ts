@@ -1,7 +1,7 @@
 import type { RouteDefinition } from './shared.js';
 import { readText } from '../request.js';
 import { writeMarkdown } from '../response.js';
-import { settingKeys } from '@/server/v2/db/settingKeys.js';
+import { settingKeys } from '@/server/v2/db-app/settingKeys.js';
 
 export const additionalContextRoutes: RouteDefinition[] = [
     {

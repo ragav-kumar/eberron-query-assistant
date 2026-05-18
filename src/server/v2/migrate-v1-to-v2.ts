@@ -5,8 +5,8 @@ import path from 'node:path';
 import type { Insertable, Transaction } from 'kysely';
 
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
-import { createAppDb, settingKeys } from '@/server/v2/db/index.js';
-import type { AppDatabaseSchema, AppDb } from '@/server/v2/db/index.js';
+import { createAppDb, settingKeys } from '@/server/v2/db-app/index.js';
+import type { AppDatabaseSchema, AppDb } from '@/server/v2/db-app/index.js';
 import type { RuntimeConfig } from '@/types.js';
 
 interface LegacyRuntimeState {

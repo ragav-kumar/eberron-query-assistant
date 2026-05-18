@@ -28,18 +28,63 @@ const MAX_VECTOR_CACHE_DATABASE_BYTES = 256 * 1024 * 1024;
 const MAX_EMBEDDING_INPUT_CHARACTERS = 6_000;
 const VECTOR_STORE_SCHEMA_VERSION = 'sqlite-json-v1';
 
+/**
+ * Summary of one vector-refresh pass over the corpus.
+ *
+ * `reusedEmbeddings` counts chunks whose existing SQLite vector rows were still
+ * compatible and up to date. `regeneratedEmbeddings` counts chunks that needed
+ * fresh embeddings written back into the corpus database.
+ */
 export interface RetrievalSyncSummary {
     chunkCount: number;
     regeneratedEmbeddings: number;
     reusedEmbeddings: number;
 }
 
+/**
+ * Read-side retrieval API backed by the corpus database.
+ *
+ * Use this from assistant or NPC runtime flows that need to:
+ * - prepare retrieval state for a runtime config
+ * - refresh or rebuild vector rows stored beside the corpus chunks
+ * - execute lexical / semantic / hybrid corpus searches
+ *
+ * Expected lifecycle:
+ * 1. create once with its embedding adapter and reporter
+ * 2. call `refresh()` during startup refresh or explicit reingest work
+ * 3. call `search()` during interactive model runs
+ *
+ * `search()` assumes `refresh()` or `prepare()` has already established the
+ * runtime config for the current process.
+ */
 export interface CorpusRetrievalService {
+    /** Binds the service to a runtime config and clears any in-memory vector cache. */
     prepare(config: RuntimeConfig): Promise<void>;
+
+    /**
+     * Synchronizes SQLite vector rows with the current corpus chunks.
+     *
+     * Use `forceRebuild` only for explicit rebuild paths. Routine refresh should
+     * normally preserve compatible embeddings and only regenerate what changed.
+     */
     refresh(config: RuntimeConfig, options?: { abortSignal?: AbortSignal; forceRebuild?: boolean }): Promise<RetrievalSyncSummary>;
+
+    /**
+     * Searches the corpus for relevant chunks.
+     *
+     * This starts with lexical search and then layers on vector scoring when
+     * appropriate, returning the merged retrieval result set expected by the
+     * assistant runtime.
+     */
     search(request: RetrievalSearchRequest): Promise<RetrievalResult[]>;
 }
 
+/**
+ * Dependencies required to build the default corpus retrieval service.
+ *
+ * The embedding adapter defines how semantic vectors are produced. The reporter
+ * is used for operational progress logging during refresh and large searches.
+ */
 export interface CorpusRetrievalServiceDependencies {
     embeddingAdapter: EmbeddingAdapter;
     maxVectorCacheDatabaseBytes?: number;
@@ -97,6 +142,14 @@ interface VectorCandidateRow {
     sourceType: SourceType;
 }
 
+/**
+ * Creates the retrieval service that reads and maintains retrieval state in the
+ * corpus database.
+ *
+ * This service intentionally keeps vector rows in the corpus database instead of
+ * moving them into the app database. It preserves the existing retrieval
+ * storage design while keeping ownership localized to this boundary.
+ */
 export const createCorpusRetrievalService = (
     dependencies: CorpusRetrievalServiceDependencies,
 ): CorpusRetrievalService => {
@@ -217,6 +270,12 @@ export const createCorpusRetrievalService = (
     };
 };
 
+/**
+ * Returns the legacy vector-index JSON path.
+ *
+ * Vectors are stored in SQLite, but the path remains useful for cleanup and
+ * test coverage around migration away from the old sidecar file.
+ */
 export const getVectorIndexPath = (config: RuntimeConfig): string => path.join(config.retrievalDir, VECTOR_INDEX_FILENAME);
 
 const deleteLegacyVectorIndex = async (config: RuntimeConfig, reporter: ProgressReporter): Promise<void> => {
@@ -229,6 +288,12 @@ const deleteLegacyVectorIndex = async (config: RuntimeConfig, reporter: Progress
     reporter.info('Deleted legacy vector-index.json; missing embeddings will be regenerated into SQLite.');
 };
 
+/**
+ * Ensures the vector-storage tables exist inside the corpus database.
+ *
+ * The vector rows are stored alongside the main corpus so refresh and retrieval
+ * can operate against one durable artifact.
+ */
 const initializeVectorStore = (database: Database.Database): void => {
     database.exec(`
     PRAGMA foreign_keys = ON;
@@ -260,6 +325,12 @@ const initializeVectorStore = (database: Database.Database): void => {
         .run(VECTOR_STORE_SCHEMA_VERSION);
 };
 
+/**
+ * Reads the subset of chunks eligible for retrieval under the given filters.
+ *
+ * This produces normalized rows that both lexical and semantic retrieval can
+ * use without re-parsing the same SQLite payload repeatedly.
+ */
 const readFilteredChunks = (database: Database.Database, request: RetrievalSearchRequest): StoredChunk[] => {
     const filters = buildSqlFilters(request, 's');
 
@@ -303,6 +374,12 @@ const readFilteredChunks = (database: Database.Database, request: RetrievalSearc
     }));
 };
 
+/**
+ * Executes the lexical retrieval pass using SQLite FTS.
+ *
+ * This is the fast first pass for all searches and can also become the only
+ * retrieval mode when in-memory vector caching is disabled for a very large DB.
+ */
 const searchLexical = (
     database: Database.Database,
     request: RetrievalSearchRequest,
@@ -356,6 +433,12 @@ const searchLexical = (
     }));
 };
 
+/**
+ * Executes the semantic retrieval pass.
+ *
+ * Depending on corpus size and cache policy, this either scores an in-memory
+ * compatible vector set or streams vectors directly from SQLite in batches.
+ */
 const searchVector = async (
     database: Database.Database,
     request: RetrievalSearchRequest,
@@ -427,6 +510,12 @@ const mergeResults = (
     return [...merged.values()].sort((left, right) => right.score - left.score).slice(0, limit);
 };
 
+/**
+ * Synchronizes stored embedding rows with the current chunk contents.
+ *
+ * This is the core maintenance step that allows retrieval to reuse compatible
+ * vectors across refreshes while only embedding changed or missing chunks.
+ */
 const syncVectorStore = async (
     database: Database.Database,
     embeddingAdapter: EmbeddingAdapter,

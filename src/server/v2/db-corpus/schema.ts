@@ -1,5 +1,12 @@
 import Database from 'better-sqlite3';
 
+/**
+ * Ensures the baseline corpus schema exists in the corpus database.
+ *
+ * This creates the durable source and chunk tables plus the FTS table used for
+ * lexical retrieval. It is safe to call multiple times and is intended to run
+ * during corpus-store initialization before any read or write workloads begin.
+ */
 export const createCorpusSchema = (database: Database.Database): void => {
     database.exec(`
       PRAGMA foreign_keys = ON;
@@ -36,10 +43,24 @@ export const createCorpusSchema = (database: Database.Database): void => {
     rebuildCorpusFts(database);
 };
 
+/**
+ * Rebuilds the full-text index from the current `chunks` table contents.
+ *
+ * Call this after bulk source mutations or any sequence of writes that changes
+ * chunk text. The store methods in this folder already do this for their public
+ * mutations, so external callers normally should not need to trigger it.
+ */
 export const rebuildCorpusFts = (database: Database.Database): void => {
     database.prepare("INSERT INTO chunks_fts(chunks_fts) VALUES ('rebuild')").run();
 };
 
+/**
+ * Checks whether an existing on-disk corpus schema is compatible with this
+ * boundary's expected `sources` and `chunks` layout.
+ *
+ * This is intentionally conservative: callers use it to decide whether routine
+ * startup may proceed or whether the user must opt into an explicit rebuild.
+ */
 export const isCompatibleCorpusSchema = (database: Database.Database): boolean => {
     const sourceColumns = readColumnNames(database, 'sources');
     const chunkColumns = readColumnNames(database, 'chunks');

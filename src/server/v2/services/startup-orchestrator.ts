@@ -1,4 +1,4 @@
-import type { AppDb } from '../db/index.js';
+import type { AppDb } from '../db-app/index.js';
 
 /**
  * Startup orchestration is the server-side entry point for app-launch work.

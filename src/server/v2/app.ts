@@ -1,6 +1,6 @@
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
 
-import { AppDb, createAppDb } from './db/index.js';
+import { AppDb, createAppDb } from './db-app/index.js';
 import {
     createConsoleEventPublisher,
     createRefreshCoordinator,

@@ -9,8 +9,8 @@ import type { CreateRefreshDto, CreateRunDto } from '@/dto/index.js';
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
 import { createV2ApiHandler } from '@/server/v2/api/index.js';
 import type { V2AppContext } from '@/server/v2/app.js';
-import { createAppDb } from '@/server/v2/db/index.js';
-import { settingKeys } from '@/server/v2/db/settingKeys.js';
+import { createAppDb } from '@/server/v2/db-app/index.js';
+import { settingKeys } from '@/server/v2/db-app/settingKeys.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-api');
 

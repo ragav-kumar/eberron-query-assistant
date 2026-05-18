@@ -7,7 +7,21 @@ import type { RuntimeConfig } from '@/types.js';
 
 import { getCorpusDatabasePath } from './database.js';
 
+/**
+ * Builds the user-visible "Current party context" block from corpus data.
+ *
+ * This is a read-only convenience layer over foundry rows stored in
+ * the corpus database. It is intended for assistant/NPC runtime code that wants a
+ * single formatted text block rather than raw structured query results.
+ */
 export interface PartyContextService {
+    /**
+     * Produces a formatted party-context string for the current campaign config.
+     *
+     * The method is intentionally resilient: when actor UUIDs, journals, or the
+     * corpus DB are missing, it returns explanatory fallback text instead of
+     * throwing, so the broader assistant workflow can continue.
+     */
     build(config: RuntimeConfig): Promise<string>;
 }
 
@@ -25,6 +39,12 @@ const QUEST_PAGE_LIMIT = 8;
 const SESSION_CONTENT_LIMIT = 1_200;
 const QUEST_CONTENT_LIMIT = 600;
 
+/**
+ * Creates the default party-context reader.
+ *
+ * Call this from runtime code that wants to enrich prompts with current party,
+ * session-note, and quest context derived from the corpus's foundry rows.
+ */
 export const createPartyContextService = (): PartyContextService => ({
     build: async (config) => {
         if (config.campaign.partyActorUuids.length === 0) {
@@ -67,6 +87,7 @@ interface FormatPartyContextRequest {
     sessionPages: FoundrySourceRow[];
 }
 
+/** Formats the final prompt-ready party-context block from raw foundry rows. */
 const formatPartyContext = (request: FormatPartyContextRequest): string => {
     const missingActorUuids = request.config.campaign.partyActorUuids.filter(
         uuid => !request.actors.some(actor => actor.metadata.sourceUuid === uuid),
@@ -107,6 +128,12 @@ const formatPartyContext = (request: FormatPartyContextRequest): string => {
     return lines.join('\n');
 };
 
+/**
+ * Reads configured party actors from the foundry-backed portion of the corpus.
+ *
+ * The returned rows preserve the configured UUID ordering so prompt assembly
+ * stays stable across runs.
+ */
 const readPartyActors = (database: Database.Database, actorUuids: string[]): FoundrySourceRow[] => {
     const rows = readAllFoundrySources(database).filter(row => actorUuids.includes(readString(row.metadata.sourceUuid)));
     return actorUuids
@@ -114,6 +141,7 @@ const readPartyActors = (database: Database.Database, actorUuids: string[]): Fou
         .filter((row): row is FoundrySourceRow => row !== undefined);
 };
 
+/** Reads and sorts journal pages for one configured journal name. */
 const readJournalPages = (database: Database.Database, journalName: string, limit: number): FoundrySourceRow[] => readAllFoundrySources(database)
     .filter(row => readString(row.metadata.entityKind) === 'JournalEntryPage')
     .filter(row => {
@@ -148,6 +176,7 @@ const compareNullableStrings = (left: string, right: string): number => {
     return left.localeCompare(right);
 };
 
+/** Reads all foundry source rows, joining chunk text into one content blob per source. */
 const readAllFoundrySources = (database: Database.Database): FoundrySourceRow[] => {
     const rows = database
         .prepare(
