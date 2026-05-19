@@ -5,11 +5,18 @@ import { buildFoundrySourceChanges } from './foundry.js';
 import type { PdfParser } from '../types.js';
 import { buildPdfSourceChanges } from './pdf.js';
 
+/**
+ * Dependencies required by the source ingestion stage.
+ */
 export interface RefreshIngestionDependencies {
     articleFetcher: ArticleFetcher;
     pdfParser: PdfParser;
 }
 
+/**
+ * Converts discovery output into corpus mutations plus the import-state rows
+ * that should be persisted if the run completes successfully.
+ */
 export const buildRefreshIngestion = async (options: {
     abortSignal?: AbortSignal;
     dependencies: RefreshIngestionDependencies;

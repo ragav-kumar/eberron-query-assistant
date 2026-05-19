@@ -9,6 +9,9 @@ import type { CorpusChunk, CorpusSource } from '@/types.js';
 import type { SourceChangeSet } from '../types.js';
 import { chunkText, normalizeText } from './chunking.js';
 
+/**
+ * Canonical index page used to discover Keith Baker article URLs.
+ */
 export const KEITH_BAKER_INDEX_URL = 'https://keith-baker.com/eberron-index/';
 
 const FETCH_TIMEOUT_MS = 30_000;
@@ -18,6 +21,9 @@ export interface ArticleFetcher {
     fetchText(url: string, options?: { signal?: AbortSignal | undefined }): Promise<string>;
 }
 
+/**
+ * Structured error returned when an article fetch fails at the HTTP layer.
+ */
 export interface HttpFetchFailedError {
     kind: 'http-fetch-failed';
     message: string;
@@ -27,6 +33,12 @@ export interface HttpFetchFailedError {
     url: string;
 }
 
+/**
+ * Default network-backed article fetcher used by refresh.
+ *
+ * Timeout and abort wiring live here so the ingestion logic can focus on the
+ * source-specific rules around indexing and normalization.
+ */
 export const createFetchArticleFetcher = (): ArticleFetcher => ({
     fetchText: async (url, options = {}) => {
         const abortController = new AbortController();
@@ -62,6 +74,10 @@ export const createFetchArticleFetcher = (): ArticleFetcher => ({
     },
 });
 
+/**
+ * Scrapes the article index when required, then ingests any articles that are
+ * new, previously failed, or being force reingested.
+ */
 export const buildArticleRefresh = async (options: {
     abortSignal?: AbortSignal;
     currentArticles: IngestedArticle[];
@@ -131,6 +147,10 @@ const isPermanentlyInaccessibleArticleFetch = (value: unknown): value is HttpFet
     return candidate.kind === 'http-fetch-failed' && typeof candidate.status === 'number' && PERMANENTLY_INACCESSIBLE_STATUSES.has(candidate.status);
 };
 
+/**
+ * Extracts canonical article URLs from the index page and merges them with the
+ * currently tracked article rows.
+ */
 const discoverArticleLinks = (
     indexHtml: string,
     previousArticles: IngestedArticle[],
@@ -172,6 +192,10 @@ const discoverArticleLinks = (
     };
 };
 
+/**
+ * Normalizes a fetched article HTML page into one corpus source plus chunked
+ * body text, and returns the updated tracked article row.
+ */
 const normalizeArticle = (
     url: string,
     html: string,
@@ -261,6 +285,10 @@ const normalizeArticle = (
     };
 };
 
+/**
+ * Restricts discovered links to the canonical Keith Baker domain and strips
+ * query/hash fragments so article rows stay stable across runs.
+ */
 const canonicalArticleUrl = (href: string | undefined): string | null => {
     if (!href) {
         return null;

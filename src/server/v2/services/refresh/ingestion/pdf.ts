@@ -9,6 +9,12 @@ import type { CorpusChunk, CorpusSource } from '@/types.js';
 import type { PdfParser, RefreshRuntimePaths, SourceChangeSet } from '../types.js';
 import { chunkText, normalizeText } from './chunking.js';
 
+/**
+ * Creates the default PDF parser used by refresh ingestion.
+ *
+ * The parser is hidden behind a small interface so tests can swap in fixtures
+ * without depending on the third-party extraction library.
+ */
 export const createPdfDataExtractParser = (): PdfParser => ({
     parse: async filePath => {
         const data = await PdfData.extract(await readFile(filePath), {
@@ -38,6 +44,9 @@ export const createPdfDataExtractParser = (): PdfParser => ({
     },
 });
 
+/**
+ * Converts discovered PDF additions and removals into corpus source changes.
+ */
 export const buildPdfSourceChanges = async (
     paths: RefreshRuntimePaths,
     scheduledFilenames: string[],
@@ -66,6 +75,9 @@ export const buildPdfSourceChanges = async (
     };
 };
 
+/**
+ * Normalizes one PDF into a single corpus source plus per-page text chunks.
+ */
 const normalizePdf = async (
     paths: RefreshRuntimePaths,
     filename: string,

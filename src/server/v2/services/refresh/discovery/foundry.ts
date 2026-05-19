@@ -9,6 +9,12 @@ import type { FoundryDiscoveryResult, FoundryExportMarker } from '../types.js';
 const FOUNDRY_MANIFEST_READ_CHUNK_BYTES = 64 * 1024;
 const SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION = '2.0.0';
 
+/**
+ * Discovers Foundry export files that still need to be applied.
+ *
+ * Routine refresh only schedules files that are not already marked applied in
+ * app state. Reingest reschedules every current export file.
+ */
 export const discoverFoundryRefresh = async (
     foundryExportDir: string,
     importState: FoundryImportState,
@@ -30,6 +36,12 @@ export const discoverFoundryRefresh = async (
     };
 };
 
+/**
+ * Parses only the manifest line of a Foundry export file.
+ *
+ * Discovery uses this to cheaply validate and identify exports without reading
+ * the full NDJSON body during the decision phase.
+ */
 export const parseFoundryExportManifest = async (foundryExportDir: string, filename: string): Promise<FoundryExportMarker> => {
     const exportPath = path.join(foundryExportDir, filename);
     const firstLine = (await readFirstLine(exportPath)).trim();

@@ -7,6 +7,9 @@ import { createRefreshPipeline, type RefreshPipeline, type RefreshPipelineDepend
 import { createRefreshStateStore, type RefreshStateStore } from './refresh-state.js';
 import { assertCanStartOperation } from './state-machine.js';
 
+/**
+ * API-facing entrypoint for the refresh feature.
+ */
 export interface RefreshCoordinator {
     startRefresh(request: CreateRefreshDto): Promise<RefreshDto>;
 }
@@ -17,6 +20,9 @@ interface ActiveRefreshOperation {
     promise: Promise<void>;
 }
 
+/**
+ * Optional seams for testing and app bootstrap composition.
+ */
 export interface RefreshCoordinatorDependencies {
     now?: () => Date;
     pipeline?: RefreshPipeline;
@@ -24,6 +30,13 @@ export interface RefreshCoordinatorDependencies {
     refreshStateStore?: RefreshStateStore;
 }
 
+/**
+ * Creates the singleton coordinator used by the V2 refresh route.
+ *
+ * The coordinator owns operation policy: it serializes runs, persists the
+ * pending/running/completed/failed lifecycle, and interrupts a running refresh
+ * when a force reingest is requested.
+ */
 export const createRefreshCoordinator = (
     appDb: AppDb,
     dependencies: RefreshCoordinatorDependencies = {},
@@ -81,6 +94,10 @@ export const createRefreshCoordinator = (
     };
 };
 
+/**
+ * Executes one refresh/reingest run after the coordinator has reserved the
+ * active slot and recorded the initial lifecycle transition.
+ */
 const runRefreshOperation = async (options: {
     activeOperationRef: () => ActiveRefreshOperation | null;
     now: () => Date;
@@ -112,6 +129,9 @@ const runRefreshOperation = async (options: {
     }
 };
 
+/**
+ * Maps the persisted singleton row into the DTO returned by the API layer.
+ */
 const toRefreshDto = (refresh: SelectRow<'refreshState'>): RefreshDto => ({
     activeOperation: refresh.activeOperation,
     createdAt: refresh.createdAt,

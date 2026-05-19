@@ -15,6 +15,13 @@ const OPENAI_API_KEY_ENV_KEY = 'OPENAI_API_KEY';
 const OPENAI_BASE_URL_ENV_KEY = 'OPENAI_BASE_URL';
 const OPENAI_EMBEDDING_MODEL_ENV_KEY = 'OPENAI_EMBEDDING_MODEL';
 
+/**
+ * Seeds refresh-specific settings expected by the runtime.
+ *
+ * Paths are stored in app DB as repo-root-relative strings for portability.
+ * Provider settings may still fall back to env because they are often machine-
+ * local or secret-backed.
+ */
 export const initializeRefreshSettings = async (appDb: AppDb, repoRoot = process.cwd()): Promise<void> => {
     const env = parseEnvFile(path.join(repoRoot, '.env'));
     const current = await Settings.readMany(appDb.db, [
@@ -51,6 +58,9 @@ export const initializeRefreshSettings = async (appDb: AppDb, repoRoot = process
     );
 };
 
+/**
+ * Resolves the runtime directories used by refresh from the persisted settings.
+ */
 export const resolveRefreshRuntimePaths = async (appDb: AppDb, repoRoot = process.cwd()): Promise<RefreshRuntimePaths> => {
     const values = await Settings.readMany(appDb.db, [
         settingKeys.articleHtmlCacheDir,
@@ -80,6 +90,12 @@ export const resolveRefreshRuntimePaths = async (appDb: AppDb, repoRoot = proces
     };
 };
 
+/**
+ * Reads provider settings with V2 precedence rules.
+ *
+ * Base URL and model are appdb -> env -> hardcoded default. API key is appdb
+ * -> env because there is no hardcoded secret fallback.
+ */
 export const readRefreshProviderSettings = async (appDb: AppDb, repoRoot = process.cwd()): Promise<RefreshProviderSettings> => {
     const env = parseEnvFile(path.join(repoRoot, '.env'));
     const values = await Settings.readMany(appDb.db, [

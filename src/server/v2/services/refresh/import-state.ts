@@ -2,6 +2,9 @@ import type { AppDb } from '@/server/v2/db/app/db.js';
 import type { IngestedArticle, SelectRow } from '@/server/v2/db/app/schema.js';
 import { Settings, settingKeys } from '@/server/v2/db/app/settingKeys.js';
 
+/**
+ * App-owned Foundry tracking state used by discovery and completion.
+ */
 export interface FoundryImportState {
     appliedExportFilenames: string[];
     lastSuccessfulExport: {
@@ -15,6 +18,12 @@ export interface FoundryImportState {
     } | null;
 }
 
+/**
+ * Refresh-local accessors for persisted import tracking state.
+ *
+ * These tables and settings exist to support the refresh feature, so the helper
+ * stays in the refresh domain instead of becoming a general DB abstraction.
+ */
 export interface ImportStateStore {
     listArticles(): Promise<Array<SelectRow<'ingestedArticles'>>>;
     listFiles(sourceType: 'foundry' | 'pdf'): Promise<string[]>;
@@ -26,6 +35,9 @@ export interface ImportStateStore {
     writeFoundry(state: FoundryImportState['lastSuccessfulExport']): Promise<void>;
 }
 
+/**
+ * Creates the import-state helper bound to the current app database.
+ */
 export const createImportStateStore = (appDb: AppDb): ImportStateStore => ({
     listFiles: async sourceType => appDb.db
         .selectFrom('ingestedFiles')

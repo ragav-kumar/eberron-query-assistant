@@ -1,18 +1,28 @@
 import type { RefreshOperationKind } from '@/types.js';
 import type { AppDb } from '@/server/v2/db/app/db.js';
-import type { RefreshState, SelectRow } from '@/server/v2/db/app/schema.js';
+import type { RefreshState } from '@/server/v2/db/app/schema.js';
 
 const SINGLETON_KEY = 1;
 
+/**
+ * Refresh-local persistence helper for the singleton lifecycle row.
+ *
+ * This is kept inside the refresh feature because the table exists solely to
+ * support refresh/reingest orchestration.
+ */
 export interface RefreshStateStore {
-    complete(kind: RefreshOperationKind, now: string): Promise<SelectRow<'refreshState'>>;
+    complete(kind: RefreshOperationKind, now: string): Promise<RefreshState>;
+    /** Bootstrapping logic. */
     ensure(): Promise<void>;
-    fail(kind: RefreshOperationKind, now: string): Promise<SelectRow<'refreshState'>>;
-    read(): Promise<SelectRow<'refreshState'>>;
-    setPending(kind: RefreshOperationKind, now: string): Promise<SelectRow<'refreshState'>>;
-    setRunning(kind: RefreshOperationKind, now: string): Promise<SelectRow<'refreshState'>>;
+    fail(kind: RefreshOperationKind, now: string): Promise<RefreshState>;
+    read(): Promise<RefreshState>;
+    setPending(kind: RefreshOperationKind, now: string): Promise<RefreshState>;
+    setRunning(kind: RefreshOperationKind, now: string): Promise<RefreshState>;
 }
 
+/**
+ * Creates a refresh-state store bound to the current app database.
+ */
 export const createRefreshStateStore = (appDb: AppDb): RefreshStateStore => ({
     ensure: async () => {
         const now = new Date().toISOString();

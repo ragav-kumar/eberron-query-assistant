@@ -4,11 +4,20 @@ import { discoverArticleRefresh } from './article.js';
 import { discoverFoundryRefresh } from './foundry.js';
 import { discoverPdfRefresh } from './pdf.js';
 
+/**
+ * Dependencies shared by the source discovery stage.
+ */
 export interface RefreshDiscoveryDependencies {
     importStateStore: ImportStateStore;
     now?: () => Date;
 }
 
+/**
+ * Performs the read-only discovery phase for one refresh run.
+ *
+ * Discovery answers "what should be processed?" by comparing the current source
+ * surfaces against the import state recorded by the last successful run.
+ */
 export const discoverRefreshWork = async (
     paths: RefreshRuntimePaths,
     forceReingest: boolean,

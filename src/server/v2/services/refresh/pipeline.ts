@@ -20,6 +20,9 @@ import { createPdfDataExtractParser } from './ingestion/pdf.js';
 import { initializeRefreshSettings, readRefreshProviderSettings, resolveRefreshRuntimePaths } from './runtime.js';
 import type { RefreshPipelineResult } from './types.js';
 
+/**
+ * Optional seams for composing or testing the refresh pipeline.
+ */
 export interface RefreshPipelineDependencies {
     articleFetcher?: ArticleFetcher;
     corpusStore?: CorpusStore;
@@ -31,10 +34,19 @@ export interface RefreshPipelineDependencies {
     retrievalFactory?: (reporter: ProgressReporter) => Promise<CorpusRetrievalService | null>;
 }
 
+/**
+ * End-to-end contract for a single refresh or reingest run.
+ */
 export interface RefreshPipeline {
     run(kind: RefreshOperationKind, options?: { abortSignal?: AbortSignal }): Promise<RefreshPipelineResult>;
 }
 
+/**
+ * Creates the concrete refresh pipeline.
+ *
+ * The pipeline does the actual work of the feature: discovery, ingestion,
+ * corpus writes, retrieval refresh, and only then app-owned state persistence.
+ */
 export const createRefreshPipeline = (
     appDb: AppDb,
     dependencies: RefreshPipelineDependencies = {},
@@ -70,6 +82,8 @@ export const createRefreshPipeline = (
             const timestamp = now().toISOString();
             throwIfAborted(options.abortSignal);
 
+            // Discovery is read-only. It decides what needs processing for this
+            // run based on source surfaces plus app-owned import metadata.
             const discovery = await discoverRefreshWork(paths, forceReingest, {
                 importStateStore,
                 now,
@@ -83,6 +97,8 @@ export const createRefreshPipeline = (
                 await corpusStore.clear(paths.retrievalDir);
             }
 
+            // Ingestion normalizes source-specific work into corpus mutations and
+            // the next import-state rows that should be persisted on success.
             const ingestion = await buildRefreshIngestion({
                 abortSignal: options.abortSignal,
                 dependencies: {
@@ -109,6 +125,8 @@ export const createRefreshPipeline = (
 
             const retrieval = await retrievalFactory(reporter);
             if (retrieval) {
+                // Retrieval artifacts are part of the trusted output of refresh.
+                // If this step fails, import state must not advance.
                 if (ingestion.corpusChanged || forceReingest) {
                     await retrieval.refresh(paths.retrievalDir, {
                         abortSignal: options.abortSignal,
@@ -119,6 +137,8 @@ export const createRefreshPipeline = (
                 }
             }
 
+            // App-owned state advances only after corpus and retrieval are both
+            // in a trustworthy state.
             await importStateStore.replaceFiles('foundry', discovery.foundry.markers.map(marker => marker.filename));
             await importStateStore.replaceFiles('pdf', ingestion.pdfFilenames);
             await importStateStore.replaceArticles(ingestion.articleRows);

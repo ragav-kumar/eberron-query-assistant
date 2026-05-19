@@ -22,6 +22,13 @@ type FoundryDeltaOperation =
         recordId: string;
     };
 
+/**
+ * Converts scheduled Foundry delta files into corpus source changes.
+ *
+ * Foundry exports already express explicit upsert/delete operations, so this
+ * stage validates the NDJSON structure and normalizes each record into the
+ * corpus source/chunk model.
+ */
 export const buildFoundrySourceChanges = async (
     paths: RefreshRuntimePaths,
     markers: FoundryExportMarker[],
@@ -62,6 +69,9 @@ export const buildFoundrySourceChanges = async (
     };
 };
 
+/**
+ * Reads and validates one Foundry NDJSON export file before applying it.
+ */
 const parseFoundryDeltaFile = async (
     paths: RefreshRuntimePaths,
     filename: string,
@@ -204,6 +214,12 @@ const parseOperationEnvelope = (
     throw createTaggedError('invalid-foundry-ndjson', `${filename}: operation on line ${lineNumber} kind must be upsert or delete.`);
 };
 
+/**
+ * Normalizes one Foundry record into a corpus source and chunk set.
+ *
+ * The export payload is flexible, so the normalization logic uses heuristics to
+ * derive stable IDs, textual content, and citation metadata.
+ */
 const normalizeFoundryRecord = (
     parsed: Record<string, unknown>,
     exportMarker: FoundryExportMarker,
@@ -277,6 +293,10 @@ const normalizeFoundryRecord = (
 
 const readRecordId = (record: Record<string, unknown>): string | null => firstString(record, ['recordId', 'id', '_id', 'uuid', 'key']);
 
+/**
+ * Fallback text extraction for structured Foundry payloads that do not expose
+ * one canonical body field.
+ */
 const extractText = (value: unknown): string => {
     const textParts: string[] = [];
     collectText(value, textParts, new Set());

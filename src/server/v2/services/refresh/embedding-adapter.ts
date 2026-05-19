@@ -7,6 +7,9 @@ const DEFAULT_PROVIDER_TIMEOUT_MS = 60_000;
 const DEFAULT_PROVIDER_MAX_RETRIES = 3;
 const DEFAULT_PROVIDER_RETRY_DELAY_MS = 500;
 
+/**
+ * Optional transport overrides for the OpenAI-compatible embedding adapter.
+ */
 export interface OpenAiProviderOptions {
     fetchImpl?: typeof fetch;
     maxRetries?: number;
@@ -14,6 +17,10 @@ export interface OpenAiProviderOptions {
     retryDelayMs?: number;
 }
 
+/**
+ * Adapts the configured provider to the embedding interface expected by corpus
+ * retrieval refresh.
+ */
 export const createOpenAiEmbeddingAdapter = (
     config: RefreshProviderSettings,
     options: OpenAiProviderOptions = {},
@@ -65,6 +72,7 @@ export const createOpenAiEmbeddingAdapter = (
     };
 
     return {
+        // Exposed for observability and tests that need to assert retry behavior.
         get failedRetries() {
             return failedRetries;
         },

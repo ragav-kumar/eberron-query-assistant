@@ -1,3 +1,7 @@
+/**
+ * Chunk metadata used to preserve paragraph-relative boundaries for citations
+ * and retrieval snippets.
+ */
 export interface TextChunk {
     endParagraph: number;
     startParagraph: number;
@@ -6,6 +10,10 @@ export interface TextChunk {
 
 const TARGET_CHUNK_CHARACTERS = 1_600;
 
+/**
+ * Splits normalized text into retrieval-friendly chunks while trying to keep
+ * paragraph groupings intact.
+ */
 export const chunkText = (text: string, targetCharacters = TARGET_CHUNK_CHARACTERS): TextChunk[] => {
     const paragraphs = normalizeText(text)
         .split(/\n{2,}/)
@@ -53,6 +61,9 @@ export const chunkText = (text: string, targetCharacters = TARGET_CHUNK_CHARACTE
     return chunks;
 };
 
+/**
+ * Normalizes line endings and collapses whitespace noise before chunking.
+ */
 export const normalizeText = (text: string): string => text
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')

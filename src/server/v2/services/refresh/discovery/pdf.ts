@@ -4,6 +4,10 @@ import { hasErrorCode } from '@/errors.js';
 
 import type { PdfDiscoveryResult } from '../types.js';
 
+/**
+ * Discovers PDF additions and removals by comparing the current directory to
+ * the filenames recorded by the last successful run.
+ */
 export const discoverPdfRefresh = async (
     pdfDir: string,
     knownFilenames: string[],
