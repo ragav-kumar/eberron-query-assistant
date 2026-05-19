@@ -67,7 +67,7 @@ export type RunStatus = 'pending' | 'running' | 'completed' | 'failed';
 
 export type RefreshOperationKind = 'refresh' | 'reingest';
 
-export type RefreshStatus = 'idle' | 'pending' | 'running' | 'completed' | 'failed';
+export type RefreshStatus = 'pending' | 'running' | 'completed' | 'failed';
 
 export type SessionFeedEntryKind = 'user' | 'reasoning' | 'response';
 

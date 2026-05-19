@@ -1,4 +1,6 @@
 import type { AppDb } from '../db/app/index.js';
+import { createRefreshStateStore } from './refresh/index.js';
+import { initializeRefreshSettings } from './refresh/runtime.js';
 
 /**
  * Startup orchestration is the server-side entry point for app-launch work.
@@ -16,25 +18,13 @@ import type { AppDb } from '../db/app/index.js';
 export const createStartupOrchestrator = (appDb: AppDb) => {
     // TODO: Replace this startup placeholder with real app-launch orchestration.
     console.warn('V2 startup orchestration is not fully implemented');
+    const refreshStateStore = createRefreshStateStore(appDb);
+    const repoRoot = process.cwd();
 
     return {
         initializeRefreshState: async () => {
-            const now = new Date().toISOString();
-
-            await appDb.db
-                .insertInto('refreshState')
-                .values({
-                    singletonKey: 1,
-                    activeOperation: null,
-                    refreshStatus: 'idle',
-                    reingestStatus: 'idle',
-                    lastRefreshAt: null,
-                    lastReingestAt: null,
-                    createdAt: now,
-                    updatedAt: now,
-                })
-                .onConflict(conflict => conflict.column('singletonKey').doNothing())
-                .execute();
+            await refreshStateStore.ensure();
+            await initializeRefreshSettings(appDb, repoRoot);
         },
     };
 };

@@ -4,6 +4,7 @@ import type { AppDatabaseSchema } from './schema.js';
 export const settingKeys = {
     additionalContext: 'additional-context',
     articleLastSuccessfulIndexScrapeAt: 'article-last-successful-index-scrape-at',
+    articleHtmlCacheDir: 'article-html-cache-dir',
     campaignJournalFolder: 'campaign-journal-folder',
     foundryLastSuccessfulExportDeleteCount: 'foundry-last-successful-export-delete-count',
     foundryLastSuccessfulExportFilename: 'foundry-last-successful-export-filename',
@@ -12,13 +13,16 @@ export const settingKeys = {
     foundryLastSuccessfulExportRunId: 'foundry-last-successful-export-run-id',
     foundryLastSuccessfulExportSchemaVersion: 'foundry-last-successful-export-schema-version',
     foundryLastSuccessfulExportUpsertCount: 'foundry-last-successful-export-upsert-count',
+    foundrySourceDir: 'foundry-source-dir',
     partyActorUuids: 'party-actor-uuids',
+    pdfSourceDir: 'pdf-source-dir',
     providerApiKey: 'provider-api-key',
     providerBaseUrl: 'provider-base-url',
     providerChatModel: 'provider-chat-model',
     providerDebug: 'provider-debug',
     providerEmbeddingModel: 'provider-embedding-model',
     questsJournal: 'quests-journal',
+    retrievalDir: 'retrieval-dir',
     sessionNotesJournal: 'session-notes-journal',
 } as const;
 

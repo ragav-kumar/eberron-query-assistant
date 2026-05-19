@@ -293,8 +293,8 @@ const initializeRefreshState = async (appDb: Awaited<ReturnType<typeof createApp
         .values({
             singletonKey: 1,
             activeOperation: null,
-            refreshStatus: 'idle',
-            reingestStatus: 'idle',
+            refreshStatus: 'failed',
+            reingestStatus: 'failed',
             lastRefreshAt: null,
             lastReingestAt: null,
             createdAt: now,

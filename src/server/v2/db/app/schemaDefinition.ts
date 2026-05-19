@@ -1,13 +1,11 @@
 import { sql, type Kysely } from 'kysely';
 
-import {
-    sessionModes,
-} from '../../../../types.js';
+import { sessionModes } from '@/types.js';
 
 import type { AppDatabaseSchema } from './schema.js';
 
 const refreshOperationKinds = ['refresh', 'reingest'] as const;
-const refreshStatuses = ['idle', 'pending', 'running', 'completed', 'failed'] as const;
+const refreshStatuses = ['pending', 'running', 'completed', 'failed'] as const;
 const runStatuses = ['pending', 'running', 'completed', 'failed'] as const;
 const sessionFeedEntryKinds = ['user', 'reasoning', 'response'] as const;
 

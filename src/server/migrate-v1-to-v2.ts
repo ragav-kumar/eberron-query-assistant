@@ -163,9 +163,13 @@ const migrateSingletonSettings = async (config: RuntimeConfig, trx: DbTransactio
 const migrateEnvSettings = async (config: RuntimeConfig, trx: DbTransaction): Promise<number> => {
     const modifiedAt = new Date().toISOString();
     const entries: Array<readonly [string, string]> = [
+        [settingKeys.articleHtmlCacheDir, toPortableRelativePath(config.repoRoot, path.join(config.cacheDir, 'keith-baker'))],
         [settingKeys.campaignJournalFolder, config.campaign.campaignJournalFolder ?? ''],
+        [settingKeys.foundrySourceDir, toPortableRelativePath(config.repoRoot, config.foundryExportDir)],
         [settingKeys.partyActorUuids, JSON.stringify(config.campaign.partyActorUuids)],
+        [settingKeys.pdfSourceDir, toPortableRelativePath(config.repoRoot, config.pdfDir)],
         [settingKeys.questsJournal, config.campaign.questsJournal],
+        [settingKeys.retrievalDir, toPortableRelativePath(config.repoRoot, config.retrievalDir)],
         [settingKeys.sessionNotesJournal, config.campaign.sessionNotesJournal],
         [settingKeys.providerApiKey, config.provider.apiKey ?? ''],
         [settingKeys.providerBaseUrl, config.provider.baseUrl],
@@ -660,6 +664,8 @@ const readdirOrEmpty = async (directoryPath: string) => {
 };
 
 const dedupeStrings = (values: string[]): string[] => [...new Set(values)].sort((left, right) => left.localeCompare(right));
+
+const toPortableRelativePath = (repoRoot: string, targetPath: string): string => path.relative(repoRoot, targetPath).replace(/\\/g, '/');
 
 const dedupeArticles = (
     articles: LegacyRuntimeState['article']['knownArticles'],

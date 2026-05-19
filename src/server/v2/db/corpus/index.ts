@@ -20,6 +20,8 @@ export { createCorpusRetrievalService, getVectorIndexPath } from './retrieval-se
 export type {
     CorpusRetrievalService,
     CorpusRetrievalServiceDependencies,
+    EmbeddingAdapter,
+    ProgressReporter,
     RetrievalSyncSummary,
 } from './retrieval-service.js';
 export { createCorpusStore } from './store.js';

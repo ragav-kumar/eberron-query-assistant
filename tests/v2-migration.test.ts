@@ -60,7 +60,7 @@ describe('migrateV1DiskToV2Db', () => {
 
             expect(firstSummary).toMatchObject({
                 articles: 2,
-                envSettings: 9,
+                envSettings: 13,
                 foundryFiles: 2,
                 logRuns: 2,
                 logSessionEntries: 6,
@@ -79,8 +79,20 @@ describe('migrateV1DiskToV2Db', () => {
                 .execute();
             expect(settings).toEqual(expect.arrayContaining([
                 expect.objectContaining({
+                    key: settingKeys.articleHtmlCacheDir,
+                    value: '.eberron-query-assistant/cache/keith-baker',
+                }),
+                expect.objectContaining({
                     key: settingKeys.additionalContext,
                     value: '# Imported context',
+                }),
+                expect.objectContaining({
+                    key: settingKeys.foundrySourceDir,
+                    value: 'foundry-export',
+                }),
+                expect.objectContaining({
+                    key: settingKeys.pdfSourceDir,
+                    value: 'pdf',
                 }),
                 expect.objectContaining({
                     key: settingKeys.providerApiKey,
@@ -101,6 +113,10 @@ describe('migrateV1DiskToV2Db', () => {
                 expect.objectContaining({
                     key: settingKeys.articleLastSuccessfulIndexScrapeAt,
                     value: '2026-05-16T17:07:53.759Z',
+                }),
+                expect.objectContaining({
+                    key: settingKeys.retrievalDir,
+                    value: '.eberron-query-assistant/retrieval',
                 }),
             ]));
             expect(settings.some(setting => setting.key.includes('app-version'))).toBe(false);
