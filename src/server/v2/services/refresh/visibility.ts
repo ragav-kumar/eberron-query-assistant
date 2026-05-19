@@ -8,6 +8,7 @@ export interface RefreshVisibility {
     publishCompleted(kind: RefreshOperationKind, timestamp: string): void;
     publishFailed(kind: RefreshOperationKind, timestamp: string, message?: string): Promise<void>;
     publishInterrupted(timestamp: string): Promise<void>;
+    publishRecoveredAfterShutdown(interruptedKind: RefreshOperationKind, restartingKind: RefreshOperationKind, timestamp: string): Promise<void>;
     publishPending(kind: RefreshOperationKind, timestamp: string): Promise<void>;
     publishRunning(kind: RefreshOperationKind, timestamp: string): Promise<void>;
     reporterFor(kind: RefreshOperationKind): ProgressReporter;
@@ -52,6 +53,22 @@ export const createRefreshVisibility = (
             runtimeEvents.publishRefreshEvent(createRefreshOperationEvent({
                 action: 'updated',
                 kind: 'refresh',
+                status: 'failed',
+                timestamp,
+            }));
+        },
+        publishRecoveredAfterShutdown: async (interruptedKind, restartingKind, timestamp) => {
+            await consoleEvents.warn(
+                interruptedKind === 'refresh'
+                    ? 'Previous refresh was interrupted by shutdown. Restarting refresh.'
+                    : restartingKind === 'reingest'
+                        ? 'Previous force reingest was interrupted by shutdown. Restarting force reingest.'
+                        : 'Previous force reingest was interrupted by shutdown.',
+                timestamp,
+            );
+            runtimeEvents.publishRefreshEvent(createRefreshOperationEvent({
+                action: 'failed',
+                kind: interruptedKind,
                 status: 'failed',
                 timestamp,
             }));

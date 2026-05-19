@@ -1,4 +1,4 @@
-import { AppDb, createAppDb, resolveAppDatabasePath } from './db/app/index.js';
+import { createAppDb, resolveAppDatabasePath } from './db/app/index.js';
 import {
     createConsoleEventPublisher,
     createRefreshCoordinator,
@@ -12,6 +12,7 @@ import type {
     RunCoordinator,
     RuntimeEventPublisher,
 } from './services/index.js';
+import type { AppDb } from './db/app/index.js';
 
 /**
  * This wraps the database lifecycle plus the process-local runtime
@@ -25,21 +26,40 @@ export interface V2AppContext extends AppDb {
 }
 
 // noinspection JSUnusedGlobalSymbols
-export const createV2App = async (): Promise<V2AppContext> => {
-    const appDb = await createAppDb(resolveAppDatabasePath());
-    const startupOrchestrator = createStartupOrchestrator(appDb);
-    const consoleEvents = await createConsoleEventPublisher(appDb);
-    const runtimeEvents = createRuntimeEventPublisher();
+export interface CreateV2AppDependencies {
+    appDbPath?: string;
+    consoleEventsFactory?: (appDb: AppDb) => Promise<ConsoleEventPublisher>;
+    refreshCoordinatorFactory?: (
+        appDb: AppDb,
+        dependencies: { consoleEvents: ConsoleEventPublisher; runtimeEvents: RuntimeEventPublisher },
+    ) => RefreshCoordinator;
+    repoRoot?: string;
+    runtimeEventsFactory?: () => RuntimeEventPublisher;
+}
 
-    await startupOrchestrator.initializeRefreshState();
+// noinspection JSUnusedGlobalSymbols
+export const createV2App = async (dependencies: CreateV2AppDependencies = {}): Promise<V2AppContext> => {
+    const appDb = await createAppDb(dependencies.appDbPath ?? resolveAppDatabasePath(dependencies.repoRoot));
+    const consoleEvents = await (dependencies.consoleEventsFactory ?? createConsoleEventPublisher)(appDb);
+    const runtimeEvents = (dependencies.runtimeEventsFactory ?? createRuntimeEventPublisher)();
+    const refreshCoordinator = (dependencies.refreshCoordinatorFactory ?? createRefreshCoordinator)(appDb, {
+        consoleEvents,
+        runtimeEvents,
+    });
+    const startupOrchestrator = createStartupOrchestrator(appDb, {
+        consoleEvents,
+        refreshCoordinator,
+        repoRoot: dependencies.repoRoot,
+        runtimeEvents,
+    });
+
+    await startupOrchestrator.bootstrap();
+    startupOrchestrator.startBackgroundRefresh();
 
     return {
         db: appDb.db,
         close: appDb.close,
-        refreshCoordinator: createRefreshCoordinator(appDb, {
-            consoleEvents,
-            runtimeEvents,
-        }),
+        refreshCoordinator,
         runCoordinator: createRunCoordinator(),
         consoleEvents,
         runtimeEvents,

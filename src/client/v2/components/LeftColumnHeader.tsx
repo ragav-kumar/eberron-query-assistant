@@ -12,7 +12,7 @@ export const LeftColumnHeader = () => {
 
     const onRefresh = (kind: 'refresh' | 'reingest') => {
         if (kind === 'reingest') {
-            const confirmed = window.confirm('Force reingest clears and rebuilds app-owned corpus and retrieval artifacts. Continue?');
+            const confirmed = window.confirm('Force reingest destroys and rebuilds app-owned corpus and retrieval artifacts. Continue?');
             if (!confirmed) {
                 return;
             }
@@ -37,7 +37,7 @@ export const LeftColumnHeader = () => {
                     Refresh
                 </Button>
                 <Button
-                    disabled={isRefreshActive}
+                    disabled={isRefreshActive && refresh?.activeOperation === 'reingest'}
                     onClick={() => onRefresh('reingest')}
                     title='Clear and rebuild app-owned corpus and retrieval artifacts.'
                     variant='danger'
@@ -90,7 +90,8 @@ const renderRefreshStatus = (
     }
 
     const latestOperation = getLatestCompletedOperation(refresh);
-    return `Last ${latestOperation} completed at ${formatTimestamp(refresh.updatedAt)}.`;
+    const updatedAt = latestOperation === 'refresh' ? refresh.lastRefreshAt : refresh.lastReingestAt;
+    return `Last ${latestOperation} completed at ${formatTimestamp(updatedAt)}.`;
 };
 
 const getLatestCompletedOperation = (refresh: RefreshDto): 'refresh' | 'force reingest' => {
@@ -113,7 +114,10 @@ const parseTimestamp = (timestamp: string | null): number => {
     return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
 };
 
-const formatTimestamp = (timestamp: string): string => {
+const formatTimestamp = (timestamp: string | null): string => {
+    if (timestamp == null) {
+        return 'Never';
+    }
     const date = new Date(timestamp);
     if (Number.isNaN(date.valueOf())) {
         return timestamp;

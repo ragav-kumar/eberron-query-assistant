@@ -1,30 +1,55 @@
 import type { AppDb } from '../db/app/index.js';
+import type { ConsoleEventPublisher } from './console-event-publisher.js';
 import { createRefreshStateStore } from './refresh/index.js';
 import { initializeRefreshSettings } from './refresh/runtime.js';
+import { recoverStartupRefreshOperation } from './refresh/startup-recovery.js';
+import { createRefreshVisibility } from './refresh/visibility.js';
+import type { RefreshCoordinator } from './refresh/index.js';
+import type { RuntimeEventPublisher } from './runtime-event-publisher.js';
 
 /**
- * Startup orchestration is the server-side entry point for app-launch work.
- *
- * This factory will likely need access to any long-lived dependencies that can
- * initiate business actions without an incoming request, for example:
- * - refresh coordination
- * - runtime and console event publishers
- * - startup-time configuration validation
- * - singleton state initialization/repair
- *
- * It should stay focused on startup-origin work only. Request-driven work
- * should continue to enter through routes and the coordinators they call.
+ * Startup orchestration stays focused on app-launch-origin work only:
+ * singleton bootstrap plus the background startup refresh kickoff.
  */
-export const createStartupOrchestrator = (appDb: AppDb) => {
-    // TODO: Replace this startup placeholder with real app-launch orchestration.
-    console.warn('V2 startup orchestration is not fully implemented');
+export interface StartupOrchestrator {
+    bootstrap(): Promise<void>;
+    startBackgroundRefresh(): void;
+}
+
+export interface StartupOrchestratorDependencies {
+    consoleEvents: ConsoleEventPublisher;
+    now?: () => Date;
+    refreshCoordinator: RefreshCoordinator;
+    repoRoot?: string;
+    runtimeEvents: RuntimeEventPublisher;
+}
+
+export const createStartupOrchestrator = (
+    appDb: AppDb,
+    dependencies: StartupOrchestratorDependencies,
+): StartupOrchestrator => {
     const refreshStateStore = createRefreshStateStore(appDb);
-    const repoRoot = process.cwd();
+    const repoRoot = dependencies.repoRoot ?? process.cwd();
+    const visibility = createRefreshVisibility(dependencies.consoleEvents, dependencies.runtimeEvents);
+
+    const runStartupRefresh = async (): Promise<void> => {
+        const nextOperation = await recoverStartupRefreshOperation({
+            now: dependencies.now,
+            refreshStateStore,
+            visibility,
+        });
+        await dependencies.refreshCoordinator.startRefresh({ kind: nextOperation });
+    };
 
     return {
-        initializeRefreshState: async () => {
+        bootstrap: async () => {
             await refreshStateStore.ensure();
             await initializeRefreshSettings(appDb, repoRoot);
+        },
+        startBackgroundRefresh: () => {
+            void runStartupRefresh().catch(error => {
+                console.error('Failed to start V2 startup refresh.', error);
+            });
         },
     };
 };

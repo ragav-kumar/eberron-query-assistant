@@ -387,6 +387,4 @@ const initializeRefreshState = async (appDb: Awaited<ReturnType<typeof createApp
         })
         .onConflict(conflict => conflict.column('singletonKey').doNothing())
         .execute();
-
-    console.warn('V2 startup orchestration is not implemented');
 };
