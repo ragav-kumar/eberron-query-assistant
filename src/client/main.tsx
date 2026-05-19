@@ -13,7 +13,7 @@ const loadV2App = async (): Promise<ComponentType> => {
   return module.App;
 };
 
-export const resolveAppForPath = (pathname: string) => pathname.includes('v2') ? loadV2App : loadV1App;
+export const resolveAppForPath = (pathname: string) => pathname.includes('v1') ? loadV1App : loadV2App;
 
 export const renderApp = (root: HTMLElement, pathname: string) => {
   void resolveAppForPath(pathname)().then((ActiveApp) => {
