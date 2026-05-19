@@ -5,11 +5,12 @@ import path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import type { CreateRefreshDto, CreateRunDto } from '@/dto/index.js';
+import type { ConsoleEntryDto, CreateRefreshDto, CreateRunDto } from '@/dto/index.js';
 import { createV2ApiHandler } from '@/server/v2/api/index.js';
 import type { V2AppContext } from '@/server/v2/app.js';
 import { createAppDb, getDefaultAppDatabasePath } from '@/server/v2/db/app/index.js';
 import { settingKeys } from '@/server/v2/db/app/settingKeys.js';
+import { createRuntimeEventPublisher } from '@/server/v2/services/index.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-api');
 
@@ -81,21 +82,54 @@ const flushAsyncHandlers = async (): Promise<void> => {
 describe('V2 API router', () => {
     let app: V2AppContext;
     let handleV2ApiRequest: ReturnType<typeof createV2ApiHandler>;
+    let consoleListener: ((entry: ConsoleEntryDto) => void) | null;
 
     beforeEach(async () => {
         await rm(TEST_ROOT, { force: true, recursive: true });
+        consoleListener = null;
 
         const appDb = await createAppDb(getDefaultAppDatabasePath(TEST_ROOT));
         await initializeRefreshState(appDb);
+        const runtimeEvents = createRuntimeEventPublisher();
         app = {
             close: appDb.close,
             consoleEvents: {
-                registerConnection: () => {
-                    console.warn('GET /api/v2/events/console is not implemented');
+                debug: (message, timestamp = '2026-05-18T00:00:00.000Z') => Promise.resolve({
+                    id: 'console-debug',
+                    level: 'debug',
+                    message,
+                    timestamp,
+                }),
+                error: (message, timestamp = '2026-05-18T00:00:00.000Z') => Promise.resolve({
+                    id: 'console-error',
+                    level: 'error',
+                    message,
+                    timestamp,
+                }),
+                info: (message, timestamp = '2026-05-18T00:00:00.000Z') => Promise.resolve({
+                    id: 'console-info',
+                    level: 'info',
+                    message,
+                    timestamp,
+                }),
+                snapshot: () => Promise.resolve([{
+                    id: 'console-1',
+                    level: 'info',
+                    message: 'Snapshot entry',
+                    timestamp: '2026-05-18T00:00:00.000Z',
+                }]),
+                subscribe: listener => {
+                    consoleListener = listener;
+                    return () => {
+                        consoleListener = null;
+                    };
                 },
-                warn: (message) => {
-                    console.warn(message);
-                },
+                warn: (message, timestamp = '2026-05-18T00:00:00.000Z') => Promise.resolve({
+                    id: 'console-warn',
+                    level: 'warn',
+                    message,
+                    timestamp,
+                }),
             },
             db: appDb.db,
             refreshCoordinator: {
@@ -123,14 +157,7 @@ describe('V2 API router', () => {
                     throw new Error('POST /api/v2/runs is not implemented');
                 },
             },
-            runtimeEvents: {
-                registerConnection: () => {
-                    console.warn('GET /api/v2/events/runtime is not implemented');
-                },
-                warn: (message) => {
-                    console.warn(message);
-                },
-            },
+            runtimeEvents,
         };
 
         await app.db.insertInto('settings').values({
@@ -282,6 +309,64 @@ describe('V2 API router', () => {
         (request as unknown as MockRequest).emit('close');
 
         expect(record.ended).toBe(true);
+    });
+
+    it('returns the console snapshot from the publisher', async () => {
+        const request = createRequest('GET', '/api/v2/console');
+        const { record, response } = createResponse();
+
+        handleV2ApiRequest(request, response);
+        await flushAsyncHandlers();
+
+        expect(record.statusCode).toBe(200);
+        expect(JSON.parse(record.body)).toEqual([
+            {
+                id: 'console-1',
+                level: 'info',
+                message: 'Snapshot entry',
+                timestamp: '2026-05-18T00:00:00.000Z',
+            },
+        ]);
+    });
+
+    it('streams publisher console entries over SSE', () => {
+        const request = createRequest('GET', '/api/v2/events/console');
+        const { record, response } = createResponse();
+
+        handleV2ApiRequest(request, response);
+        consoleListener?.({
+            id: 'console-2',
+            level: 'warn',
+            message: 'Streaming entry',
+            timestamp: '2026-05-18T00:00:02.000Z',
+        });
+
+        expect(record.writes).toEqual([
+            ': connected\n\n',
+            'data: {"id":"console-2","level":"warn","message":"Streaming entry","timestamp":"2026-05-18T00:00:02.000Z"}\n\n',
+        ]);
+
+        (request as unknown as MockRequest).emit('close');
+        expect(consoleListener).toBeNull();
+    });
+
+    it('streams runtime events over SSE', () => {
+        const request = createRequest('GET', '/api/v2/events/runtime');
+        const { record, response } = createResponse();
+
+        handleV2ApiRequest(request, response);
+        app.runtimeEvents.publishRefreshEvent({
+            action: 'updated',
+            kind: 'refresh',
+            resourceId: 'refresh',
+            status: 'running',
+            timestamp: '2026-05-18T00:00:03.000Z',
+        });
+
+        expect(record.writes).toEqual([
+            ': connected\n\n',
+            'data: {"action":"updated","kind":"refresh","resourceId":"refresh","status":"running","timestamp":"2026-05-18T00:00:03.000Z","resource":"refresh"}\n\n',
+        ]);
     });
 });
 

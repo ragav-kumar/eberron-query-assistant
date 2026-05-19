@@ -4,6 +4,7 @@ import path from 'node:path';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { OperationEventDto } from '@/dto/index.js';
 import { createTaggedError } from '@/errors.js';
 import { createAppDb, getAppDatabasePath, Settings, settingKeys, type AppDb } from '@/server/v2/db/app/index.js';
 import {
@@ -13,6 +14,7 @@ import {
     type CorpusStore,
     type EmbeddingAdapter,
 } from '@/server/v2/db/corpus/index.js';
+import { createConsoleEventPublisher, createRuntimeEventPublisher } from '@/server/v2/services/index.js';
 import { createRefreshCoordinator } from '@/server/v2/services/refresh/index.js';
 import { createImportStateStore } from '@/server/v2/services/refresh/import-state.js';
 import { createRefreshPipeline } from '@/server/v2/services/refresh/pipeline.js';
@@ -65,14 +67,23 @@ describe('v2 refresh flow', () => {
         const appDb = await createTestAppDb('coordinator');
         const refreshStateStore = createRefreshStateStore(appDb);
         await refreshStateStore.ensure();
+        const consoleEvents = await createConsoleEventPublisher(appDb);
+        const runtimeEvents = createRuntimeEventPublisher();
+        const refreshEvents: OperationEventDto[] = [];
+        runtimeEvents.subscribe(event => {
+            refreshEvents.push(event);
+        });
 
         const coordinator = createRefreshCoordinator(appDb, {
+            consoleEvents,
             pipeline: {
                 run: async (kind, options = {}) => {
                     if (kind === 'reingest') {
+                        options.reporter?.info('Reingest progress emitted.');
                         return { corpusChanged: true, kind };
                     }
 
+                    options.reporter?.info('Refresh progress emitted.');
                     await new Promise<void>((resolve, reject) => {
                         options.abortSignal?.addEventListener('abort', () => {
                             const error = new Error('Refresh aborted.');
@@ -83,6 +94,7 @@ describe('v2 refresh flow', () => {
                     return { corpusChanged: false, kind };
                 },
             },
+            runtimeEvents,
         });
 
         const first = await coordinator.startRefresh({ kind: 'refresh' });
@@ -105,6 +117,23 @@ describe('v2 refresh flow', () => {
             refreshStatus: 'failed',
             reingestStatus: 'completed',
         });
+        expect(await consoleEvents.snapshot()).toEqual(expect.arrayContaining([
+            expect.objectContaining({ level: 'info', message: 'Refresh requested.' }),
+            expect.objectContaining({ level: 'info', message: 'Refresh started.' }),
+            expect.objectContaining({ level: 'info', message: 'Refresh progress emitted.' }),
+            expect.objectContaining({ level: 'warn', message: 'Force reingest interrupted the active refresh.' }),
+            expect.objectContaining({ level: 'info', message: 'Force reingest requested.' }),
+            expect.objectContaining({ level: 'info', message: 'Force reingest started.' }),
+            expect.objectContaining({ level: 'info', message: 'Reingest progress emitted.' }),
+        ]));
+        expect(refreshEvents).toEqual(expect.arrayContaining([
+            expect.objectContaining({ action: 'created', kind: 'refresh', resource: 'refresh', status: 'pending' }),
+            expect.objectContaining({ action: 'updated', kind: 'refresh', resource: 'refresh', status: 'running' }),
+            expect.objectContaining({ action: 'updated', kind: 'refresh', resource: 'refresh', status: 'failed' }),
+            expect.objectContaining({ action: 'created', kind: 'reingest', resource: 'refresh', status: 'pending' }),
+            expect.objectContaining({ action: 'updated', kind: 'reingest', resource: 'refresh', status: 'running' }),
+            expect.objectContaining({ action: 'completed', kind: 'reingest', resource: 'refresh', status: 'completed' }),
+        ]));
     });
 
     it('discovers, ingests, and persists refresh state through db/app and db/corpus', async () => {
@@ -178,11 +207,41 @@ describe('v2 refresh flow', () => {
             })),
         });
 
-        const result = await pipeline.run('refresh');
+        const messages: string[] = [];
+        const warnings: string[] = [];
+        const result = await pipeline.run('refresh', {
+            reporter: {
+                info: message => {
+                    messages.push(message);
+                },
+                progress: message => {
+                    messages.push(message);
+                },
+                warn: message => {
+                    warnings.push(message);
+                },
+            },
+        });
         expect(result).toEqual({
             corpusChanged: true,
             kind: 'refresh',
         });
+        expect(messages).toEqual(expect.arrayContaining([
+            'Preparing refresh runtime settings.',
+            'Starting source discovery.',
+            expect.stringContaining('Source discovery complete:'),
+            'Preparing corpus storage.',
+            'Building ingestion change set.',
+            expect.stringContaining('Ingestion change set built:'),
+            expect.stringContaining('Applying 3 corpus source changes.'),
+            'Refreshing retrieval artifacts.',
+            expect.stringContaining('Retrieval embedding sync started:'),
+            expect.stringContaining('Retrieval embedding sync progress:'),
+            expect.stringContaining('Retrieval vector index synchronized:'),
+            'Persisting app-owned refresh state.',
+            'Refresh pipeline completed successfully.',
+        ]));
+        expect(warnings).toEqual([]);
 
         expect(await importStateStore.listFiles('foundry')).toEqual(['20260518T120000000Z-foundry-export.ndjson']);
         expect(await importStateStore.listFiles('pdf')).toEqual(['rising.pdf']);
@@ -233,6 +292,41 @@ describe('v2 refresh flow', () => {
             retrievalDir: path.resolve(repoRoot, 'custom/retrieval'),
             repoRoot,
         });
+    });
+
+    it('keeps console output transient by default and mirrors it into sqlite when debug is enabled', async () => {
+        const transientAppDb = await createTestAppDb('console-transient');
+        const transientConsole = await createConsoleEventPublisher(transientAppDb);
+        await transientConsole.info('Transient entry', '2026-05-18T00:00:00.000Z');
+
+        expect(await transientConsole.snapshot()).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                level: 'info',
+                message: 'Transient entry',
+                timestamp: '2026-05-18T00:00:00.000Z',
+            }),
+        ]));
+        expect(await transientAppDb.db.selectFrom('consoleEntries').selectAll().execute()).toEqual([]);
+
+        const debugAppDb = await createTestAppDb('console-debug');
+        await Settings.write(debugAppDb.db, settingKeys.providerDebug, 'true');
+        const debugConsole = await createConsoleEventPublisher(debugAppDb);
+        await debugConsole.warn('Persisted entry', '2026-05-18T00:00:01.000Z');
+
+        expect(await debugConsole.snapshot()).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                level: 'warn',
+                message: 'Persisted entry',
+                timestamp: '2026-05-18T00:00:01.000Z',
+            }),
+        ]));
+        expect(await debugAppDb.db.selectFrom('consoleEntries').selectAll().execute()).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                createdAt: '2026-05-18T00:00:01.000Z',
+                level: 'warn',
+                message: 'Persisted entry',
+            }),
+        ]));
     });
 });
 

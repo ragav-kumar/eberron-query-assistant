@@ -38,7 +38,7 @@ export interface RefreshPipelineDependencies {
  * End-to-end contract for a single refresh or reingest run.
  */
 export interface RefreshPipeline {
-    run(kind: RefreshOperationKind, options?: { abortSignal?: AbortSignal }): Promise<RefreshPipelineResult>;
+    run(kind: RefreshOperationKind, options?: { abortSignal?: AbortSignal; reporter?: ProgressReporter }): Promise<RefreshPipelineResult>;
 }
 
 /**
@@ -56,10 +56,6 @@ export const createRefreshPipeline = (
     const now = dependencies.now ?? (() => new Date());
     const articleFetcher = dependencies.articleFetcher ?? createFetchArticleFetcher();
     const pdfParser = dependencies.pdfParser ?? createPdfDataExtractParser();
-    const reporter = dependencies.reporter ?? {
-        info: () => undefined,
-        warn: () => undefined,
-    };
     const repoRoot = dependencies.repoRoot ?? process.cwd();
     const retrievalFactory = dependencies.retrievalFactory ?? (async (pipelineReporter) => {
         const providerSettings = await readRefreshProviderSettings(appDb, repoRoot);
@@ -76,7 +72,12 @@ export const createRefreshPipeline = (
 
     return {
         run: async (kind, options = {}) => {
+            const reporter = options.reporter ?? dependencies.reporter ?? {
+                info: () => undefined,
+                warn: () => undefined,
+            };
             const forceReingest = kind === 'reingest';
+            reporter.info(kind === 'refresh' ? 'Preparing refresh runtime settings.' : 'Preparing force reingest runtime settings.');
             await initializeRefreshSettings(appDb, repoRoot);
             const paths = await resolveRefreshRuntimePaths(appDb, repoRoot);
             const timestamp = now().toISOString();
@@ -84,21 +85,28 @@ export const createRefreshPipeline = (
 
             // Discovery is read-only. It decides what needs processing for this
             // run based on source surfaces plus app-owned import metadata.
+            reporter.info('Starting source discovery.');
             const discovery = await discoverRefreshWork(paths, forceReingest, {
                 importStateStore,
                 now,
             });
+            reporter.info(
+                `Source discovery complete: foundryScheduled=${discovery.foundry.scheduledMarkers.length}, pdfScheduled=${discovery.pdf.scheduledFilenames.length}, pdfRemoved=${discovery.pdf.removedFilenames.length}, articleRefreshIndex=${discovery.article.shouldRefreshIndex}.`,
+            );
             throwIfAborted(options.abortSignal);
 
+            reporter.info('Preparing corpus storage.');
             await corpusStore.initialize(paths.retrievalDir, {
                 allowIncompatibleReset: forceReingest,
             });
             if (forceReingest) {
+                reporter.warn('Force reingest requested; clearing existing corpus sources before rebuild.');
                 await corpusStore.clear(paths.retrievalDir);
             }
 
             // Ingestion normalizes source-specific work into corpus mutations and
             // the next import-state rows that should be persisted on success.
+            reporter.info('Building ingestion change set.');
             const ingestion = await buildRefreshIngestion({
                 abortSignal: options.abortSignal,
                 dependencies: {
@@ -110,12 +118,18 @@ export const createRefreshPipeline = (
                 now: timestamp,
                 paths,
             });
+            reporter.info(
+                `Ingestion change set built: changes=${ingestion.sourceChangeSet.changes.length}, corpusChanged=${ingestion.corpusChanged}, articles=${ingestion.articleRows.length}, pdfFiles=${ingestion.pdfFilenames.length}.`,
+            );
             throwIfAborted(options.abortSignal);
 
             if (ingestion.sourceChangeSet.changes.length > 0) {
+                reporter.info(`Applying ${ingestion.sourceChangeSet.changes.length} corpus source changes.`);
                 await corpusStore.applySourceChanges(paths.retrievalDir, {
                     changes: ingestion.sourceChangeSet.changes,
                 });
+            } else {
+                reporter.info('No corpus source changes were required.');
             }
 
             const corpusSourceCount = await corpusStore.countSources(paths.retrievalDir);
@@ -128,17 +142,20 @@ export const createRefreshPipeline = (
                 // Retrieval artifacts are part of the trusted output of refresh.
                 // If this step fails, import state must not advance.
                 if (ingestion.corpusChanged || forceReingest) {
+                    reporter.info('Refreshing retrieval artifacts.');
                     await retrieval.refresh(paths.retrievalDir, {
                         abortSignal: options.abortSignal,
                         forceRebuild: forceReingest,
                     });
                 } else {
+                    reporter.info('Corpus is unchanged; preparing retrieval service without a rebuild.');
                     await retrieval.prepare(paths.retrievalDir);
                 }
             }
 
             // App-owned state advances only after corpus and retrieval are both
             // in a trustworthy state.
+            reporter.info('Persisting app-owned refresh state.');
             await importStateStore.replaceFiles('foundry', discovery.foundry.markers.map(marker => marker.filename));
             await importStateStore.replaceFiles('pdf', ingestion.pdfFilenames);
             await importStateStore.replaceArticles(ingestion.articleRows);
@@ -149,6 +166,7 @@ export const createRefreshPipeline = (
             if (latestFoundryMarker) {
                 await importStateStore.writeFoundry(latestFoundryMarker);
             }
+            reporter.info('Refresh pipeline completed successfully.');
 
             return {
                 corpusChanged: ingestion.corpusChanged,

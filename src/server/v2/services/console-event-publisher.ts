@@ -1,21 +1,83 @@
+import { randomUUID } from 'node:crypto';
+
+import type { ConsoleEntryDto } from '@/dto/index.js';
+import { Settings, settingKeys, type AppDb } from '@/server/v2/db/app/index.js';
+import type { ConsoleLevel } from '@/types.js';
+
+type ConsoleEventSubscriber = (entry: ConsoleEntryDto) => void;
+
 export interface ConsoleEventPublisher {
-    /**
-     * TODO: Replace this stub with a real process-local publisher that:
-     * - keeps subscriber sets for live console listeners
-     * - optionally mirrors entries into consoleEntries persistence
-     * - replays initial console state when appropriate
-     * - pushes ConsoleEntryDto payloads over the SSE stream
-     */
-    registerConnection(): void;
-    warn(message: string): void;
+    debug(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
+    error(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
+    info(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
+    snapshot(): Promise<ConsoleEntryDto[]>;
+    subscribe(listener: ConsoleEventSubscriber): () => void;
+    warn(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
 }
 
-export const createConsoleEventPublisher = (): ConsoleEventPublisher => ({
-    registerConnection: () => {
-        // TODO: Register live console subscribers once the console publisher is wired up.
-        console.warn('GET /api/v2/events/console is not implemented');
-    },
-    warn: message => {
-        console.warn(message);
-    },
-});
+export const createConsoleEventPublisher = async (appDb: AppDb): Promise<ConsoleEventPublisher> => {
+    const subscribers = new Set<ConsoleEventSubscriber>();
+    const shouldPersist = await Settings.read(appDb.db, settingKeys.providerDebug) === 'true';
+    const inMemoryEntries: ConsoleEntryDto[] = [];
+
+    const publish = async (
+        level: ConsoleLevel,
+        message: string,
+        timestamp = new Date().toISOString(),
+    ): Promise<ConsoleEntryDto> => {
+        const entry: ConsoleEntryDto = {
+            id: randomUUID(),
+            level,
+            message,
+            timestamp,
+        };
+
+        inMemoryEntries.push(entry);
+        if (shouldPersist) {
+            await appDb.db.insertInto('consoleEntries').values({
+                createdAt: entry.timestamp,
+                id: entry.id,
+                level: entry.level,
+                message: entry.message,
+            }).execute();
+        }
+
+        for (const subscriber of subscribers) {
+            subscriber(entry);
+        }
+
+        return entry;
+    };
+
+    return {
+        debug: (message, timestamp) => publish('debug', message, timestamp),
+        error: (message, timestamp) => publish('error', message, timestamp),
+        info: (message, timestamp) => publish('info', message, timestamp),
+        snapshot: async () => {
+            if (!shouldPersist) {
+                return [...inMemoryEntries];
+            }
+
+            const entries = await appDb.db
+                .selectFrom('consoleEntries')
+                .selectAll()
+                .orderBy('createdAt', 'asc')
+                .orderBy('id', 'asc')
+                .execute();
+
+            return entries.map(entry => ({
+                id: entry.id,
+                level: entry.level,
+                message: entry.message,
+                timestamp: entry.createdAt,
+            }));
+        },
+        subscribe: listener => {
+            subscribers.add(listener);
+            return () => {
+                subscribers.delete(listener);
+            };
+        },
+        warn: (message, timestamp) => publish('warn', message, timestamp),
+    };
+};

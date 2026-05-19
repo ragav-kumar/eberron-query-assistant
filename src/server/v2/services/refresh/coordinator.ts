@@ -3,9 +3,12 @@ import { createTaggedError, isOperationAbortedError } from '@/errors.js';
 import type { AppDb, SelectRow } from '@/server/v2/db/app/index.js';
 import type { RefreshOperationKind } from '@/types.js';
 
+import type { ConsoleEventPublisher } from '../console-event-publisher.js';
+import type { RuntimeEventPublisher } from '../runtime-event-publisher.js';
 import { createRefreshPipeline, type RefreshPipeline, type RefreshPipelineDependencies } from './pipeline.js';
 import { createRefreshStateStore, type RefreshStateStore } from './refresh-state.js';
 import { assertCanStartOperation } from './state-machine.js';
+import { createRefreshVisibility, type RefreshVisibility } from './visibility.js';
 
 /**
  * API-facing entrypoint for the refresh feature.
@@ -24,10 +27,13 @@ interface ActiveRefreshOperation {
  * Optional seams for testing and app bootstrap composition.
  */
 export interface RefreshCoordinatorDependencies {
+    consoleEvents?: ConsoleEventPublisher;
     now?: () => Date;
     pipeline?: RefreshPipeline;
     pipelineDependencies?: RefreshPipelineDependencies;
     refreshStateStore?: RefreshStateStore;
+    runtimeEvents?: RuntimeEventPublisher;
+    visibility?: RefreshVisibility;
 }
 
 /**
@@ -43,7 +49,50 @@ export const createRefreshCoordinator = (
 ): RefreshCoordinator => {
     const now = dependencies.now ?? (() => new Date());
     const refreshStateStore = dependencies.refreshStateStore ?? createRefreshStateStore(appDb);
-    const pipeline = dependencies.pipeline ?? createRefreshPipeline(appDb, dependencies.pipelineDependencies);
+    const consoleEvents = dependencies.consoleEvents ?? {
+        debug: (_message: string, _timestamp?: string) => Promise.resolve({
+            id: 'noop',
+            level: 'debug' as const,
+            message: '',
+            timestamp: '',
+        }),
+        error: (_message: string, _timestamp?: string) => Promise.resolve({
+            id: 'noop',
+            level: 'error' as const,
+            message: '',
+            timestamp: '',
+        }),
+        info: (_message: string, _timestamp?: string) => Promise.resolve({
+            id: 'noop',
+            level: 'info' as const,
+            message: '',
+            timestamp: '',
+        }),
+        snapshot: () => Promise.resolve([]),
+        subscribe: () => () => undefined,
+        warn: (_message: string, _timestamp?: string) => Promise.resolve({
+            id: 'noop',
+            level: 'warn' as const,
+            message: '',
+            timestamp: '',
+        }),
+    };
+    const runtimeEvents = dependencies.runtimeEvents ?? {
+        publish: (_event) => undefined,
+        publishRefreshEvent: event => ({
+            ...event,
+            resource: 'refresh' as const,
+        }),
+        subscribe: () => () => undefined,
+    };
+    const visibility = dependencies.visibility ?? createRefreshVisibility(
+        consoleEvents,
+        runtimeEvents,
+    );
+    const pipeline = dependencies.pipeline ?? createRefreshPipeline(appDb, {
+        ...dependencies.pipelineDependencies,
+        reporter: dependencies.pipelineDependencies?.reporter,
+    });
     let activeOperation: ActiveRefreshOperation | null = null;
 
     return {
@@ -60,6 +109,7 @@ export const createRefreshCoordinator = (
             if (activeOperation && activeOperation.kind === 'refresh' && request.kind === 'reingest') {
                 activeOperation.abortController.abort();
                 await activeOperation.promise.catch(() => undefined);
+                await visibility.publishInterrupted(now().toISOString());
                 activeOperation = null;
             } else if (activeOperation) {
                 throw createTaggedError(
@@ -68,7 +118,9 @@ export const createRefreshCoordinator = (
                 );
             }
 
-            const pending = await refreshStateStore.setPending(request.kind, now().toISOString());
+            const pendingAt = now().toISOString();
+            const pending = await refreshStateStore.setPending(request.kind, pendingAt);
+            await visibility.publishPending(request.kind, pendingAt);
             const abortController = new AbortController();
             const operation: ActiveRefreshOperation = {
                 abortController,
@@ -85,6 +137,7 @@ export const createRefreshCoordinator = (
                 setActiveOperation: nextOperation => {
                     activeOperation = nextOperation;
                 },
+                visibility,
             });
 
             activeOperation = operation;
@@ -105,18 +158,32 @@ const runRefreshOperation = async (options: {
     pipeline: RefreshPipeline;
     refreshStateStore: RefreshStateStore;
     setActiveOperation: (nextOperation: ActiveRefreshOperation | null) => void;
+    visibility: RefreshVisibility;
 }): Promise<void> => {
     try {
-        await options.refreshStateStore.setRunning(options.operation.kind, options.now().toISOString());
+        const startedAt = options.now().toISOString();
+        await options.refreshStateStore.setRunning(options.operation.kind, startedAt);
+        await options.visibility.publishRunning(options.operation.kind, startedAt);
         await options.pipeline.run(options.operation.kind, {
             abortSignal: options.operation.abortController.signal,
+            reporter: options.visibility.reporterFor(options.operation.kind),
         });
         if (options.activeOperationRef() === options.operation) {
-            await options.refreshStateStore.complete(options.operation.kind, options.now().toISOString());
+            const completedAt = options.now().toISOString();
+            await options.refreshStateStore.complete(options.operation.kind, completedAt);
+            options.visibility.publishCompleted(options.operation.kind, completedAt);
         }
     } catch (error) {
         if (options.activeOperationRef() === options.operation) {
-            await options.refreshStateStore.fail(options.operation.kind, options.now().toISOString());
+            const failedAt = options.now().toISOString();
+            await options.refreshStateStore.fail(options.operation.kind, failedAt);
+            await options.visibility.publishFailed(
+                options.operation.kind,
+                failedAt,
+                isOperationAbortedError(error)
+                    ? undefined
+                    : `Refresh ${options.operation.kind} failed.`,
+            );
         }
 
         if (!isOperationAbortedError(error)) {

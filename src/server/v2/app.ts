@@ -28,15 +28,20 @@ export interface V2AppContext extends AppDb {
 export const createV2App = async (): Promise<V2AppContext> => {
     const appDb = await createAppDb(resolveAppDatabasePath());
     const startupOrchestrator = createStartupOrchestrator(appDb);
+    const consoleEvents = await createConsoleEventPublisher(appDb);
+    const runtimeEvents = createRuntimeEventPublisher();
 
     await startupOrchestrator.initializeRefreshState();
 
     return {
         db: appDb.db,
         close: appDb.close,
-        refreshCoordinator: createRefreshCoordinator(appDb),
+        refreshCoordinator: createRefreshCoordinator(appDb, {
+            consoleEvents,
+            runtimeEvents,
+        }),
         runCoordinator: createRunCoordinator(),
-        consoleEvents: createConsoleEventPublisher(),
-        runtimeEvents: createRuntimeEventPublisher(),
+        consoleEvents,
+        runtimeEvents,
     };
 };
