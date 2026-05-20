@@ -38,6 +38,8 @@
 ## Development
 - Purpose: implement behavior changes.
 - Code changes are expected in this mode.
+- Generated non-trivial code should be documented with JSDoc that clearly explains what the code is doing and, where relevant, why it works that way and how it behaves.
+- This JSDoc expectation does not apply to trivial layout components, styles, or small helper functions unless their behavior would otherwise be unclear.
 - During the V2 transition, default to V2 unless the user explicitly requires V1 work or V1 changes are necessary to unblock compilation or runtime behavior.
 - For non-trivial V2 work, consult `docs/fdd-v2.md` before making changes.
 - For non-trivial V1 work that is explicitly required, consult `docs/fdd-v1.md` before making changes.
