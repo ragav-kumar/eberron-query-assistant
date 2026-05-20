@@ -62,8 +62,8 @@ export const createV2App = async (dependencies: CreateV2AppDependencies = {}): P
         runtimeEvents,
     });
     const runtimePaths = await resolveRuntimePaths(appDb, repoRoot);
-    const embeddingProviderSettings = await readEmbeddingProviderSettings(appDb, repoRoot);
-    const chatProviderSettings = await readChatProviderSettings(appDb, repoRoot);
+    const embeddingProviderSettings = await readEmbeddingProviderSettings(appDb);
+    const chatProviderSettings = await readChatProviderSettings(appDb);
     const retrieval = createCorpusRetrievalService({
         embeddingAdapter: createLazyEmbeddingAdapter(embeddingProviderSettings),
         reporter: {

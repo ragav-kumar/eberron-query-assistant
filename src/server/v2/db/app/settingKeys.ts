@@ -27,7 +27,11 @@ export const settingKeys = {
 } as const;
 
 export type SettingKey = (typeof settingKeys)[keyof typeof settingKeys];
+export type SettingKeyName = keyof typeof settingKeys;
 
+/**
+ * Helpers for interacting with Settings. Intentionally does not parse types. You want that, you need something more robust.
+ */
 export const Settings = {
     read: async (db: Kysely<AppDatabaseSchema>, key: SettingKey): Promise<string | null> => db
         .selectFrom('settings')
@@ -36,12 +40,12 @@ export const Settings = {
         .executeTakeFirst()
         .then((row) => row?.value ?? null),
 
-    readMany: async (
+    readMany: async <T extends SettingKey>(
         db: Kysely<AppDatabaseSchema>,
-        keys: readonly SettingKey[],
-    ): Promise<Map<SettingKey, string>> => {
+        keys: readonly T[],
+    ): Promise<Map<T, string>> => {
         if (keys.length === 0) {
-            return new Map();
+            return new Map<T, string>();
         }
 
         const rows = await db
@@ -50,7 +54,7 @@ export const Settings = {
             .where('key', 'in', [...keys])
             .execute();
 
-        return new Map(rows.map((row) => [row.key as SettingKey, row.value]));
+        return new Map(rows.map((row) => [row.key as T, row.value]));
     },
 
     write: async (db: Kysely<AppDatabaseSchema>, key: SettingKey, value: string) => {

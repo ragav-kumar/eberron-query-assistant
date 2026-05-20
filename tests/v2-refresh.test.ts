@@ -314,7 +314,7 @@ describe('v2 refresh flow', () => {
         const runtimeDir = path.join(repoRoot, '.eberron-query-assistant');
         const appDb = await createTestAppDb('runtime-settings', runtimeDir);
 
-        await initializeSettings(appDb, repoRoot);
+        await initializeSettings(appDb);
         expect(await Settings.read(appDb.db, settingKeys.foundrySourceDir)).toBe('foundry-export');
         expect(await Settings.read(appDb.db, settingKeys.pdfSourceDir)).toBe('pdf');
         expect(await Settings.read(appDb.db, settingKeys.retrievalDir)).toBe('.eberron-query-assistant/retrieval');
@@ -340,7 +340,7 @@ describe('v2 refresh flow', () => {
         const runtimeDir = path.join(repoRoot, '.eberron-query-assistant');
         const appDb = await createTestAppDb('runtime-settings-absolute', runtimeDir);
 
-        await initializeSettings(appDb, repoRoot);
+        await initializeSettings(appDb);
         await Settings.write(appDb.db, settingKeys.foundrySourceDir, path.resolve(repoRoot, 'absolute-foundry'));
 
         await expect(resolveRuntimePaths(appDb, repoRoot)).rejects.toMatchObject({

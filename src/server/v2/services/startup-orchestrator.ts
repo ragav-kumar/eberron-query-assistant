@@ -29,7 +29,6 @@ export const createStartupOrchestrator = (
     dependencies: StartupOrchestratorDependencies,
 ): StartupOrchestrator => {
     const refreshStateStore = createRefreshStateStore(appDb);
-    const repoRoot = dependencies.repoRoot ?? process.cwd();
     const visibility = createRefreshVisibility(dependencies.consoleEvents, dependencies.runtimeEvents);
 
     const runStartupRefresh = async (): Promise<void> => {
@@ -44,7 +43,7 @@ export const createStartupOrchestrator = (
     return {
         bootstrap: async () => {
             await refreshStateStore.ensure();
-            await initializeSettings(appDb, repoRoot);
+            await initializeSettings(appDb);
         },
         startBackgroundRefresh: () => {
             void runStartupRefresh().catch(error => {

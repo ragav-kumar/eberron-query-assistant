@@ -1,5 +1,4 @@
 import path from 'node:path';
-
 import { createTaggedError } from '@/errors.js';
 import { Settings, settingKeys, type AppDb } from '@/server/v2/db/app/index.js';
 import { defaults } from './defaults.js';
@@ -28,7 +27,6 @@ export interface ChatProviderSettings {
  * Resolves runtime directories from persisted app settings.
  */
 export const resolveRuntimePaths = async (appDb: AppDb, repoRoot = process.cwd()): Promise<RuntimePaths> => {
-    const configuredDefaults = defaults.load(repoRoot);
     const values = await Settings.readMany(appDb.db, [
         settingKeys.articleHtmlCacheDir,
         settingKeys.foundrySourceDir,
@@ -39,20 +37,20 @@ export const resolveRuntimePaths = async (appDb: AppDb, repoRoot = process.cwd()
     return {
         articleHtmlCacheDir: resolveRepoRelativePath(
             repoRoot,
-            values.get(settingKeys.articleHtmlCacheDir) ?? configuredDefaults.paths.articleHtmlCacheDir,
+            values.get(settingKeys.articleHtmlCacheDir) ?? defaults.articleHtmlCacheDir,
         ),
         foundryExportDir: resolveRepoRelativePath(
             repoRoot,
-            values.get(settingKeys.foundrySourceDir) ?? configuredDefaults.paths.foundrySourceDir,
+            values.get(settingKeys.foundrySourceDir) ?? defaults.foundrySourceDir,
         ),
         pdfDir: resolveRepoRelativePath(
             repoRoot,
-            values.get(settingKeys.pdfSourceDir) ?? configuredDefaults.paths.pdfSourceDir,
+            values.get(settingKeys.pdfSourceDir) ?? defaults.pdfSourceDir,
         ),
         repoRoot,
         retrievalDir: resolveRepoRelativePath(
             repoRoot,
-            values.get(settingKeys.retrievalDir) ?? configuredDefaults.paths.retrievalDir,
+            values.get(settingKeys.retrievalDir) ?? defaults.retrievalDir,
         ),
     };
 };
@@ -60,8 +58,7 @@ export const resolveRuntimePaths = async (appDb: AppDb, repoRoot = process.cwd()
 /**
  * Reads provider settings used for embedding-backed retrieval refresh.
  */
-export const readEmbeddingProviderSettings = async (appDb: AppDb, repoRoot = process.cwd()): Promise<EmbeddingProviderSettings> => {
-    const configuredDefaults = defaults.load(repoRoot);
+export const readEmbeddingProviderSettings = async (appDb: AppDb): Promise<EmbeddingProviderSettings> => {
     const values = await Settings.readMany(appDb.db, [
         settingKeys.providerApiKey,
         settingKeys.providerBaseUrl,
@@ -69,13 +66,13 @@ export const readEmbeddingProviderSettings = async (appDb: AppDb, repoRoot = pro
     ]);
 
     const apiKey = normalizeNullable(values.get(settingKeys.providerApiKey))
-        ?? configuredDefaults.provider.apiKey;
+        ?? defaults.providerApiKey;
     const baseUrl = normalizeBaseUrl(
         normalizeNullable(values.get(settingKeys.providerBaseUrl))
-        ?? configuredDefaults.provider.baseUrl,
+        ?? defaults.providerBaseUrl,
     );
     const embeddingModel = normalizeNullable(values.get(settingKeys.providerEmbeddingModel))
-        ?? configuredDefaults.provider.embeddingModel;
+        ?? defaults.providerEmbeddingModel;
 
     return {
         apiKey,
@@ -87,22 +84,18 @@ export const readEmbeddingProviderSettings = async (appDb: AppDb, repoRoot = pro
 /**
  * Reads provider settings used for interactive chat runs.
  */
-export const readChatProviderSettings = async (appDb: AppDb, repoRoot = process.cwd()): Promise<ChatProviderSettings> => {
-    const configuredDefaults = defaults.load(repoRoot);
+export const readChatProviderSettings = async (appDb: AppDb): Promise<ChatProviderSettings> => {
     const values = await Settings.readMany(appDb.db, [
         settingKeys.providerApiKey,
         settingKeys.providerBaseUrl,
         settingKeys.providerChatModel,
     ]);
 
-    const apiKey = normalizeNullable(values.get(settingKeys.providerApiKey))
-        ?? configuredDefaults.provider.apiKey;
+    const apiKey = normalizeNullable(values.get(settingKeys.providerApiKey)) ?? defaults.providerApiKey;
     const baseUrl = normalizeBaseUrl(
-        normalizeNullable(values.get(settingKeys.providerBaseUrl))
-        ?? configuredDefaults.provider.baseUrl,
+        normalizeNullable(values.get(settingKeys.providerBaseUrl)) ?? defaults.providerBaseUrl,
     );
-    const chatModel = normalizeNullable(values.get(settingKeys.providerChatModel))
-        ?? configuredDefaults.provider.chatModel;
+    const chatModel = normalizeNullable(values.get(settingKeys.providerChatModel)) ?? defaults.providerChatModel;
 
     return {
         apiKey,

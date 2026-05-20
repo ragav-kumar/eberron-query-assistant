@@ -1,125 +1,58 @@
-import { existsSync, readFileSync } from 'node:fs';
-import path from 'node:path';
+import { z } from 'zod';
+import { SettingKeyName, settingKeys } from '../db/app/index.js';
 
-interface LoadedDefaults {
-    paths: {
-        articleHtmlCacheDir: string;
-        foundrySourceDir: string;
-        pdfSourceDir: string;
-        retrievalDir: string;
-    };
-    provider: {
-        apiKey: string | null;
-        baseUrl: string;
-        chatModel: string;
-        embeddingModel: string;
-    };
-}
+export const settingKeysToInitialize = [
+    'articleHtmlCacheDir',
+    'foundrySourceDir',
+    'pdfSourceDir',
+    'providerApiKey',
+    'providerBaseUrl',
+    'providerChatModel',
+    'providerEmbeddingModel',
+    'retrievalDir',
+    'questsJournal',
+    'additionalContext',
+    'campaignJournalFolder',
+    'partyActorUuids',
+    'providerDebug',
+    'sessionNotesJournal'
+] as const satisfies SettingKeyName[];
+export const settingsToInitialize = settingKeysToInitialize.map(key => settingKeys[key]);
 
-const settings = {
-    defaults: {
-        articleHtmlCacheDir: '.eberron-query-assistant/cache/keith-baker',
-        foundrySourceDir: 'foundry-export',
-        pdfSourceDir: 'pdf',
-        providerBaseUrl: 'https://api.openai.com/v1',
-        providerChatModel: 'gpt-5.4-mini',
-        providerEmbeddingModel: 'text-embedding-3-small',
-        retrievalDir: '.eberron-query-assistant/retrieval',
-    },
-    envKeys: {
-        providerApiKey: 'OPENAI_API_KEY',
-        providerBaseUrl: 'OPENAI_BASE_URL',
-        providerChatModel: 'OPENAI_CHAT_MODEL',
-        providerEmbeddingModel: 'OPENAI_EMBEDDING_MODEL',
-    },
-} as const;
+const envSchema = z.object({
+    // Mandatory
+    OPENAI_API_KEY: z.string().min(1),
+    EQA_PARTY_ACTOR_UUIDS: z.array(z.string()),
 
-const cache = new Map<string, LoadedDefaults>();
+    // Optional
+    OPENAI_BASE_URL: z.url().default('https://api.openai.com/v1'),
+    OPENAI_CHAT_MODEL: z.string().default('gpt-5.4-mini'),
+    OPENAI_EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
+    EQA_APP_DB_PATH: z.string().default('.eberron-query-assistant/app.sqlite'),
+    EQA_SESSION_NOTES_JOURNAL: z.string().default('Session Notes'),
+    EQA_QUESTS_JOURNAL: z.string().default('Quests'),
+    EQA_CAMPAIGN_JOURNAL_FOLDER: z.string().default('Legacy'),
+    EQA_PROVIDER_DEBUG: z.boolean().default(false),
+});
 
-/**
- * Shared startup/runtime defaults resolved once per repo root from `.env`,
- * process env, and hardcoded fallbacks.
- */
+const env = Object.freeze(envSchema.parse(process.env));
+
 export const defaults = Object.freeze({
-    load: (repoRoot = process.cwd()): LoadedDefaults => {
-        const normalizedRepoRoot = path.resolve(repoRoot);
-        const cached = cache.get(normalizedRepoRoot);
-        if (cached) {
-            return cached;
-        }
+    articleHtmlCacheDir: '.eberron-query-assistant/cache/keith-baker',
+    foundrySourceDir: 'foundry-export',
+    pdfSourceDir: 'pdf',
+    retrievalDir: '.eberron-query-assistant/retrieval',
 
-        const env = parseEnvFile(path.join(normalizedRepoRoot, '.env'));
-        const loaded: LoadedDefaults = Object.freeze({
-            paths: Object.freeze({
-                articleHtmlCacheDir: settings.defaults.articleHtmlCacheDir,
-                foundrySourceDir: settings.defaults.foundrySourceDir,
-                pdfSourceDir: settings.defaults.pdfSourceDir,
-                retrievalDir: settings.defaults.retrievalDir,
-            }),
-            provider: Object.freeze({
-                apiKey: normalizeNullable(readEnvValue(settings.envKeys.providerApiKey, env)),
-                baseUrl: normalizeBaseUrl(
-                    readEnvValue(settings.envKeys.providerBaseUrl, env) ?? settings.defaults.providerBaseUrl,
-                ),
-                chatModel: readEnvValue(settings.envKeys.providerChatModel, env) ?? settings.defaults.providerChatModel,
-                embeddingModel: readEnvValue(settings.envKeys.providerEmbeddingModel, env) ?? settings.defaults.providerEmbeddingModel,
-            }),
-        });
+    providerApiKey: env.OPENAI_API_KEY,
+    providerBaseUrl: env.OPENAI_BASE_URL,
+    providerChatModel: env.OPENAI_CHAT_MODEL,
+    providerEmbeddingModel: env.OPENAI_EMBEDDING_MODEL,
 
-        cache.set(normalizedRepoRoot, loaded);
-        return loaded;
-    },
-}) satisfies Readonly<{
-    load(repoRoot?: string): LoadedDefaults;
-}>;
+    sessionNotesJournal: 'Session Notes',
+    questsJournal: 'Quests',
+    campaignJournalFolder: 'Legacy',
+    providerDebug: env.EQA_PROVIDER_DEBUG,
+    additionalContext: '',
+    partyActorUuids: env.EQA_PARTY_ACTOR_UUIDS,
 
-const normalizeNullable = (value: string | undefined): string | null => {
-    const trimmed = value?.trim();
-    return trimmed && trimmed.length > 0 ? trimmed : null;
-};
-
-const normalizeBaseUrl = (value: string): string => value.replace(/\/+$/, '');
-
-const readEnvValue = (key: string, envFile: Record<string, string>): string | undefined => {
-    const value = process.env[key] ?? envFile[key];
-    const normalized = value?.trim();
-    return normalized && normalized.length > 0 ? normalized : undefined;
-};
-
-const parseEnvFile = (envPath: string): Record<string, string> => {
-    if (!existsSync(envPath)) {
-        return {};
-    }
-
-    const entries: Record<string, string> = {};
-    const lines = readFileSync(envPath, 'utf8').split(/\r?\n/);
-
-    for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed.length === 0 || trimmed.startsWith('#')) {
-            continue;
-        }
-
-        const separatorIndex = trimmed.indexOf('=');
-        if (separatorIndex <= 0) {
-            continue;
-        }
-
-        const key = trimmed.slice(0, separatorIndex).trim();
-        const rawValue = trimmed.slice(separatorIndex + 1).trim();
-        entries[key] = unwrapEnvValue(rawValue);
-    }
-
-    return entries;
-};
-
-const unwrapEnvValue = (value: string): string => {
-    if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-    ) {
-        return value.slice(1, -1);
-    }
-
-    return value;
-};
+} satisfies Record<typeof settingKeysToInitialize[number], string | boolean | string[]>);

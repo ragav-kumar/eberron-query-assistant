@@ -62,7 +62,7 @@ export const createRefreshPipeline = (
     const pdfParser = dependencies.pdfParser ?? createPdfDataExtractParser();
     const repoRoot = dependencies.repoRoot ?? process.cwd();
     const retrievalFactory = dependencies.retrievalFactory ?? (async (pipelineReporter) => {
-        const providerSettings = await readEmbeddingProviderSettings(appDb, repoRoot);
+        const providerSettings = await readEmbeddingProviderSettings(appDb);
         if (!providerSettings.apiKey) {
             pipelineReporter.warn('Skipping retrieval refresh because no provider API key is configured.');
             return null;
@@ -82,7 +82,7 @@ export const createRefreshPipeline = (
             };
             const forceReingest = kind === 'reingest';
             reporter.info(kind === 'refresh' ? 'Preparing refresh runtime settings.' : 'Preparing force reingest runtime settings.');
-            await initializeSettings(appDb, repoRoot);
+            await initializeSettings(appDb);
             const paths = await resolveRuntimePaths(appDb, repoRoot);
             const timestamp = now().toISOString();
             throwIfAborted(options.abortSignal);
