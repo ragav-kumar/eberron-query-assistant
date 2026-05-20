@@ -2,6 +2,15 @@
 
 High-level roadmap for the remaining V2 work. This document is intentionally short and should stay grounded in the current codebase rather than aspirational architecture.
 
+## Working Rules For Future Sessions
+
+- Prefer server-side work. Most agent implementation work should stay within `src/server/v2` and related tests.
+- Before taking on client-side V2 work, first explain what is ready to be implemented and give the user a chance to handle that client work personally.
+- Do not change DTOs, API contracts, or database schemas without explicit user approval.
+- Keep the V2 architecture aligned with the intentional Node-server-backed application shape; do not plan around a browser-only shortcut.
+- Keep the top-level folder structure within `src/server/v2` tight and domain-oriented. A little depth is acceptable when it keeps domain ownership clear.
+- If a proposed change materially expands work outside `src/server/v2` and tests, get approval first unless the user explicitly requested that broader scope.
+
 ## Baseline prior to phase 1
 
 - Refresh orchestration is implemented, including `POST /api/v2/refresh`, startup refresh, console SSE, and runtime SSE plumbing.

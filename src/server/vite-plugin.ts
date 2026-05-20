@@ -1,3 +1,4 @@
+// This file is meant for v1. If you're modifying this in v2, you're probably making a mistake.
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import type { Plugin } from 'vite';
