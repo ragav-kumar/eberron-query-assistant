@@ -10,7 +10,7 @@ import { refreshRoutes } from './routes/refresh.js';
 import { runRoutes } from './routes/runs.js';
 import { sessionRoutes } from './routes/sessions.js';
 import type { RouteDefinition } from './routes/shared.js';
-import { writeGenericJson } from './response.js';
+import { toApiErrorResponse, writeErrorJson } from './response.js';
 
 const routes: RouteDefinition[] = [
     ...additionalContextRoutes,
@@ -46,9 +46,8 @@ export const createV2ApiHandler = (app: V2AppContext) => {
             } catch (error) {
                 console.error(error);
                 if (!response.headersSent && !response.writableEnded) {
-                    writeGenericJson(response, 500, {
-                        error: 'Internal server error',
-                    });
+                    const apiError = toApiErrorResponse(error);
+                    writeErrorJson(response, apiError.statusCode, apiError.message);
                 }
             }
         });

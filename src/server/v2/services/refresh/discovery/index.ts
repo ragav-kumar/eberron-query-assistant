@@ -1,4 +1,4 @@
-import type { RefreshDiscoveryResult, RefreshRuntimePaths } from '../types.js';
+import type { RefreshDiscoveryResult, RuntimePaths } from '../types.js';
 import type { ImportStateStore } from '../import-state.js';
 import { discoverArticleRefresh } from './article.js';
 import { discoverFoundryRefresh } from './foundry.js';
@@ -19,7 +19,7 @@ export interface RefreshDiscoveryDependencies {
  * surfaces against the import state recorded by the last successful run.
  */
 export const discoverRefreshWork = async (
-    paths: RefreshRuntimePaths,
+    paths: RuntimePaths,
     forceReingest: boolean,
     dependencies: RefreshDiscoveryDependencies,
 ): Promise<RefreshDiscoveryResult> => {

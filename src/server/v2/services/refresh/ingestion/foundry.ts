@@ -5,7 +5,7 @@ import path from 'node:path';
 import { createTaggedError, formatThrownValue, isRecord } from '@/errors.js';
 import type { CorpusChunk, CorpusSource } from '@/types.js';
 
-import type { FoundryExportMarker, RefreshRuntimePaths, SourceChangeSet } from '../types.js';
+import type { FoundryExportMarker, RuntimePaths, SourceChangeSet } from '../types.js';
 import { chunkText } from './chunking.js';
 
 const SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION = '2.0.0';
@@ -30,7 +30,7 @@ type FoundryDeltaOperation =
  * corpus source/chunk model.
  */
 export const buildFoundrySourceChanges = async (
-    paths: RefreshRuntimePaths,
+    paths: RuntimePaths,
     markers: FoundryExportMarker[],
     forceReingest: boolean,
 ): Promise<{
@@ -73,7 +73,7 @@ export const buildFoundrySourceChanges = async (
  * Reads and validates one Foundry NDJSON export file before applying it.
  */
 const parseFoundryDeltaFile = async (
-    paths: RefreshRuntimePaths,
+    paths: RuntimePaths,
     filename: string,
 ): Promise<FoundryDeltaOperation[]> => {
     const recordsPath = path.join(paths.foundryExportDir, filename);

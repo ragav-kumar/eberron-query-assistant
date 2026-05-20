@@ -15,12 +15,12 @@ import {
     type CorpusStore,
     type EmbeddingAdapter,
 } from '@/server/v2/db/corpus/index.js';
+import { initializeSettings, resolveRuntimePaths } from '@/server/v2/settings/index.js';
 import { createConsoleEventPublisher, createRuntimeEventPublisher } from '@/server/v2/services/index.js';
 import { createRefreshCoordinator } from '@/server/v2/services/refresh/index.js';
 import { createImportStateStore } from '@/server/v2/services/refresh/import-state.js';
 import { createRefreshPipeline } from '@/server/v2/services/refresh/pipeline.js';
 import { createRefreshStateStore } from '@/server/v2/services/refresh/refresh-state.js';
-import { initializeRefreshSettings, resolveRefreshRuntimePaths } from '@/server/v2/services/refresh/runtime.js';
 import { createStartupOrchestrator } from '@/server/v2/services/startup-orchestrator.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-refresh');
@@ -314,7 +314,7 @@ describe('v2 refresh flow', () => {
         const runtimeDir = path.join(repoRoot, '.eberron-query-assistant');
         const appDb = await createTestAppDb('runtime-settings', runtimeDir);
 
-        await initializeRefreshSettings(appDb, repoRoot);
+        await initializeSettings(appDb, repoRoot);
         expect(await Settings.read(appDb.db, settingKeys.foundrySourceDir)).toBe('foundry-export');
         expect(await Settings.read(appDb.db, settingKeys.pdfSourceDir)).toBe('pdf');
         expect(await Settings.read(appDb.db, settingKeys.retrievalDir)).toBe('.eberron-query-assistant/retrieval');
@@ -325,13 +325,26 @@ describe('v2 refresh flow', () => {
         await Settings.write(appDb.db, settingKeys.retrievalDir, 'custom/retrieval');
         await Settings.write(appDb.db, settingKeys.articleHtmlCacheDir, 'custom/cache/html');
 
-        const paths = await resolveRefreshRuntimePaths(appDb, repoRoot);
+        const paths = await resolveRuntimePaths(appDb, repoRoot);
         expect(paths).toMatchObject({
             articleHtmlCacheDir: path.resolve(repoRoot, 'custom/cache/html'),
             foundryExportDir: path.resolve(repoRoot, 'custom/foundry'),
             pdfDir: path.resolve(repoRoot, 'custom/pdfs'),
             retrievalDir: path.resolve(repoRoot, 'custom/retrieval'),
             repoRoot,
+        });
+    });
+
+    it('rejects absolute persisted runtime setting paths', async () => {
+        const repoRoot = path.join(TEST_ROOT, 'runtime-settings-absolute');
+        const runtimeDir = path.join(repoRoot, '.eberron-query-assistant');
+        const appDb = await createTestAppDb('runtime-settings-absolute', runtimeDir);
+
+        await initializeSettings(appDb, repoRoot);
+        await Settings.write(appDb.db, settingKeys.foundrySourceDir, path.resolve(repoRoot, 'absolute-foundry'));
+
+        await expect(resolveRuntimePaths(appDb, repoRoot)).rejects.toMatchObject({
+            kind: 'invalid-settings-path',
         });
     });
 

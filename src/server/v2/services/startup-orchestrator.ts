@@ -1,7 +1,7 @@
 import type { AppDb } from '../db/app/index.js';
+import { initializeSettings } from '../settings/index.js';
 import type { ConsoleEventPublisher } from './console-event-publisher.js';
 import { createRefreshStateStore } from './refresh/index.js';
-import { initializeRefreshSettings } from './refresh/runtime.js';
 import { recoverStartupRefreshOperation } from './refresh/startup-recovery.js';
 import { createRefreshVisibility } from './refresh/visibility.js';
 import type { RefreshCoordinator } from './refresh/index.js';
@@ -44,7 +44,7 @@ export const createStartupOrchestrator = (
     return {
         bootstrap: async () => {
             await refreshStateStore.ensure();
-            await initializeRefreshSettings(appDb, repoRoot);
+            await initializeSettings(appDb, repoRoot);
         },
         startBackgroundRefresh: () => {
             void runStartupRefresh().catch(error => {

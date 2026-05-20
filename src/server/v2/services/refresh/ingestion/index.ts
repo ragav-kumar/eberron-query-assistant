@@ -1,4 +1,4 @@
-import type { RefreshDiscoveryResult, RefreshRuntimePaths } from '../types.js';
+import type { RefreshDiscoveryResult, RuntimePaths } from '../types.js';
 import type { ArticleFetcher } from './article.js';
 import { buildArticleRefresh } from './article.js';
 import { buildFoundrySourceChanges } from './foundry.js';
@@ -23,7 +23,7 @@ export const buildRefreshIngestion = async (options: {
     discovery: RefreshDiscoveryResult;
     forceReingest: boolean;
     now: string;
-    paths: RefreshRuntimePaths;
+    paths: RuntimePaths;
 }) => {
     const [foundry, pdf, article] = await Promise.all([
         buildFoundrySourceChanges(

@@ -1,28 +1,6 @@
+import type { RuntimePaths } from '@/server/v2/settings/index.js';
 import type { CorpusChunk, CorpusSource, RefreshOperationKind } from '@/types.js';
 import type { IngestedArticle } from '@/server/v2/db/app/index.js';
-
-/**
- * Repository-local paths used by refresh during discovery and ingestion.
- *
- * These are resolved from app settings as repo-root-relative paths so the
- * installation remains portable across machines.
- */
-export interface RefreshRuntimePaths {
-    articleHtmlCacheDir: string;
-    foundryExportDir: string;
-    pdfDir: string;
-    repoRoot: string;
-    retrievalDir: string;
-}
-
-/**
- * Provider configuration used when refresh updates retrieval embeddings.
- */
-export interface RefreshProviderSettings {
-    apiKey: string | null;
-    baseUrl: string;
-    embeddingModel: string;
-}
 
 /**
  * Parsed metadata for a Foundry export file.
@@ -131,3 +109,5 @@ export interface PdfParser {
         title: string | null;
     }>;
 }
+
+export type { RuntimePaths };

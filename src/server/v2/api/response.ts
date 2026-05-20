@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
+import { isRecord } from '@/errors.js';
+
 export const writeGenericJson = (response: ServerResponse, statusCode: number, body: unknown): void => {
     response.statusCode = statusCode;
     response.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -30,4 +32,33 @@ export const writeSse = (response: ServerResponse, request: IncomingMessage): vo
     request.on('close', () => {
         response.end();
     });
+};
+
+export const writeErrorJson = (response: ServerResponse, statusCode: number, message: string): void => {
+    writeGenericJson(response, statusCode, {error: message});
+};
+
+export const toApiErrorResponse = (error: unknown): {message: string; statusCode: number} => {
+    if (isRecord(error) && typeof error.kind === 'string' && typeof error.message === 'string') {
+        switch (error.kind) {
+            case 'run-blocked-refresh':
+                return {message: error.message, statusCode: 409};
+            case 'run-invalid-response':
+            case 'run-invalid-thinking':
+            case 'run-prompt-empty':
+            case 'run-session-required':
+            case 'run-unsupported-mode':
+                return {message: error.message, statusCode: 400};
+            case 'run-session-missing':
+            case 'run-session-mode-mismatch':
+                return {message: error.message, statusCode: 404};
+            default:
+                return {message: error.message, statusCode: 500};
+        }
+    }
+
+    return {
+        message: 'Internal server error',
+        statusCode: 500,
+    };
 };

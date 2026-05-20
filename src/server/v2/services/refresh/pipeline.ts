@@ -7,6 +7,11 @@ import {
     type CorpusStore,
     type ProgressReporter,
 } from '@/server/v2/db/corpus/index.js';
+import {
+    initializeSettings,
+    readEmbeddingProviderSettings,
+    resolveRuntimePaths,
+} from '@/server/v2/settings/index.js';
 import type { RefreshOperationKind } from '@/types.js';
 
 import { discoverRefreshWork } from './discovery/index.js';
@@ -17,7 +22,6 @@ import { buildRefreshIngestion } from './ingestion/index.js';
 import { createImportStateStore, type ImportStateStore } from './import-state.js';
 import type { PdfParser } from './types.js';
 import { createPdfDataExtractParser } from './ingestion/pdf.js';
-import { initializeRefreshSettings, readRefreshProviderSettings, resolveRefreshRuntimePaths } from './runtime.js';
 import type { RefreshPipelineResult } from './types.js';
 
 /**
@@ -58,7 +62,7 @@ export const createRefreshPipeline = (
     const pdfParser = dependencies.pdfParser ?? createPdfDataExtractParser();
     const repoRoot = dependencies.repoRoot ?? process.cwd();
     const retrievalFactory = dependencies.retrievalFactory ?? (async (pipelineReporter) => {
-        const providerSettings = await readRefreshProviderSettings(appDb, repoRoot);
+        const providerSettings = await readEmbeddingProviderSettings(appDb, repoRoot);
         if (!providerSettings.apiKey) {
             pipelineReporter.warn('Skipping retrieval refresh because no provider API key is configured.');
             return null;
@@ -78,8 +82,8 @@ export const createRefreshPipeline = (
             };
             const forceReingest = kind === 'reingest';
             reporter.info(kind === 'refresh' ? 'Preparing refresh runtime settings.' : 'Preparing force reingest runtime settings.');
-            await initializeRefreshSettings(appDb, repoRoot);
-            const paths = await resolveRefreshRuntimePaths(appDb, repoRoot);
+            await initializeSettings(appDb, repoRoot);
+            const paths = await resolveRuntimePaths(appDb, repoRoot);
             const timestamp = now().toISOString();
             throwIfAborted(options.abortSignal);
 

@@ -6,7 +6,7 @@ import { PdfData, VerbosityLevel } from 'pdfdataextract';
 
 import type { CorpusChunk, CorpusSource } from '@/types.js';
 
-import type { PdfParser, RefreshRuntimePaths, SourceChangeSet } from '../types.js';
+import type { PdfParser, RuntimePaths, SourceChangeSet } from '../types.js';
 import { chunkText, normalizeText } from './chunking.js';
 
 /**
@@ -48,7 +48,7 @@ export const createPdfDataExtractParser = (): PdfParser => ({
  * Converts discovered PDF additions and removals into corpus source changes.
  */
 export const buildPdfSourceChanges = async (
-    paths: RefreshRuntimePaths,
+    paths: RuntimePaths,
     scheduledFilenames: string[],
     removedFilenames: string[],
     parser: PdfParser,
@@ -79,7 +79,7 @@ export const buildPdfSourceChanges = async (
  * Normalizes one PDF into a single corpus source plus per-page text chunks.
  */
 const normalizePdf = async (
-    paths: RefreshRuntimePaths,
+    paths: RuntimePaths,
     filename: string,
     parser: PdfParser,
 ): Promise<{ chunks: CorpusChunk[]; source: CorpusSource }> => {

@@ -1,7 +1,6 @@
 import { createTaggedError, formatThrownValue, isRecord } from '@/errors.js';
 import type { EmbeddingAdapter } from '@/server/v2/db/corpus/index.js';
-
-import type { RefreshProviderSettings } from './types.js';
+import type { EmbeddingProviderSettings } from '@/server/v2/settings/index.js';
 
 const DEFAULT_PROVIDER_TIMEOUT_MS = 60_000;
 const DEFAULT_PROVIDER_MAX_RETRIES = 3;
@@ -22,7 +21,7 @@ export interface OpenAiProviderOptions {
  * retrieval refresh.
  */
 export const createOpenAiEmbeddingAdapter = (
-    config: RefreshProviderSettings,
+    config: EmbeddingProviderSettings,
     options: OpenAiProviderOptions = {},
 ): EmbeddingAdapter => {
     if (!config.apiKey) {
