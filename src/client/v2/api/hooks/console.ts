@@ -1,16 +1,20 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { queryApi } from '../utils.js';
-import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useSyncExternalStore } from 'react';
 import type { ConsoleEntryDto } from '@/dto/index.js';
 
 import { contracts } from '@/contract/index.js';
 
 const queryKey = ['api', 'console'];
 
-export const useConsoleQuery = () => useQuery({
-    queryKey,
-    queryFn: () => queryApi(contracts.console.get),
-});
+export const useConsoleEntries = () => {
+    const queryClient = useQueryClient();
+
+    return useSyncExternalStore(
+        onStoreChange => queryClient.getQueryCache().subscribe(onStoreChange),
+        () => queryClient.getQueryData<ConsoleEntryDto[]>(queryKey) ?? [],
+        () => [],
+    );
+};
 
 export const useConsoleSubscription = () => {
     const queryClient = useQueryClient();

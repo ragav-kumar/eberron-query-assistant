@@ -109,18 +109,6 @@ export const contracts = {
     },
 
     /**
-     * Console is a transient diagnostic resource for process-local operational
-     * output. It is intentionally not durable assistant conversation state.
-     */
-    console: {
-        /** Reads the current in-memory console snapshot. */
-        get: defineEndpoint<null, ConsoleEntryDto[]>({
-            method: 'GET',
-            path: '/api/v2/console',
-        }),
-    },
-
-    /**
      * Server-sent event streams complement the fetchable resources above.
      *
      * `console` carries transient diagnostic output, while `runtime` carries

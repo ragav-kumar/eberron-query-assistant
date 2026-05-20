@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "dev": "vite-node src/dev.ts",
+    "dev:vite": "vite",
     "lint": "eslint .",
     "migrate:v1-to-v2": "vite-node src/server/v2/migrate-v1-to-v2.cli.ts",
     "prestart": "tsc --noEmit",
     "start": "vite",
+    "start:v2-server": "vite-node src/server/v2/server.cli.ts",
     "test": "vitest run",
     "verify": "npm audit --audit-level=moderate && npm run lint && tsc --noEmit && npm run test"
   },

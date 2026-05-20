@@ -25,19 +25,9 @@ type HandleV1ApiRequest = (
   response: ServerResponse
 ) => Promise<void>;
 
-type HandleV2ApiRequest = (
-  request: IncomingMessage,
-  response: ServerResponse
-) => void;
-
 interface V1Runtime {
   app: WebAppLike;
   handleV1ApiRequest: HandleV1ApiRequest;
-}
-
-interface V2Runtime {
-  close: () => Promise<void>;
-  handleRequest: HandleV2ApiRequest;
 }
 
 interface V1AppModule {
@@ -48,15 +38,10 @@ interface V1ApiModule {
   handleV1ApiRequest: HandleV1ApiRequest;
 }
 
-interface V2ServerModule {
-  createV2ServerRuntime: () => Promise<V2Runtime>;
-}
-
 export const eberronApiPlugin = (): Plugin => ({
     name: 'eberron-api',
     configureServer: (server) => {
       let v1RuntimePromise: Promise<V1Runtime> | null = null;
-      let v2RuntimePromise: Promise<V2Runtime> | null = null;
 
       const loadV1Runtime = async (): Promise<V1Runtime> => {
         if (v1RuntimePromise) {
@@ -80,18 +65,6 @@ export const eberronApiPlugin = (): Plugin => ({
         return v1RuntimePromise;
       };
 
-      const loadV2Runtime = async (): Promise<V2Runtime> => {
-        if (v2RuntimePromise) {
-          return v2RuntimePromise;
-        }
-
-        v2RuntimePromise = server
-          .ssrLoadModule('/src/server/v2/server.ts')
-          .then(async (loadedModule) => (loadedModule as V2ServerModule).createV2ServerRuntime());
-
-        return v2RuntimePromise;
-      };
-
       server.middlewares.use((request, response, next) => {
         if (!request.url?.startsWith('/api/')) {
           next();
@@ -99,18 +72,16 @@ export const eberronApiPlugin = (): Plugin => ({
         }
 
         const url = new URL(request.url, 'http://localhost');
+        if (url.pathname.startsWith('/api/v2/')) {
+          next();
+          return;
+        }
 
         void Promise.resolve()
           .then(async () => {
             if (url.pathname.startsWith('/api/v1/')) {
               const { app, handleV1ApiRequest } = await loadV1Runtime();
               await handleV1ApiRequest(app, request, response);
-              return;
-            }
-
-            if (url.pathname.startsWith('/api/v2/')) {
-              const { handleRequest } = await loadV2Runtime();
-              handleRequest(request, response);
               return;
             }
 

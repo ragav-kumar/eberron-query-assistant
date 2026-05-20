@@ -112,12 +112,7 @@ describe('V2 API router', () => {
                     message,
                     timestamp,
                 }),
-                snapshot: () => Promise.resolve([{
-                    id: 'console-1',
-                    level: 'info',
-                    message: 'Snapshot entry',
-                    timestamp: '2026-05-18T00:00:00.000Z',
-                }]),
+                snapshot: () => Promise.resolve([]),
                 subscribe: listener => {
                     consoleListener = listener;
                     return () => {
@@ -309,24 +304,6 @@ describe('V2 API router', () => {
         (request as unknown as MockRequest).emit('close');
 
         expect(record.ended).toBe(true);
-    });
-
-    it('returns the console snapshot from the publisher', async () => {
-        const request = createRequest('GET', '/api/v2/console');
-        const { record, response } = createResponse();
-
-        handleV2ApiRequest(request, response);
-        await flushAsyncHandlers();
-
-        expect(record.statusCode).toBe(200);
-        expect(JSON.parse(record.body)).toEqual([
-            {
-                id: 'console-1',
-                level: 'info',
-                message: 'Snapshot entry',
-                timestamp: '2026-05-18T00:00:00.000Z',
-            },
-        ]);
     });
 
     it('streams publisher console entries over SSE', () => {

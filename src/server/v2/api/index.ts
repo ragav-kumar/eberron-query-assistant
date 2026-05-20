@@ -4,7 +4,6 @@ import FindMyWay from 'find-my-way';
 import type { V2AppContext } from '../app.js';
 import { writeNotFound } from './not-found.js';
 import { additionalContextRoutes } from './routes/additional-context.js';
-import { consoleRoutes } from './routes/console.js';
 import { eventRoutes } from './routes/events.js';
 import { npcRoutes } from './routes/npcs.js';
 import { refreshRoutes } from './routes/refresh.js';
@@ -19,7 +18,6 @@ const routes: RouteDefinition[] = [
     ...runRoutes,
     ...npcRoutes,
     ...refreshRoutes,
-    ...consoleRoutes,
     ...eventRoutes,
 ];
 
