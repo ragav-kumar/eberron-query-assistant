@@ -20,4 +20,5 @@
 - Design ingestion and retrieval logic so most tests can run without network access or live model calls. Use mocks or fixtures for provider interactions and remote content wherever practical.
 - Use `npm run verify` as the final acceptance command for changes that involve the server. Targeted test runs may be used during iteration, but they do not replace the final full-suite gate.
 - When starting the dev server from PowerShell for verification, invoke the Windows npm shim (`npm.cmd`), not `npm`.
-- After startup verification on Windows, explicitly tear down every Vite process started for the check and verify teardown by confirming both that no repo-local `vite.js` child process remains and that no listener remains on each tested port.
+- After startup verification on Windows, explicitly tear down every repo-local dev or server process started for the check.
+- Verify teardown by confirming that no repo-local `vite.js` child process remains, no repo-local `vite-node` process running `src/server/v2/server.cli.ts` remains, and no listener remains on each tested port.

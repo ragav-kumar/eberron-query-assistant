@@ -2,7 +2,7 @@
 
 ## Scope
 - These rules apply to documentation under `/docs`.
-- This file is primarily relevant during `Analysis`.
+- This file is primarily relevant during `Analysis` and `Introspection`.
 
 ## Docs Structure
 - Treat `docs/fdd-v1.md` as the intended design for V1.
@@ -13,5 +13,6 @@
 - If `docs/agent-modes.md` grows enough that one mode dominates it, mode-specific examples or edge cases accumulate substantially, or routine edits start touching only one mode section, warn the user that it is time to consider splitting the mode doc.
 
 ## Documentation Changes
-- Do not update files under `/docs` outside `Analysis`.
-- Within `Analysis`, only update files under `/docs` when the user explicitly requested the documentation change or clearly suggested the change being made.
+- Do not update files under `/docs` outside `Analysis` or `Introspection`.
+- Files under `/docs` whose primary purpose is agent governance, workflow, permissions, or verification rules, including `docs/agent-modes.md`, may only be updated in `Introspection`.
+- Within `Analysis`, only update non-agent documentation under `/docs` when the user explicitly requested the documentation change or clearly suggested the change being made.

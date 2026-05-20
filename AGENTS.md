@@ -3,7 +3,11 @@
 Follow these rules unless a later instruction in the repo or task explicitly overrides them.
 
 ## Agent Modes
-- Every task operates in exactly one agent mode: `Analysis`, `Development`, or `Review`.
+- Every task operates in exactly one agent mode: `Analysis`, `Development`, `Review`, or `Introspection`.
+- `Analysis`: understand current and intended behavior before implementation.
+- `Development`: implement behavior changes and run the required acceptance checks.
+- `Review`: evaluate changes for bugs, risks, regressions, and missing coverage.
+- `Introspection`: create or revise agent-governance rules and workflow instructions only.
 - Mode-specific workflow rules live in `docs/agent-modes.md`.
 - Use that document to determine mode selection, allowed actions, switching behavior, and mode-specific verification workflow before reading path-specific implementation guidance.
 - Path-specific `AGENTS.md` files define local constraints for their areas. Consult them whenever the current task touches that area.
