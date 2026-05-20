@@ -37,7 +37,7 @@ interface V1Runtime {
 
 interface V2Runtime {
   close: () => Promise<void>;
-  handleV2ApiRequest: HandleV2ApiRequest;
+  handleRequest: HandleV2ApiRequest;
 }
 
 interface V1AppModule {
@@ -48,17 +48,8 @@ interface V1ApiModule {
   handleV1ApiRequest: HandleV1ApiRequest;
 }
 
-interface V2ApiModule {
-  createV2ApiHandler: (app: V2RuntimeApp) => HandleV2ApiRequest;
-}
-
-interface V2AppModule {
-  createV2App: () => Promise<V2RuntimeApp>;
-}
-
-interface V2RuntimeApp {
-  close: () => Promise<void>;
-  db: unknown;
+interface V2ServerModule {
+  createV2ServerRuntime: () => Promise<V2Runtime>;
 }
 
 export const eberronApiPlugin = (): Plugin => ({
@@ -94,18 +85,9 @@ export const eberronApiPlugin = (): Plugin => ({
           return v2RuntimePromise;
         }
 
-        v2RuntimePromise = Promise.all([
-          server.ssrLoadModule('/src/server/v2/app.ts'),
-          server.ssrLoadModule('/src/server/v2/api/index.ts')
-        ]).then(async (loadedModules) => {
-          const [appModule, apiModule] = loadedModules as [V2AppModule, V2ApiModule];
-          const app = await appModule.createV2App();
-
-          return {
-            close: app.close,
-            handleV2ApiRequest: apiModule.createV2ApiHandler(app)
-          };
-        });
+        v2RuntimePromise = server
+          .ssrLoadModule('/src/server/v2/server.ts')
+          .then(async (loadedModule) => (loadedModule as V2ServerModule).createV2ServerRuntime());
 
         return v2RuntimePromise;
       };
@@ -127,8 +109,8 @@ export const eberronApiPlugin = (): Plugin => ({
             }
 
             if (url.pathname.startsWith('/api/v2/')) {
-              const { handleV2ApiRequest } = await loadV2Runtime();
-              handleV2ApiRequest(request, response);
+              const { handleRequest } = await loadV2Runtime();
+              handleRequest(request, response);
               return;
             }
 
