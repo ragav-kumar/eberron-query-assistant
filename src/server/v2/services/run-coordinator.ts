@@ -13,7 +13,6 @@ import {
     buildChatHistoryFromSessionEntries,
     executeAssistantRun,
     loadPromptAssets,
-    type PromptAssets,
 } from './run-runtime.js';
 import type { ChatAdapter } from './provider.js';
 
@@ -24,7 +23,6 @@ export interface RunCoordinator {
 export interface RunCoordinatorDependencies {
     appDb: AppDb;
     chat: ChatAdapter;
-    loadPromptAssets?: () => Promise<PromptAssets>;
     partyContext: PartyContextService;
     retrieval: CorpusRetrievalService;
     retrievalDir: string;
@@ -49,7 +47,7 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
         await dependencies.retrieval.prepare(dependencies.retrievalDir);
 
         const runId = randomUUID();
-        const promptAssets = await (dependencies.loadPromptAssets ?? loadPromptAssets)();
+        const promptAssets = await loadPromptAssets();
         const now = new Date().toISOString();
         const persistedEntries: SessionEntryDto[] = [];
         const session = await dependencies.appDb.db
@@ -111,32 +109,40 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
 
         try {
             const assistantResult = await executeAssistantRun({
-                additionalContext,
-                chat: dependencies.chat,
-                history: buildChatHistoryFromSessionEntries(existingEntries),
-                includePartyContext: normalized.includePartyContext,
-                onReasoning: async reasoning => {
-                    const entry = await dependencies.appDb.db.transaction().execute(async trx => appendSessionEntry(trx, {
-                        content: reasoning.content,
-                        createdAt: reasoning.createdAt,
-                        kind: 'reasoning',
-                        runId,
-                        sequenceIndex: nextSequenceIndex,
-                        sessionId,
-                        title: null,
-                        toolCallId: reasoning.toolCallId,
-                    }));
-                    persistedEntries.push(toSessionEntryDto(entry));
-                    nextSequenceIndex += 1;
+                callbacks: {
+                    onReasoning: async reasoning => {
+                        const entry = await dependencies.appDb.db.transaction().execute(async trx => appendSessionEntry(trx, {
+                            content: reasoning.content,
+                            createdAt: reasoning.createdAt,
+                            kind: 'reasoning',
+                            runId,
+                            sequenceIndex: nextSequenceIndex,
+                            sessionId,
+                            title: null,
+                            toolCallId: reasoning.toolCallId,
+                        }));
+                        persistedEntries.push(toSessionEntryDto(entry));
+                        nextSequenceIndex += 1;
+                    },
                 },
-                partyContext,
-                prompt: normalized.prompt,
-                promptAssets,
-                requestSessionTitle,
-                retrieval: dependencies.retrieval,
-                retrievalTurnLimit: normalized.retrievalTurnLimit,
-                runId,
-                sessionId,
+                context: {
+                    runId,
+                    sessionId,
+                },
+                inputs: {
+                    additionalContext,
+                    history: buildChatHistoryFromSessionEntries(existingEntries),
+                    includePartyContext: normalized.includePartyContext,
+                    partyContext,
+                    prompt: normalized.prompt,
+                    promptAssets,
+                    requestSessionTitle,
+                    retrievalTurnLimit: normalized.retrievalTurnLimit,
+                },
+                services: {
+                    chat: dependencies.chat,
+                    retrieval: dependencies.retrieval,
+                },
             });
 
             await dependencies.appDb.db.transaction().execute(async trx => {

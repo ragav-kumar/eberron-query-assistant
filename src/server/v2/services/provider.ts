@@ -1,4 +1,12 @@
 import { createTaggedError, formatThrownValue, isRecord } from '@/errors.js';
+import {
+    createOpenAiRequestConfig,
+    fetchWithRetry,
+    formatProviderError,
+    OpenAiProviderTransportOptions,
+    readEmbeddings,
+    readJsonResponse,
+} from './provider-transport.js';
 
 /**
  * HASTILY COPIED FROM V1 TO PURGE A FORBIDDEN V2 -> V1 REFERENCE.
@@ -8,14 +16,16 @@ import { createTaggedError, formatThrownValue, isRecord } from '@/errors.js';
  * with minimal redesign and should not be treated as the intended long-term
  * V2 provider boundary.
  */
-const DEFAULT_PROVIDER_TIMEOUT_MS = 60_000;
-const DEFAULT_PROVIDER_MAX_RETRIES = 3;
-const DEFAULT_PROVIDER_RETRY_DELAY_MS = 500;
-
 export interface ProviderConfig {
     apiKey: string;
     baseUrl: string;
     chatModel: string;
+    embeddingModel: string;
+}
+
+export interface OpenAiEmbeddingConfig {
+    apiKey: string;
+    baseUrl: string;
     embeddingModel: string;
 }
 
@@ -95,12 +105,7 @@ export interface EmbeddingAdapter {
     embedBatch(inputs: string[]): Promise<number[][]>;
 }
 
-export interface OpenAiProviderOptions {
-    fetchImpl?: typeof fetch;
-    maxRetries?: number;
-    requestTimeoutMs?: number;
-    retryDelayMs?: number;
-}
+export type OpenAiProviderOptions = OpenAiProviderTransportOptions;
 
 export const createOpenAiChatAdapter = (
     config: ProviderConfig,
@@ -200,9 +205,12 @@ export const createOpenAiChatAdapter = (
 };
 
 export const createOpenAiEmbeddingAdapter = (
-    config: ProviderConfig,
+    config: OpenAiEmbeddingConfig,
     options: OpenAiProviderOptions = {},
 ): EmbeddingAdapter => {
+    if (!config.apiKey) {
+        throw createTaggedError('provider-api-key-missing', 'OPENAI_API_KEY is required for provider-backed embeddings.');
+    }
     const provider = createOpenAiRequestConfig(config);
     let failedRetries = 0;
 
@@ -258,27 +266,6 @@ export const createOpenAiEmbeddingAdapter = (
         },
         embedBatch,
     };
-};
-
-const createOpenAiRequestConfig = (config: ProviderConfig): { baseUrl: string; headers: Record<string, string> } => ({
-    baseUrl: config.baseUrl,
-    headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json',
-    },
-});
-
-const readJsonResponse = async (response: Response): Promise<unknown> => {
-    const text = await response.text();
-    if (text.length === 0) {
-        return null;
-    }
-
-    try {
-        return JSON.parse(text) as unknown;
-    } catch (error) {
-        throw createTaggedError('provider-invalid-json', `Provider returned invalid JSON: ${formatThrownValue(error)}`);
-    }
 };
 
 const readChatCompletionResult = (body: unknown): ChatStructuredResult | null => {
@@ -367,101 +354,3 @@ const serializeToolDefinition = (tool: ChatToolDefinition): Record<string, unkno
     },
     type: 'function',
 });
-
-const readEmbeddings = (body: unknown): number[][] => {
-    if (!isRecord(body) || !Array.isArray(body.data)) {
-        return [];
-    }
-
-    return body.data
-        .map((item, fallbackIndex) => {
-            if (!isRecord(item) || !Array.isArray(item.embedding)) {
-                return null;
-            }
-
-            const embedding = item.embedding;
-            if (!embedding.every((value) => typeof value === 'number')) {
-                return null;
-            }
-
-            return {
-                index: typeof item.index === 'number' ? item.index : fallbackIndex,
-                embedding,
-            };
-        })
-        .filter((item): item is { index: number; embedding: number[] } => item !== null)
-        .sort((left, right) => left.index - right.index)
-        .map((item) => item.embedding);
-};
-
-const formatProviderError = (fallback: string, body: unknown): string => {
-    if (isRecord(body) && isRecord(body.error) && typeof body.error.message === 'string') {
-        return `${fallback}: ${body.error.message}`;
-    }
-
-    return fallback;
-};
-
-const fetchWithRetry = async (
-    url: string,
-    init: RequestInit,
-    options: OpenAiProviderOptions & { onRetry?: () => void },
-): Promise<Response> => {
-    const maxRetries = options.maxRetries ?? DEFAULT_PROVIDER_MAX_RETRIES;
-    const retryDelayMs = options.retryDelayMs ?? DEFAULT_PROVIDER_RETRY_DELAY_MS;
-    let lastError: unknown = null;
-
-    for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
-        try {
-            const response = await fetchWithTimeout(url, init, options);
-            if (!isRetryableStatus(response.status) || attempt === maxRetries) {
-                return response;
-            }
-            lastError = createTaggedError('provider-retryable-status', `Provider returned retryable status ${response.status}.`);
-        } catch (error) {
-            if (!isRetryableFetchError(error) || attempt === maxRetries) {
-                throw error;
-            }
-            lastError = error;
-        }
-
-        options.onRetry?.();
-        await delay(retryDelayMs * 2 ** attempt);
-    }
-
-    throw lastError ?? createTaggedError('provider-request-failed', 'Provider request failed.');
-};
-
-const fetchWithTimeout = async (
-    url: string,
-    init: RequestInit,
-    options: OpenAiProviderOptions,
-): Promise<Response> => {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.requestTimeoutMs ?? DEFAULT_PROVIDER_TIMEOUT_MS);
-
-    try {
-        return await (options.fetchImpl ?? fetch)(url, {
-            ...init,
-            signal: controller.signal,
-        });
-    } finally {
-        clearTimeout(timeout);
-    }
-};
-
-const isRetryableStatus = (status: number): boolean => status === 408 || status === 409 || status === 429 || status >= 500;
-
-const isRetryableFetchError = (error: unknown): boolean => {
-    if (!isRecord(error)) {
-        return false;
-    }
-
-    return error.name === 'AbortError' || error.name === 'TimeoutError' || error.name === 'TypeError';
-};
-
-const delay = async (durationMs: number): Promise<void> => {
-    await new Promise<void>((resolve) => {
-        setTimeout(resolve, durationMs);
-    });
-};

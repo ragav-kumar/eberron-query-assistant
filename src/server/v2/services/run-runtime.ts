@@ -40,27 +40,35 @@ export interface AssistantMessageBuildRequest {
 }
 
 export interface ExecuteAssistantRunDependencies {
-    additionalContext: string;
-    chat: ChatAdapter;
-    history: ChatMessage[];
-    includePartyContext: boolean;
-    onReasoning: (reasoning: Omit<SessionEntryReasoningDto, 'id'>) => Promise<void>;
-    partyContext: string;
-    prompt: string;
-    promptAssets: PromptAssets;
-    requestSessionTitle: boolean;
-    retrieval: {
-        search: (request: {
-            limit: number;
-            query: string;
-            sourceKeys?: string[];
-            sourceTypes?: SourceType[];
-            timing: TimingContext;
-        }) => Promise<RetrievalResult[]>;
+    context: {
+        runId: string;
+        sessionId: string;
     };
-    retrievalTurnLimit: number;
-    sessionId: string;
-    runId: string;
+    inputs: {
+        additionalContext: string;
+        history: ChatMessage[];
+        includePartyContext: boolean;
+        partyContext: string;
+        prompt: string;
+        promptAssets: PromptAssets;
+        requestSessionTitle: boolean;
+        retrievalTurnLimit: number;
+    };
+    callbacks: {
+        onReasoning: (reasoning: Omit<SessionEntryReasoningDto, 'id'>) => Promise<void>;
+    };
+    services: {
+        chat: ChatAdapter;
+        retrieval: {
+            search: (request: {
+                limit: number;
+                query: string;
+                sourceKeys?: string[];
+                sourceTypes?: SourceType[];
+                timing: TimingContext;
+            }) => Promise<RetrievalResult[]>;
+        };
+    };
 }
 
 export interface AssistantRunResult {
@@ -165,32 +173,32 @@ export const executeAssistantRun = async (
     const retrievalMaxEvidenceResults = store.read('retrievalMaxEvidenceResults');
     const timing: TimingContext = {
         operation: 'assistant',
-        operationId: dependencies.runId,
+        operationId: dependencies.context.runId,
         reporter: createNoopTimingReporter(),
     };
     const retrievalTurnLimit = clampRetrievalTurnLimit(
-        dependencies.retrievalTurnLimit,
+        dependencies.inputs.retrievalTurnLimit,
         retrievalMaxToolTurns,
     );
     const retrievalTool = buildRetrievalTool(retrievalMaxEvidenceResults);
-    const initialEvidence = await dependencies.retrieval.search({
+    const initialEvidence = await dependencies.services.retrieval.search({
         limit: retrievalMaxEvidenceResults,
-        query: dependencies.prompt,
+        query: dependencies.inputs.prompt,
         timing,
     });
     const messages = buildAssistantMessages({
-        additionalContext: dependencies.additionalContext,
+        additionalContext: dependencies.inputs.additionalContext,
         evidence: initialEvidence,
-        history: dependencies.history,
-        includePartyContext: dependencies.includePartyContext,
-        partyContext: dependencies.partyContext,
-        prompt: dependencies.prompt,
-        promptAssets: dependencies.promptAssets,
-        requestSessionTitle: dependencies.requestSessionTitle,
+        history: dependencies.inputs.history,
+        includePartyContext: dependencies.inputs.includePartyContext,
+        partyContext: dependencies.inputs.partyContext,
+        prompt: dependencies.inputs.prompt,
+        promptAssets: dependencies.inputs.promptAssets,
+        requestSessionTitle: dependencies.inputs.requestSessionTitle,
         retrievalTurnLimit,
     });
 
-    let response = await completeStructured(dependencies.chat, messages, {
+    let response = await completeStructured(dependencies.services.chat, messages, {
         debug: {
             operation: timing.operation,
             operationId: timing.operationId,
@@ -205,12 +213,12 @@ export const executeAssistantRun = async (
         if (!thinking) {
             throw createTaggedError('run-invalid-thinking', 'Assistant tool call response did not include a valid <thinking> block.');
         }
-        await dependencies.onReasoning({
+        await dependencies.callbacks.onReasoning({
             content: thinking.content,
             createdAt: new Date().toISOString(),
             kind: 'reasoning',
-            runId: dependencies.runId,
-            sessionId: dependencies.sessionId,
+            runId: dependencies.context.runId,
+            sessionId: dependencies.context.sessionId,
             toolCallId: response.toolCalls[0]?.id ?? null,
         });
         messages.push({
@@ -223,7 +231,7 @@ export const executeAssistantRun = async (
             const toolResult = await executeSearchCorpusToolCall({
                 maxEvidenceResults: retrievalMaxEvidenceResults,
                 remainingTurns,
-                retrieval: dependencies.retrieval,
+                retrieval: dependencies.services.retrieval,
                 timing,
                 toolCall,
             });
@@ -238,7 +246,7 @@ export const executeAssistantRun = async (
             });
         }
 
-        response = await completeStructured(dependencies.chat, messages, {
+        response = await completeStructured(dependencies.services.chat, messages, {
             debug: {
                 operation: timing.operation,
                 operationId: timing.operationId,
@@ -249,8 +257,8 @@ export const executeAssistantRun = async (
     }
 
     const finalResponse = await repairStructuredResponseIfNeeded({
-        chat: dependencies.chat,
-        expectSessionTitle: dependencies.requestSessionTitle,
+        chat: dependencies.services.chat,
+        expectSessionTitle: dependencies.inputs.requestSessionTitle,
         messages,
         rawResponse: response,
         timing,
@@ -261,8 +269,8 @@ export const executeAssistantRun = async (
             content: finalResponse.answer,
             createdAt: new Date().toISOString(),
             kind: 'response',
-            runId: dependencies.runId,
-            sessionId: dependencies.sessionId,
+            runId: dependencies.context.runId,
+            sessionId: dependencies.context.sessionId,
             title: finalResponse.responseTitle,
         },
         sessionTitle: finalResponse.sessionTitle,
@@ -368,7 +376,7 @@ const buildMetadataRepairPrompt = (expectSessionTitle: boolean): string => [
 const executeSearchCorpusToolCall = async (request: {
     maxEvidenceResults: number;
     remainingTurns: number;
-    retrieval: ExecuteAssistantRunDependencies['retrieval'];
+    retrieval: ExecuteAssistantRunDependencies['services']['retrieval'];
     timing: TimingContext;
     toolCall: ChatToolCall;
 }): Promise<{ consumeTurn: boolean; content: string }> => {

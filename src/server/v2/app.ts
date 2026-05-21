@@ -12,6 +12,7 @@ import {
     createRunCoordinator,
     createStartupOrchestrator,
     createRuntimeEventPublisher,
+    createRefreshVisibility,
 } from './services/index.js';
 import {
     createOpenAiChatAdapter,
@@ -40,14 +41,7 @@ export interface AppContext extends AppDb {
 
 // noinspection JSUnusedGlobalSymbols
 export interface CreateAppDependencies {
-    appDbPath?: string;
-    consoleEventsFactory?: (appDb: AppDb) => Promise<ConsoleEventPublisher>;
-    refreshCoordinatorFactory?: (
-        appDb: AppDb,
-        dependencies: { consoleEvents: ConsoleEventPublisher; runtimeEvents: RuntimeEventPublisher },
-    ) => RefreshCoordinator;
     repoRoot?: string;
-    runtimeEventsFactory?: () => RuntimeEventPublisher;
 }
 
 // noinspection JSUnusedGlobalSymbols
@@ -55,11 +49,10 @@ export const createApp = async (dependencies: CreateAppDependencies = {}): Promi
     const repoRoot = dependencies.repoRoot ?? process.cwd();
     const appDb = await createAppDb();
     await initializeSettingsStore(appDb);
-    const consoleEvents = await (dependencies.consoleEventsFactory ?? createConsoleEventPublisher)(appDb);
-    const runtimeEvents = (dependencies.runtimeEventsFactory ?? createRuntimeEventPublisher)();
-    const refreshCoordinator = (dependencies.refreshCoordinatorFactory ?? createRefreshCoordinator)(appDb, {
-        consoleEvents,
-        runtimeEvents,
+    const consoleEvents = await createConsoleEventPublisher(appDb);
+    const runtimeEvents = createRuntimeEventPublisher();
+    const refreshCoordinator = createRefreshCoordinator(appDb, {
+        visibility: createRefreshVisibility(consoleEvents, runtimeEvents),
     });
     const store = settingsStore();
     const runtimePaths = resolveRuntimePaths(repoRoot);
@@ -85,7 +78,6 @@ export const createApp = async (dependencies: CreateAppDependencies = {}): Promi
     const startupOrchestrator = createStartupOrchestrator(appDb, {
         consoleEvents,
         refreshCoordinator,
-        repoRoot,
         runtimeEvents,
     });
 

@@ -1,11 +1,10 @@
-import type { AppDb } from '../db/app/index.js';
 import type { ConsoleEventPublisher } from './console-event-publisher.js';
 import { createRefreshStateStore } from './refresh/index.js';
 import { recoverStartupRefreshOperation } from './refresh/startup-recovery.js';
 import { createRefreshVisibility } from './refresh/visibility.js';
 import type { RefreshCoordinator } from './refresh/index.js';
 import type { RuntimeEventPublisher } from './runtime-event-publisher.js';
-import { initializeSettingsStore } from '../db/app/settings/settingsStore.js';
+import { AppDb, initializeSettingsStore } from '@server/db/app/index.js';
 
 /**
  * Startup orchestration stays focused on app-launch-origin work only:
@@ -20,7 +19,6 @@ export interface StartupOrchestratorDependencies {
     consoleEvents: ConsoleEventPublisher;
     now?: () => Date;
     refreshCoordinator: RefreshCoordinator;
-    repoRoot?: string;
     runtimeEvents: RuntimeEventPublisher;
 }
 

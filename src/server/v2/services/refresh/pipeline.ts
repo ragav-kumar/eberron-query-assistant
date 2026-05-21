@@ -32,7 +32,6 @@ export interface RefreshPipelineDependencies {
     now?: () => Date;
     pdfParser?: PdfParser;
     repoRoot?: string;
-    reporter?: ProgressReporter;
     retrievalFactory?: (reporter: ProgressReporter) => Promise<CorpusRetrievalService | null>;
 }
 
@@ -75,7 +74,7 @@ export const createRefreshPipeline = (
 
     return {
         run: async (kind, options = {}) => {
-            const reporter = options.reporter ?? dependencies.reporter ?? {
+            const reporter = options.reporter ?? {
                 info: () => undefined,
                 warn: () => undefined,
             };

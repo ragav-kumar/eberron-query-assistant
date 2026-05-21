@@ -3,12 +3,10 @@ import { createTaggedError, isOperationAbortedError } from '@/errors.js';
 import type { AppDb, SelectRow } from '@server/db/app/index.js';
 import type { RefreshOperationKind } from '@/types.js';
 
-import type { ConsoleEventPublisher } from '../console-event-publisher.js';
-import type { RuntimeEventPublisher } from '../runtime-event-publisher.js';
-import { createRefreshPipeline, type RefreshPipeline, type RefreshPipelineDependencies } from './pipeline.js';
+import { createRefreshPipeline, type RefreshPipeline } from './pipeline.js';
 import { createRefreshStateStore, type RefreshStateStore } from './refresh-state.js';
 import { assertCanStartOperation } from './state-machine.js';
-import { createRefreshVisibility, type RefreshVisibility } from './visibility.js';
+import type { RefreshVisibility } from './visibility.js';
 
 /**
  * API-facing entrypoint for the refresh feature.
@@ -27,12 +25,9 @@ interface ActiveRefreshOperation {
  * Optional seams for testing and app bootstrap composition.
  */
 export interface RefreshCoordinatorDependencies {
-    consoleEvents?: ConsoleEventPublisher;
     now?: () => Date;
     pipeline?: RefreshPipeline;
-    pipelineDependencies?: RefreshPipelineDependencies;
     refreshStateStore?: RefreshStateStore;
-    runtimeEvents?: RuntimeEventPublisher;
     visibility?: RefreshVisibility;
 }
 
@@ -49,50 +44,11 @@ export const createRefreshCoordinator = (
 ): RefreshCoordinator => {
     const now = dependencies.now ?? (() => new Date());
     const refreshStateStore = dependencies.refreshStateStore ?? createRefreshStateStore(appDb);
-    const consoleEvents = dependencies.consoleEvents ?? {
-        debug: (_message: string, _timestamp?: string) => Promise.resolve({
-            id: 'noop',
-            level: 'debug' as const,
-            message: '',
-            timestamp: '',
-        }),
-        error: (_message: string, _timestamp?: string) => Promise.resolve({
-            id: 'noop',
-            level: 'error' as const,
-            message: '',
-            timestamp: '',
-        }),
-        info: (_message: string, _timestamp?: string) => Promise.resolve({
-            id: 'noop',
-            level: 'info' as const,
-            message: '',
-            timestamp: '',
-        }),
-        snapshot: () => Promise.resolve([]),
-        subscribe: () => () => undefined,
-        warn: (_message: string, _timestamp?: string) => Promise.resolve({
-            id: 'noop',
-            level: 'warn' as const,
-            message: '',
-            timestamp: '',
-        }),
-    };
-    const runtimeEvents = dependencies.runtimeEvents ?? {
-        publish: (_event) => undefined,
-        publishRefreshEvent: event => ({
-            ...event,
-            resource: 'refresh' as const,
-        }),
-        subscribe: () => () => undefined,
-    };
-    const visibility = dependencies.visibility ?? createRefreshVisibility(
-        consoleEvents,
-        runtimeEvents,
-    );
-    const pipeline = dependencies.pipeline ?? createRefreshPipeline(appDb, {
-        ...dependencies.pipelineDependencies,
-        reporter: dependencies.pipelineDependencies?.reporter,
-    });
+    const visibility = dependencies.visibility;
+    const pipeline = dependencies.pipeline ?? createRefreshPipeline(appDb);
+    if (!visibility) {
+        throw new Error('Refresh coordinator requires a visibility publisher.');
+    }
     let activeOperation: ActiveRefreshOperation | null = null;
 
     return {
