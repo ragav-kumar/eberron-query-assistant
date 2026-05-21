@@ -1,8 +1,7 @@
 import type { IngestedArticle } from '@server/db/app/index.js';
+import { settingsStore } from '@server/db/app/index.js';
 
 import type { ArticleDiscoveryResult } from '../types.js';
-
-const ARTICLE_INDEX_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Decides whether the remote article index should be scraped during this run.
@@ -16,6 +15,7 @@ export const discoverArticleRefresh = (
     forceReingest: boolean,
     now: Date,
 ): ArticleDiscoveryResult => {
+    const refreshIntervalMs = settingsStore().read('articleIndexRefreshIntervalMs');
     if (forceReingest) {
         return {
             currentArticles,
@@ -40,6 +40,6 @@ export const discoverArticleRefresh = (
 
     return {
         currentArticles,
-        shouldRefreshIndex: now.getTime() - lastScrapeTime >= ARTICLE_INDEX_INTERVAL_MS,
+        shouldRefreshIndex: now.getTime() - lastScrapeTime >= refreshIntervalMs,
     };
 };

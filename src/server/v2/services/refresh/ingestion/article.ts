@@ -4,15 +4,11 @@ import * as cheerio from 'cheerio';
 
 import { createTaggedError } from '@/errors.js';
 import type { IngestedArticle } from '@server/db/app/index.js';
+import { settingsStore } from '@server/db/app/index.js';
 import type { CorpusChunk, CorpusSource } from '@/types.js';
 
 import type { SourceChangeSet } from '../types.js';
 import { chunkText, normalizeText } from './chunking.js';
-
-/**
- * Canonical index page used to discover Keith Baker article URLs.
- */
-export const KEITH_BAKER_INDEX_URL = 'https://keith-baker.com/eberron-index/';
 
 const FETCH_TIMEOUT_MS = 30_000;
 const PERMANENTLY_INACCESSIBLE_STATUSES = new Set([403, 404]);
@@ -89,6 +85,7 @@ export const buildArticleRefresh = async (options: {
     articleRows: IngestedArticle[];
     changeSet: SourceChangeSet;
 }> => {
+    const indexUrl = settingsStore().read('articleIndexUrl');
     const byUrl = new Map(options.currentArticles.map(article => [article.canonicalUrl, article]));
     if (!options.shouldRefreshIndex) {
         return {
@@ -99,8 +96,8 @@ export const buildArticleRefresh = async (options: {
         };
     }
 
-    const indexHtml = await options.fetcher.fetchText(KEITH_BAKER_INDEX_URL, { signal: options.abortSignal });
-    const discovered = discoverArticleLinks(indexHtml, [...byUrl.values()], options.now);
+    const indexHtml = await options.fetcher.fetchText(indexUrl, { signal: options.abortSignal });
+    const discovered = discoverArticleLinks(indexHtml, [...byUrl.values()], indexUrl, options.now);
     const candidates = options.forceReingest
         ? discovered.articles
         : discovered.articles.filter(article => article.scrapeStatus !== 'succeeded' || !article.lastIngestedAt);
@@ -154,6 +151,7 @@ const isPermanentlyInaccessibleArticleFetch = (value: unknown): value is HttpFet
 const discoverArticleLinks = (
     indexHtml: string,
     previousArticles: IngestedArticle[],
+    indexUrl: string,
     now: string,
 ): {
     articles: IngestedArticle[];
@@ -168,7 +166,7 @@ const discoverArticleLinks = (
             root
                 .find('a[href]')
                 .toArray()
-                .map(element => canonicalArticleUrl($(element).attr('href')))
+                .map(element => canonicalArticleUrl($(element).attr('href'), indexUrl))
                 .filter((url): url is string => url !== null),
         ),
     ].sort((left, right) => left.localeCompare(right));
@@ -289,14 +287,14 @@ const normalizeArticle = (
  * Restricts discovered links to the canonical Keith Baker domain and strips
  * query/hash fragments so article rows stay stable across runs.
  */
-const canonicalArticleUrl = (href: string | undefined): string | null => {
+const canonicalArticleUrl = (href: string | undefined, indexUrl: string): string | null => {
     if (!href) {
         return null;
     }
 
     let url: URL;
     try {
-        url = new URL(href, KEITH_BAKER_INDEX_URL);
+        url = new URL(href, indexUrl);
     } catch {
         return null;
     }
@@ -308,7 +306,7 @@ const canonicalArticleUrl = (href: string | undefined): string | null => {
     url.hash = '';
     url.search = '';
     const value = url.toString();
-    if (value === KEITH_BAKER_INDEX_URL || !value.startsWith('https://keith-baker.com/')) {
+    if (value === indexUrl || !value.startsWith('https://keith-baker.com/')) {
         return null;
     }
     return value;

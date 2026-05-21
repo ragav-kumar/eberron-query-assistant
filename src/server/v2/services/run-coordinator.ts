@@ -72,7 +72,8 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
             .execute();
         let nextSequenceIndex = (existingEntries.at(-1)?.sequenceIndex ?? 0) + 1;
         const requestSessionTitle = existingEntries.filter(entry => entry.kind === 'response').length === 0;
-        const additionalContext = settingsStore().read('additionalContext');
+        const settings = settingsStore();
+        const additionalContext = settings.read('additionalContext');
         const partyContext = normalized.includePartyContext
             ? await dependencies.partyContext.build(dependencies.retrievalDir)
             : '';
@@ -223,7 +224,10 @@ const normalizeCreateRunRequest = (request: CreateRunDto): CreateRunDto & { prom
     return {
         ...request,
         prompt,
-        retrievalTurnLimit: Math.min(3, Math.max(0, Math.trunc(request.retrievalTurnLimit))),
+        retrievalTurnLimit: Math.min(
+            settingsStore().read('retrievalMaxToolTurns'),
+            Math.max(0, Math.trunc(request.retrievalTurnLimit)),
+        ),
     };
 };
 

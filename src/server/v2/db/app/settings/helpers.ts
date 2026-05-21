@@ -7,9 +7,13 @@ export const parseSetting = <K extends SettingKeyName>(key: K, stringValue: stri
         case 'foundryLastSuccessfulExportGeneratedAt':
             return new Date(stringValue) as Settings[K];
 
+        case 'articleIndexRefreshIntervalMs':
         case 'foundryLastSuccessfulExportDeleteCount':
         case 'foundryLastSuccessfulExportRecordCount':
         case 'foundryLastSuccessfulExportUpsertCount':
+        case 'retrievalMaxEvidenceResults':
+        case 'retrievalMaxToolTurns':
+        case 'retrievalMaxVectorCacheDatabaseBytes':
             return Number.parseInt(stringValue, 10) as Settings[K];
 
         case 'partyActorUuids':
@@ -20,6 +24,32 @@ export const parseSetting = <K extends SettingKeyName>(key: K, stringValue: stri
 
         default:
             return stringValue as Settings[K];
+    }
+};
+
+export const serializeSetting = <K extends SettingKeyName>(key: K, value: Settings[K]): string => {
+    switch (key) {
+        case 'articleLastSuccessfulIndexScrapeAt':
+        case 'foundryLastSuccessfulExportGeneratedAt':
+            return (value as Date).toISOString();
+
+        case 'articleIndexRefreshIntervalMs':
+        case 'foundryLastSuccessfulExportDeleteCount':
+        case 'foundryLastSuccessfulExportRecordCount':
+        case 'foundryLastSuccessfulExportUpsertCount':
+        case 'retrievalMaxEvidenceResults':
+        case 'retrievalMaxToolTurns':
+        case 'retrievalMaxVectorCacheDatabaseBytes':
+            return String(value);
+
+        case 'partyActorUuids':
+            return JSON.stringify(value);
+
+        case 'providerDebug':
+            return value ? 'true' : 'false';
+
+        default:
+            return String(value);
     }
 };
 

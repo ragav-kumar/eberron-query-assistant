@@ -4,8 +4,9 @@ import { createTaggedError } from '@/errors.js';
 import { createNoopTimingReporter, type TimingContext } from '@/timing.js';
 import type { SessionEntryReasoningDto, SessionEntryResponseDto } from '@/dto/index.js';
 import type { RetrievalResult, SourceType } from '@/types.js';
+import { settingsStore } from '@server/db/app/index.js';
 import {
-    RETRIEVAL_TOOL,
+    buildRetrievalTool,
     buildRetrievalToolInstructions,
     clampRetrievalTurnLimit,
     completeStructured,
@@ -66,8 +67,6 @@ export interface AssistantRunResult {
     response: Omit<SessionEntryResponseDto, 'id'>;
     sessionTitle: string | null;
 }
-
-const MAX_EVIDENCE_RESULTS = 8;
 
 /**
  * Loads the tracked V2 prompt markdown assets needed for assistant execution.
@@ -161,14 +160,21 @@ export const buildAssistantMessages = (request: AssistantMessageBuildRequest): C
 export const executeAssistantRun = async (
     dependencies: ExecuteAssistantRunDependencies,
 ): Promise<AssistantRunResult> => {
+    const store = settingsStore();
+    const retrievalMaxToolTurns = store.read('retrievalMaxToolTurns');
+    const retrievalMaxEvidenceResults = store.read('retrievalMaxEvidenceResults');
     const timing: TimingContext = {
         operation: 'assistant',
         operationId: dependencies.runId,
         reporter: createNoopTimingReporter(),
     };
-    const retrievalTurnLimit = clampRetrievalTurnLimit(dependencies.retrievalTurnLimit);
+    const retrievalTurnLimit = clampRetrievalTurnLimit(
+        dependencies.retrievalTurnLimit,
+        retrievalMaxToolTurns,
+    );
+    const retrievalTool = buildRetrievalTool(retrievalMaxEvidenceResults);
     const initialEvidence = await dependencies.retrieval.search({
-        limit: MAX_EVIDENCE_RESULTS,
+        limit: retrievalMaxEvidenceResults,
         query: dependencies.prompt,
         timing,
     });
@@ -190,7 +196,7 @@ export const executeAssistantRun = async (
             operationId: timing.operationId,
             purpose: 'assistant',
         },
-        ...(retrievalTurnLimit > 0 ? {tools: [RETRIEVAL_TOOL]} : {}),
+        ...(retrievalTurnLimit > 0 ? {tools: [retrievalTool]} : {}),
     });
     let remainingTurns = retrievalTurnLimit;
 
@@ -215,6 +221,7 @@ export const executeAssistantRun = async (
 
         for (const toolCall of response.toolCalls) {
             const toolResult = await executeSearchCorpusToolCall({
+                maxEvidenceResults: retrievalMaxEvidenceResults,
                 remainingTurns,
                 retrieval: dependencies.retrieval,
                 timing,
@@ -237,7 +244,7 @@ export const executeAssistantRun = async (
                 operationId: timing.operationId,
                 purpose: 'assistant',
             },
-            ...(remainingTurns > 0 ? {tools: [RETRIEVAL_TOOL]} : {}),
+            ...(remainingTurns > 0 ? {tools: [retrievalTool]} : {}),
         });
     }
 
@@ -359,6 +366,7 @@ const buildMetadataRepairPrompt = (expectSessionTitle: boolean): string => [
 ].join('\n');
 
 const executeSearchCorpusToolCall = async (request: {
+    maxEvidenceResults: number;
     remainingTurns: number;
     retrieval: ExecuteAssistantRunDependencies['retrieval'];
     timing: TimingContext;
@@ -377,7 +385,7 @@ const executeSearchCorpusToolCall = async (request: {
         };
     }
 
-    const parsedArgs = readSearchCorpusArgs(request.toolCall.arguments);
+    const parsedArgs = readSearchCorpusArgs(request.toolCall.arguments, request.maxEvidenceResults);
     if (!parsedArgs.ok) {
         return {
             consumeTurn: false,
@@ -404,7 +412,10 @@ const executeSearchCorpusToolCall = async (request: {
     };
 };
 
-const readSearchCorpusArgs = (rawArguments: string): {ok: true; value: SearchCorpusToolArgs} | {message: string; ok: false} => {
+const readSearchCorpusArgs = (
+    rawArguments: string,
+    maxEvidenceResults: number,
+): {ok: true; value: SearchCorpusToolArgs} | {message: string; ok: false} => {
     let parsed: unknown;
     try {
         parsed = JSON.parse(rawArguments) as unknown;
@@ -450,7 +461,7 @@ const readSearchCorpusArgs = (rawArguments: string): {ok: true; value: SearchCor
     return {
         ok: true,
         value: {
-            limit: clampEvidenceLimit(record.limit),
+            limit: clampEvidenceLimit(record.limit, maxEvidenceResults),
             query,
             ...(sourceKeys.value ? {sourceKeys: sourceKeys.value} : {}),
             ...(sourceTypes.value ? {sourceTypes: sourceTypes.value} : {}),
@@ -500,12 +511,12 @@ const readStringArray = (
     };
 };
 
-const clampEvidenceLimit = (value: unknown): number => {
+const clampEvidenceLimit = (value: unknown, maxEvidenceResults: number): number => {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
-        return MAX_EVIDENCE_RESULTS;
+        return maxEvidenceResults;
     }
 
-    return Math.min(MAX_EVIDENCE_RESULTS, Math.max(1, Math.trunc(value)));
+    return Math.min(maxEvidenceResults, Math.max(1, Math.trunc(value)));
 };
 
 const formatEvidence = (results: RetrievalResult[]): string => {

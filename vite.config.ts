@@ -1,18 +1,28 @@
 import { fileURLToPath, URL } from 'node:url';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, type PluginOption } from 'vite';
 import checker from 'vite-plugin-checker';
 
 import { eberronApiPlugin } from './src/server/vite-plugin.js';
-import { resolveServerPort } from './src/server/v2/server-config.js';
+import {
+  serverHost,
+  serverPort
+} from './src/server/v2/db/app/settings/defaults.js';
 
-const serverTarget = `http://127.0.0.1:${resolveServerPort()}`;
+const createCheckerPlugin = checker as (options: {
+  typescript: boolean;
+  eslint: {
+    lintCommand: string;
+  };
+}) => PluginOption;
+
+const serverTarget = `http://${serverHost}:${serverPort}`;
 
 export default defineConfig({
   plugins: [
     eberronApiPlugin(),
     react(),
-    checker({
+    createCheckerPlugin({
       typescript: true,
       eslint: {
         lintCommand: 'eslint .'

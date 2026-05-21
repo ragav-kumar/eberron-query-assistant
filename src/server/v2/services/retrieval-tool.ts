@@ -15,11 +15,9 @@ import type {
  * self-contained after removing the cross-version import, and its API/shape
  * should be revisited rather than extended casually.
  */
-const MAX_EVIDENCE_RESULTS = 8;
-const MAX_RETRIEVAL_TOOL_TURNS = 3;
 const SEARCH_CORPUS_TOOL_NAME = 'search_corpus';
 
-export const RETRIEVAL_TOOL: ChatToolDefinition = {
+export const buildRetrievalTool = (maxEvidenceResults: number): ChatToolDefinition => ({
     description: 'Search the local Eberron corpus for targeted supporting evidence.',
     name: SEARCH_CORPUS_TOOL_NAME,
     parameters: {
@@ -44,7 +42,7 @@ export const RETRIEVAL_TOOL: ChatToolDefinition = {
             limit: {
                 type: 'integer',
                 minimum: 1,
-                maximum: MAX_EVIDENCE_RESULTS,
+                maximum: maxEvidenceResults,
             },
             userMessage: {
                 type: 'string',
@@ -52,14 +50,14 @@ export const RETRIEVAL_TOOL: ChatToolDefinition = {
         },
         required: ['query', 'userMessage'],
     },
-};
+});
 
-export const clampRetrievalTurnLimit = (value: number): number => {
+export const clampRetrievalTurnLimit = (value: number, maxRetrievalToolTurns: number): number => {
     if (!Number.isFinite(value)) {
         return 1;
     }
 
-    return Math.min(MAX_RETRIEVAL_TOOL_TURNS, Math.max(0, Math.trunc(value)));
+    return Math.min(maxRetrievalToolTurns, Math.max(0, Math.trunc(value)));
 };
 
 export const buildRetrievalToolInstructions = (retrievalTurnLimit: number): string => retrievalTurnLimit > 0

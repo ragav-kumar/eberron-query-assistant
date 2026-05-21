@@ -1,10 +1,12 @@
 import { SettingKeyName, settingKeyNames, settingKeys, SettingsHelper } from './settingKeys.js';
 import { AppDb } from '../db.js';
 import { defaults } from './defaults.js';
-import { assignSetting, parseSetting } from './helpers.js';
+import { assignSetting, parseSetting, serializeSetting } from './helpers.js';
 
 interface TypedSettings {
     articleLastSuccessfulIndexScrapeAt: Date | undefined;
+    articleIndexRefreshIntervalMs: number;
+    articleIndexUrl: string;
     foundryLastSuccessfulExportDeleteCount: number | undefined;
     foundryLastSuccessfulExportFilename: string | undefined;
     foundryLastSuccessfulExportGeneratedAt: Date | undefined;
@@ -15,6 +17,9 @@ interface TypedSettings {
 
     partyActorUuids: string[];
     providerDebug: boolean;
+    retrievalMaxEvidenceResults: number;
+    retrievalMaxToolTurns: number;
+    retrievalMaxVectorCacheDatabaseBytes: number;
 }
 
 const optionalSettingDefaults = {
@@ -40,7 +45,7 @@ interface SettingsStore {
 }
 
 export const initializeSettingsStore = async (appDb: AppDb) => {
-    const insertIfMissing = async <T>(key: SettingKeyName) => {
+    const insertIfMissing = async (key: SettingKeyName) => {
         if (Object.hasOwnProperty.call(optionalSettingDefaults, key)) {
             return;
         }
@@ -53,9 +58,9 @@ export const initializeSettingsStore = async (appDb: AppDb) => {
         if (existing != null) {
             return;
         }
-        const defaultValue = defaults[key as keyof typeof defaults] as T;
+        const defaultValue = defaults[key as keyof typeof defaults] as Settings[typeof key];
 
-        await SettingsHelper.write(appDb.db, dbKey, JSON.stringify(defaultValue));
+        await SettingsHelper.write(appDb.db, dbKey, serializeSetting(key, defaultValue));
     };
 
     for (const settingKey of Object.keys(settingKeys) as SettingKeyName[]) {
@@ -83,7 +88,7 @@ export const settingsStore = (): SettingsStore => {
     const writeSetting = async <T extends SettingKeyName>(appDb: AppDb, key: T, value: Settings[T]) => {
         // write value
         const dbKey = settingKeys[key];
-        await SettingsHelper.write(appDb.db, dbKey, JSON.stringify(value));
+        await SettingsHelper.write(appDb.db, dbKey, serializeSetting(key, value));
 
         // Update value in settingData
         settingsData![key] = value;

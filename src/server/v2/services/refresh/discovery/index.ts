@@ -37,7 +37,12 @@ export const discoverRefreshWork = async (
     ]);
 
     return {
-        article: discoverArticleRefresh(currentArticles, lastSuccessfulIndexScrapeAt, forceReingest, now()),
+        article: discoverArticleRefresh(
+            currentArticles,
+            lastSuccessfulIndexScrapeAt,
+            forceReingest,
+            now(),
+        ),
         foundry,
         pdf,
     };

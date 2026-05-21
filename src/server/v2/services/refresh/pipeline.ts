@@ -60,9 +60,15 @@ export const createRefreshPipeline = (
     const pdfParser = dependencies.pdfParser ?? createPdfDataExtractParser();
     const repoRoot = dependencies.repoRoot ?? process.cwd();
     const retrievalFactory = dependencies.retrievalFactory ?? ((pipelineReporter) => {
-        const providerSettings = buildEmbeddingConfig();
+        const store = settingsStore();
+        const providerSettings: OpenAiEmbeddingConfig = {
+            apiKey: store.read('providerApiKey'),
+            baseUrl: store.read('providerBaseUrl'),
+            embeddingModel: store.read('providerEmbeddingModel'),
+        };
         return Promise.resolve(createCorpusRetrievalService({
             embeddingAdapter: createOpenAiEmbeddingAdapter(providerSettings),
+            maxVectorCacheDatabaseBytes: store.read('retrievalMaxVectorCacheDatabaseBytes'),
             reporter: pipelineReporter,
         }));
     });
@@ -170,16 +176,6 @@ export const createRefreshPipeline = (
                 kind,
             };
         },
-    };
-};
-
-/** Reads the current embedding-provider configuration from the initialized store. */
-const buildEmbeddingConfig = (): OpenAiEmbeddingConfig => {
-    const store = settingsStore();
-    return {
-        apiKey: store.read('providerApiKey'),
-        baseUrl: store.read('providerBaseUrl'),
-        embeddingModel: store.read('providerEmbeddingModel'),
     };
 };
 

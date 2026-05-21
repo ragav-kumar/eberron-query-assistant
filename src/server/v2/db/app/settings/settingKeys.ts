@@ -5,6 +5,8 @@ export const settingKeys = {
     additionalContext: 'additional-context',
     articleLastSuccessfulIndexScrapeAt: 'article-last-successful-index-scrape-at',
     articleHtmlCacheDir: 'article-html-cache-dir',
+    articleIndexRefreshIntervalMs: 'article-index-refresh-interval-ms',
+    articleIndexUrl: 'article-index-url',
     campaignJournalFolder: 'campaign-journal-folder',
     foundryLastSuccessfulExportDeleteCount: 'foundry-last-successful-export-delete-count',
     foundryLastSuccessfulExportFilename: 'foundry-last-successful-export-filename',
@@ -23,6 +25,9 @@ export const settingKeys = {
     providerEmbeddingModel: 'provider-embedding-model',
     questsJournal: 'quests-journal',
     retrievalDir: 'retrieval-dir',
+    retrievalMaxEvidenceResults: 'retrieval-max-evidence-results',
+    retrievalMaxToolTurns: 'retrieval-max-tool-turns',
+    retrievalMaxVectorCacheDatabaseBytes: 'retrieval-max-vector-cache-database-bytes',
     sessionNotesJournal: 'session-notes-journal',
 } as const;
 

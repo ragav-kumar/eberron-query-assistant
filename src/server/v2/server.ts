@@ -6,9 +6,9 @@ import {
 } from './app.js';
 import { createApiHandler } from './api/index.js';
 import {
-    DEFAULT_SERVER_HOST,
-    resolveServerPort,
-} from './server-config.js';
+    serverHost,
+    serverPort,
+} from './db/app/settings/defaults.js';
 
 export interface ServerRuntime {
     close: () => Promise<void>;
@@ -58,8 +58,8 @@ export const startServer = async (
     options: StartServerOptions = {},
 ): Promise<StartedServer> => {
     const runtime = options.runtime ?? await createServerRuntime(options.appDependencies);
-    const host = options.host ?? DEFAULT_SERVER_HOST;
-    const requestedPort = options.port ?? resolveServerPort();
+    const host = options.host ?? serverHost;
+    const requestedPort = options.port ?? serverPort;
     const server = createServer(createRequestListener(runtime));
 
     try {

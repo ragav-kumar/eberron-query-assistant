@@ -61,10 +61,17 @@ export const createApp = async (dependencies: CreateAppDependencies = {}): Promi
         consoleEvents,
         runtimeEvents,
     });
+    const store = settingsStore();
     const runtimePaths = resolveRuntimePaths(repoRoot);
-    const providerConfig = readProviderConfig();
+    const providerConfig: ProviderConfig = {
+        apiKey: store.read('providerApiKey'),
+        baseUrl: store.read('providerBaseUrl'),
+        chatModel: store.read('providerChatModel'),
+        embeddingModel: store.read('providerEmbeddingModel'),
+    };
     const retrieval = createCorpusRetrievalService({
         embeddingAdapter: createOpenAiEmbeddingAdapter(providerConfig),
+        maxVectorCacheDatabaseBytes: store.read('retrievalMaxVectorCacheDatabaseBytes'),
         reporter: {
             info: (message) => {
                 console.info(message);
@@ -98,17 +105,6 @@ export const createApp = async (dependencies: CreateAppDependencies = {}): Promi
         }),
         consoleEvents,
         runtimeEvents,
-    };
-};
-
-/** Reads the current provider configuration from the initialized store. */
-const readProviderConfig = (): ProviderConfig => {
-    const store = settingsStore();
-    return {
-        apiKey: store.read('providerApiKey'),
-        baseUrl: store.read('providerBaseUrl'),
-        chatModel: store.read('providerChatModel'),
-        embeddingModel: store.read('providerEmbeddingModel'),
     };
 };
 
