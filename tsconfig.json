@@ -14,7 +14,9 @@
     "noImplicitOverride": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["src/*"],
+      "@client/*": ["src/client/v2/*"],
+      "@server/*": ["src/server/v2/*"]
     },
     "types": ["node", "vite/client"]
   },

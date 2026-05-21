@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import type { AppDatabaseSchema } from './schema.js';
+import type { AppDatabaseSchema } from '../schema.js';
 
 export const settingKeys = {
     additionalContext: 'additional-context',
@@ -26,13 +26,27 @@ export const settingKeys = {
     sessionNotesJournal: 'session-notes-journal',
 } as const;
 
-export type SettingKey = (typeof settingKeys)[keyof typeof settingKeys];
+
 export type SettingKeyName = keyof typeof settingKeys;
+export type SettingKey = (typeof settingKeys)[SettingKeyName];
+
+let reverseLookup: Record<SettingKey, SettingKeyName> | undefined = undefined;
+
+const getKeyName = (key: SettingKey): SettingKeyName => {
+    if (reverseLookup == null) {
+        const partialReverseLookup: Partial<Record<SettingKey, SettingKeyName>> = {};
+        for (const [key, value] of Object.entries(settingKeys)) {
+            partialReverseLookup[value] = key as SettingKeyName;
+        }
+        reverseLookup = partialReverseLookup as Record<SettingKey, SettingKeyName>;
+    }
+    return reverseLookup[key];
+};
 
 /**
  * Helpers for interacting with Settings. Intentionally does not parse types. You want that, you need something more robust.
  */
-export const Settings = {
+export const SettingsHelper = {
     read: async (db: Kysely<AppDatabaseSchema>, key: SettingKey): Promise<string | null> => db
         .selectFrom('settings')
         .select('value')
@@ -40,21 +54,28 @@ export const Settings = {
         .executeTakeFirst()
         .then((row) => row?.value ?? null),
 
-    readMany: async <T extends SettingKey>(
+    /**
+     * Should only be used by settingsStore.
+     */
+    readMany: async <T extends SettingKeyName>(
         db: Kysely<AppDatabaseSchema>,
         keys: readonly T[],
-    ): Promise<Map<T, string>> => {
+    ): Promise<{key: T, dbKey: (typeof settingKeys)[T], stringValue: string}[]> => {
         if (keys.length === 0) {
-            return new Map<T, string>();
+            return [];
         }
 
         const rows = await db
             .selectFrom('settings')
             .select(['key', 'value'])
-            .where('key', 'in', [...keys])
+            .where('key', 'in', [...keys.map(key => settingKeys[key])])
             .execute();
 
-        return new Map(rows.map((row) => [row.key as T, row.value]));
+        return rows.map((row) => ({
+            key: getKeyName(row.key as SettingKey) as T,
+            dbKey: row.key as (typeof settingKeys)[T],
+            stringValue: row.value,
+        }));
     },
 
     write: async (db: Kysely<AppDatabaseSchema>, key: SettingKey, value: string) => {

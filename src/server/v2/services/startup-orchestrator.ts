@@ -1,11 +1,11 @@
 import type { AppDb } from '../db/app/index.js';
-import { initializeSettings } from '../settings/index.js';
 import type { ConsoleEventPublisher } from './console-event-publisher.js';
 import { createRefreshStateStore } from './refresh/index.js';
 import { recoverStartupRefreshOperation } from './refresh/startup-recovery.js';
 import { createRefreshVisibility } from './refresh/visibility.js';
 import type { RefreshCoordinator } from './refresh/index.js';
 import type { RuntimeEventPublisher } from './runtime-event-publisher.js';
+import { initializeSettingsStore } from '../db/app/settings/settingsStore.js';
 
 /**
  * Startup orchestration stays focused on app-launch-origin work only:
@@ -43,7 +43,7 @@ export const createStartupOrchestrator = (
     return {
         bootstrap: async () => {
             await refreshStateStore.ensure();
-            await initializeSettings(appDb);
+            await initializeSettingsStore(appDb);
         },
         startBackgroundRefresh: () => {
             void runStartupRefresh().catch(error => {

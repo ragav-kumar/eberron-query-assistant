@@ -1,14 +1,14 @@
 import type { RouteDefinition } from './shared.js';
 import { readText } from '../request.js';
 import { writeMarkdown } from '../response.js';
-import { settingKeys, Settings } from '../../db/app/index.js';
+import { settingsStore } from '@server/db/app/index.js';
 
 export const additionalContextRoutes: RouteDefinition[] = [
     {
         method: 'GET',
         path: '/api/v2/additional-context',
-        handler: async ({response, context}) => {
-            const markdown = await Settings.read(context.db, settingKeys.additionalContext) ?? '';
+        handler: ({response}) => {
+            const markdown = settingsStore().read('additionalContext');
             writeMarkdown(response, markdown);
         },
     },
@@ -17,7 +17,7 @@ export const additionalContextRoutes: RouteDefinition[] = [
         path: '/api/v2/additional-context',
         handler: async ({request, response, context}) => {
             const markdown = await readText(request);
-            await Settings.write(context.db, settingKeys.additionalContext, markdown);
+            await settingsStore().write(context, 'additionalContext', markdown);
 
             writeMarkdown(response, markdown);
         },

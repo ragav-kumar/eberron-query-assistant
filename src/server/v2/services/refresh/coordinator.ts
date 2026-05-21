@@ -1,6 +1,6 @@
 import type { CreateRefreshDto, RefreshDto } from '@/dto/index.js';
 import { createTaggedError, isOperationAbortedError } from '@/errors.js';
-import type { AppDb, SelectRow } from '@/server/v2/db/app/index.js';
+import type { AppDb, SelectRow } from '@server/db/app/index.js';
 import type { RefreshOperationKind } from '@/types.js';
 
 import type { ConsoleEventPublisher } from '../console-event-publisher.js';

@@ -4,10 +4,10 @@ import { type Insertable, type Kysely, type Transaction } from 'kysely';
 
 import type { CreateRunDto, RunDto, SessionEntryDto } from '@/dto/index.js';
 import { createTaggedError, formatThrownValue } from '@/errors.js';
-import { Settings, settingKeys, type AppDatabaseSchema, type SessionEntry, type UpdateRow } from '@/server/v2/db/app/index.js';
-import type { AppDb } from '@/server/v2/db/app/db.js';
-import type { PartyContextService } from '@/server/v2/db/corpus/party-context.js';
-import type { CorpusRetrievalService } from '@/server/v2/db/corpus/retrieval-service.js';
+import { SettingsHelper, settingKeys, type AppDatabaseSchema, type SessionEntry, type UpdateRow } from '@server/db/app/index.js';
+import type { AppDb } from '@server/db/app/db.js';
+import type { PartyContextService } from '@server/db/corpus/party-context.js';
+import type { CorpusRetrievalService } from '@server/db/corpus/retrieval-service.js';
 import type { ChatAdapter } from '@/server/v1/provider/index.js';
 
 import {
@@ -72,7 +72,7 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
             .execute();
         let nextSequenceIndex = (existingEntries.at(-1)?.sequenceIndex ?? 0) + 1;
         const requestSessionTitle = existingEntries.filter(entry => entry.kind === 'response').length === 0;
-        const additionalContext = await Settings.read(dependencies.appDb.db, settingKeys.additionalContext) ?? '';
+        const additionalContext = await SettingsHelper.read(dependencies.appDb.db, settingKeys.additionalContext) ?? '';
         const partyContext = normalized.includePartyContext
             ? await dependencies.partyContext.build(dependencies.retrievalDir)
             : '';

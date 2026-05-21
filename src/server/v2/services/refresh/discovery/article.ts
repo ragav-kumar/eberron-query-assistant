@@ -1,4 +1,4 @@
-import type { IngestedArticle } from '@/server/v2/db/app/index.js';
+import type { IngestedArticle } from '@server/db/app/index.js';
 
 import type { ArticleDiscoveryResult } from '../types.js';
 

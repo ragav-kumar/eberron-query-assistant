@@ -1,6 +1,6 @@
 import { createTaggedError, formatThrownValue, isRecord } from '@/errors.js';
-import type { EmbeddingAdapter } from '@/server/v2/db/corpus/index.js';
-import type { EmbeddingProviderSettings } from '@/server/v2/settings/index.js';
+import type { EmbeddingAdapter } from '@server/db/corpus/index.js';
+import type { EmbeddingProviderSettings } from '@server/settings/index.js';
 
 const DEFAULT_PROVIDER_TIMEOUT_MS = 60_000;
 const DEFAULT_PROVIDER_MAX_RETRIES = 3;

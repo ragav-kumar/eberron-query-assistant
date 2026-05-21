@@ -2,7 +2,7 @@ import { access } from 'node:fs/promises';
 
 import Database from 'better-sqlite3';
 
-import { Settings, type AppDb, settingKeys } from '../app/index.js';
+import { SettingsHelper, type AppDb, settingKeys } from '../app/index.js';
 import { isRecord } from '../../../../errors.js';
 
 import { getCorpusDatabasePath } from './database.js';
@@ -137,7 +137,7 @@ const formatPartyContext = (request: FormatPartyContextRequest): string => {
 };
 
 const readPartyContextSettings = async (appDb: AppDb): Promise<PartyContextSettings> => {
-    const values = await Settings.readMany(appDb.db, [
+    const values = await SettingsHelper.readMany(appDb.db, [
         settingKeys.campaignJournalFolder,
         settingKeys.partyActorUuids,
         settingKeys.questsJournal,

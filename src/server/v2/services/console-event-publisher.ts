@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { ConsoleEntryDto } from '@/dto/index.js';
-import { Settings, settingKeys, type AppDb } from '@/server/v2/db/app/index.js';
+import { AppDb } from '@server/db/app/index.js';
 import type { ConsoleLevel } from '@/types.js';
 
 type ConsoleEventSubscriber = (entry: ConsoleEntryDto) => void;
@@ -17,7 +17,7 @@ export interface ConsoleEventPublisher {
 
 export const createConsoleEventPublisher = async (appDb: AppDb): Promise<ConsoleEventPublisher> => {
     const subscribers = new Set<ConsoleEventSubscriber>();
-    const shouldPersist = await Settings.read(appDb.db, settingKeys.providerDebug) === 'true';
+    const shouldPersist = await SettingsHelper.read(appDb.db, settingKeys.providerDebug) === 'true';
     const inMemoryEntries: ConsoleEntryDto[] = [];
 
     const publish = async (

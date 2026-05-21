@@ -2,16 +2,16 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { CreateV2AppDependencies, V2AppContext } from '@/server/v2/app.js';
+import type { CreateV2AppDependencies, V2AppContext } from '@server/app.js';
 
 const createV2App = vi.fn<(dependencies?: CreateV2AppDependencies) => Promise<V2AppContext>>();
 const createV2ApiHandler = vi.fn<(app: V2AppContext) => (request: IncomingMessage, response: ServerResponse) => void>();
 
-vi.mock('@/server/v2/app.js', () => ({
+vi.mock('@server/app.js', () => ({
     createV2App,
 }));
 
-vi.mock('@/server/v2/api/index.js', () => ({
+vi.mock('@server/api/index.js', () => ({
     createV2ApiHandler,
 }));
 
@@ -34,7 +34,7 @@ describe('V2 server runtime', () => {
         createV2App.mockResolvedValue(app);
         createV2ApiHandler.mockReturnValue(handleRequest);
 
-        const { createV2ServerRuntime } = await import('@/server/v2/server.js');
+        const { createV2ServerRuntime } = await import('@server/server.js');
         const runtime = await createV2ServerRuntime({ repoRoot: 'C:/repo-root' });
 
         expect(createV2App).toHaveBeenCalledWith({ repoRoot: 'C:/repo-root' });
@@ -56,7 +56,7 @@ describe('V2 server runtime', () => {
         createV2App.mockResolvedValue(app);
         createV2ApiHandler.mockReturnValue(handleRequest);
 
-        const { createV2ServerRuntime } = await import('@/server/v2/server.js');
+        const { createV2ServerRuntime } = await import('@server/server.js');
         const runtime = await createV2ServerRuntime();
         const request = {} as IncomingMessage;
         const response = {} as ServerResponse;
@@ -80,7 +80,7 @@ describe('V2 server runtime', () => {
             handleRequest,
         };
 
-        const { startV2Server } = await import('@/server/v2/server.js');
+        const { startV2Server } = await import('@server/server.js');
         const startedServer = await startV2Server({
             host: '127.0.0.1',
             port: 0,
@@ -116,7 +116,7 @@ describe('V2 server runtime', () => {
             }),
         };
 
-        const { startV2Server } = await import('@/server/v2/server.js');
+        const { startV2Server } = await import('@server/server.js');
         const startedServer = await startV2Server({
             host: '127.0.0.1',
             port: 0,
@@ -148,7 +148,7 @@ describe('V2 server runtime', () => {
             handleRequest: vi.fn(),
         };
 
-        const { startV2Server } = await import('@/server/v2/server.js');
+        const { startV2Server } = await import('@server/server.js');
         const startedServer = await startV2Server({
             host: '127.0.0.1',
             port: 0,

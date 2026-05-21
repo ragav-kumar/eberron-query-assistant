@@ -6,13 +6,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
 import type { EmbeddingAdapter } from '@/server/v1/provider/index.js';
-import { createAppDb, getAppDatabasePath, settingKeys, type AppDb } from '@/server/v2/db/app/index.js';
+import { createAppDb, getAppDatabasePath, settingKeys, type AppDb } from '@server/db/app/index.js';
 import {
     createCorpusRetrievalService,
     createCorpusStore,
     createPartyContextService,
     getCorpusDatabasePath,
-} from '@/server/v2/db/corpus/index.js';
+} from '@server/db/corpus/index.js';
 import type { CorpusChunk, CorpusSource } from '@/types.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-corpus');

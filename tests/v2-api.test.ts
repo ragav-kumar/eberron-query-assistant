@@ -6,11 +6,11 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { ConsoleEntryDto, CreateRefreshDto, CreateRunDto } from '@/dto/index.js';
-import { createV2ApiHandler } from '@/server/v2/api/index.js';
-import type { V2AppContext } from '@/server/v2/app.js';
-import { createAppDb, getDefaultAppDatabasePath } from '@/server/v2/db/app/index.js';
-import { settingKeys } from '@/server/v2/db/app/settingKeys.js';
-import { createRuntimeEventPublisher } from '@/server/v2/services/index.js';
+import { createV2ApiHandler } from '@server/api/index.js';
+import type { V2AppContext } from '@server/app.js';
+import { createAppDb, getDefaultAppDatabasePath } from '@server/db/app/index.js';
+import { settingKeys } from '@server/db/app/settings/settingKeys.js';
+import { createRuntimeEventPublisher } from '@server/services/index.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-api');
 

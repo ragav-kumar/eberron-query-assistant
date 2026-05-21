@@ -6,22 +6,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { OperationEventDto } from '@/dto/index.js';
 import { createTaggedError } from '@/errors.js';
-import { createV2App } from '@/server/v2/app.js';
-import { createAppDb, getAppDatabasePath, Settings, settingKeys, type AppDb } from '@/server/v2/db/app/index.js';
+import { createV2App } from '@server/app.js';
+import { createAppDb, getAppDatabasePath, SettingsHelper, settingKeys, type AppDb } from '@server/db/app/index.js';
 import {
     createCorpusRetrievalService,
     createCorpusStore,
     getCorpusDatabasePath,
     type CorpusStore,
     type EmbeddingAdapter,
-} from '@/server/v2/db/corpus/index.js';
-import { initializeSettings, resolveRuntimePaths } from '@/server/v2/settings/index.js';
-import { createConsoleEventPublisher, createRuntimeEventPublisher } from '@/server/v2/services/index.js';
-import { createRefreshCoordinator } from '@/server/v2/services/refresh/index.js';
-import { createImportStateStore } from '@/server/v2/services/refresh/import-state.js';
-import { createRefreshPipeline } from '@/server/v2/services/refresh/pipeline.js';
-import { createRefreshStateStore } from '@/server/v2/services/refresh/refresh-state.js';
-import { createStartupOrchestrator } from '@/server/v2/services/startup-orchestrator.js';
+} from '@server/db/corpus/index.js';
+import { resolveRuntimePaths } from '@server/settings/index.js';
+import { createConsoleEventPublisher, createRuntimeEventPublisher } from '@server/services/index.js';
+import { createRefreshCoordinator } from '@server/services/refresh/index.js';
+import { createImportStateStore } from '@server/services/refresh/import-state.js';
+import { createRefreshPipeline } from '@server/services/refresh/pipeline.js';
+import { createRefreshStateStore } from '@server/services/refresh/refresh-state.js';
+import { createStartupOrchestrator } from '@server/services/startup-orchestrator.js';
+import { initializeSettingsStore } from '@server/db/app/settings/settingsStore.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-refresh');
 const appDbs: AppDb[] = [];
@@ -314,16 +315,16 @@ describe('v2 refresh flow', () => {
         const runtimeDir = path.join(repoRoot, '.eberron-query-assistant');
         const appDb = await createTestAppDb('runtime-settings', runtimeDir);
 
-        await initializeSettings(appDb);
-        expect(await Settings.read(appDb.db, settingKeys.foundrySourceDir)).toBe('foundry-export');
-        expect(await Settings.read(appDb.db, settingKeys.pdfSourceDir)).toBe('pdf');
-        expect(await Settings.read(appDb.db, settingKeys.retrievalDir)).toBe('.eberron-query-assistant/retrieval');
-        expect(await Settings.read(appDb.db, settingKeys.articleHtmlCacheDir)).toBe('.eberron-query-assistant/cache/keith-baker');
+        await initializeSettingsStore(appDb);
+        expect(await SettingsHelper.read(appDb.db, settingKeys.foundrySourceDir)).toBe('foundry-export');
+        expect(await SettingsHelper.read(appDb.db, settingKeys.pdfSourceDir)).toBe('pdf');
+        expect(await SettingsHelper.read(appDb.db, settingKeys.retrievalDir)).toBe('.eberron-query-assistant/retrieval');
+        expect(await SettingsHelper.read(appDb.db, settingKeys.articleHtmlCacheDir)).toBe('.eberron-query-assistant/cache/keith-baker');
 
-        await Settings.write(appDb.db, settingKeys.foundrySourceDir, 'custom/foundry');
-        await Settings.write(appDb.db, settingKeys.pdfSourceDir, 'custom/pdfs');
-        await Settings.write(appDb.db, settingKeys.retrievalDir, 'custom/retrieval');
-        await Settings.write(appDb.db, settingKeys.articleHtmlCacheDir, 'custom/cache/html');
+        await SettingsHelper.write(appDb.db, settingKeys.foundrySourceDir, 'custom/foundry');
+        await SettingsHelper.write(appDb.db, settingKeys.pdfSourceDir, 'custom/pdfs');
+        await SettingsHelper.write(appDb.db, settingKeys.retrievalDir, 'custom/retrieval');
+        await SettingsHelper.write(appDb.db, settingKeys.articleHtmlCacheDir, 'custom/cache/html');
 
         const paths = await resolveRuntimePaths(appDb, repoRoot);
         expect(paths).toMatchObject({
@@ -340,8 +341,8 @@ describe('v2 refresh flow', () => {
         const runtimeDir = path.join(repoRoot, '.eberron-query-assistant');
         const appDb = await createTestAppDb('runtime-settings-absolute', runtimeDir);
 
-        await initializeSettings(appDb);
-        await Settings.write(appDb.db, settingKeys.foundrySourceDir, path.resolve(repoRoot, 'absolute-foundry'));
+        await initializeSettingsStore(appDb);
+        await SettingsHelper.write(appDb.db, settingKeys.foundrySourceDir, path.resolve(repoRoot, 'absolute-foundry'));
 
         await expect(resolveRuntimePaths(appDb, repoRoot)).rejects.toMatchObject({
             kind: 'invalid-settings-path',
@@ -363,7 +364,7 @@ describe('v2 refresh flow', () => {
         expect(await transientAppDb.db.selectFrom('consoleEntries').selectAll().execute()).toEqual([]);
 
         const debugAppDb = await createTestAppDb('console-debug');
-        await Settings.write(debugAppDb.db, settingKeys.providerDebug, 'true');
+        await SettingsHelper.write(debugAppDb.db, settingKeys.providerDebug, 'true');
         const debugConsole = await createConsoleEventPublisher(debugAppDb);
         await debugConsole.warn('Persisted entry', '2026-05-18T00:00:01.000Z');
 
@@ -404,9 +405,9 @@ describe('v2 refresh flow', () => {
             refreshStatus: 'failed',
             reingestStatus: 'failed',
         });
-        expect(await Settings.read(app.db, settingKeys.retrievalDir)).toBe('.eberron-query-assistant/retrieval');
-        expect(await Settings.read(app.db, settingKeys.foundrySourceDir)).toBe('foundry-export');
-        expect(await Settings.read(app.db, settingKeys.pdfSourceDir)).toBe('pdf');
+        expect(await SettingsHelper.read(app.db, settingKeys.retrievalDir)).toBe('.eberron-query-assistant/retrieval');
+        expect(await SettingsHelper.read(app.db, settingKeys.foundrySourceDir)).toBe('foundry-export');
+        expect(await SettingsHelper.read(app.db, settingKeys.pdfSourceDir)).toBe('pdf');
 
         await flushAsyncHandlers();
         expect(calls).toEqual([{ kind: 'refresh' }]);

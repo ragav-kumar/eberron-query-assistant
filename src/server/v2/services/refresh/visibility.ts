@@ -1,4 +1,4 @@
-import type { ProgressReporter } from '@/server/v2/db/corpus/index.js';
+import type { ProgressReporter } from '@server/db/corpus/index.js';
 import type { RefreshOperationKind } from '@/types.js';
 
 import type { ConsoleEventPublisher } from '../console-event-publisher.js';

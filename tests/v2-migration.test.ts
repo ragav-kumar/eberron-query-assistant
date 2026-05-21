@@ -4,8 +4,8 @@ import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
-import { createAppDb, getAppDatabasePath } from '@/server/v2/db/app/index.js';
-import { settingKeys } from '@/server/v2/db/app/settingKeys.js';
+import { createAppDb, getAppDatabasePath } from '@server/db/app/index.js';
+import { settingKeys } from '@server/db/app/settings/settingKeys.js';
 import { migrateV1DiskToV2Db } from '@/server/migrate-v1-to-v2.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-migration');

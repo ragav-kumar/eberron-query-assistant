@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import * as cheerio from 'cheerio';
 
 import { createTaggedError } from '@/errors.js';
-import type { IngestedArticle } from '@/server/v2/db/app/index.js';
+import type { IngestedArticle } from '@server/db/app/index.js';
 import type { CorpusChunk, CorpusSource } from '@/types.js';
 
 import type { SourceChangeSet } from '../types.js';

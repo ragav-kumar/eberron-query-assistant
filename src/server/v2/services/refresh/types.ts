@@ -1,6 +1,6 @@
-import type { RuntimePaths } from '@/server/v2/settings/index.js';
+import type { RuntimePaths } from '@server/settings/index.js';
 import type { CorpusChunk, CorpusSource, RefreshOperationKind } from '@/types.js';
-import type { IngestedArticle } from '@/server/v2/db/app/index.js';
+import type { IngestedArticle } from '@server/db/app/index.js';
 
 /**
  * Parsed metadata for a Foundry export file.

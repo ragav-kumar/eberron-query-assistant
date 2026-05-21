@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SettingKeyName, settingKeys } from '../db/app/index.js';
+import { SettingKeyName, settingKeys } from './db/app/index.js';
 
 export const settingKeysToInitialize = [
     'articleHtmlCacheDir',
@@ -56,3 +56,5 @@ export const defaults = Object.freeze({
     partyActorUuids: env.EQA_PARTY_ACTOR_UUIDS,
 
 } satisfies Record<typeof settingKeysToInitialize[number], string | boolean | string[]>);
+
+export const appDbPath = env.EQA_APP_DB_PATH;

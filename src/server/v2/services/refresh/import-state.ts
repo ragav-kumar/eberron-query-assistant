@@ -1,6 +1,6 @@
-import type { AppDb } from '@/server/v2/db/app/db.js';
-import type { IngestedArticle, SelectRow } from '@/server/v2/db/app/schema.js';
-import { Settings, settingKeys } from '@/server/v2/db/app/settingKeys.js';
+import type { AppDb } from '@server/db/app/db.js';
+import type { IngestedArticle, SelectRow } from '@server/db/app/schema.js';
+import { SettingsHelper, settingKeys } from '../../db/app/settings/settingKeys.js';
 
 /**
  * App-owned Foundry tracking state used by discovery and completion.
@@ -78,14 +78,14 @@ export const createImportStateStore = (appDb: AppDb): ImportStateStore => ({
         });
     },
 
-    readArticleLastSuccessfulIndexScrapeAt: async () => Settings.read(appDb.db, settingKeys.articleLastSuccessfulIndexScrapeAt),
+    readArticleLastSuccessfulIndexScrapeAt: async () => SettingsHelper.read(appDb.db, settingKeys.articleLastSuccessfulIndexScrapeAt),
 
     writeArticleLastSuccessfulIndexScrapeAt: async value => {
-        await Settings.write(appDb.db, settingKeys.articleLastSuccessfulIndexScrapeAt, value);
+        await SettingsHelper.write(appDb.db, settingKeys.articleLastSuccessfulIndexScrapeAt, value);
     },
 
     readFoundry: async () => {
-        const values = await Settings.readMany(appDb.db, [
+        const values = await SettingsHelper.readMany(appDb.db, [
             settingKeys.foundryLastSuccessfulExportDeleteCount,
             settingKeys.foundryLastSuccessfulExportFilename,
             settingKeys.foundryLastSuccessfulExportGeneratedAt,
@@ -130,13 +130,13 @@ export const createImportStateStore = (appDb: AppDb): ImportStateStore => ({
         }
 
         await Promise.all([
-            Settings.write(appDb.db, settingKeys.foundryLastSuccessfulExportDeleteCount, String(state.deleteCount)),
-            Settings.write(appDb.db, settingKeys.foundryLastSuccessfulExportFilename, state.filename),
-            Settings.write(appDb.db, settingKeys.foundryLastSuccessfulExportGeneratedAt, state.generatedAt),
-            Settings.write(appDb.db, settingKeys.foundryLastSuccessfulExportRecordCount, String(state.recordCount)),
-            Settings.write(appDb.db, settingKeys.foundryLastSuccessfulExportRunId, state.runId),
-            Settings.write(appDb.db, settingKeys.foundryLastSuccessfulExportSchemaVersion, state.schemaVersion),
-            Settings.write(appDb.db, settingKeys.foundryLastSuccessfulExportUpsertCount, String(state.upsertCount)),
+            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportDeleteCount, String(state.deleteCount)),
+            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportFilename, state.filename),
+            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportGeneratedAt, state.generatedAt),
+            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportRecordCount, String(state.recordCount)),
+            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportRunId, state.runId),
+            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportSchemaVersion, state.schemaVersion),
+            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportUpsertCount, String(state.upsertCount)),
         ]);
     },
 });

@@ -1,17 +1,16 @@
 import { createTaggedError, throwIfAborted } from '@/errors.js';
-import type { AppDb } from '@/server/v2/db/app/index.js';
+import type { AppDb } from '@server/db/app/index.js';
 import {
     createCorpusRetrievalService,
     createCorpusStore,
     type CorpusRetrievalService,
     type CorpusStore,
     type ProgressReporter,
-} from '@/server/v2/db/corpus/index.js';
+} from '@server/db/corpus/index.js';
 import {
-    initializeSettings,
     readEmbeddingProviderSettings,
     resolveRuntimePaths,
-} from '@/server/v2/settings/index.js';
+} from '@server/settings/index.js';
 import type { RefreshOperationKind } from '@/types.js';
 
 import { discoverRefreshWork } from './discovery/index.js';
@@ -23,6 +22,7 @@ import { createImportStateStore, type ImportStateStore } from './import-state.js
 import type { PdfParser } from './types.js';
 import { createPdfDataExtractParser } from './ingestion/pdf.js';
 import type { RefreshPipelineResult } from './types.js';
+import { initializeSettingsStore } from '../../db/app/settings/settingsStore.js';
 
 /**
  * Optional seams for composing or testing the refresh pipeline.
@@ -82,7 +82,7 @@ export const createRefreshPipeline = (
             };
             const forceReingest = kind === 'reingest';
             reporter.info(kind === 'refresh' ? 'Preparing refresh runtime settings.' : 'Preparing force reingest runtime settings.');
-            await initializeSettings(appDb);
+            await initializeSettingsStore(appDb);
             const paths = await resolveRuntimePaths(appDb, repoRoot);
             const timestamp = now().toISOString();
             throwIfAborted(options.abortSignal);

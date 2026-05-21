@@ -6,14 +6,14 @@ import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CreateRunDto } from '@/dto/index.js';
-import { createV2ApiHandler } from '@/server/v2/api/index.js';
-import type { V2AppContext } from '@/server/v2/app.js';
-import { createAppDb, getDefaultAppDatabasePath } from '@/server/v2/db/app/index.js';
-import { settingKeys } from '@/server/v2/db/app/settingKeys.js';
-import { createRunCoordinator } from '@/server/v2/services/run-coordinator.js';
-import type { V2PromptAssets } from '@/server/v2/services/run-runtime.js';
+import { createV2ApiHandler } from '@server/api/index.js';
+import type { V2AppContext } from '@server/app.js';
+import { createAppDb, getDefaultAppDatabasePath } from '@server/db/app/index.js';
+import { settingKeys } from '@server/db/app/settings/settingKeys.js';
+import { createRunCoordinator } from '@server/services/run-coordinator.js';
+import type { V2PromptAssets } from '@server/services/run-runtime.js';
 import type { ChatAdapter } from '@/server/v1/provider/index.js';
-import type { CorpusRetrievalService, PartyContextService } from '@/server/v2/db/corpus/index.js';
+import type { CorpusRetrievalService, PartyContextService } from '@server/db/corpus/index.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-runs');
 
