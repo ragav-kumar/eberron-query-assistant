@@ -1,48 +1,48 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 
 import {
-    createV2App,
-    type CreateV2AppDependencies,
+    createApp,
+    type CreateAppDependencies,
 } from './app.js';
-import { createV2ApiHandler } from './api/index.js';
+import { createApiHandler } from './api/index.js';
 import {
-    DEFAULT_V2_SERVER_HOST,
-    resolveV2ServerPort,
+    DEFAULT_SERVER_HOST,
+    resolveServerPort,
 } from './server-config.js';
 
-export interface V2ServerRuntime {
+export interface ServerRuntime {
     close: () => Promise<void>;
     handleRequest: (request: IncomingMessage, response: ServerResponse) => void;
 }
 
-export interface StartedV2Server {
+export interface StartedServer {
     close: () => Promise<void>;
     host: string;
     port: number;
-    runtime: V2ServerRuntime;
+    runtime: ServerRuntime;
     server: Server;
 }
 
-export interface StartV2ServerOptions {
-    appDependencies?: CreateV2AppDependencies;
+export interface StartServerOptions {
+    appDependencies?: CreateAppDependencies;
     host?: string;
     port?: number;
-    runtime?: V2ServerRuntime;
+    runtime?: ServerRuntime;
 }
 
-export const createV2ServerRuntime = async (
-    dependencies: CreateV2AppDependencies = {},
-): Promise<V2ServerRuntime> => {
-    const app = await createV2App(dependencies);
+export const createServerRuntime = async (
+    dependencies: CreateAppDependencies = {},
+): Promise<ServerRuntime> => {
+    const app = await createApp(dependencies);
 
     return {
         close: app.close,
-        handleRequest: createV2ApiHandler(app),
+        handleRequest: createApiHandler(app),
     };
 };
 
-export const createV2RequestListener = (
-    runtime: V2ServerRuntime,
+export const createRequestListener = (
+    runtime: ServerRuntime,
 ) => (request: IncomingMessage, response: ServerResponse): void => {
     if (request.url?.startsWith('/api/v2/')) {
         runtime.handleRequest(request, response);
@@ -54,13 +54,13 @@ export const createV2RequestListener = (
     response.end(JSON.stringify({ error: 'Unknown API route.' }));
 };
 
-export const startV2Server = async (
-    options: StartV2ServerOptions = {},
-): Promise<StartedV2Server> => {
-    const runtime = options.runtime ?? await createV2ServerRuntime(options.appDependencies);
-    const host = options.host ?? DEFAULT_V2_SERVER_HOST;
-    const requestedPort = options.port ?? resolveV2ServerPort();
-    const server = createServer(createV2RequestListener(runtime));
+export const startServer = async (
+    options: StartServerOptions = {},
+): Promise<StartedServer> => {
+    const runtime = options.runtime ?? await createServerRuntime(options.appDependencies);
+    const host = options.host ?? DEFAULT_SERVER_HOST;
+    const requestedPort = options.port ?? resolveServerPort();
+    const server = createServer(createRequestListener(runtime));
 
     try {
         await new Promise<void>((resolve, reject) => {

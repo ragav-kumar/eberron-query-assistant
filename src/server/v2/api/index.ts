@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import FindMyWay from 'find-my-way';
-import type { V2AppContext } from '../app.js';
+import type { AppContext } from '../app.js';
 import { writeNotFound } from './not-found.js';
 import { additionalContextRoutes } from './routes/additional-context.js';
 import { eventRoutes } from './routes/events.js';
@@ -21,7 +21,7 @@ const routes: RouteDefinition[] = [
     ...eventRoutes,
 ];
 
-export const createV2ApiHandler = (app: V2AppContext) => {
+export const createApiHandler = (app: AppContext) => {
     const router = FindMyWay({
         defaultRoute: (_request, response) => {
             writeNotFound(response);

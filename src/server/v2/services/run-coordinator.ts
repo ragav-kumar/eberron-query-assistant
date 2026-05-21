@@ -12,8 +12,8 @@ import type { CorpusRetrievalService } from '@server/db/corpus/retrieval-service
 import {
     buildChatHistoryFromSessionEntries,
     executeAssistantRun,
-    loadV2PromptAssets,
-    type V2PromptAssets,
+    loadPromptAssets,
+    type PromptAssets,
 } from './run-runtime.js';
 import type { ChatAdapter } from './provider.js';
 
@@ -24,7 +24,7 @@ export interface RunCoordinator {
 export interface RunCoordinatorDependencies {
     appDb: AppDb;
     chat: ChatAdapter;
-    loadPromptAssets?: () => Promise<V2PromptAssets>;
+    loadPromptAssets?: () => Promise<PromptAssets>;
     partyContext: PartyContextService;
     retrieval: CorpusRetrievalService;
     retrievalDir: string;
@@ -49,7 +49,7 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
         await dependencies.retrieval.prepare(dependencies.retrievalDir);
 
         const runId = randomUUID();
-        const promptAssets = await (dependencies.loadPromptAssets ?? loadV2PromptAssets)();
+        const promptAssets = await (dependencies.loadPromptAssets ?? loadPromptAssets)();
         const now = new Date().toISOString();
         const persistedEntries: SessionEntryDto[] = [];
         const session = await dependencies.appDb.db

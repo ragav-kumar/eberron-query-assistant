@@ -2,17 +2,17 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { CreateV2AppDependencies, V2AppContext } from '@server/app.js';
+import type { CreateAppDependencies, AppContext } from '@server/app.js';
 
-const createV2App = vi.fn<(dependencies?: CreateV2AppDependencies) => Promise<V2AppContext>>();
-const createV2ApiHandler = vi.fn<(app: V2AppContext) => (request: IncomingMessage, response: ServerResponse) => void>();
+const createApp = vi.fn<(dependencies?: CreateAppDependencies) => Promise<AppContext>>();
+const createApiHandler = vi.fn<(app: AppContext) => (request: IncomingMessage, response: ServerResponse) => void>();
 
 vi.mock('@server/app.js', () => ({
-    createV2App,
+    createApp,
 }));
 
 vi.mock('@server/api/index.js', () => ({
-    createV2ApiHandler,
+    createApiHandler,
 }));
 
 // Sanitized sample suite: keep this as a unit-test pattern for mocked app/runtime boundaries.
@@ -25,21 +25,21 @@ describe('V2 server runtime', () => {
         const close = vi.fn().mockResolvedValue(undefined);
         const app = {
             close,
-            consoleEvents: {} as V2AppContext['consoleEvents'],
-            db: {} as V2AppContext['db'],
-            refreshCoordinator: {} as V2AppContext['refreshCoordinator'],
-            runCoordinator: {} as V2AppContext['runCoordinator'],
-            runtimeEvents: {} as V2AppContext['runtimeEvents'],
-        } satisfies V2AppContext;
+            consoleEvents: {} as AppContext['consoleEvents'],
+            db: {} as AppContext['db'],
+            refreshCoordinator: {} as AppContext['refreshCoordinator'],
+            runCoordinator: {} as AppContext['runCoordinator'],
+            runtimeEvents: {} as AppContext['runtimeEvents'],
+        } satisfies AppContext;
         const handleRequest = vi.fn();
-        createV2App.mockResolvedValue(app);
-        createV2ApiHandler.mockReturnValue(handleRequest);
+        createApp.mockResolvedValue(app);
+        createApiHandler.mockReturnValue(handleRequest);
 
-        const { createV2ServerRuntime } = await import('@server/server.js');
-        const runtime = await createV2ServerRuntime({ repoRoot: 'C:/repo-root' });
+        const { createServerRuntime } = await import('@server/server.js');
+        const runtime = await createServerRuntime({ repoRoot: 'C:/repo-root' });
 
-        expect(createV2App).toHaveBeenCalledWith({ repoRoot: 'C:/repo-root' });
-        expect(createV2ApiHandler).toHaveBeenCalledWith(app);
+        expect(createApp).toHaveBeenCalledWith({ repoRoot: 'C:/repo-root' });
+        expect(createApiHandler).toHaveBeenCalledWith(app);
         expect(runtime.handleRequest).toBe(handleRequest);
         expect(runtime.close).toBe(close);
     });
@@ -50,8 +50,8 @@ describe('V2 server runtime', () => {
             handleRequest: vi.fn(),
         };
 
-        const { startV2Server } = await import('@server/server.js');
-        const startedServer = await startV2Server({
+        const { startServer } = await import('@server/server.js');
+        const startedServer = await startServer({
             host: '127.0.0.1',
             port: 0,
             runtime,

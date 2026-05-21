@@ -31,7 +31,7 @@ import { createTaggedError } from '@/errors.js';
  * This wraps the database lifecycle plus the process-local runtime
  * services that do not belong in SQLite itself.
  */
-export interface V2AppContext extends AppDb {
+export interface AppContext extends AppDb {
     consoleEvents: ConsoleEventPublisher;
     refreshCoordinator: RefreshCoordinator;
     runCoordinator: RunCoordinator;
@@ -39,7 +39,7 @@ export interface V2AppContext extends AppDb {
 }
 
 // noinspection JSUnusedGlobalSymbols
-export interface CreateV2AppDependencies {
+export interface CreateAppDependencies {
     appDbPath?: string;
     consoleEventsFactory?: (appDb: AppDb) => Promise<ConsoleEventPublisher>;
     refreshCoordinatorFactory?: (
@@ -51,7 +51,7 @@ export interface CreateV2AppDependencies {
 }
 
 // noinspection JSUnusedGlobalSymbols
-export const createV2App = async (dependencies: CreateV2AppDependencies = {}): Promise<V2AppContext> => {
+export const createApp = async (dependencies: CreateAppDependencies = {}): Promise<AppContext> => {
     const repoRoot = dependencies.repoRoot ?? process.cwd();
     const appDb = await createAppDb();
     await initializeSettingsStore(appDb);

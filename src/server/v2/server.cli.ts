@@ -1,9 +1,9 @@
 import {
-    startV2Server,
-    type StartedV2Server,
+    startServer,
+    type StartedServer,
 } from './server.js';
 
-const registerShutdownHandlers = (startedServer: StartedV2Server): void => {
+const registerShutdownHandlers = (startedServer: StartedServer): void => {
     let shuttingDown = false;
 
     const shutdown = async (signal: string): Promise<void> => {
@@ -31,7 +31,7 @@ const registerShutdownHandlers = (startedServer: StartedV2Server): void => {
 };
 
 const main = async (): Promise<void> => {
-    const startedServer = await startV2Server();
+    const startedServer = await startServer();
     console.info(`V2 API server listening at http://${startedServer.host}:${startedServer.port}`);
     registerShutdownHandlers(startedServer);
 };

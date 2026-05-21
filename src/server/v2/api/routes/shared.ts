@@ -1,12 +1,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { HTTPMethod } from 'find-my-way';
 
-import type { V2AppContext } from '../../app.js';
+import type { AppContext } from '../../app.js';
 
 export type RouteParams = Record<string, string | undefined>;
 
 export interface RouteHandlerArgs {
-    context: V2AppContext;
+    context: AppContext;
     pathParams: RouteParams;
     queryParams: Record<string, string>;
     request: IncomingMessage,

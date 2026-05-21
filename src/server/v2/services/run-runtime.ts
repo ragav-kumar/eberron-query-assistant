@@ -18,22 +18,22 @@ import {
     type ChatToolCall,
 } from './provider.js';
 
-import { listV2PromptAssets } from '../prompts/index.js';
+import { listPromptAssets } from '../prompts/index.js';
 
-export interface V2PromptAssets {
+export interface PromptAssets {
     assistant: string;
     sessionTitling: string;
     shared: string;
 }
 
-export interface V2AssistantMessageBuildRequest {
+export interface AssistantMessageBuildRequest {
     additionalContext: string;
     evidence: RetrievalResult[];
     history: ChatMessage[];
     includePartyContext: boolean;
     partyContext: string;
     prompt: string;
-    promptAssets: V2PromptAssets;
+    promptAssets: PromptAssets;
     requestSessionTitle: boolean;
     retrievalTurnLimit: number;
 }
@@ -46,7 +46,7 @@ export interface ExecuteAssistantRunDependencies {
     onReasoning: (reasoning: Omit<SessionEntryReasoningDto, 'id'>) => Promise<void>;
     partyContext: string;
     prompt: string;
-    promptAssets: V2PromptAssets;
+    promptAssets: PromptAssets;
     requestSessionTitle: boolean;
     retrieval: {
         search: (request: {
@@ -72,8 +72,8 @@ const MAX_EVIDENCE_RESULTS = 8;
 /**
  * Loads the tracked V2 prompt markdown assets needed for assistant execution.
  */
-export const loadV2PromptAssets = async (): Promise<V2PromptAssets> => {
-    const promptAssetPaths = listV2PromptAssets('assistant', true);
+export const loadPromptAssets = async (): Promise<PromptAssets> => {
+    const promptAssetPaths = listPromptAssets('assistant', true);
     const sharedPath = promptAssetPaths[0];
     const sessionTitlingPath = promptAssetPaths[1];
     const assistantPath = promptAssetPaths[2];
@@ -120,7 +120,7 @@ export const buildChatHistoryFromSessionEntries = (
  * Builds the V2 assistant prompt stack around history, retrieval evidence, and
  * the current user prompt.
  */
-export const buildV2AssistantMessages = (request: V2AssistantMessageBuildRequest): ChatMessage[] => {
+export const buildAssistantMessages = (request: AssistantMessageBuildRequest): ChatMessage[] => {
     const evidence = formatEvidence(request.evidence);
     const systemPromptParts = [
         request.promptAssets.shared,
@@ -172,7 +172,7 @@ export const executeAssistantRun = async (
         query: dependencies.prompt,
         timing,
     });
-    const messages = buildV2AssistantMessages({
+    const messages = buildAssistantMessages({
         additionalContext: dependencies.additionalContext,
         evidence: initialEvidence,
         history: dependencies.history,
