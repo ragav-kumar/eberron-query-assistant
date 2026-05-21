@@ -4,6 +4,7 @@
 - Use this doc to decide what V2 tests should exist across the remaining phases.
 - Keep the suite focused on repo behavior, stable contracts, and durable invariants.
 - Do not preserve existing tests by default. Use this doc as the target state for later test burn-down work.
+- Use the current sanitized sample suites as style guides for rebuilt unit coverage.
 
 ## Rules
 - Test V2 behavior, not V1 behavior, unless the migration path still matters to V2.
@@ -12,20 +13,26 @@
 - Test our request payloads, persistence behavior, state transitions, DTOs, and rendered output.
 - Mock provider calls, network fetches, EventSource clients, editor internals, and parser-library behavior unless the boundary contract itself is under test.
 - Add coverage for new V2 work when the feature lands. Do not defer obvious coverage for already-implemented behavior.
+- Keep test names behavior-first. Do not mention mocking, fake filesystems, or sanitization in the test title.
 
 ## Current Shape
-- Existing tests are mostly server-side.
-- Current coverage already touches API routing, runs, refresh, corpus/retrieval, migration, and server hosting.
+- The suite was intentionally reset to a safe baseline.
+- Two sample unit suites remain:
+  - `tests/server.test.ts` for mocked app/runtime boundaries
+  - `tests/refresh.test.ts` for repo file behavior with `memfs`
+- `tests/api.test.ts`, `tests/runs.test.ts`, `tests/migration.test.ts`, and `tests/corpus.test.ts` are intentional failing placeholders.
 - V2 client coverage is effectively absent.
-- Several current tests are broader integration tests using temp filesystem state and real SQLite. Do not treat that as the default pattern.
+- `.test-tmp` is no longer part of the test strategy.
 
 ## Targets
 ### API, Routes, SSE
 - Test now:
+  - Only thin runtime composition behavior that can stay isolated from env-coupled app initialization.
+- Add when implemented:
+  - Safe unit coverage for `createV2ApiHandler` once the current env-coupled import path is no longer blocking sanitized tests.
   - Route matching for implemented `/api/v2` paths.
   - Request parsing, response status mapping, and error bodies.
-  - SSE framing, headers, and event payload shaping for console/runtime streams.
-- Add when implemented:
+  - SSE framing and event payload shaping for console/runtime streams.
   - Any new V2 route contract introduced in later phases.
   - DTO behavior for temporary-session promotion and future run/session runtime events.
 - Mock instead:
@@ -34,10 +41,11 @@
 
 ### Session And Run Lifecycle
 - Test now:
+  - None. Rebuild this area from the placeholder suite.
+- Add when implemented:
   - Session validation, mode validation, and run blocking during refresh/reingest.
   - Run persistence, session-entry persistence, session title updates, and `activeRunId` cleanup.
   - Failure durability for malformed or failed assistant runs.
-- Add when implemented:
   - Temporary-session creation and first-run promotion.
   - Session creation flows beyond persisted-session-only Phase 1 behavior.
   - Mode-specific session visibility rules required by the final V2 UI.
@@ -57,8 +65,9 @@
 
 ### NPC Workflow
 - Test now:
-  - Only current server behavior that already exists for NPC listing, filtering, and pagination.
+  - None. Rebuild this area from the placeholder suite.
 - Add when implemented:
+  - NPC listing, filtering, and pagination behavior.
   - Structured NPC run execution.
   - NPC persistence/finalization from runs.
   - Active-session card marking and cross-session rendering workflow.
@@ -68,22 +77,25 @@
 
 ### Refresh And Reingest Workflow
 - Test now:
+  - File-boundary behavior like PDF discovery and Foundry manifest parsing, following `tests/refresh.test.ts`.
+- Add when implemented:
   - Refresh state transitions.
   - Conflict rules and reingest interruption semantics.
   - Startup recovery behavior.
   - Console/runtime event publication.
   - Run blocking while refresh or reingest is active.
-- Add when implemented:
   - UI confirmation and disabling behavior around force reingest.
   - Any future runtime-event fanout added for richer client updates.
 
 ### Discovery, Ingestion, Corpus Construction
 - Test now:
-  - Foundry manifest and NDJSON validation.
-  - Discovery decisions for foundry, article, and PDF sources.
+  - Foundry manifest validation.
+  - Discovery decisions for PDF sources.
+- Add when implemented:
+  - Full NDJSON validation coverage.
+  - Discovery decisions for foundry and article sources.
   - Change-set generation and source provenance shaping.
   - Empty-corpus and invalid-source failure behavior.
-- Add when implemented:
   - Any new source types or ingestion stages added in later phases.
 - Mock instead:
   - Cheerio parsing internals.
@@ -92,11 +104,12 @@
 
 ### Retrieval And Party Context
 - Test now:
+  - None. Rebuild this area from the placeholder suite.
+- Add when implemented:
   - Retrieval refresh bookkeeping.
   - Embedding cache reuse behavior.
   - Search-result shaping and source typing.
   - Party-context assembly from stored corpus rows.
-- Add when implemented:
   - Any new retrieval result shaping required by later assistant/NPC flows.
   - Any final party-context inclusion rules not yet wired into the full V2 session workflow.
 - Mock instead:
@@ -104,12 +117,13 @@
 
 ### Settings, Startup, Migration Boundary
 - Test now:
+  - None. Rebuild this area from the placeholder suite.
+- Add when implemented:
   - Default setting initialization.
   - Persisted setting parsing.
   - Relative-path enforcement.
   - Startup bootstrap behavior.
   - V1-to-V2 migration behavior that still matters during the transition.
-- Add when implemented:
   - Any new persisted V2 settings or startup recovery branches added in later phases.
 - Do not add:
   - New V1 product tests unrelated to migration.
@@ -144,12 +158,11 @@
 - Keep:
   - `vitest`
   - `@testing-library/react`
-  - `jsdom`
-- Likely add:
   - `@testing-library/user-event`
+  - `jsdom`
+  - `memfs`
+- Likely add:
   - `msw`
-- Likely useful:
-  - `tempy` or `tmp-promise`
 - Optional:
   - `supertest` if the suite shifts toward higher-level HTTP boundary tests
 
@@ -165,3 +178,4 @@
 - Cheerio internals.
 - PDF parser-library correctness.
 - React Query internals.
+- Host filesystem temp-tree behavior when a virtual filesystem is enough.

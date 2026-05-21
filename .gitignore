@@ -1,7 +1,6 @@
 node_modules/
 dist/
 coverage/
-.test-tmp/
 .eberron-query-assistant/
 logs/
 foundry-export/
