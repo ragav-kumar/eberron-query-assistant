@@ -3,17 +3,12 @@ import { createRoot } from 'react-dom/client';
 import type { ComponentType } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
-const loadV1App = async (): Promise<ComponentType> => {
-  const module = await import('./v1/App.js');
-  return module.App;
-};
-
 const loadV2App = async (): Promise<ComponentType> => {
   const module = await import('./v2/App.js');
   return module.App;
 };
 
-export const resolveAppForPath = (pathname: string) => pathname.includes('v1') ? loadV1App : loadV2App;
+export const resolveAppForPath = (_pathname: string) => loadV2App;
 
 export const renderApp = (root: HTMLElement, pathname: string) => {
   void resolveAppForPath(pathname)().then((ActiveApp) => {

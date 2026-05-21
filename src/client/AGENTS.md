@@ -2,10 +2,11 @@
 
 ## Scope
 - This file is primarily relevant during `Development`, and secondarily during `Review` when evaluating or making small scoped client changes.
-- The /src/client/v1 folder and its contents are frozen. They should only be modified if they are blocking compilation or tests.
-- Do not write any tests against the v1 client.
 - All user-requested changes will target the v2 client, /src/client/v2.
 - During the V2 transition, treat new user-requested client behavior changes as targeting V2 unless the user explicitly says otherwise.
+- No repo-local V1 client implementation remains in this repository.
+- Do not use removed, archived, or external historical V1 client implementation as a design reference for V2 client work.
+- If legacy client compatibility analysis ever requires consulting historical V1 client code outside this repo, disclose the specific reference and why it was needed.
 
 ## React And TypeScript
 - Use React with TypeScript.

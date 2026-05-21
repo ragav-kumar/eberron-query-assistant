@@ -1,19 +1,41 @@
-/* eslint-disable @typescript-eslint/no-deprecated */
-
 // Migration files are for the v1 to v2 transition. These are the only files permitted to touch both codebases.
 // These should be deleted during the v1 purge.
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 
 import type { Insertable, Transaction } from 'kysely';
 
-import { loadDefaultConfig } from '@/server/v1/config/index.js';
 import { createAppDb, AppDatabaseSchema, AppDb } from './v2/db/app/index.js';
 import { settingKeys } from './v2/db/app/settings/settingKeys.js';
-import type { RuntimeConfig } from '@/types.js';
 
-// Intentional temporary bridge between V1 and V2 while migration logic still spans both server layouts.
+interface LegacyMigrationConfig {
+    assistant: {
+        additionalContextPath: string;
+    };
+    cacheDir: string;
+    campaign: {
+        campaignJournalFolder: string | null;
+        partyActorUuids: string[];
+        questsJournal: string;
+        sessionNotesJournal: string;
+    };
+    foundryExportDir: string;
+    logDir: string;
+    pdfDir: string;
+    provider: {
+        apiKey: string | null;
+        baseUrl: string;
+        chatModel: string;
+        debug: boolean;
+        embeddingModel: string;
+    };
+    repoRoot: string;
+    retrievalDir: string;
+    stateDir: string;
+}
+
 interface LegacyRuntimeState {
     article: {
         knownArticles: Array<{
@@ -99,11 +121,12 @@ interface NormalizedLogFile {
 const LEGACY_LOG_SESSION_ID_PREFIX = 'legacy-log-';
 const LEGACY_NPC_RUN_ID = 'legacy-v1-npc-run';
 const LEGACY_NPC_SESSION_ID = 'legacy-v1-npc-session';
+const LEGACY_GENERATED_NPCS_LOG_FILE = 'generated_npcs.md';
 const LEGACY_RESPONSE_TITLE = 'Untitled Response';
 const LEGACY_LOG_FILENAME_PATTERN = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s+(.+)$/;
 
 export const migrateV1DiskToV2Db = async (
-    config: RuntimeConfig,
+    config: LegacyMigrationConfig,
     appDb: AppDb,
     logger: MigrationLogger = console,
 ): Promise<MigrationSummary> => {
@@ -145,7 +168,7 @@ export const migrateV1DiskToV2Db = async (
     return result;
 };
 
-const migrateSingletonSettings = async (config: RuntimeConfig, trx: DbTransaction): Promise<number> => {
+const migrateSingletonSettings = async (config: LegacyMigrationConfig, trx: DbTransaction): Promise<number> => {
     const currentTime = new Date().toISOString();
     let written = 0;
 
@@ -164,7 +187,7 @@ const migrateSingletonSettings = async (config: RuntimeConfig, trx: DbTransactio
     return written;
 };
 
-const migrateEnvSettings = async (config: RuntimeConfig, trx: DbTransaction): Promise<number> => {
+const migrateEnvSettings = async (config: LegacyMigrationConfig, trx: DbTransaction): Promise<number> => {
     const modifiedAt = new Date().toISOString();
     const entries: Array<readonly [string, string]> = [
         [settingKeys.articleHtmlCacheDir, toPortableRelativePath(config.repoRoot, path.join(config.cacheDir, 'keith-baker'))],
@@ -190,7 +213,7 @@ const migrateEnvSettings = async (config: RuntimeConfig, trx: DbTransaction): Pr
 };
 
 const migrateRuntimeState = async (
-    config: RuntimeConfig,
+    config: LegacyMigrationConfig,
     trx: DbTransaction,
 ): Promise<Pick<MigrationSummary, 'articles' | 'foundryFiles' | 'pdfFiles'> & { singletonSettings: number }> => {
     const runtimeStatePath = path.join(config.stateDir, 'runtime-state.json');
@@ -299,16 +322,10 @@ const migrateRuntimeState = async (
     };
 };
 
-const migrateLegacyNpcs = async (config: RuntimeConfig, trx: DbTransaction): Promise<number> => {
-    const npcStatePath = path.join(config.stateDir, 'generated-npcs.json');
-    const npcStateText = await readTextOrNull(npcStatePath);
+const migrateLegacyNpcs = async (config: LegacyMigrationConfig, trx: DbTransaction): Promise<number> => {
+    const legacyNpcs = await readLegacyNpcInputs(config);
 
     await deleteSessionIfPresent(trx, LEGACY_NPC_SESSION_ID);
-    if (npcStateText === null) {
-        return 0;
-    }
-
-    const legacyNpcs = JSON.parse(npcStateText) as LegacyStoredNpc[];
     if (legacyNpcs.length === 0) {
         return 0;
     }
@@ -367,7 +384,7 @@ const migrateLegacyNpcs = async (config: RuntimeConfig, trx: DbTransaction): Pro
 };
 
 const migrateLogFiles = async (
-    config: RuntimeConfig,
+    config: LegacyMigrationConfig,
     trx: DbTransaction,
     warn: (message: string) => void,
 ): Promise<Pick<MigrationSummary, 'logRuns' | 'logSessionEntries' | 'logSessions'>> => {
@@ -495,6 +512,57 @@ const migrateLogFiles = async (
         logSessionEntries,
         logSessions,
     };
+};
+
+const readLegacyNpcInputs = async (config: LegacyMigrationConfig): Promise<LegacyStoredNpc[]> => {
+    const npcStatePath = path.join(config.stateDir, 'generated-npcs.json');
+    const npcStateText = await readTextOrNull(npcStatePath);
+    if (npcStateText !== null) {
+        return JSON.parse(npcStateText) as LegacyStoredNpc[];
+    }
+
+    const legacyNpcLogPath = path.join(config.logDir, LEGACY_GENERATED_NPCS_LOG_FILE);
+    const legacyNpcLogText = await readTextOrNull(legacyNpcLogPath);
+    if (legacyNpcLogText === null) {
+        return [];
+    }
+
+    const legacyNpcLogStat = await stat(legacyNpcLogPath);
+    return parseLegacyGeneratedNpcMarkdown(legacyNpcLogText, legacyNpcLogStat.mtime.toISOString());
+};
+
+const parseLegacyGeneratedNpcMarkdown = (markdown: string, timestamp: string): LegacyStoredNpc[] => {
+    const headers = [...markdown.matchAll(/^###[ \t]+(?<id>\d+)\.[ \t]+(?<name>.+?)[ \t]*$/gm)];
+    const npcs = headers.map((header, index) => {
+        const groups = header.groups;
+        const nextHeader = headers[index + 1];
+        const body = markdown.slice((header.index ?? 0) + header[0].length, nextHeader?.index ?? markdown.length);
+        const descriptionMatch = body.match(/\r?\n\r?\nDescription:\s*(?<description>[\s\S]*?)\r?\n\r?\nBio:/);
+        const bioMatch = body.match(/\r?\n\r?\nBio:\s*(?<bio>[\s\S]*?)(?=\r?\n\r?\n## NPC Generation|\s*$)/);
+
+        if (!groups || !descriptionMatch?.groups || !bioMatch?.groups) {
+            throw new Error('Legacy generated NPC Markdown contains a malformed NPC card.');
+        }
+
+        const description = descriptionMatch.groups.description;
+        const bio = bioMatch.groups.bio;
+        const name = groups.name;
+        if (description === undefined || bio === undefined || name === undefined) {
+            throw new Error('Legacy generated NPC Markdown contains a malformed NPC card.');
+        }
+
+        return {
+            bio: bio.trim(),
+            createdAt: timestamp,
+            description: description.trim(),
+            id: Number(groups.id),
+            name: name.trim(),
+            updatedAt: timestamp,
+        };
+    });
+
+    assertUniqueNpcIds(npcs);
+    return npcs.sort((left, right) => left.id - right.id);
 };
 
 const normalizeLogFile = (
@@ -695,6 +763,12 @@ const maximumIsoDate = (values: string[]): string | null => values.length === 0
     ? null
     : values.reduce((maximum, value) => value.localeCompare(maximum) > 0 ? value : maximum);
 
+const assertUniqueNpcIds = (npcs: LegacyStoredNpc[]): void => {
+    if (new Set(npcs.map(npc => npc.id)).size !== npcs.length) {
+        throw new Error('Generated NPC state file contains duplicate NPC ids.');
+    }
+};
+
 const stableId = (value: string): string => createHash('sha1').update(value).digest('hex').slice(0, 16);
 
 const offsetIso = (baseDate: Date, milliseconds: number): string => new Date(baseDate.getTime() + milliseconds).toISOString();
@@ -709,8 +783,105 @@ const hasNodeErrorCode = (error: unknown, code: string): boolean => (
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
 
+/** Rebuilds the minimal V1-era path and env view still needed for legacy-data migration. */
+export const loadLegacyMigrationConfig = (repoRoot = process.cwd()): LegacyMigrationConfig => {
+    const runtimeDir = path.join(repoRoot, '.eberron-query-assistant');
+    const assistantDir = path.join(repoRoot, 'assistant');
+    const envFile = parseEnvFile(path.join(repoRoot, '.env'));
+
+    return {
+        assistant: {
+            additionalContextPath: path.join(assistantDir, 'additional-context.md'),
+        },
+        cacheDir: path.join(runtimeDir, 'cache'),
+        campaign: {
+            campaignJournalFolder: getConfigValue('EQA_CAMPAIGN_JOURNAL_FOLDER', envFile) ?? 'Legacy',
+            partyActorUuids: parseCommaSeparatedList(getConfigValue('EQA_PARTY_ACTOR_UUIDS', envFile)),
+            questsJournal: getConfigValue('EQA_QUESTS_JOURNAL', envFile) ?? 'Quests',
+            sessionNotesJournal: getConfigValue('EQA_SESSION_NOTES_JOURNAL', envFile) ?? 'Session Notes',
+        },
+        foundryExportDir: path.join(repoRoot, 'foundry-export'),
+        logDir: path.join(repoRoot, 'logs'),
+        pdfDir: path.join(repoRoot, 'pdf'),
+        provider: {
+            apiKey: getConfigValue('OPENAI_API_KEY', envFile) ?? null,
+            baseUrl: normalizeBaseUrl(getConfigValue('OPENAI_BASE_URL', envFile) ?? 'https://api.openai.com/v1'),
+            chatModel: getConfigValue('OPENAI_CHAT_MODEL', envFile) ?? 'gpt-5.4-mini',
+            debug: parseBoolean(getConfigValue('EQA_PROVIDER_DEBUG', envFile)),
+            embeddingModel: getConfigValue('OPENAI_EMBEDDING_MODEL', envFile) ?? 'text-embedding-3-small',
+        },
+        repoRoot,
+        retrievalDir: path.join(runtimeDir, 'retrieval'),
+        stateDir: path.join(runtimeDir, 'state'),
+    };
+};
+
+const getConfigValue = (key: string, envFile: Record<string, string>): string | undefined => {
+    const value = process.env[key] ?? envFile[key];
+    const normalized = value?.trim();
+    return normalized && normalized.length > 0 ? normalized : undefined;
+};
+
+const parseEnvFile = (envPath: string): Record<string, string> => {
+    try {
+        const text = readFileSync(envPath, 'utf8');
+        return parseEnvEntries(text);
+    } catch (error) {
+        if (hasNodeErrorCode(error, 'ENOENT')) {
+            return {};
+        }
+        throw error;
+    }
+};
+
+const parseEnvEntries = (text: string): Record<string, string> => {
+    const entries: Record<string, string> = {};
+    for (const line of text.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (trimmed.length === 0 || trimmed.startsWith('#')) {
+            continue;
+        }
+
+        const separatorIndex = trimmed.indexOf('=');
+        if (separatorIndex <= 0) {
+            continue;
+        }
+
+        const key = trimmed.slice(0, separatorIndex).trim();
+        const rawValue = trimmed.slice(separatorIndex + 1).trim();
+        entries[key] = unwrapEnvValue(rawValue);
+    }
+    return entries;
+};
+
+const unwrapEnvValue = (value: string): string => {
+    if (
+        (value.startsWith('"') && value.endsWith('"')) ||
+        (value.startsWith('\'') && value.endsWith('\''))
+    ) {
+        return value.slice(1, -1);
+    }
+
+    return value;
+};
+
+const parseCommaSeparatedList = (value: string | undefined): string[] => {
+    if (!value) {
+        return [];
+    }
+
+    return value
+        .split(',')
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+};
+
+const parseBoolean = (value: string | undefined): boolean => value?.toLowerCase() === 'true';
+
+const normalizeBaseUrl = (value: string): string => value.replace(/\/+$/, '');
+
 export const runMigrationCli = async (): Promise<void> => {
-    const config = loadDefaultConfig();
+    const config = loadLegacyMigrationConfig();
     const appDb = await createAppDb();
 
     try {
