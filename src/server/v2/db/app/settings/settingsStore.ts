@@ -1,17 +1,32 @@
-import { SettingKeyName, settingKeys, SettingsHelper } from './settingKeys.js';
+import { SettingKeyName, settingKeyNames, settingKeys, SettingsHelper } from './settingKeys.js';
 import { AppDb } from '../db.js';
-import { defaults, settingKeysToInitialize } from './defaults.js';
+import { defaults } from './defaults.js';
 import { assignSetting, parseSetting } from './helpers.js';
 
 interface TypedSettings {
-    articleLastSuccessfulIndexScrapeAt: Date;
-    foundryLastSuccessfulExportDeleteCount: number;
-    foundryLastSuccessfulExportGeneratedAt: Date;
-    foundryLastSuccessfulExportRecordCount: number;
-    foundryLastSuccessfulExportUpsertCount: number;
+    articleLastSuccessfulIndexScrapeAt: Date | undefined;
+    foundryLastSuccessfulExportDeleteCount: number | undefined;
+    foundryLastSuccessfulExportFilename: string | undefined;
+    foundryLastSuccessfulExportGeneratedAt: Date | undefined;
+    foundryLastSuccessfulExportRecordCount: number | undefined;
+    foundryLastSuccessfulExportRunId: string | undefined;
+    foundryLastSuccessfulExportSchemaVersion: string | undefined;
+    foundryLastSuccessfulExportUpsertCount: number | undefined;
+
     partyActorUuids: string[];
     providerDebug: boolean;
 }
+
+const optionalSettingDefaults = {
+    articleLastSuccessfulIndexScrapeAt: undefined,
+    foundryLastSuccessfulExportDeleteCount: undefined,
+    foundryLastSuccessfulExportFilename: undefined,
+    foundryLastSuccessfulExportGeneratedAt: undefined,
+    foundryLastSuccessfulExportRecordCount: undefined,
+    foundryLastSuccessfulExportRunId: undefined,
+    foundryLastSuccessfulExportSchemaVersion: undefined,
+    foundryLastSuccessfulExportUpsertCount: undefined,
+} as const;
 
 export type Settings = {
     [K in SettingKeyName]: K extends keyof TypedSettings ? TypedSettings[K] : string;
@@ -26,6 +41,10 @@ interface SettingsStore {
 
 export const initializeSettingsStore = async (appDb: AppDb) => {
     const insertIfMissing = async <T>(key: SettingKeyName) => {
+        if (Object.hasOwnProperty.call(optionalSettingDefaults, key)) {
+            return;
+        }
+
         if (!Object.hasOwnProperty.call(defaults, key)) {
             return;
         }
@@ -39,17 +58,21 @@ export const initializeSettingsStore = async (appDb: AppDb) => {
         await SettingsHelper.write(appDb.db, dbKey, JSON.stringify(defaultValue));
     };
 
-    for (const settingKey of settingKeysToInitialize) {
+    for (const settingKey of Object.keys(settingKeys) as SettingKeyName[]) {
         await insertIfMissing(settingKey);
     }
 
-    const settingsStrings = await SettingsHelper.readMany(appDb.db, settingKeysToInitialize);
+    const settingsStrings = await SettingsHelper.readMany(appDb.db, settingKeyNames);
 
-    const partialSettings: Partial<Settings> = {};
-    for (const { key, stringValue } of settingsStrings) {
-        assignSetting(partialSettings, key, parseSetting(key, stringValue));
+    const hydrated = {
+        ...defaults,
+        ...optionalSettingDefaults,
+    };
+
+    for (const {key, stringValue} of settingsStrings) {
+        assignSetting(hydrated, key, parseSetting(key, stringValue));
     }
-    settingsData = partialSettings as Settings;
+    settingsData = hydrated;
 };
 
 export const settingsStore = (): SettingsStore => {

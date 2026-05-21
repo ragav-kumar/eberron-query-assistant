@@ -26,6 +26,7 @@ export const settingKeys = {
     sessionNotesJournal: 'session-notes-journal',
 } as const;
 
+export const settingKeyNames = Object.keys(settingKeys) as SettingKeyName[];
 
 export type SettingKeyName = keyof typeof settingKeys;
 export type SettingKey = (typeof settingKeys)[SettingKeyName];
