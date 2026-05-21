@@ -27,4 +27,7 @@
 ## Testing And Verification
 - Until the user explicitly declares the V2 client ready for a unit test suite, do not add, update, request, or run client unit tests.
 - During that temporary transition, only add or update client unit tests when the user specifically asks for them in the current task.
+- When a client task depends on automated test acceptance, execute `npm run test`.
+- Treat any test failure whose reason is not `Not implemented.` as a blocking acceptance failure.
+- Treat a `Not implemented.` failure as blocking when the failing test is affected by the current task.
 - When a client change affects the local web app, use browser or API smoke coverage during verification.

@@ -61,4 +61,12 @@ describe('V2 server runtime', () => {
 
         expect(runtime.close).toHaveBeenCalledTimes(1);
     });
+
+    it('bootstraps settings and startup refresh orchestration when creating the app', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('fails startup when persisted runtime paths are absolute', () => {
+        expect.fail('Not implemented.');
+    });
 });

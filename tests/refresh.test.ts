@@ -72,4 +72,56 @@ describe('refresh file discovery', () => {
             upsertCount: 2,
         });
     });
+
+    it('allows a reingest request to replace an active refresh', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('rejects refresh conflicts that are not refresh replaced by reingest', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('marks an orphaned persisted active operation as failed before starting a new one', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('records pending running completed lifecycle transitions', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('records failed lifecycle transitions for non-abort pipeline errors', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('publishes interrupted visibility when reingest cancels refresh', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('recovers startup refresh as refresh after interrupted refresh', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('recovers startup refresh as reingest after interrupted reingest', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('rejects absolute persisted runtime paths', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('fails refresh when the resulting corpus is empty', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('skips retrieval rebuild when corpus is unchanged', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('forces retrieval rebuild during reingest', () => {
+        expect.fail('Not implemented.');
+    });
+
+    it('persists import-state updates only after corpus and retrieval succeed', () => {
+        expect.fail('Not implemented.');
+    });
 });

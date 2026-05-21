@@ -18,6 +18,9 @@
 ## Testing And Verification
 - Add or update automated tests alongside behavior changes when the change involves the server.
 - Design ingestion and retrieval logic so most tests can run without network access or live model calls. Use mocks or fixtures for provider interactions and remote content wherever practical.
+- Execute `npm run test` for server tasks that depend on automated test acceptance.
+- Treat any test failure whose reason is not `Not implemented.` as a blocking acceptance failure.
+- Treat a `Not implemented.` failure as blocking when the failing test is affected by the current task.
 - Use `npm run verify` as the final acceptance command for changes that involve the server. Targeted test runs may be used during iteration, but they do not replace the final full-suite gate.
 - When starting the dev server from PowerShell for verification, invoke the Windows npm shim (`npm.cmd`), not `npm`.
 - After startup verification on Windows, explicitly tear down every repo-local dev or server process started for the check.

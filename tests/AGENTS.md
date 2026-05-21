@@ -8,6 +8,8 @@
 - Prefer tests that validate user-visible behavior, durable invariants, and meaningful service contracts.
 - Do not write tests whose main purpose is to ratify a specific code edit, implementation detail, helper call sequence, or refactor shape unless that detail is itself a required contract.
 - A good test should answer "what behavior must remain true?" rather than "did the code change in the way I expected?"
+- Do not add new tests when the current task is already sufficiently covered by existing suites.
+- If a new test is still needed, justify why the existing suites do not already provide adequate coverage for the task.
 
 ## Unit tests first
 - Prefer actual unit tests by default.
@@ -38,6 +40,11 @@
   - the test depends on filesystem or database writes without needing to
   - the assertions overfit implementation details instead of behavior
   - a package would simplify the harness and reduce custom test code
+
+## Verification expectations
+- Execute `npm run test` when the task depends on automated test acceptance.
+- Any test failure whose reason is not `Not implemented.` is a blocking acceptance failure.
+- A `Not implemented.` failure is also blocking when the failing test is affected by the current task.
 
 ## V1 and V2
 - V1 is frozen. Do not add new V1 tests.

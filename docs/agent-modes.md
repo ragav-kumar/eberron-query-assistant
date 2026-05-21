@@ -64,6 +64,9 @@
 
 ## Development Verification
 - Do not hand off a change while its required acceptance checks are failing.
+- Execute `npm run test` for development tasks that touch automated test coverage or rely on automated test acceptance.
+- Treat any test failure whose reason is not `Not implemented.` as a blocking acceptance failure that must be fixed before handoff.
+- Treat a `Not implemented.` failure as a blocking acceptance failure when the failing test is affected by the current task.
 - This repository is commonly worked on from Windows PowerShell. Vite and Vitest load TypeScript config through esbuild, which may fail in the sandbox with `spawn EPERM`.
 - Request escalation directly for commands known to need network access, external write permissions, or esbuild process spawning, including `npm install`, `git push`, `npm test`, targeted Vitest runs, `npm run start`, `npm run start:v2-server`, and `npm run dev`.
 - If a workflow is discovered to require escalation in this environment, treat it as an escalation-required workflow in future runs and update the relevant `AGENTS.md` guidance when that behavior is durable.
