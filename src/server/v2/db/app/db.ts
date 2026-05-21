@@ -3,7 +3,7 @@ import { Kysely, SqliteDialect } from 'kysely';
 import { createAppDatabase } from './database.js';
 import type { AppDatabaseSchema } from './schema.js';
 import { createSchema } from './schemaDefinition.js';
-import { appDbPath } from '@server/defaults.js';
+import { appDbPath } from './settings/defaults.js';
 
 export interface AppDb {
     close: () => Promise<void>;

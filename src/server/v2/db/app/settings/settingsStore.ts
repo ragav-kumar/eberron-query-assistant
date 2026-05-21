@@ -1,6 +1,6 @@
 import { SettingKeyName, settingKeys, SettingsHelper } from './settingKeys.js';
 import { AppDb } from '../db.js';
-import { defaults, settingKeysToInitialize } from '@server/defaults.js';
+import { defaults, settingKeysToInitialize } from './defaults.js';
 import { assignSetting, parseSetting } from './helpers.js';
 
 interface TypedSettings {
@@ -13,7 +13,7 @@ interface TypedSettings {
     providerDebug: boolean;
 }
 
-type Settings = {
+export type Settings = {
     [K in SettingKeyName]: K extends keyof TypedSettings ? TypedSettings[K] : string;
 };
 

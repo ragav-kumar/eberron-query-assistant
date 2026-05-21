@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { SettingKeyName, settingKeys } from './db/app/index.js';
+import { SettingKeyName } from './settingKeys.js';
 
 export const settingKeysToInitialize = [
     'articleHtmlCacheDir',
@@ -17,7 +17,6 @@ export const settingKeysToInitialize = [
     'providerDebug',
     'sessionNotesJournal'
 ] as const satisfies SettingKeyName[];
-export const settingsToInitialize = settingKeysToInitialize.map(key => settingKeys[key]);
 
 const envSchema = z.object({
     // Mandatory
