@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type { ConsoleEntryDto } from '@/dto/index.js';
-import { AppDb } from '@server/db/app/index.js';
+import { AppDb, settingsStore } from '@server/db/app/index.js';
 import type { ConsoleLevel } from '@/types.js';
 
 type ConsoleEventSubscriber = (entry: ConsoleEntryDto) => void;
@@ -15,9 +15,9 @@ export interface ConsoleEventPublisher {
     warn(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
 }
 
-export const createConsoleEventPublisher = async (appDb: AppDb): Promise<ConsoleEventPublisher> => {
+export const createConsoleEventPublisher = (appDb: AppDb): Promise<ConsoleEventPublisher> => {
     const subscribers = new Set<ConsoleEventSubscriber>();
-    const shouldPersist = await SettingsHelper.read(appDb.db, settingKeys.providerDebug) === 'true';
+    const shouldPersist = settingsStore().read('providerDebug');
     const inMemoryEntries: ConsoleEntryDto[] = [];
 
     const publish = async (
@@ -49,7 +49,7 @@ export const createConsoleEventPublisher = async (appDb: AppDb): Promise<Console
         return entry;
     };
 
-    return {
+    return Promise.resolve({
         debug: (message, timestamp) => publish('debug', message, timestamp),
         error: (message, timestamp) => publish('error', message, timestamp),
         info: (message, timestamp) => publish('info', message, timestamp),
@@ -79,5 +79,5 @@ export const createConsoleEventPublisher = async (appDb: AppDb): Promise<Console
             };
         },
         warn: (message, timestamp) => publish('warn', message, timestamp),
-    };
+    });
 };

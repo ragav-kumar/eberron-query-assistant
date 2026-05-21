@@ -1,6 +1,13 @@
-import type { RuntimePaths } from '@server/settings/index.js';
 import type { CorpusChunk, CorpusSource, RefreshOperationKind } from '@/types.js';
 import type { IngestedArticle } from '@server/db/app/index.js';
+
+export interface RuntimePaths {
+    articleHtmlCacheDir: string;
+    foundryExportDir: string;
+    pdfDir: string;
+    repoRoot: string;
+    retrievalDir: string;
+}
 
 /**
  * Parsed metadata for a Foundry export file.
@@ -109,5 +116,3 @@ export interface PdfParser {
         title: string | null;
     }>;
 }
-
-export type { RuntimePaths };

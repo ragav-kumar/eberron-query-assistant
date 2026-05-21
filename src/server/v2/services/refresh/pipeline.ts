@@ -1,5 +1,7 @@
+import path from 'node:path';
+
 import { createTaggedError, throwIfAborted } from '@/errors.js';
-import type { AppDb } from '@server/db/app/index.js';
+import { initializeSettingsStore, settingsStore, type AppDb } from '@server/db/app/index.js';
 import {
     createCorpusRetrievalService,
     createCorpusStore,
@@ -7,10 +9,6 @@ import {
     type CorpusStore,
     type ProgressReporter,
 } from '@server/db/corpus/index.js';
-import {
-    readEmbeddingProviderSettings,
-    resolveRuntimePaths,
-} from '@server/settings/index.js';
 import type { RefreshOperationKind } from '@/types.js';
 
 import { discoverRefreshWork } from './discovery/index.js';
@@ -19,10 +17,10 @@ import type { ArticleFetcher } from './ingestion/article.js';
 import { createFetchArticleFetcher } from './ingestion/article.js';
 import { buildRefreshIngestion } from './ingestion/index.js';
 import { createImportStateStore, type ImportStateStore } from './import-state.js';
-import type { PdfParser } from './types.js';
+import type { PdfParser, RuntimePaths } from './types.js';
 import { createPdfDataExtractParser } from './ingestion/pdf.js';
 import type { RefreshPipelineResult } from './types.js';
-import { initializeSettingsStore } from '../../db/app/settings/settingsStore.js';
+import type { OpenAiEmbeddingConfig } from './embedding-adapter.js';
 
 /**
  * Optional seams for composing or testing the refresh pipeline.
@@ -61,17 +59,12 @@ export const createRefreshPipeline = (
     const articleFetcher = dependencies.articleFetcher ?? createFetchArticleFetcher();
     const pdfParser = dependencies.pdfParser ?? createPdfDataExtractParser();
     const repoRoot = dependencies.repoRoot ?? process.cwd();
-    const retrievalFactory = dependencies.retrievalFactory ?? (async (pipelineReporter) => {
-        const providerSettings = await readEmbeddingProviderSettings(appDb);
-        if (!providerSettings.apiKey) {
-            pipelineReporter.warn('Skipping retrieval refresh because no provider API key is configured.');
-            return null;
-        }
-
-        return createCorpusRetrievalService({
+    const retrievalFactory = dependencies.retrievalFactory ?? ((pipelineReporter) => {
+        const providerSettings = buildEmbeddingConfig();
+        return Promise.resolve(createCorpusRetrievalService({
             embeddingAdapter: createOpenAiEmbeddingAdapter(providerSettings),
             reporter: pipelineReporter,
-        });
+        }));
     });
 
     return {
@@ -83,7 +76,7 @@ export const createRefreshPipeline = (
             const forceReingest = kind === 'reingest';
             reporter.info(kind === 'refresh' ? 'Preparing refresh runtime settings.' : 'Preparing force reingest runtime settings.');
             await initializeSettingsStore(appDb);
-            const paths = await resolveRuntimePaths(appDb, repoRoot);
+            const paths = resolveRuntimePaths(repoRoot);
             const timestamp = now().toISOString();
             throwIfAborted(options.abortSignal);
 
@@ -178,4 +171,34 @@ export const createRefreshPipeline = (
             };
         },
     };
+};
+
+/** Reads the current embedding-provider configuration from the initialized store. */
+const buildEmbeddingConfig = (): OpenAiEmbeddingConfig => {
+    const store = settingsStore();
+    return {
+        apiKey: store.read('providerApiKey'),
+        baseUrl: store.read('providerBaseUrl'),
+        embeddingModel: store.read('providerEmbeddingModel'),
+    };
+};
+
+/** Resolves persisted relative runtime paths against the current repo root. */
+const resolveRuntimePaths = (repoRoot: string): RuntimePaths => ({
+    articleHtmlCacheDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('articleHtmlCacheDir'), 'articleHtmlCacheDir'),
+    foundryExportDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('foundrySourceDir'), 'foundrySourceDir'),
+    pdfDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('pdfSourceDir'), 'pdfSourceDir'),
+    repoRoot,
+    retrievalDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('retrievalDir'), 'retrievalDir'),
+});
+
+const resolvePersistedRelativePath = (
+    repoRoot: string,
+    value: string,
+    key: 'articleHtmlCacheDir' | 'foundrySourceDir' | 'pdfSourceDir' | 'retrievalDir',
+): string => {
+    if (path.isAbsolute(value)) {
+        throw createTaggedError('invalid-settings-path', `Persisted setting "${key}" must be relative to the repo root.`);
+    }
+    return path.resolve(repoRoot, value);
 };

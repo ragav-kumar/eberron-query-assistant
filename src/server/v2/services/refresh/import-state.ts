@@ -1,6 +1,6 @@
 import type { AppDb } from '@server/db/app/db.js';
 import type { IngestedArticle, SelectRow } from '@server/db/app/schema.js';
-import { SettingsHelper, settingKeys } from '../../db/app/settings/settingKeys.js';
+import { settingsStore } from '@server/db/app/index.js';
 
 /**
  * App-owned Foundry tracking state used by discovery and completion.
@@ -78,29 +78,24 @@ export const createImportStateStore = (appDb: AppDb): ImportStateStore => ({
         });
     },
 
-    readArticleLastSuccessfulIndexScrapeAt: async () => SettingsHelper.read(appDb.db, settingKeys.articleLastSuccessfulIndexScrapeAt),
+    readArticleLastSuccessfulIndexScrapeAt: () => {
+        const value = settingsStore().read('articleLastSuccessfulIndexScrapeAt');
+        return Promise.resolve(value?.toISOString() ?? null);
+    },
 
     writeArticleLastSuccessfulIndexScrapeAt: async value => {
-        await SettingsHelper.write(appDb.db, settingKeys.articleLastSuccessfulIndexScrapeAt, value);
+        await settingsStore().write(appDb, 'articleLastSuccessfulIndexScrapeAt', new Date(value));
     },
 
     readFoundry: async () => {
-        const values = await SettingsHelper.readMany(appDb.db, [
-            settingKeys.foundryLastSuccessfulExportDeleteCount,
-            settingKeys.foundryLastSuccessfulExportFilename,
-            settingKeys.foundryLastSuccessfulExportGeneratedAt,
-            settingKeys.foundryLastSuccessfulExportRecordCount,
-            settingKeys.foundryLastSuccessfulExportRunId,
-            settingKeys.foundryLastSuccessfulExportSchemaVersion,
-            settingKeys.foundryLastSuccessfulExportUpsertCount,
-        ]);
-        const filename = values.get(settingKeys.foundryLastSuccessfulExportFilename) ?? null;
-        const generatedAt = values.get(settingKeys.foundryLastSuccessfulExportGeneratedAt) ?? null;
-        const runId = values.get(settingKeys.foundryLastSuccessfulExportRunId) ?? null;
-        const schemaVersion = values.get(settingKeys.foundryLastSuccessfulExportSchemaVersion) ?? null;
-        const recordCount = parseInteger(values.get(settingKeys.foundryLastSuccessfulExportRecordCount) ?? null);
-        const upsertCount = parseInteger(values.get(settingKeys.foundryLastSuccessfulExportUpsertCount) ?? null);
-        const deleteCount = parseInteger(values.get(settingKeys.foundryLastSuccessfulExportDeleteCount) ?? null);
+        const store = settingsStore();
+        const filename = store.read('foundryLastSuccessfulExportFilename') ?? null;
+        const generatedAt = store.read('foundryLastSuccessfulExportGeneratedAt')?.toISOString() ?? null;
+        const runId = store.read('foundryLastSuccessfulExportRunId') ?? null;
+        const schemaVersion = store.read('foundryLastSuccessfulExportSchemaVersion') ?? null;
+        const recordCount = store.read('foundryLastSuccessfulExportRecordCount') ?? null;
+        const upsertCount = store.read('foundryLastSuccessfulExportUpsertCount') ?? null;
+        const deleteCount = store.read('foundryLastSuccessfulExportDeleteCount') ?? null;
 
         return {
             appliedExportFilenames: await appDb.db
@@ -130,22 +125,13 @@ export const createImportStateStore = (appDb: AppDb): ImportStateStore => ({
         }
 
         await Promise.all([
-            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportDeleteCount, String(state.deleteCount)),
-            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportFilename, state.filename),
-            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportGeneratedAt, state.generatedAt),
-            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportRecordCount, String(state.recordCount)),
-            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportRunId, state.runId),
-            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportSchemaVersion, state.schemaVersion),
-            SettingsHelper.write(appDb.db, settingKeys.foundryLastSuccessfulExportUpsertCount, String(state.upsertCount)),
+            settingsStore().write(appDb, 'foundryLastSuccessfulExportDeleteCount', state.deleteCount),
+            settingsStore().write(appDb, 'foundryLastSuccessfulExportFilename', state.filename),
+            settingsStore().write(appDb, 'foundryLastSuccessfulExportGeneratedAt', new Date(state.generatedAt)),
+            settingsStore().write(appDb, 'foundryLastSuccessfulExportRecordCount', state.recordCount),
+            settingsStore().write(appDb, 'foundryLastSuccessfulExportRunId', state.runId),
+            settingsStore().write(appDb, 'foundryLastSuccessfulExportSchemaVersion', state.schemaVersion),
+            settingsStore().write(appDb, 'foundryLastSuccessfulExportUpsertCount', state.upsertCount),
         ]);
     },
 });
-
-const parseInteger = (value: string | null): number | null => {
-    if (value == null) {
-        return null;
-    }
-
-    const parsed = Number.parseInt(value, 10);
-    return Number.isFinite(parsed) ? parsed : null;
-};

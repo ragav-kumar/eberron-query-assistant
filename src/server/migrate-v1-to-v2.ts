@@ -9,7 +9,8 @@ import path from 'node:path';
 import type { Insertable, Transaction } from 'kysely';
 
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
-import { createAppDb, getAppDatabasePath, settingKeys, AppDatabaseSchema, AppDb } from './v2/db/app/index.js';
+import { createAppDb, AppDatabaseSchema, AppDb } from './v2/db/app/index.js';
+import { settingKeys } from './v2/db/app/settings/settingKeys.js';
 import type { RuntimeConfig } from '@/types.js';
 
 // Intentional temporary bridge between V1 and V2 while migration logic still spans both server layouts.
@@ -710,7 +711,7 @@ const isRecord = (value: unknown): value is Record<string, unknown> => typeof va
 
 export const runMigrationCli = async (): Promise<void> => {
     const config = loadDefaultConfig();
-    const appDb = await createAppDb(getAppDatabasePath(config.runtimeDir));
+    const appDb = await createAppDb();
 
     try {
         await migrateV1DiskToV2Db(config, appDb);

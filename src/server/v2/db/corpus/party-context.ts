@@ -95,7 +95,7 @@ const formatPartyContext = (request: FormatPartyContextRequest): string => {
     const lines = [
         'Current party context:',
         `- Foundry export freshness: ${request.exportGeneratedAt ?? 'unknown'}.`,
-        `- Configured campaign journal folder: ${campaignJournalFolder ?? 'none'}. Journal matching uses configured journal names when folder metadata is unavailable.`,
+        `- Configured campaign journal folder: ${campaignJournalFolder}. Journal matching uses configured journal names when folder metadata is unavailable.`,
         '- Source weighting: Session Notes are authoritative for events that happened in play. Quests are authoritative for active or expected quest threads. Actor-sheet mechanics describe the character sheet. Actor backstory describes what the character believes happened, but may include player error, incomplete knowledge, or unreliable narration.',
         '',
         'Party actors:',

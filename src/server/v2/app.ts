@@ -1,10 +1,11 @@
-import { createAppDb, resolveAppDatabasePath } from './db/app/index.js';
+import path from 'node:path';
+
+import { createAppDb } from './db/app/index.js';
 import { createCorpusRetrievalService, createPartyContextService } from './db/corpus/index.js';
 import {
-    readChatProviderSettings,
-    readEmbeddingProviderSettings,
-    resolveRuntimePaths,
-} from './settings/index.js';
+    initializeSettingsStore,
+    settingsStore,
+} from './db/app/index.js';
 import {
     createConsoleEventPublisher,
     createRefreshCoordinator,
@@ -12,6 +13,11 @@ import {
     createStartupOrchestrator,
     createRuntimeEventPublisher,
 } from './services/index.js';
+import {
+    createOpenAiChatAdapter,
+    createOpenAiEmbeddingAdapter,
+    type ProviderConfig,
+} from './services/provider.js';
 import type {
     ConsoleEventPublisher,
     RefreshCoordinator,
@@ -19,14 +25,7 @@ import type {
     RuntimeEventPublisher,
 } from './services/index.js';
 import type { AppDb } from './db/app/index.js';
-import { createOpenAiChatAdapter, createOpenAiEmbeddingAdapter } from '@/server/v1/provider/index.js';
-import type {
-    ChatAdapter,
-    ChatCompletionOptions,
-    ChatMessage,
-    ChatStructuredResult,
-    EmbeddingAdapter,
-} from '@/server/v1/provider/index.js';
+import { createTaggedError } from '@/errors.js';
 
 /**
  * This wraps the database lifecycle plus the process-local runtime
@@ -54,18 +53,18 @@ export interface CreateV2AppDependencies {
 // noinspection JSUnusedGlobalSymbols
 export const createV2App = async (dependencies: CreateV2AppDependencies = {}): Promise<V2AppContext> => {
     const repoRoot = dependencies.repoRoot ?? process.cwd();
-    const appDb = await createAppDb(dependencies.appDbPath ?? resolveAppDatabasePath(dependencies.repoRoot));
+    const appDb = await createAppDb();
+    await initializeSettingsStore(appDb);
     const consoleEvents = await (dependencies.consoleEventsFactory ?? createConsoleEventPublisher)(appDb);
     const runtimeEvents = (dependencies.runtimeEventsFactory ?? createRuntimeEventPublisher)();
     const refreshCoordinator = (dependencies.refreshCoordinatorFactory ?? createRefreshCoordinator)(appDb, {
         consoleEvents,
         runtimeEvents,
     });
-    const runtimePaths = await resolveRuntimePaths(appDb, repoRoot);
-    const embeddingProviderSettings = await readEmbeddingProviderSettings(appDb);
-    const chatProviderSettings = await readChatProviderSettings(appDb);
+    const runtimePaths = resolveRuntimePaths(repoRoot);
+    const providerConfig = readProviderConfig();
     const retrieval = createCorpusRetrievalService({
-        embeddingAdapter: createLazyEmbeddingAdapter(embeddingProviderSettings),
+        embeddingAdapter: createOpenAiEmbeddingAdapter(providerConfig),
         reporter: {
             info: (message) => {
                 console.info(message);
@@ -75,7 +74,7 @@ export const createV2App = async (dependencies: CreateV2AppDependencies = {}): P
             },
         },
     });
-    const partyContext = createPartyContextService(appDb);
+    const partyContext = createPartyContextService();
     const startupOrchestrator = createStartupOrchestrator(appDb, {
         consoleEvents,
         refreshCoordinator,
@@ -92,13 +91,7 @@ export const createV2App = async (dependencies: CreateV2AppDependencies = {}): P
         refreshCoordinator,
         runCoordinator: createRunCoordinator({
             appDb,
-            chat: createLazyChatAdapter({
-                apiKey: chatProviderSettings.apiKey,
-                baseUrl: chatProviderSettings.baseUrl,
-                chatModel: chatProviderSettings.chatModel,
-                debug: false,
-                embeddingModel: embeddingProviderSettings.embeddingModel,
-            }),
+            chat: createOpenAiChatAdapter(providerConfig),
             partyContext,
             retrieval,
             retrievalDir: runtimePaths.retrievalDir,
@@ -108,61 +101,39 @@ export const createV2App = async (dependencies: CreateV2AppDependencies = {}): P
     };
 };
 
-const createLazyChatAdapter = (config: {
-    apiKey: string | null;
-    baseUrl: string;
-    chatModel: string;
-    debug: boolean;
-    embeddingModel: string;
-}): ChatAdapter => {
-    let adapter: ChatAdapter | null = null;
-    const resolveAdapter = (): ChatAdapter => {
-        adapter ??= createOpenAiChatAdapter(config);
-        return adapter;
-    };
-
+/** Reads the current provider configuration from the initialized store. */
+const readProviderConfig = (): ProviderConfig => {
+    const store = settingsStore();
     return {
-        complete: (messages: ChatMessage[], options?: ChatCompletionOptions) => resolveAdapter().complete(messages, options),
-        completeStructured: (messages: ChatMessage[], options?: ChatCompletionOptions): Promise<ChatStructuredResult> => {
-            const adapter = resolveAdapter();
-            if (!adapter.completeStructured) {
-                throw new Error('Structured chat completion is unavailable.');
-            }
-            return adapter.completeStructured(messages, options);
-        },
+        apiKey: store.read('providerApiKey'),
+        baseUrl: store.read('providerBaseUrl'),
+        chatModel: store.read('providerChatModel'),
+        embeddingModel: store.read('providerEmbeddingModel'),
     };
 };
 
-const createLazyEmbeddingAdapter = (config: {
-    apiKey: string | null;
-    baseUrl: string;
-    chatModel?: string;
-    debug?: boolean;
-    embeddingModel: string;
-}): EmbeddingAdapter => {
-    let adapter: EmbeddingAdapter | null = null;
-    const resolveAdapter = (): EmbeddingAdapter => {
-        adapter ??= createOpenAiEmbeddingAdapter({
-            apiKey: config.apiKey,
-            baseUrl: config.baseUrl,
-            chatModel: config.chatModel ?? 'unused-chat-model',
-            debug: config.debug ?? false,
-            embeddingModel: config.embeddingModel,
-        });
-        return adapter;
-    };
+/** Resolves persisted relative runtime paths against the active repo root. */
+const resolveRuntimePaths = (repoRoot: string): {
+    articleHtmlCacheDir: string;
+    foundryExportDir: string;
+    pdfDir: string;
+    repoRoot: string;
+    retrievalDir: string;
+} => ({
+    articleHtmlCacheDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('articleHtmlCacheDir'), 'articleHtmlCacheDir'),
+    foundryExportDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('foundrySourceDir'), 'foundrySourceDir'),
+    pdfDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('pdfSourceDir'), 'pdfSourceDir'),
+    repoRoot,
+    retrievalDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('retrievalDir'), 'retrievalDir'),
+});
 
-    return {
-        get failedRetries() {
-            return resolveAdapter().failedRetries;
-        },
-        get modelId() {
-            return resolveAdapter().modelId;
-        },
-        get schemaVersion() {
-            return resolveAdapter().schemaVersion;
-        },
-        embed: (input: string) => resolveAdapter().embed(input),
-        embedBatch: (inputs: string[]) => resolveAdapter().embedBatch(inputs),
-    };
+const resolvePersistedRelativePath = (
+    repoRoot: string,
+    value: string,
+    key: 'articleHtmlCacheDir' | 'foundrySourceDir' | 'pdfSourceDir' | 'retrievalDir',
+): string => {
+    if (path.isAbsolute(value)) {
+        throw createTaggedError('invalid-settings-path', `Persisted setting "${key}" must be relative to the repo root.`);
+    }
+    return path.resolve(repoRoot, value);
 };

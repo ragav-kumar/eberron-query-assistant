@@ -8,8 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CreateRunDto } from '@/dto/index.js';
 import { createV2ApiHandler } from '@server/api/index.js';
 import type { V2AppContext } from '@server/app.js';
-import { createAppDb, getDefaultAppDatabasePath } from '@server/db/app/index.js';
-import { settingKeys } from '@server/db/app/settings/settingKeys.js';
+import { createAppDb, initializeSettingsStore, settingsStore } from '@server/db/app/index.js';
 import { createRunCoordinator } from '@server/services/run-coordinator.js';
 import type { V2PromptAssets } from '@server/services/run-runtime.js';
 import type { ChatAdapter } from '@/server/v1/provider/index.js';
@@ -77,13 +76,10 @@ describe('V2 run coordinator', () => {
 
     beforeEach(async () => {
         await rm(TEST_ROOT, {force: true, recursive: true});
-        appDb = await createAppDb(getDefaultAppDatabasePath(TEST_ROOT));
+        appDb = await createAppDb();
+        await initializeSettingsStore(appDb);
         await initializeRefreshState(appDb);
-        await appDb.db.insertInto('settings').values({
-            key: settingKeys.additionalContext,
-            modifiedAt: '2026-05-19T00:00:00.000Z',
-            value: '# Additional Context',
-        }).execute();
+        await settingsStore().write(appDb, 'additionalContext', '# Additional Context');
         await appDb.db.insertInto('sessions').values({
             activeRunId: null,
             archivedAt: null,
@@ -379,13 +375,10 @@ describe('V2 runs API route', () => {
 
     beforeEach(async () => {
         await rm(TEST_ROOT, {force: true, recursive: true});
-        appDb = await createAppDb(getDefaultAppDatabasePath(TEST_ROOT));
+        appDb = await createAppDb();
+        await initializeSettingsStore(appDb);
         await initializeRefreshState(appDb);
-        await appDb.db.insertInto('settings').values({
-            key: settingKeys.additionalContext,
-            modifiedAt: '2026-05-19T00:00:00.000Z',
-            value: '# Additional Context',
-        }).execute();
+        await settingsStore().write(appDb, 'additionalContext', '# Additional Context');
         await appDb.db.insertInto('sessions').values({
             activeRunId: null,
             archivedAt: null,
@@ -438,7 +431,7 @@ describe('V2 runs API route', () => {
         expect(run.sessionEntries.map(entry => entry.kind)).toEqual(['user', 'response']);
 
         await app.close();
-        const reopened = await createAppDb(getDefaultAppDatabasePath(TEST_ROOT));
+        const reopened = await createAppDb();
         try {
             const feedEntries = await reopened.db
                 .selectFrom('sessionEntries')

@@ -8,8 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { ConsoleEntryDto, CreateRefreshDto, CreateRunDto } from '@/dto/index.js';
 import { createV2ApiHandler } from '@server/api/index.js';
 import type { V2AppContext } from '@server/app.js';
-import { createAppDb, getDefaultAppDatabasePath } from '@server/db/app/index.js';
-import { settingKeys } from '@server/db/app/settings/settingKeys.js';
+import { createAppDb, initializeSettingsStore, settingsStore } from '@server/db/app/index.js';
 import { createRuntimeEventPublisher } from '@server/services/index.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-api');
@@ -88,7 +87,8 @@ describe('V2 API router', () => {
         await rm(TEST_ROOT, { force: true, recursive: true });
         consoleListener = null;
 
-        const appDb = await createAppDb(getDefaultAppDatabasePath(TEST_ROOT));
+        const appDb = await createAppDb();
+        await initializeSettingsStore(appDb);
         await initializeRefreshState(appDb);
         const runtimeEvents = createRuntimeEventPublisher();
         app = {
@@ -155,11 +155,7 @@ describe('V2 API router', () => {
             runtimeEvents,
         };
 
-        await app.db.insertInto('settings').values({
-            key: settingKeys.additionalContext,
-            modifiedAt: '2026-05-17T00:00:00.000Z',
-            value: '# Campaign Context',
-        }).execute();
+        await settingsStore().write(appDb, 'additionalContext', '# Campaign Context');
         await app.db.insertInto('sessions').values({
             activeRunId: null,
             archivedAt: null,

@@ -9,14 +9,14 @@ import {
     buildRetrievalToolInstructions,
     clampRetrievalTurnLimit,
     completeStructured,
-} from '@/server/v1/runtime/retrieval-tool.js';
+    isSourceType,
+} from './retrieval-tool.js';
 import {
     type ChatAdapter,
     type ChatMessage,
     type ChatStructuredResult,
     type ChatToolCall,
-} from '@/server/v1/provider/index.js';
-import { formatCitation } from '@/server/v1/runtime/assistant-prompts.js';
+} from './provider.js';
 
 import { listV2PromptAssets } from '../prompts/index.js';
 
@@ -500,8 +500,6 @@ const readStringArray = (
     };
 };
 
-const isSourceType = (value: string): value is SourceType => value === 'foundry' || value === 'pdf' || value === 'article';
-
 const clampEvidenceLimit = (value: unknown): number => {
     if (typeof value !== 'number' || !Number.isFinite(value)) {
         return MAX_EVIDENCE_RESULTS;
@@ -522,4 +520,10 @@ const formatEvidence = (results: RetrievalResult[]): string => {
             result.content,
         ].join('\n'))
         .join('\n\n');
+};
+
+const formatCitation = (result: RetrievalResult): string => {
+    const locator = result.citation.locator ? `, ${result.citation.locator}` : '';
+    const url = result.citation.url ? `, ${result.citation.url}` : '';
+    return `${result.citation.label}${locator}${url} [${result.sourceType}:${result.sourceKey}]`;
 };

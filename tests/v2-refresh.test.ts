@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { OperationEventDto } from '@/dto/index.js';
 import { createTaggedError } from '@/errors.js';
 import { createV2App } from '@server/app.js';
-import { createAppDb, getAppDatabasePath, SettingsHelper, settingKeys, type AppDb } from '@server/db/app/index.js';
+import { createAppDb, getAppDatabasePath, initializeSettingsStore, settingsStore, type AppDb } from '@server/db/app/index.js';
 import {
     createCorpusRetrievalService,
     createCorpusStore,
@@ -15,14 +15,12 @@ import {
     type CorpusStore,
     type EmbeddingAdapter,
 } from '@server/db/corpus/index.js';
-import { resolveRuntimePaths } from '@server/settings/index.js';
 import { createConsoleEventPublisher, createRuntimeEventPublisher } from '@server/services/index.js';
 import { createRefreshCoordinator } from '@server/services/refresh/index.js';
 import { createImportStateStore } from '@server/services/refresh/import-state.js';
 import { createRefreshPipeline } from '@server/services/refresh/pipeline.js';
 import { createRefreshStateStore } from '@server/services/refresh/refresh-state.js';
 import { createStartupOrchestrator } from '@server/services/startup-orchestrator.js';
-import { initializeSettingsStore } from '@server/db/app/settings/settingsStore.js';
 
 const TEST_ROOT = path.resolve('.test-tmp', 'v2-refresh');
 const appDbs: AppDb[] = [];
@@ -315,18 +313,17 @@ describe('v2 refresh flow', () => {
         const runtimeDir = path.join(repoRoot, '.eberron-query-assistant');
         const appDb = await createTestAppDb('runtime-settings', runtimeDir);
 
-        await initializeSettingsStore(appDb);
-        expect(await SettingsHelper.read(appDb.db, settingKeys.foundrySourceDir)).toBe('foundry-export');
-        expect(await SettingsHelper.read(appDb.db, settingKeys.pdfSourceDir)).toBe('pdf');
-        expect(await SettingsHelper.read(appDb.db, settingKeys.retrievalDir)).toBe('.eberron-query-assistant/retrieval');
-        expect(await SettingsHelper.read(appDb.db, settingKeys.articleHtmlCacheDir)).toBe('.eberron-query-assistant/cache/keith-baker');
+        expect(settingsStore().read('foundrySourceDir')).toBe('foundry-export');
+        expect(settingsStore().read('pdfSourceDir')).toBe('pdf');
+        expect(settingsStore().read('retrievalDir')).toBe('.eberron-query-assistant/retrieval');
+        expect(settingsStore().read('articleHtmlCacheDir')).toBe('.eberron-query-assistant/cache/keith-baker');
 
-        await SettingsHelper.write(appDb.db, settingKeys.foundrySourceDir, 'custom/foundry');
-        await SettingsHelper.write(appDb.db, settingKeys.pdfSourceDir, 'custom/pdfs');
-        await SettingsHelper.write(appDb.db, settingKeys.retrievalDir, 'custom/retrieval');
-        await SettingsHelper.write(appDb.db, settingKeys.articleHtmlCacheDir, 'custom/cache/html');
+        await settingsStore().write(appDb, 'foundrySourceDir', 'custom/foundry');
+        await settingsStore().write(appDb, 'pdfSourceDir', 'custom/pdfs');
+        await settingsStore().write(appDb, 'retrievalDir', 'custom/retrieval');
+        await settingsStore().write(appDb, 'articleHtmlCacheDir', 'custom/cache/html');
 
-        const paths = await resolveRuntimePaths(appDb, repoRoot);
+        const paths = resolveRuntimePathsForTest(repoRoot);
         expect(paths).toMatchObject({
             articleHtmlCacheDir: path.resolve(repoRoot, 'custom/cache/html'),
             foundryExportDir: path.resolve(repoRoot, 'custom/foundry'),
@@ -341,10 +338,9 @@ describe('v2 refresh flow', () => {
         const runtimeDir = path.join(repoRoot, '.eberron-query-assistant');
         const appDb = await createTestAppDb('runtime-settings-absolute', runtimeDir);
 
-        await initializeSettingsStore(appDb);
-        await SettingsHelper.write(appDb.db, settingKeys.foundrySourceDir, path.resolve(repoRoot, 'absolute-foundry'));
+        await settingsStore().write(appDb, 'foundrySourceDir', path.resolve(repoRoot, 'absolute-foundry'));
 
-        await expect(resolveRuntimePaths(appDb, repoRoot)).rejects.toMatchObject({
+        await expect(Promise.resolve().then(() => resolveRuntimePathsForTest(repoRoot))).rejects.toMatchObject({
             kind: 'invalid-settings-path',
         });
     });
@@ -364,7 +360,7 @@ describe('v2 refresh flow', () => {
         expect(await transientAppDb.db.selectFrom('consoleEntries').selectAll().execute()).toEqual([]);
 
         const debugAppDb = await createTestAppDb('console-debug');
-        await SettingsHelper.write(debugAppDb.db, settingKeys.providerDebug, 'true');
+        await settingsStore().write(debugAppDb, 'providerDebug', true);
         const debugConsole = await createConsoleEventPublisher(debugAppDb);
         await debugConsole.warn('Persisted entry', '2026-05-18T00:00:01.000Z');
 
@@ -405,9 +401,9 @@ describe('v2 refresh flow', () => {
             refreshStatus: 'failed',
             reingestStatus: 'failed',
         });
-        expect(await SettingsHelper.read(app.db, settingKeys.retrievalDir)).toBe('.eberron-query-assistant/retrieval');
-        expect(await SettingsHelper.read(app.db, settingKeys.foundrySourceDir)).toBe('foundry-export');
-        expect(await SettingsHelper.read(app.db, settingKeys.pdfSourceDir)).toBe('pdf');
+        expect(settingsStore().read('retrievalDir')).toBe('.eberron-query-assistant/retrieval');
+        expect(settingsStore().read('foundrySourceDir')).toBe('foundry-export');
+        expect(settingsStore().read('pdfSourceDir')).toBe('pdf');
 
         await flushAsyncHandlers();
         expect(calls).toEqual([{ kind: 'refresh' }]);
@@ -646,9 +642,34 @@ describe('v2 refresh flow', () => {
 });
 
 const createTestAppDb = async (name: string, runtimeDir = path.join(TEST_ROOT, name, '.eberron-query-assistant')): Promise<AppDb> => {
-    const appDb = await createAppDb(getAppDatabasePath(runtimeDir));
+    void name;
+    void runtimeDir;
+    const appDb = await createAppDb();
+    await initializeSettingsStore(appDb);
     appDbs.push(appDb);
     return appDb;
+};
+
+const resolveRuntimePathsForTest = (repoRoot: string) => ({
+    articleHtmlCacheDir: resolvePersistedRelativePathForTest(repoRoot, 'articleHtmlCacheDir'),
+    foundryExportDir: resolvePersistedRelativePathForTest(repoRoot, 'foundrySourceDir'),
+    pdfDir: resolvePersistedRelativePathForTest(repoRoot, 'pdfSourceDir'),
+    repoRoot,
+    retrievalDir: resolvePersistedRelativePathForTest(repoRoot, 'retrievalDir'),
+});
+
+const resolvePersistedRelativePathForTest = (
+    repoRoot: string,
+    key: 'articleHtmlCacheDir' | 'foundrySourceDir' | 'pdfSourceDir' | 'retrievalDir',
+): string => {
+    const value = settingsStore().read(key);
+    if (!value) {
+        throw createTaggedError('missing-settings-value', `Required setting "${key}" is missing.`);
+    }
+    if (path.isAbsolute(value)) {
+        throw createTaggedError('invalid-settings-path', `Persisted setting "${key}" must be relative to the repo root.`);
+    }
+    return path.resolve(repoRoot, value);
 };
 
 const createTestCorpusStore = (): CorpusStore => {

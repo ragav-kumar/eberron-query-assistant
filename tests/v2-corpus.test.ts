@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { loadDefaultConfig } from '@/server/v1/config/index.js';
 import type { EmbeddingAdapter } from '@/server/v1/provider/index.js';
-import { createAppDb, getAppDatabasePath, settingKeys, type AppDb } from '@server/db/app/index.js';
+import { createAppDb, initializeSettingsStore, settingsStore, type AppDb } from '@server/db/app/index.js';
 import {
     createCorpusRetrievalService,
     createCorpusStore,
@@ -209,7 +209,9 @@ const createStore = () => {
 };
 
 const createTestAppDb = async (runtimeDir: string): Promise<AppDb> => {
-    const appDb = await createAppDb(getAppDatabasePath(runtimeDir));
+    void runtimeDir;
+    const appDb = await createAppDb();
+    await initializeSettingsStore(appDb);
     appDbs.push(appDb);
     return appDb;
 };
@@ -223,24 +225,10 @@ const writePartyContextSettings = async (
         sessionNotesJournal?: string;
     },
 ): Promise<void> => {
-    const modifiedAt = new Date().toISOString();
-    const rows = [
-        { key: settingKeys.campaignJournalFolder, modifiedAt, value: settings.campaignJournalFolder ?? '' },
-        { key: settingKeys.partyActorUuids, modifiedAt, value: JSON.stringify(settings.partyActorUuids ?? []) },
-        { key: settingKeys.questsJournal, modifiedAt, value: settings.questsJournal ?? 'Quests' },
-        { key: settingKeys.sessionNotesJournal, modifiedAt, value: settings.sessionNotesJournal ?? 'Session Notes' },
-    ];
-
-    for (const row of rows) {
-        await appDb.db
-            .insertInto('settings')
-            .values(row)
-            .onConflict(conflict => conflict.column('key').doUpdateSet({
-                modifiedAt: row.modifiedAt,
-                value: row.value,
-            }))
-            .execute();
-    }
+    await settingsStore().write(appDb, 'campaignJournalFolder', settings.campaignJournalFolder ?? '');
+    await settingsStore().write(appDb, 'partyActorUuids', settings.partyActorUuids ?? []);
+    await settingsStore().write(appDb, 'questsJournal', settings.questsJournal ?? 'Quests');
+    await settingsStore().write(appDb, 'sessionNotesJournal', settings.sessionNotesJournal ?? 'Session Notes');
 };
 
 const source = (sourceType: CorpusSource['sourceType'], sourceKey: string, title: string): CorpusSource => ({
