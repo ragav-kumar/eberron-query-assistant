@@ -161,7 +161,7 @@ describe('v2 corpus boundary', () => {
             ),
         ]);
 
-        const context = await createPartyContextService(appDb).build(config.retrievalDir);
+        const context = await createPartyContextService().build(config.retrievalDir);
 
         expect(context).toContain('Current party context:');
         expect(context).toContain('Peanunt');
@@ -176,7 +176,7 @@ describe('v2 corpus boundary', () => {
         await writePartyContextSettings(missingCorpusAppDb, {
             partyActorUuids: ['Actor.peanunt'],
         });
-        await expect(createPartyContextService(missingCorpusAppDb).build(missingCorpusConfig.retrievalDir)).resolves.toContain(
+        await expect(createPartyContextService().build(missingCorpusConfig.retrievalDir)).resolves.toContain(
             'Party context unavailable: corpus.sqlite has not been created.',
         );
 
@@ -194,7 +194,7 @@ describe('v2 corpus boundary', () => {
             foundrySource('foundry:other', 'world.actor.other', 'Other', 'Actor.other', 'Actor', [], 'Other actor.'),
         ]);
 
-        const context = await createPartyContextService(missingActorAppDb).build(missingActorConfig.retrievalDir);
+        const context = await createPartyContextService().build(missingActorConfig.retrievalDir);
         expect(context).toContain('No configured party actors were found');
         expect(context).toContain('Missing configured actor UUIDs: Actor.missing');
         expect(context).toContain('No pages found for journal "Missing Notes"');
