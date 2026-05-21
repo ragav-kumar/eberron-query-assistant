@@ -2,7 +2,7 @@
 
 ## Scope
 - These rules apply to files under `/tests`.
-- This file is relevant in `Development`, `Review`, and `Introspection`.
+- This file is relevant in all modes.
 
 ## Test intent
 - Prefer tests that validate user-visible behavior, durable invariants, and meaningful service contracts.
