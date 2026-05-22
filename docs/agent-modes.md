@@ -2,9 +2,9 @@
 
 ## Purpose
 - This document defines task-mode workflow rules for the agent.
-- Use it together with the root `AGENTS.md`.
-- Path-specific `AGENTS.md` files remain the source of truth for local implementation constraints, especially during development work.
-- Agent-governance files are files whose primary purpose is directing agent behavior, workflow, permissions, or verification rules, such as `AGENTS.md`, `agent-modes.md`, and similar agent-rule-oriented documents.
+- Use it together with the root `CLAUDE.md`.
+- Path-specific `CLAUDE.md` files remain the source of truth for local implementation constraints, especially during development work.
+- Agent-governance files are files whose primary purpose is directing agent behavior, workflow, permissions, or verification rules, such as `CLAUDE.md`, `agent-modes.md`, and similar agent-rule-oriented documents.
 
 ## Mode Selection
 - Every task runs in exactly one mode: `Analysis`, `Development`, `Review`, or `Introspection`.
@@ -12,7 +12,7 @@
 - If the user does not explicitly name a mode, infer the mode from the request.
 - If the request is to create, revise, reorganize, or review agent-governance files, use `Introspection`.
 - If a request mixes agent-governance edits with code work, product documentation work, or ordinary review work, stop and ask to split it into separate tasks.
-- Explicitly tell the user which mode you are operating in before doing work.
+- For non-trivial or multi-step tasks, state which mode you are operating in before beginning work.
 - If a request mixes modes in a way that changes permissions or expected output, stop and ask the user to confirm the intended mode or staged workflow.
 
 ## Mode Switching
@@ -36,17 +36,15 @@
 - No repo-local V1 implementation remains in this repository.
 - Do not consult external or archived historical V1 implementation unless the analysis task is specifically about migration or legacy-data compatibility.
 - When historical V1 code is consulted for that purpose, explicitly disclose the consulted file or files and why they were needed.
-- Path-specific `AGENTS.md` files are usually not the main source for this mode unless they contain relevant architectural or verification constraints needed for analysis.
+- Path-specific `CLAUDE.md` files are usually not the main source for this mode unless they contain relevant architectural or verification constraints needed for analysis.
 
 ## Development
 - Purpose: implement behavior changes.
 - Code changes are expected in this mode.
-- Generated non-trivial code should be documented with JSDoc that clearly explains what the code is doing and, where relevant, why it works that way and how it behaves.
-- This JSDoc expectation does not apply to trivial layout components, styles, or small helper functions unless their behavior would otherwise be unclear.
 - During the V2 transition, default to V2 unless the user explicitly requires V1 work or V1 changes are necessary to unblock compilation or runtime behavior.
 - For non-trivial V2 work, consult `docs/fdd-v2.md` before making changes.
 - For non-trivial V1 work that is explicitly required, consult `docs/fdd-v1.md` before making changes.
-- Follow the root `AGENTS.md` plus any relevant path-specific `AGENTS.md` files for the areas being changed.
+- Follow the root `CLAUDE.md` plus any relevant path-specific `CLAUDE.md` files for the areas being changed.
 - Documentation changes are not permitted in this mode.
 - Agent-governance files may not be edited in this mode.
 
@@ -61,7 +59,7 @@
   - Under no circumstances should you ever change the port Vite runs on.
 - Prefer plain functions, hooks, modules, and object literals over project-authored classes.
 - Do not introduce class-based wrappers, service objects, or constructor-driven abstractions when a functional or module-scoped design is sufficient.
-- Keep product logic, UI state transitions, presentation decisions, and user workflow behavior in the client layer when they do not require privileged Node access. Client-layer placement guidance lives in `src/client/AGENTS.md`.
+- Keep product logic, UI state transitions, presentation decisions, and user workflow behavior in the client layer when they do not require privileged Node access. Client-layer placement guidance lives in `src/client/CLAUDE.md`.
 - If a change is intentionally left without automated coverage, document the risk and provide manual verification steps.
 - Do not restore, recreate, or preserve obsolete untracked local files unless the current task explicitly requires that exact file. Gitignored runtime artifacts, generated logs, and converted legacy files may represent deliberate local cleanup or migration state. Treat changes made outside the current session as user-owned work: do not revert, reintroduce, or "helpfully" reconstruct them while doing unrelated implementation or documentation work.
 - Before extending an existing pattern in a meaningful way, decide whether it reflects intended architecture or a local workaround.
@@ -74,10 +72,7 @@
 - Execute `npm run test` for development tasks that touch automated test coverage or rely on automated test acceptance.
 - Treat any test failure whose reason is not `Not implemented.` as a blocking acceptance failure that must be fixed before handoff.
 - Treat a `Not implemented.` failure as a blocking acceptance failure when the failing test is affected by the current task.
-- This repository is commonly worked on from Windows PowerShell. Vite and Vitest load TypeScript config through esbuild, which may fail in the sandbox with `spawn EPERM`.
-- Request escalation directly for commands known to need network access, external write permissions, or esbuild process spawning, including `npm install`, `git push`, `npm test`, targeted Vitest runs, `npm run start`, `npm run start:v2-server`, and `npm run dev`.
-- If a workflow is discovered to require escalation in this environment, treat it as an escalation-required workflow in future runs and update the relevant `AGENTS.md` guidance when that behavior is durable.
-- Use sandboxed commands for checks that do not need esbuild process spawning, such as `npm run lint` and `npm run prestart`.
+- This repository is commonly worked on from Windows PowerShell.
 - Use `npm run prestart` for the TypeScript no-emit check. There is no `npm run build` script.
 - Treat `npm audit` findings as actionable quality issues, not incidental noise. A vulnerability that can be fixed with an audit-driven dependency update is expected to be addressed when it is in scope to do so.
 - Treat any high or critical vulnerability that cannot currently be fixed as a serious concern that must be surfaced clearly to the user, even when it is unrelated to the code being changed.
@@ -87,7 +82,7 @@
 - After every agent-started dev or server run on Windows, explicitly verify cleanup by confirming that no repo-local `vite.js` process remains, no repo-local `vite-node` process running `src/server/v2/server.cli.ts` remains, and no listener remains on each port used for the check.
 - On Windows, cleanup verification for agent-started dev or server runs is incomplete until the repo-local `vite.js` check, the repo-local V2 API server process check, and the per-port listener checks all pass.
 - For non-server changes during the temporary V2 transition, use `npm run lint` and `npm run prestart` as the final acceptance checks instead of unit-test commands.
-- For server changes, follow the final acceptance workflow in `src/server/AGENTS.md`.
+- For server changes, follow the final acceptance workflow in `src/server/CLAUDE.md`.
 
 ## Review
 - Purpose: evaluate changes and provide critique, risks, and suggestions.
@@ -101,7 +96,7 @@
 - Agent-governance files may not be edited in this mode.
 - Review may use docs and V2 code freely.
 - Review may consult historical V1 code only when the review is about migration or legacy-data compatibility, and that consultation must be disclosed to the user with specific file references.
-- Path-specific `AGENTS.md` files are relevant when they affect correctness, architecture, verification expectations, or whether a requested fix remains small enough to stay in review mode.
+- Path-specific `CLAUDE.md` files are relevant when they affect correctness, architecture, verification expectations, or whether a requested fix remains small enough to stay in review mode.
 
 ## Introspection
 - Purpose: create, revise, or reorganize agent-governance rules and workflow instructions.

@@ -1,0 +1,29 @@
+# Server Rules
+
+## Scope
+- This file is primarily relevant during `Development`, and secondarily during `Review` when evaluating or making small scoped server changes.
+- During the V2 transition, treat new user-requested server behavior changes as targeting `/src/server/v2` unless the user explicitly says otherwise.
+- Keep the Node layer as thin as practical. Put filesystem access, process/runtime concerns, persistence, and other host-only capabilities in the server layer.
+- No repo-local V1 server implementation remains in this repository.
+- Do not use removed, archived, or external historical V1 server implementation as a general reference for V2 server work.
+- Server-side historical V1 consultation is allowed only for migration or legacy-data compatibility work, and it must be disclosed with specific file references.
+
+## Server Structure
+- Keep durable model prompt instructions in tracked Markdown files under `assistant/` as much as is reasonable. Code may assemble those prompt assets with dynamic runtime context, retrieved evidence, saved state, user input, and validation-specific constraints, but reusable assistant behavior instructions should not live as large string literals in source files.
+
+## Persistence and Runtime Behavior
+- The stored `appVersion` is diagnostic metadata only and must not drive compatibility decisions.
+- Keep persistent-state changes migration-safe. Startup should validate persisted state by shape and preserve usable state across version bumps.
+- Routine startup must not silently delete, rebuild, or invalidate app-owned corpus, retrieval artifacts, or other persisted user data. Incompatible artifacts should fail clearly and direct the user to an explicit force-reingest path.
+- Handle ingest and index failures in a source-scoped way, preserve provenance needed for citations and cleanup, and keep startup/progress logging operationally useful.
+
+## Testing and Verification
+- Add or update automated tests alongside behavior changes when the change involves the server.
+- Design ingestion and retrieval logic so most tests can run without network access or live model calls. Use mocks or fixtures for provider interactions and remote content wherever practical.
+- Execute `npm run test` for server tasks that depend on automated test acceptance.
+- Treat any test failure whose reason is not `Not implemented.` as a blocking acceptance failure.
+- Treat a `Not implemented.` failure as blocking when the failing test is affected by the current task.
+- Use `npm run verify` as the final acceptance command for changes that involve the server. Targeted test runs may be used during iteration, but they do not replace the final full-suite gate.
+- When starting the dev server from PowerShell for verification, invoke the Windows npm shim (`npm.cmd`), not `npm`.
+- After startup verification on Windows, explicitly tear down every repo-local dev or server process started for the check.
+- Verify teardown by confirming that no repo-local `vite.js` child process remains, no repo-local `vite-node` process running `src/server/v2/server.cli.ts` remains, and no listener remains on each tested port.
