@@ -1,4 +1,5 @@
 import { useSessionContext } from './SessionContext/index.js';
+import { TEMP_SESSION_ID } from './SessionContext/SessionProvider.js';
 import { SessionMode } from '@/dto/index.js';
 import styles from './SessionSelector.module.css';
 import { ChangeEvent } from 'react';
@@ -9,17 +10,13 @@ interface SessionSelectorProps {
 }
 
 export const SessionSelector = ({mode}:SessionSelectorProps) => {
-    const { sessionsByMode, activeSessions, changeActiveSession } = useSessionContext();
+    const { sessionsByMode, activeSessions, changeActiveSession, createTempSession } = useSessionContext();
     const sessions = sessionsByMode(mode);
     const activeSession = activeSessions[mode];
 
     const changeSession = (e: ChangeEvent<HTMLSelectElement>) => {
         const sessionId = e.target.value;
-        changeActiveSession(mode, sessionId as SessionMode);
-    };
-
-    const createNewSession = () => {
-        // TODO
+        changeActiveSession(sessionId, mode);
     };
 
     return (
@@ -33,6 +30,9 @@ export const SessionSelector = ({mode}:SessionSelectorProps) => {
                 value={activeSession?.id}
                 onChange={changeSession}
             >
+                {activeSession?.id === TEMP_SESSION_ID && (
+                    <option value={TEMP_SESSION_ID}>Untitled (new session)</option>
+                )}
                 {sessions.map(session => (
                     <option
                         key={session.id}
@@ -44,7 +44,7 @@ export const SessionSelector = ({mode}:SessionSelectorProps) => {
             </select>
             <Button
                 variant='primary'
-                onClick={createNewSession}
+                onClick={() => createTempSession(mode)}
             >
                 New session
             </Button>

@@ -4,10 +4,6 @@ import { defineConfig, type PluginOption } from 'vite';
 import checker from 'vite-plugin-checker';
 
 import { eberronApiPlugin } from './src/server/vite-plugin.js';
-import {
-  serverHost,
-  serverPort
-} from './src/server/v2/db/app/settings/defaults.js';
 
 const createCheckerPlugin = checker as (options: {
   typescript: boolean;
@@ -16,6 +12,16 @@ const createCheckerPlugin = checker as (options: {
   };
 }) => PluginOption;
 
+// Read directly rather than importing from defaults.ts. That module validates mandatory
+// keys (OPENAI_API_KEY, EQA_PARTY_ACTOR_UUIDS) at import time via Zod, and those keys
+// live in .env — which Vite has not loaded yet when vite.config.ts is evaluated.
+const serverHost = process.env['EQA_V2_SERVER_HOST'] ?? '127.0.0.1';
+const serverPort = (() => {
+  const raw = process.env['EQA_V2_SERVER_PORT'];
+  if (raw == null) return 3001;
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 0 && n <= 65535 ? n : 3001;
+})();
 const serverTarget = `http://${serverHost}:${serverPort}`;
 
 export default defineConfig({

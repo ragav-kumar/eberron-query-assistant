@@ -5,14 +5,15 @@ import type { ConsoleEntryDto } from '@/dto/index.js';
 import { contracts } from '@/contract/index.js';
 
 const queryKey = ['api', 'console'];
+const EMPTY_ENTRIES: ConsoleEntryDto[] = [];
 
 export const useConsoleEntries = () => {
     const queryClient = useQueryClient();
 
     return useSyncExternalStore(
         onStoreChange => queryClient.getQueryCache().subscribe(onStoreChange),
-        () => queryClient.getQueryData<ConsoleEntryDto[]>(queryKey) ?? [],
-        () => [],
+        () => queryClient.getQueryData<ConsoleEntryDto[]>(queryKey) ?? EMPTY_ENTRIES,
+        () => EMPTY_ENTRIES,
     );
 };
 

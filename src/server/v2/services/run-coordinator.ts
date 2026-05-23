@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { type Insertable, type Kysely, type Transaction } from 'kysely';
 
-import type { CreateRunDto, RunDto, SessionDto, SessionEntryDto } from '@/dto/index.js';
+import type { CreateRunDto, RunDto, SessionDto, SessionEntryDto, SessionMode } from '@/dto/index.js';
 import { createTaggedError, formatThrownValue } from '@/errors.js';
 import { settingsStore, type AppDatabaseSchema, type SessionEntry, type UpdateRow } from '@server/db/app/index.js';
 import type { AppDb } from '@server/db/app/db.js';
@@ -37,12 +37,8 @@ export interface RunCoordinatorDependencies {
 export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): RunCoordinator => ({
     startRun: async (request) => {
         const normalized = normalizeCreateRunRequest(request);
-        const sessionId = normalized.sessionId;
         if (normalized.mode !== 'assistant') {
             throw createTaggedError('run-unsupported-mode', 'Only assistant runs are supported in Phase 1.');
-        }
-        if (!sessionId) {
-            throw createTaggedError('run-session-required', 'A persisted sessionId is required for V2 runs in Phase 1.');
         }
 
         await assertRunNotBlocked(dependencies.appDb.db);
@@ -51,6 +47,7 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
         const runId = randomUUID();
         const promptAssets = await loadPromptAssets();
         const now = new Date().toISOString();
+        const sessionId = normalized.sessionId ?? await insertNewSession(dependencies.appDb.db, normalized.mode, normalized.includePartyContext, now);
         const persistedEntries: SessionEntryDto[] = [];
         const session = await dependencies.appDb.db
             .selectFrom('sessions')
@@ -394,6 +391,32 @@ const toSessionEntryDto = (entry: SessionEntry): SessionEntryDto => ({
     title: entry.title ?? undefined,
     toolCallId: entry.toolCallId,
 });
+
+/**
+ * Inserts a new session row and returns its generated ID.
+ * Called when a run arrives without a sessionId so that a durable session
+ * exists before the transaction writes begin. includePartyContext is set
+ * immediately from the run request so it is never null.
+ */
+const insertNewSession = async (
+    db: Kysely<AppDatabaseSchema>,
+    mode: SessionMode,
+    includePartyContext: boolean,
+    now: string,
+): Promise<string> => {
+    const id = randomUUID();
+    await db.insertInto('sessions').values({
+        activeRunId: null,
+        archivedAt: null,
+        createdAt: now,
+        id,
+        includePartyContext: includePartyContext ? 1 : 0,
+        mode,
+        title: '',
+        updatedAt: now,
+    }).execute();
+    return id;
+};
 
 /**
  * Fetches a single session as a SessionDto, including the aggregate entry count

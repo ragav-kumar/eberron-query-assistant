@@ -66,8 +66,6 @@ const envSchema = z.object({
     OPENAI_CHAT_MODEL: z.string().default('gpt-5.4-mini'),
     OPENAI_EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
     EQA_APP_DB_PATH: z.string().default('.eberron-query-assistant/app.sqlite'),
-    EQA_V2_SERVER_HOST: z.string().default('127.0.0.1'),
-    EQA_V2_SERVER_PORT: z.coerce.number().int().min(0).max(65535).default(3001),
     EQA_SESSION_NOTES_JOURNAL: z.string().default('Session Notes'),
     EQA_QUESTS_JOURNAL: z.string().default('Quests'),
     EQA_CAMPAIGN_JOURNAL_FOLDER: z.string().default('Legacy'),
@@ -102,5 +100,16 @@ export const defaults = Object.freeze({
 } satisfies Record<typeof settingKeysToInitialize[number], string | boolean | number | string[]>);
 
 export const appDbPath = env.EQA_APP_DB_PATH;
-export const serverHost = env.EQA_V2_SERVER_HOST;
-export const serverPort = env.EQA_V2_SERVER_PORT;
+
+/**
+ * Host and port the V2 API server binds to and the Vite dev proxy forwards to.
+ * Hardcoded to loopback defaults; set EQA_V2_SERVER_HOST / EQA_V2_SERVER_PORT
+ * in the environment to override without touching source.
+ */
+export const serverHost = process.env['EQA_V2_SERVER_HOST'] ?? '127.0.0.1';
+export const serverPort: number = (() => {
+    const raw = process.env['EQA_V2_SERVER_PORT'];
+    if (raw == null) return 3001;
+    const n = Number(raw);
+    return Number.isInteger(n) && n >= 0 && n <= 65535 ? n : 3001;
+})();

@@ -58,16 +58,26 @@ describe('V2 run coordinator', () => {
         await expect(coordinator.startRun(createRequest())).rejects.toThrow('Runs are blocked while refresh or reingest is active.');
     });
 
-    it('requires a persisted session during phase 1 assistant runs', async () => {
+    it('creates a new persisted session when no sessionId is provided', async () => {
         const coordinator = createCoordinator(appDb);
 
-        await expect(coordinator.startRun({
+        const run = await coordinator.startRun({
             includePartyContext: false,
             mode: 'assistant',
             prompt: 'Question',
             retrievalTurnLimit: 1,
             sessionId: undefined,
-        })).rejects.toThrow('A persisted sessionId is required for V2 runs in Phase 1.');
+        });
+
+        const session = await appDb.db
+            .selectFrom('sessions')
+            .selectAll()
+            .where('id', '=', run.sessionId)
+            .executeTakeFirst();
+        expect(session).toBeDefined();
+        expect(session?.mode).toBe('assistant');
+        expect(session?.includePartyContext).toBe(0);
+        expect(run.sessionId).not.toBe('session-1');
     });
 
     it('rejects unsupported run modes', async () => {

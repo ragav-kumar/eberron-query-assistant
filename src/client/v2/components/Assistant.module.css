@@ -26,3 +26,15 @@
     composes: entry;
     /*TODO*/
 }
+
+.empty {
+    opacity: 0.5;
+    padding: 1rem;
+    text-align: center;
+}
+
+.thinking {
+    opacity: 0.6;
+    padding: 0.5rem 0;
+    font-style: italic;
+}

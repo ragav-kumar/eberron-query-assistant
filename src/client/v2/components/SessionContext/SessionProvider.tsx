@@ -10,15 +10,23 @@ import {
     useSessionsQuery,
 } from '@/client/v2/api/index.js';
 
+/** Sentinel ID used for the UI-local temporary session before first-run promotion. */
+export const TEMP_SESSION_ID = '__temp__';
+
 export const SessionProvider = ({children}: { children: ReactNode }) => {
     const [activeTab, setActiveTab] = useState<SessionMode>('assistant');
     const [tabInputStates, setTabInputStates] = useState<Record<SessionMode, TabInputState>>(initTabInputStates);
     const [activeSessionIds, setActiveSessionIds] = useState<Record<SessionMode, string | undefined>>(initActiveSessionIds);
+    const [tempSessions, setTempSessions] = useState<Record<SessionMode, SessionData | undefined>>(
+        () => ({ assistant: undefined, npc: undefined }),
+    );
 
     const sessionsQuery = useSessionsQuery();
-    const sessionFeedQueries = useSessionFeedsQuery(
-        Object.values(activeSessionIds).filter(Boolean) as string[],
+    // Exclude the sentinel so useSessionFeedsQuery only queries real session IDs.
+    const realActiveIds = Object.values(activeSessionIds).filter(
+        (id): id is string => id != null && id !== TEMP_SESSION_ID,
     );
+    const sessionFeedQueries = useSessionFeedsQuery(realActiveIds);
     const sessionFeedData = sessionFeedQueries
         .map(query => query.data)
         .filter((feed): feed is SessionFeedDto => feed != null);
@@ -42,15 +50,50 @@ export const SessionProvider = ({children}: { children: ReactNode }) => {
             [mode]: sessionId,
         }));
     };
+
+    /**
+     * Creates a UI-local temporary session for the given mode and immediately
+     * selects it. The temp session lives in local state until promoteSession
+     * replaces it with a real persisted session after the first run completes.
+     */
+    const createTempSession = (mode: SessionMode) => {
+        const now = new Date().toISOString();
+        const tempSession: SessionData = {
+            id: TEMP_SESSION_ID,
+            mode,
+            title: 'Untitled',
+            sessionEntryCount: 0,
+            createdAt: now,
+            updatedAt: now,
+            activeRunId: null,
+            includePartyContext: null,
+            runs: [],
+        };
+        setTempSessions(prev => ({ ...prev, [mode]: tempSession }));
+        setActiveSessionIds(prev => ({ ...prev, [mode]: TEMP_SESSION_ID }));
+    };
+
+    /**
+     * Swaps the active temporary session for a real persisted session ID.
+     * Called after the first run against a temp session succeeds and the server
+     * has created and titled the durable session.
+     */
+    const promoteSession = (mode: SessionMode, realSessionId: string) => {
+        setTempSessions(prev => ({ ...prev, [mode]: undefined }));
+        setActiveSessionIds(prev => ({ ...prev, [mode]: realSessionId }));
+    };
+
     return (
         <SessionContext
             value={{
                 changeActiveTab: setActiveTab,
                 activeTabState: tabInputStates[activeTab],
                 patchActiveTabState,
-                activeSessions: constructActiveSessions(sessionsQuery.data, sessionFeedData, activeSessionIds),
+                activeSessions: constructActiveSessions(sessionsQuery.data, sessionFeedData, activeSessionIds, tempSessions),
                 sessionsByMode: mode => sessionsQuery.data?.filter(d => d.mode === mode) ?? [],
                 changeActiveSession,
+                createTempSession,
+                promoteSession,
                 isBusy,
             }}
         >
@@ -76,13 +119,23 @@ const constructActiveSessions = (
     sessions: SessionDto[] | undefined,
     sessionFeed: SessionFeedDto[],
     activeSessionIds: Record<SessionMode, string | undefined>,
+    tempSessions: Record<SessionMode, SessionData | undefined>,
 ): Record<SessionMode, SessionData | undefined> => {
     const activeSessions: Partial<Record<SessionMode, SessionData | undefined>> = {};
 
     for (const entry of Object.entries(activeSessionIds)) {
         const mode = entry[0] as SessionMode;
         const sessionId = entry[1];
-        if (sessionId == null || sessions == null) {
+        if (sessionId == null) {
+            continue;
+        }
+
+        if (sessionId === TEMP_SESSION_ID) {
+            activeSessions[mode] = tempSessions[mode];
+            continue;
+        }
+
+        if (sessions == null) {
             continue;
         }
 

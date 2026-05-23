@@ -1,11 +1,15 @@
 import { useSessionContext } from '../SessionContext/index.js';
+import { TEMP_SESSION_ID } from '../SessionContext/SessionProvider.js';
 import { Button } from '../Button.js';
 import styles from './Input.module.css';
 import { useRun } from './useRun.js';
 
 export const Input = () => {
-    const {isBusy, activeTabState, patchActiveTabState} = useSessionContext();
+    const { isBusy, activeTabState, patchActiveTabState, activeSessions } = useSessionContext();
     const submit = useRun();
+    const activeSession = activeSessions[activeTabState.key];
+    // A real persisted session (not the temp sentinel) means a run has already been submitted.
+    const isPartyContextLocked = activeSession != null && activeSession.id !== TEMP_SESSION_ID;
 
     return (
         <div className={styles.wrap}>
@@ -15,6 +19,7 @@ export const Input = () => {
                     id='include-party-context'
                     className={styles.checkbox}
                     checked={activeTabState.includePartyContext}
+                    disabled={isPartyContextLocked}
                     onChange={(e) => patchActiveTabState({includePartyContext: e.target.checked})}
                 />
                 <span>Include party context</span>
@@ -46,7 +51,7 @@ export const Input = () => {
                 variant='primary'
                 className={styles.button}
                 disabled={isBusy}
-                onClick={void submit}
+                onClick={() => void submit()}
             >
                 Submit
             </Button>
