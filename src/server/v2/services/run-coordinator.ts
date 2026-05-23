@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { type Insertable, type Kysely, type Transaction } from 'kysely';
 
-import type { CreateRunDto, RunDto, SessionEntryDto } from '@/dto/index.js';
+import type { CreateRunDto, RunDto, SessionDto, SessionEntryDto } from '@/dto/index.js';
 import { createTaggedError, formatThrownValue } from '@/errors.js';
 import { settingsStore, type AppDatabaseSchema, type SessionEntry, type UpdateRow } from '@server/db/app/index.js';
 import type { AppDb } from '@server/db/app/db.js';
@@ -15,6 +15,7 @@ import {
     loadPromptAssets,
 } from './run-runtime.js';
 import type { ChatAdapter } from './provider.js';
+import type { RuntimeEventPublisher } from './runtime-event-publisher.js';
 
 export interface RunCoordinator {
     startRun(request: CreateRunDto): Promise<RunDto>;
@@ -26,6 +27,7 @@ export interface RunCoordinatorDependencies {
     partyContext: PartyContextService;
     retrieval: CorpusRetrievalService;
     retrievalDir: string;
+    runtimeEvents: RuntimeEventPublisher;
 }
 
 /**
@@ -106,6 +108,24 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
             persistedEntries.push(toSessionEntryDto(userEntry));
         });
         nextSequenceIndex += 1;
+        const startedUserEntry = persistedEntries[0]!;
+        dependencies.runtimeEvents.publish({
+            resource: 'run',
+            action: 'created',
+            resourceId: runId,
+            sessionId,
+            status: 'running',
+            timestamp: now,
+        });
+        dependencies.runtimeEvents.publish({
+            resource: 'session-entry',
+            action: 'appended',
+            resourceId: startedUserEntry.id,
+            sessionId,
+            runId,
+            entry: startedUserEntry,
+            timestamp: now,
+        });
 
         try {
             const assistantResult = await executeAssistantRun({
@@ -121,8 +141,18 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
                             title: null,
                             toolCallId: reasoning.toolCallId,
                         }));
-                        persistedEntries.push(toSessionEntryDto(entry));
+                        const reasoningEntry = toSessionEntryDto(entry);
+                        persistedEntries.push(reasoningEntry);
                         nextSequenceIndex += 1;
+                        dependencies.runtimeEvents.publish({
+                            resource: 'session-entry',
+                            action: 'appended',
+                            resourceId: reasoningEntry.id,
+                            sessionId,
+                            runId,
+                            entry: reasoningEntry,
+                            timestamp: reasoningEntry.createdAt,
+                        });
                     },
                 },
                 context: {
@@ -145,6 +175,7 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
                 },
             });
 
+            const completedAt = new Date().toISOString();
             await dependencies.appDb.db.transaction().execute(async trx => {
                 const responseEntry = await appendSessionEntry(trx, {
                     content: assistantResult.response.content,
@@ -158,7 +189,6 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
                 });
                 persistedEntries.push(toSessionEntryDto(responseEntry));
 
-                const completedAt = new Date().toISOString();
                 await trx
                     .updateTable('runs')
                     .set({
@@ -177,6 +207,34 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
                     })
                     .where('id', '=', sessionId)
                     .execute();
+            });
+            const responseEntry = persistedEntries.at(-1)!;
+            const updatedSessionDto = await fetchSessionDto(dependencies.appDb.db, sessionId);
+            dependencies.runtimeEvents.publish({
+                resource: 'session-entry',
+                action: 'appended',
+                resourceId: responseEntry.id,
+                sessionId,
+                runId,
+                entry: responseEntry,
+                timestamp: completedAt,
+            });
+            dependencies.runtimeEvents.publish({
+                resource: 'run',
+                action: 'completed',
+                resourceId: runId,
+                sessionId,
+                status: 'completed',
+                timestamp: completedAt,
+            });
+            dependencies.runtimeEvents.publish({
+                resource: 'session',
+                action: 'updated',
+                resourceId: sessionId,
+                sessionId,
+                mode: updatedSessionDto.mode,
+                state: updatedSessionDto,
+                timestamp: completedAt,
             });
         } catch (error) {
             const failedAt = new Date().toISOString();
@@ -198,6 +256,24 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
                 })
                 .where('id', '=', sessionId)
                 .execute();
+            const failedSessionDto = await fetchSessionDto(dependencies.appDb.db, sessionId);
+            dependencies.runtimeEvents.publish({
+                resource: 'run',
+                action: 'failed',
+                resourceId: runId,
+                sessionId,
+                status: 'failed',
+                timestamp: failedAt,
+            });
+            dependencies.runtimeEvents.publish({
+                resource: 'session',
+                action: 'updated',
+                resourceId: sessionId,
+                sessionId,
+                mode: failedSessionDto.mode,
+                state: failedSessionDto,
+                timestamp: failedAt,
+            });
             throw error;
         }
 
@@ -318,3 +394,40 @@ const toSessionEntryDto = (entry: SessionEntry): SessionEntryDto => ({
     title: entry.title ?? undefined,
     toolCallId: entry.toolCallId,
 });
+
+/**
+ * Fetches a single session as a SessionDto, including the aggregate entry count
+ * required for session event state payloads.
+ */
+const fetchSessionDto = async (db: Kysely<AppDatabaseSchema>, sessionId: string): Promise<SessionDto> => {
+    const row = await db
+        .selectFrom('sessions')
+        .leftJoin('sessionEntries', 'sessions.id', 'sessionEntries.sessionId')
+        .select(({ fn }) => [
+            'sessions.id',
+            'sessions.mode',
+            'sessions.title',
+            'sessions.activeRunId',
+            'sessions.includePartyContext',
+            'sessions.createdAt',
+            'sessions.updatedAt',
+            fn.count('sessionEntries.id').as('sessionEntryCount'),
+        ])
+        .where('sessions.id', '=', sessionId)
+        .groupBy([
+            'sessions.id',
+            'sessions.mode',
+            'sessions.title',
+            'sessions.activeRunId',
+            'sessions.includePartyContext',
+            'sessions.createdAt',
+            'sessions.updatedAt',
+        ])
+        .executeTakeFirstOrThrow();
+
+    return {
+        ...row,
+        sessionEntryCount: row.sessionEntryCount as number,
+        includePartyContext: row.includePartyContext == null ? null : !!row.includePartyContext,
+    };
+};

@@ -38,7 +38,7 @@ High-level roadmap for the remaining V2 work. This document is intentionally sho
   - Submit a prompt against an existing persisted session.
   - Reload and confirm the resulting feed is still present.
 
-## Phase 2: Runtime Event Completion
+## Phase 2: Runtime Event Completion — COMPLETE
 
 - Publish real run lifecycle events from server execution paths.
 - Publish session-entry append events and session promotion/update events in the DTO shapes the client already expects.
@@ -46,6 +46,12 @@ High-level roadmap for the remaining V2 work. This document is intentionally sho
 - Ensure the existing V2 runtime subscription is operating against real events rather than refresh-only behavior.
 - Human testable:
   - Start a run with the UI open and verify the session/feed updates without a manual reload.
+
+Repo state after completion:
+- `createRunCoordinator` accepts `runtimeEvents: RuntimeEventPublisher` and publishes at four lifecycle points: run created, each reasoning entry appended, run completed (with response entry and session update), and run failed.
+- `createApp` passes the app-level `runtimeEvents` instance to the run coordinator.
+- A private `fetchSessionDto` helper in the coordinator re-fetches the session with entry count for session event payloads.
+- The client `useRuntimeSubscription` now receives live run/session-entry/session events and invalidates the correct query caches without a manual reload.
 
 ## Phase 3: Assistant Session Workflow
 

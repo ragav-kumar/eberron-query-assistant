@@ -239,6 +239,11 @@ const createCoordinator = (
         search: vi.fn().mockResolvedValue([]),
     },
     retrievalDir: '.retrieval',
+    runtimeEvents: {
+        publish: vi.fn(),
+        publishRefreshEvent: vi.fn(),
+        subscribe: vi.fn().mockReturnValue(vi.fn()),
+    },
 });
 
 const createRequest = (overrides: Partial<{

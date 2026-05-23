@@ -94,6 +94,7 @@ export const createApp = async (dependencies: CreateAppDependencies = {}): Promi
             partyContext,
             retrieval,
             retrievalDir: runtimePaths.retrievalDir,
+            runtimeEvents,
         }),
         consoleEvents,
         runtimeEvents,
