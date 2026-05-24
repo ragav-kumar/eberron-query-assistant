@@ -425,7 +425,7 @@ const insertNewSession = async (
 const fetchSessionDto = async (db: Kysely<AppDatabaseSchema>, sessionId: string): Promise<SessionDto> => {
     const row = await db
         .selectFrom('sessions')
-        .leftJoin('sessionEntries', 'sessions.id', 'sessionEntries.sessionId')
+        .leftJoin('runs', 'sessions.id', 'runs.sessionId')
         .select(({ fn }) => [
             'sessions.id',
             'sessions.mode',
@@ -434,7 +434,7 @@ const fetchSessionDto = async (db: Kysely<AppDatabaseSchema>, sessionId: string)
             'sessions.includePartyContext',
             'sessions.createdAt',
             'sessions.updatedAt',
-            fn.count('sessionEntries.id').as('sessionEntryCount'),
+            fn.count('runs.id').as('runCount'),
         ])
         .where('sessions.id', '=', sessionId)
         .groupBy([
@@ -450,7 +450,7 @@ const fetchSessionDto = async (db: Kysely<AppDatabaseSchema>, sessionId: string)
 
     return {
         ...row,
-        sessionEntryCount: row.sessionEntryCount as number,
+        runCount: row.runCount as number,
         includePartyContext: row.includePartyContext == null ? null : !!row.includePartyContext,
     };
 };

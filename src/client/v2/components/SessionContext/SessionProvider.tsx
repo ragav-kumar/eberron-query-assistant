@@ -62,7 +62,7 @@ export const SessionProvider = ({children}: { children: ReactNode }) => {
             id: TEMP_SESSION_ID,
             mode,
             title: 'Untitled',
-            sessionEntryCount: 0,
+            runCount: 0,
             createdAt: now,
             updatedAt: now,
             activeRunId: null,

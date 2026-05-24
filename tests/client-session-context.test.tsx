@@ -28,7 +28,7 @@ const makeSession = (id: string, mode: 'assistant' | 'npc' = 'assistant', overri
     id,
     mode,
     title: `Session ${id}`,
-    sessionEntryCount: 0,
+    runCount: 0,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     activeRunId: null,

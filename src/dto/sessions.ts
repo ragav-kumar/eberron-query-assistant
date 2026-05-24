@@ -5,7 +5,7 @@ export interface SessionDto {
     id: string;
     mode: SessionMode;
     title: string;
-    sessionEntryCount: number;
+    runCount: number;
     createdAt: string;
     updatedAt: string;
     activeRunId: string | null;

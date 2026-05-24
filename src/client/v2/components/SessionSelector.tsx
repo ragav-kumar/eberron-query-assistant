@@ -1,5 +1,4 @@
-import { useSessionContext } from './SessionContext/index.js';
-import { TEMP_SESSION_ID } from './SessionContext/SessionProvider.js';
+import { useSessionContext, TEMP_SESSION_ID } from './SessionContext/index.js';
 import { SessionMode } from '@/dto/index.js';
 import styles from './SessionSelector.module.css';
 import { ChangeEvent } from 'react';
@@ -38,7 +37,7 @@ export const SessionSelector = ({mode}:SessionSelectorProps) => {
                         key={session.id}
                         value={session.id}
                     >
-                        {session.createdAt} - {session.title} ({session.sessionEntryCount})
+                        {session.createdAt} - {session.title} ({session.runCount})
                     </option>
                 ))}
             </select>

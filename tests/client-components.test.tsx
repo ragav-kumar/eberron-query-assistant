@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@client/components/SessionContext/index.js', () => ({
     useSessionContext: mocks.useSessionContext,
+    TEMP_SESSION_ID: '__temp__',
 }));
 
 vi.mock('@/client/v2/api/index.js', () => ({
@@ -58,7 +59,7 @@ const makeSessionData = (id: string, mode: SessionMode = 'assistant', overrides?
     id,
     mode,
     title: `Session ${id}`,
-    sessionEntryCount: 0,
+    runCount: 0,
     createdAt: '2024-01-01T00:00:00.000Z',
     updatedAt: '2024-01-01T00:00:00.000Z',
     activeRunId: null,
@@ -204,8 +205,8 @@ describe('V2 client components', () => {
 
     it('renders session options for the selected mode', () => {
         const sessions: SessionDto[] = [
-            { id: 's-1', mode: 'assistant', title: 'First Session', sessionEntryCount: 3, createdAt: '2024-01-01', updatedAt: '2024-01-01', activeRunId: null, includePartyContext: null },
-            { id: 's-2', mode: 'assistant', title: 'Second Session', sessionEntryCount: 7, createdAt: '2024-01-02', updatedAt: '2024-01-02', activeRunId: null, includePartyContext: null },
+            { id: 's-1', mode: 'assistant', title: 'First Session', runCount: 3, createdAt: '2024-01-01', updatedAt: '2024-01-01', activeRunId: null, includePartyContext: null },
+            { id: 's-2', mode: 'assistant', title: 'Second Session', runCount: 7, createdAt: '2024-01-02', updatedAt: '2024-01-02', activeRunId: null, includePartyContext: null },
         ];
         const createTempSession = vi.fn();
         mocks.useSessionContext.mockReturnValue(makeContext({

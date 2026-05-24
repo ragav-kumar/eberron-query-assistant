@@ -14,7 +14,7 @@ export const sessionRoutes: RouteDefinition[] = [
 
             let query = context.db
                 .selectFrom('sessions')
-                .leftJoin('sessionEntries', 'sessions.id', 'sessionEntries.sessionId')
+                .leftJoin('runs', 'sessions.id', 'runs.sessionId')
                 .select(({ fn }) => [
                     'sessions.id',
                     'sessions.mode',
@@ -23,7 +23,7 @@ export const sessionRoutes: RouteDefinition[] = [
                     'sessions.includePartyContext',
                     'sessions.createdAt',
                     'sessions.updatedAt',
-                    fn.count('sessionEntries.id').as('sessionEntryCount'),
+                    fn.count('runs.id').as('runCount'),
                 ])
                 .groupBy([
                     'sessions.id',
@@ -41,7 +41,7 @@ export const sessionRoutes: RouteDefinition[] = [
 
             const sessionDtos = sessionRows.map<SessionDto>(session => ({
                 ...session,
-                sessionEntryCount: session.sessionEntryCount as number,
+                runCount: session.runCount as number,
                 includePartyContext: !!session.includePartyContext,
             }));
 
