@@ -81,8 +81,9 @@
 - On Windows, do not treat a timed-out `npm run start`, `npm run start:v2-server`, or `npm run dev`, a stopped wrapper process, or a returned shell command as proof of cleanup.
 - After every agent-started dev or server run on Windows, explicitly verify cleanup by confirming that no repo-local `vite.js` process remains, no repo-local `vite-node` process running `src/server/v2/server.cli.ts` remains, and no listener remains on each port used for the check.
 - On Windows, cleanup verification for agent-started dev or server runs is incomplete until the repo-local `vite.js` check, the repo-local V2 API server process check, and the per-port listener checks all pass.
-- For non-server changes during the temporary V2 transition, use `npm run lint` and `npm run prestart` as the final acceptance checks instead of unit-test commands.
-- For server changes, follow the final acceptance workflow in `src/server/CLAUDE.md`.
+- For any task in which any code was changed, use `npm run verify` as the final acceptance command unless the user explicitly says otherwise.
+- For any task that will affect the UI, perform a browser smoke test before handoff unless the user confirms the UI is already running.
+- For server changes, also follow the startup and process-cleanup verification steps in `src/server/CLAUDE.md`.
 
 ## Review
 - Purpose: evaluate changes and provide critique, risks, and suggestions.

@@ -13,10 +13,13 @@
 - Use functional components and React hooks. Do not introduce class components.
 - Prefer `const` arrow-function components, hooks, and helpers over classic `function` declarations.
 - Prefer `interface` for object-shaped props and context contracts, and keep prop types close to the component that uses them.
+- Name the props interface for a component `Foo` as `FooProps`.
 
 ## Client Structure
 - Prefer the shortest readable import path. Use the `@/` path alias for internal imports when it shortens the import; otherwise relative imports are fine.
-- If a component only needs its own component file plus stylesheet, keep it as standalone sibling files instead of creating a folder. Use a component folder when the component owns additional files such as child components or other closely related modules.
+- Every component that is not conceptually part of `App` belongs in the `components` folder.
+- Keep a component as standalone sibling files (component + stylesheet) as long as it spans no more than those two files. Move it into a folder with a barrel `index` when it acquires a third file.
+- A folder with a barrel `index` should share one stylesheet across the folder rather than having per-file stylesheets.
 - Keep simple one-off render helpers private to the module instead of promoting them into shared utilities too early.
 - Prefer CSS Modules for component-scoped styles, with a nearby `*.module.css` file and `styles.foo` access.
 - Prefer color tokens from `/src/client/v2/themes.css` instead of component-local hex values or one-off RGB literals. Add to the shared theme file first when a new reusable color is needed.
@@ -31,4 +34,4 @@
 - When a client task depends on automated test acceptance, execute `npm run test`.
 - Treat any test failure whose reason is not `Not implemented.` as a blocking acceptance failure.
 - Treat a `Not implemented.` failure as blocking when the failing test is affected by the current task.
-- When a client change affects the local web app, use browser or API smoke coverage during verification.
+- When a client change affects the local web app, use browser or API smoke coverage during verification unless the user confirms the UI is already running.

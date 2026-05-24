@@ -7,6 +7,7 @@ Follow these rules unless a later instruction in the repo or task explicitly ove
 ## Code Style
 - Non-trivial generated code should include JSDoc explaining what it does and, where relevant, why it works that way. This overrides the default no-comments preference for this project.
 - This JSDoc expectation does not apply to trivial layout components, styles, or small helper functions unless their behavior would otherwise be unclear.
+- When a barrel `index` file exists for a module or folder, always import from the barrel rather than from a direct file path within it.
 
 ## General Rules
 - Do not expand the scope of a task without asking the user first. If you decide scope should expand, stop and ask before making the broader change. This applies even outside plan mode.
