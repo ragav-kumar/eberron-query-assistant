@@ -2,7 +2,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { Assistant } from '@client/components/Assistant.js';
+import { Assistant } from '@client/components/Assistant/Assistant.js';
 import { Input } from '@client/components/Input/Input.js';
 import { SessionSelector } from '@client/components/SessionSelector.js';
 import { TEMP_SESSION_ID } from '@client/components/SessionContext/SessionProvider.js';

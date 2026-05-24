@@ -1,0 +1,185 @@
+.wrap {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    gap: 1rem;
+    padding-right: .5rem;
+    margin-top: 1rem;
+}
+
+/**
+ * Each run renders as a card. The card background acts as a divider color —
+ * a 1px gap between flex children lets it bleed through as hairline separators
+ * between the user prompt, reasoning, and response sections.
+ */
+.exchange {
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+    border-radius: 1rem;
+    padding: .5rem;
+}
+
+.entry {
+    border: 1px solid gray;
+    border-radius: 1rem;
+    padding: .25rem 1rem;
+}
+
+/** User prompt */
+.entry-user {
+    composes: entry;
+    margin-left: 4rem;
+    padding-top: 0;
+    padding-bottom: 0;
+    background-color: var(--color-surface-raised);
+    border-color: var(--color-border-strong);
+}
+
+.entry-reasoning {
+    composes: entry;
+    margin-right: 2rem;
+    font-style: italic;
+    background-color: var(--color-surface-panel-subtle);
+    border-color: var(--color-border-subtle);
+    color: var(--color-text-muted);
+}
+
+/** Model response */
+.entry-response {
+    composes: entry;
+    margin-right: 2rem;
+    background-color: var(--color-accent-base);
+    border-color: var(--color-border-subtle);
+}
+
+.empty {
+    opacity: 0.5;
+    padding: 1rem;
+    text-align: center;
+}
+
+.thinking {
+    opacity: 0.6;
+    padding: 0.5rem 0;
+    font-style: italic;
+}
+
+/**
+ * Sticky wrapper. position: sticky keeps it pinned to the top of the
+ * scrollable feed container; position is also needed so the absolute-
+ * positioned panel is anchored relative to this element.
+ */
+.toc {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background-color: var(--color-surface-panel-subtle);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: .75rem;
+}
+
+.tocToggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .35rem .75rem;
+    color: var(--color-text-subtle);
+    font-size: .8rem;
+    border-radius: .75rem;
+    transition: background-color 120ms ease, color 120ms ease;
+    user-select: none;
+}
+
+.toc:hover .tocToggle {
+    background-color: var(--color-surface-raised-hover);
+    color: var(--color-text-primary);
+}
+
+.tocChevron::before {
+    content: '▾';
+    font-size: .65rem;
+    opacity: 0.7;
+}
+
+.toc:hover .tocChevron::before {
+    content: '▴';
+}
+
+/**
+ * Floating panel. Uses visibility+opacity rather than display so that a
+ * transition-delay on hide keeps the panel readable for a moment after the
+ * cursor leaves, preventing accidental dismissal.
+ */
+.tocPanel {
+    visibility: hidden;
+    opacity: 0;
+    transition: opacity 100ms ease, visibility 0s linear 350ms;
+    position: absolute;
+    top: calc(100% + 3px);
+    left: 0;
+    right: 0;
+    z-index: 10;
+    background-color: var(--color-surface-panel-subtle);
+    border: 1px solid var(--color-border-subtle);
+    border-radius: .75rem;
+    padding: .25rem .5rem .5rem;
+    box-shadow: var(--shadow-panel);
+}
+
+.toc:hover .tocPanel {
+    visibility: visible;
+    opacity: 1;
+    transition: opacity 100ms ease, visibility 0s linear 0ms;
+}
+
+.list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: .125rem;
+}
+
+.item {
+    display: flex;
+}
+
+.link {
+    display: flex;
+    align-items: baseline;
+    gap: .4rem;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: .2rem .25rem;
+    border-radius: .375rem;
+    color: var(--color-accent-link);
+    font-size: .8rem;
+    text-align: left;
+    width: 100%;
+    line-height: 1.4;
+    transition: background-color 120ms ease, color 120ms ease;
+}
+
+.link:hover {
+    background-color: var(--color-accent-surface);
+    color: var(--color-text-primary);
+}
+
+.index {
+    flex-shrink: 0;
+    color: var(--color-text-subtle);
+    font-size: .75rem;
+    min-width: 1.25rem;
+    text-align: right;
+}
+
+.label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

@@ -3,7 +3,7 @@ import { defaultTabKey, tabDefinitionList } from './SessionContext/tabDefinition
 import { Tabs } from './Tabs/index.js';
 import { SessionSelector } from './SessionSelector.js';
 import { useSessionContext } from './SessionContext/index.js';
-import { Assistant } from './Assistant.js';
+import { Assistant } from './Assistant/index.js';
 import { NpcCards } from './NpcCards/index.js';
 
 interface RightColumnTabsProps {

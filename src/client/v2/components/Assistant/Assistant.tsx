@@ -2,7 +2,8 @@ import styles from './Assistant.module.css';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { useEffect, useRef } from 'react';
-import { useSessionContext } from './SessionContext/index.js';
+import { useSessionContext } from '../SessionContext/index.js';
+import { AssistantTableOfContents } from './AssistantTableOfContents.js';
 
 export const Assistant = () => {
     const { activeSessions } = useSessionContext();
@@ -24,6 +25,7 @@ export const Assistant = () => {
 
     return (
         <div ref={feedRef} id='assistant-feed' className={styles.wrap}>
+            <AssistantTableOfContents runs={activeSession.runs} />
             {activeSession.runs.map(run => (
                 <div key={run.id} id={`run-${run.id}`} className={styles.exchange}>
                     {run.sessionEntries.map(entry => (
