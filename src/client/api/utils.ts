@@ -1,4 +1,4 @@
-import { Endpoint } from '../../contract/helpers.js';
+import { Endpoint } from '@/contract/helpers.js';
 
 type EmptyParams = Record<never, never>;
 type PathParams = Record<string, string>;

@@ -1,8 +1,6 @@
-import { RefreshDiscoveryResult, RuntimePaths } from '../types.js';
-import { ArticleFetcher } from './article.js';
-import { buildArticleRefresh } from './article.js';
+import { RefreshDiscoveryResult, RuntimePaths, PdfParser } from '../types.js';
+import { ArticleFetcher, buildArticleRefresh } from './article.js';
 import { buildFoundrySourceChanges } from './foundry.js';
-import { PdfParser } from '../types.js';
 import { buildPdfSourceChanges } from './pdf.js';
 
 /**

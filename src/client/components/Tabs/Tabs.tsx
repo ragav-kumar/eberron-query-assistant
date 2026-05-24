@@ -1,5 +1,4 @@
-import { ReactNode } from 'react';
-import { Children, isValidElement } from 'react';
+import { ReactNode, Children, isValidElement } from 'react';
 import { TabButtonProps, TabButton } from './TabButton.js';
 import { TabContentProps, TabContent } from './TabContent.js';
 import styles from './Tabs.module.css';

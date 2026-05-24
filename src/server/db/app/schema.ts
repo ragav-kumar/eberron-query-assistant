@@ -7,7 +7,7 @@ import {
     RunStatus,
     SessionFeedEntryKind,
     SessionMode,
-} from '../../../types.js';
+} from '@/types.js';
 
 type NullableRefreshOperationKind = RefreshOperationKind | null;
 

@@ -1,12 +1,12 @@
 import path from 'node:path';
 
-import { createAppDb } from './db/app/index.js';
+import { AppDb, createAppDb, initializeSettingsStore, settingsStore } from './db/app/index.js';
 import { createCorpusRetrievalService, createPartyContextService } from './db/corpus/index.js';
 import {
-    initializeSettingsStore,
-    settingsStore,
-} from './db/app/index.js';
-import {
+    ConsoleEventPublisher,
+    RefreshCoordinator,
+    RunCoordinator,
+    RuntimeEventPublisher,
     createConsoleEventPublisher,
     createRefreshCoordinator,
     createRunCoordinator,
@@ -19,13 +19,6 @@ import {
     createOpenAiEmbeddingAdapter,
     ProviderConfig,
 } from './services/provider.js';
-import {
-    ConsoleEventPublisher,
-    RefreshCoordinator,
-    RunCoordinator,
-    RuntimeEventPublisher,
-} from './services/index.js';
-import { AppDb } from './db/app/index.js';
 import { createTaggedError } from '@/errors.js';
 
 /**

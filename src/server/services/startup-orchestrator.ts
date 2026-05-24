@@ -1,8 +1,7 @@
 import { ConsoleEventPublisher } from './console-event-publisher.js';
-import { createRefreshStateStore } from './refresh/index.js';
+import { createRefreshStateStore, RefreshCoordinator } from './refresh/index.js';
 import { recoverStartupRefreshOperation } from './refresh/startup-recovery.js';
 import { createRefreshVisibility } from './refresh/visibility.js';
-import { RefreshCoordinator } from './refresh/index.js';
 import { RuntimeEventPublisher } from './runtime-event-publisher.js';
 import { AppDb, initializeSettingsStore } from '@server/db/app/index.js';
 

@@ -12,15 +12,12 @@ import {
 import { RefreshOperationKind } from '@/types.js';
 
 import { discoverRefreshWork } from './discovery/index.js';
-import { createOpenAiEmbeddingAdapter } from './embedding-adapter.js';
-import { ArticleFetcher } from './ingestion/article.js';
-import { createFetchArticleFetcher } from './ingestion/article.js';
+import { createOpenAiEmbeddingAdapter, OpenAiEmbeddingConfig } from './embedding-adapter.js';
+import { ArticleFetcher, createFetchArticleFetcher } from './ingestion/article.js';
 import { buildRefreshIngestion } from './ingestion/index.js';
 import { createImportStateStore, ImportStateStore } from './import-state.js';
-import { PdfParser, RuntimePaths } from './types.js';
+import { PdfParser, RuntimePaths, RefreshPipelineResult } from './types.js';
 import { createPdfDataExtractParser } from './ingestion/pdf.js';
-import { RefreshPipelineResult } from './types.js';
-import { OpenAiEmbeddingConfig } from './embedding-adapter.js';
 
 /**
  * Optional seams for composing or testing the refresh pipeline.

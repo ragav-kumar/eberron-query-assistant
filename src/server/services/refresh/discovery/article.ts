@@ -1,5 +1,4 @@
-import { IngestedArticle } from '@server/db/app/index.js';
-import { settingsStore } from '@server/db/app/index.js';
+import { IngestedArticle, settingsStore } from '@server/db/app/index.js';
 
 import { ArticleDiscoveryResult } from '../types.js';
 

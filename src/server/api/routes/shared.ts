@@ -1,7 +1,7 @@
 import { IncomingMessage, ServerResponse } from 'node:http';
 import { HTTPMethod } from 'find-my-way';
 
-import { AppContext } from '../../app.js';
+import { AppContext } from '@server/app.js';
 
 export type RouteParams = Record<string, string | undefined>;
 

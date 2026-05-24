@@ -3,7 +3,7 @@ import { writeNotFound } from '../not-found.js';
 import { writeJson } from '../response.js';
 import { SessionMode } from '@/types.js';
 import { RunDto, SessionDto, SessionEntryDto, SessionFeedDto } from '@/dto/index.js';
-import { Run, SessionEntry } from '../../db/app/index.js';
+import { Run, SessionEntry } from '@server/db/app/index.js';
 
 export const sessionRoutes: RouteDefinition[] = [
     {
