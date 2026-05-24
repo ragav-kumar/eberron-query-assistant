@@ -30,9 +30,9 @@ export const SessionSelector = ({mode}:SessionSelectorProps) => {
                 value={activeSession?.id}
                 onChange={changeSession}
             >
-                {activeSession?.id === TEMP_SESSION_ID && (
-                    <option value={TEMP_SESSION_ID}>Untitled (new session)</option>
-                )}
+                {(activeSession?.id === TEMP_SESSION_ID || !activeSession?.id) ? (
+                    <option value={TEMP_SESSION_ID}>-- New session --</option>
+                ) : null}
                 {sessions.map(session => (
                     <option
                         key={session.id}

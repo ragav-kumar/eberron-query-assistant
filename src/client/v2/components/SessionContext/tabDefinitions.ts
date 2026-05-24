@@ -1,7 +1,4 @@
 import { CreateRunDto, SessionMode } from '@/dto/index.js';
-import { ComponentType } from 'react';
-import { Assistant } from '../Assistant.js';
-import { NpcCards } from '../NpcCards/NpcCards.js';
 
 export const defaultTabKey: SessionMode = 'assistant';
 
@@ -17,7 +14,6 @@ export interface TabDefinition {
     label: string;
     emptyInput: TabInputState;
     buildRun: (input: TabInputState) => CreateRunDto;
-    component: ComponentType;
 }
 
 export const tabDefinitions = {
@@ -34,7 +30,6 @@ export const tabDefinitions = {
             mode: 'assistant',
             ...input,
         }),
-        component: Assistant,
     },
     npc: {
         key: 'npc',
@@ -49,7 +44,6 @@ export const tabDefinitions = {
             mode: 'npc',
             ...input,
         }),
-        component: NpcCards,
     },
 } as const satisfies Record<SessionMode, TabDefinition>;
 

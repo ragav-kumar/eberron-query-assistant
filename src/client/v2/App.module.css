@@ -28,7 +28,7 @@
 }
 
 .rightTabs.rightTabs {
-    --tabs-active-surface: var(--color-surface-app-alt);
+    --tabs-active-surface: #24282b;
 }
 
 @media (max-width: 900px) {

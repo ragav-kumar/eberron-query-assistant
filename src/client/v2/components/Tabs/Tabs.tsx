@@ -1,9 +1,9 @@
-import type { ReactNode} from 'react';
+import { ReactNode } from 'react';
 import { Children, isValidElement } from 'react';
 import { TabButtonProps, TabButton } from './TabButton.js';
 import { TabContentProps, TabContent } from './TabContent.js';
 import styles from './Tabs.module.css';
-import { joinClassNames } from '@/client/v2/utils.js';
+import { joinClassNames, unwrapFragment } from '@/client/v2/utils.js';
 
 interface TabsProps<T> {
     children: ReactNode;
@@ -18,10 +18,13 @@ export const Tabs = <T extends string>({children, className, contentClassName, c
     const tabContents: TabContentProps<T>[] = [];
     Children.forEach(children, (child) => {
         if (isValidElement(child)) {
-            if (child.type === TabButton) {
-                tabButtons.push(child.props as TabButtonProps<T>);
-            } else if (child.type === TabContent) {
-                tabContents.push(child.props as TabContentProps<T>);
+            const unwrapped = unwrapFragment(child);
+            for (const unwrappedElement of unwrapped) {
+                if (unwrappedElement.type === TabButton) {
+                    tabButtons.push(unwrappedElement.props as TabButtonProps<T>);
+                } else if (unwrappedElement.type === TabContent) {
+                    tabContents.push(unwrappedElement.props as TabContentProps<T>);
+                }
             }
         }
     });
