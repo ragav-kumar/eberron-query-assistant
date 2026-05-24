@@ -1,4 +1,4 @@
-import type { ConsoleEntryDto } from './console.js';
+import { ConsoleEntryDto } from './console.js';
 
 export interface ProviderDebugEntryDto {
     assistantContent?: string;

@@ -1,5 +1,5 @@
 import { useRefreshMutation, useRefreshQuery } from '@/client/api/index.js';
-import type { RefreshDto } from '@/dto/index.js';
+import { RefreshDto } from '@/dto/index.js';
 import { Button } from './Button.js';
 import styles from './LeftColumnHeader.module.css';
 

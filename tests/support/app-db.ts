@@ -2,8 +2,8 @@ import Database from 'better-sqlite3';
 import { Kysely, SqliteDialect } from 'kysely';
 
 import { initializeSettingsStore } from '@server/db/app/index.js';
-import type { AppDb } from '@server/db/app/db.js';
-import type { AppDatabaseSchema } from '@server/db/app/schema.js';
+import { AppDb } from '@server/db/app/db.js';
+import { AppDatabaseSchema } from '@server/db/app/schema.js';
 import { createSchema } from '@server/db/app/schemaDefinition.js';
 
 /**

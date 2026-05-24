@@ -1,6 +1,6 @@
-import type { SourceType } from '@/types.js';
+import { SourceType } from '@/types.js';
 
-import type {
+import {
     ChatAdapter,
     ChatCompletionOptions,
     ChatMessage,

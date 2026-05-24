@@ -1,4 +1,4 @@
-import type { RouteDefinition } from './shared.js';
+import { RouteDefinition } from './shared.js';
 import { readText } from '../request.js';
 import { writeMarkdown } from '../response.js';
 import { settingsStore } from '@server/db/app/index.js';

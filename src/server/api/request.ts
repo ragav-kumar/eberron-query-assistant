@@ -1,4 +1,4 @@
-import type { IncomingMessage } from 'node:http';
+import { IncomingMessage } from 'node:http';
 
 const readRawBody = async (request: IncomingMessage): Promise<Buffer> => {
     const chunks: Buffer[] = [];

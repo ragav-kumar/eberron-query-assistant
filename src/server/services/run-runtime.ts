@@ -1,9 +1,9 @@
 import { readFile } from 'node:fs/promises';
 
 import { createTaggedError } from '@/errors.js';
-import { createNoopTimingReporter, type TimingContext } from '@/timing.js';
-import type { SessionEntryReasoningDto, SessionEntryResponseDto } from '@/dto/index.js';
-import type { RetrievalResult, SourceType } from '@/types.js';
+import { createNoopTimingReporter, TimingContext } from '@/timing.js';
+import { SessionEntryReasoningDto, SessionEntryResponseDto } from '@/dto/index.js';
+import { RetrievalResult, SourceType } from '@/types.js';
 import { settingsStore } from '@server/db/app/index.js';
 import {
     buildRetrievalTool,
@@ -13,10 +13,10 @@ import {
     isSourceType,
 } from './retrieval-tool.js';
 import {
-    type ChatAdapter,
-    type ChatMessage,
-    type ChatStructuredResult,
-    type ChatToolCall,
+    ChatAdapter,
+    ChatMessage,
+    ChatStructuredResult,
+    ChatToolCall,
 } from './provider.js';
 
 import { listPromptAssets } from '../prompts/index.js';

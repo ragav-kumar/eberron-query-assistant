@@ -1,9 +1,9 @@
 import { rm } from 'node:fs/promises';
 
-import type { Database as BetterSqliteDatabase } from 'better-sqlite3';
+import { Database as BetterSqliteDatabase } from 'better-sqlite3';
 
 import { createTaggedError } from '../../../errors.js';
-import type { CorpusChunk, CorpusSource, SourceType } from '../../../types.js';
+import { CorpusChunk, CorpusSource, SourceType } from '../../../types.js';
 
 import { createCorpusDatabase, getCorpusDatabasePath } from './database.js';
 import { createCorpusSchema, isCompatibleCorpusSchema, rebuildCorpusFts } from './schema.js';

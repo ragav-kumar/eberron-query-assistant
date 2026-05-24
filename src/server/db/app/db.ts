@@ -1,7 +1,7 @@
 import { Kysely, SqliteDialect } from 'kysely';
 
 import { createAppDatabase } from './database.js';
-import type { AppDatabaseSchema } from './schema.js';
+import { AppDatabaseSchema } from './schema.js';
 import { createSchema } from './schemaDefinition.js';
 import { appDbPath } from './settings/defaults.js';
 

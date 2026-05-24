@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { mutateApi, queryApi } from '@/client/api/utils.js';
-import type { CreateRefreshDto } from '@/dto/index.js';
+import { CreateRefreshDto } from '@/dto/index.js';
 
 import { contracts } from '@/contract/index.js';
 

@@ -3,11 +3,11 @@ import { createHash } from 'node:crypto';
 import * as cheerio from 'cheerio';
 
 import { createTaggedError } from '@/errors.js';
-import type { IngestedArticle } from '@server/db/app/index.js';
+import { IngestedArticle } from '@server/db/app/index.js';
 import { settingsStore } from '@server/db/app/index.js';
-import type { CorpusChunk, CorpusSource } from '@/types.js';
+import { CorpusChunk, CorpusSource } from '@/types.js';
 
-import type { SourceChangeSet } from '../types.js';
+import { SourceChangeSet } from '../types.js';
 import { chunkText, normalizeText } from './chunking.js';
 
 const FETCH_TIMEOUT_MS = 30_000;

@@ -1,4 +1,4 @@
-import type { RouteDefinition } from './shared.js';
+import { RouteDefinition } from './shared.js';
 import { writeJson } from '../response.js';
 import { NpcCollectionDto, NpcDto } from '@/dto/index.js';
 

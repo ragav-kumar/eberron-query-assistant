@@ -1,7 +1,7 @@
-import type { RefreshOperationKind } from '@/types.js';
+import { RefreshOperationKind } from '@/types.js';
 
-import type { RefreshStateStore } from './refresh-state.js';
-import type { RefreshVisibility } from './visibility.js';
+import { RefreshStateStore } from './refresh-state.js';
+import { RefreshVisibility } from './visibility.js';
 
 /**
  * Startup-specific recovery policy for persisted refresh state.

@@ -1,4 +1,4 @@
-import type { RouteDefinition } from './shared.js';
+import { RouteDefinition } from './shared.js';
 import { writeSse } from '../response.js';
 
 export const eventRoutes: RouteDefinition[] = [

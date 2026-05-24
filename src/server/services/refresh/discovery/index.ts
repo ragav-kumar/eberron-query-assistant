@@ -1,5 +1,5 @@
-import type { RefreshDiscoveryResult, RuntimePaths } from '../types.js';
-import type { ImportStateStore } from '../import-state.js';
+import { RefreshDiscoveryResult, RuntimePaths } from '../types.js';
+import { ImportStateStore } from '../import-state.js';
 import { discoverArticleRefresh } from './article.js';
 import { discoverFoundryRefresh } from './foundry.js';
 import { discoverPdfRefresh } from './pdf.js';

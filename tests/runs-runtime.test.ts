@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { RetrievalResult } from '@/types.js';
+import { RetrievalResult } from '@/types.js';
 import { settingsStore } from '@server/db/app/index.js';
 import {
     buildAssistantMessages,
     buildChatHistoryFromSessionEntries,
     executeAssistantRun,
     loadPromptAssets,
-    type PromptAssets,
+    PromptAssets,
 } from '@server/services/run-runtime.js';
 
 import { createInMemoryAppDb } from './support/app-db.js';

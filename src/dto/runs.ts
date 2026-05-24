@@ -1,4 +1,4 @@
-import type { RunStatus, SessionMode } from '@/types.js';
+import { RunStatus, SessionMode } from '@/types.js';
 
 export interface SessionEntryDtoBase {
     id: string;

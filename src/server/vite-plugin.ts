@@ -1,6 +1,6 @@
-import type { IncomingMessage, ServerResponse } from 'node:http';
+import { IncomingMessage, ServerResponse } from 'node:http';
 
-import type { Plugin } from 'vite';
+import { Plugin } from 'vite';
 
 export const eberronApiPlugin = (): Plugin => ({
     name: 'eberron-api',

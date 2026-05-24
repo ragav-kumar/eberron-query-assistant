@@ -4,7 +4,7 @@ import path from 'node:path';
 import Database from 'better-sqlite3';
 import { throwIfAborted } from '@/errors.js';
 import { createNoopTimingReporter } from '@/timing.js';
-import type {
+import {
     CitationMetadata,
     RetrievalResult,
     RetrievalSearchRequest,

@@ -1,4 +1,4 @@
-import type { ServerResponse } from 'node:http';
+import { ServerResponse } from 'node:http';
 import { writeGenericJson } from './response.js';
 
 export const writeNotFound = (response: ServerResponse): void => {

@@ -1,5 +1,5 @@
-import type { SessionMode } from '@/types.js';
-import type { RunDto } from './runs.js';
+import { SessionMode } from '@/types.js';
+import { RunDto } from './runs.js';
 
 export interface SessionDto {
     id: string;

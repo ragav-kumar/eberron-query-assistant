@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import type { OperationEventDto } from '@/dto/index.js';
+import { OperationEventDto } from '@/dto/index.js';
 import { refreshQueryKey } from './refresh.js';
 import { sessionQueryKey } from './sessions.js';
 

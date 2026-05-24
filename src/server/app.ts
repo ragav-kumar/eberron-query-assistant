@@ -17,15 +17,15 @@ import {
 import {
     createOpenAiChatAdapter,
     createOpenAiEmbeddingAdapter,
-    type ProviderConfig,
+    ProviderConfig,
 } from './services/provider.js';
-import type {
+import {
     ConsoleEventPublisher,
     RefreshCoordinator,
     RunCoordinator,
     RuntimeEventPublisher,
 } from './services/index.js';
-import type { AppDb } from './db/app/index.js';
+import { AppDb } from './db/app/index.js';
 import { createTaggedError } from '@/errors.js';
 
 /**

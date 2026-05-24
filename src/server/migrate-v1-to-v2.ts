@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { readFile, readdir, stat } from 'node:fs/promises';
 import path from 'node:path';
 
-import type { Insertable, Transaction } from 'kysely';
+import { Insertable, Transaction } from 'kysely';
 
 import { createAppDb, AppDatabaseSchema, AppDb } from './db/app/index.js';
 import { settingKeys } from './db/app/settings/settingKeys.js';

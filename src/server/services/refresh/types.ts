@@ -1,5 +1,5 @@
-import type { CorpusChunk, CorpusSource, RefreshOperationKind } from '@/types.js';
-import type { IngestedArticle } from '@server/db/app/index.js';
+import { CorpusChunk, CorpusSource, RefreshOperationKind } from '@/types.js';
+import { IngestedArticle } from '@server/db/app/index.js';
 
 export interface RuntimePaths {
     articleHtmlCacheDir: string;

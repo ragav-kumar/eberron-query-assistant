@@ -1,5 +1,5 @@
-import type { OperationEventDto, RefreshOperationEventDto } from '@/dto/index.js';
-import type { RefreshOperationKind, RefreshStatus } from '@/types.js';
+import { OperationEventDto, RefreshOperationEventDto } from '@/dto/index.js';
+import { RefreshOperationKind, RefreshStatus } from '@/types.js';
 
 type RuntimeEventSubscriber = (event: OperationEventDto) => void;
 

@@ -1,7 +1,7 @@
-import type { IngestedArticle } from '@server/db/app/index.js';
+import { IngestedArticle } from '@server/db/app/index.js';
 import { settingsStore } from '@server/db/app/index.js';
 
-import type { ArticleDiscoveryResult } from '../types.js';
+import { ArticleDiscoveryResult } from '../types.js';
 
 /**
  * Decides whether the remote article index should be scraped during this run.

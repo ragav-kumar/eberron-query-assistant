@@ -2,7 +2,7 @@ import { readdir } from 'node:fs/promises';
 
 import { hasErrorCode } from '@/errors.js';
 
-import type { PdfDiscoveryResult } from '../types.js';
+import { PdfDiscoveryResult } from '../types.js';
 
 /**
  * Discovers PDF additions and removals by comparing the current directory to

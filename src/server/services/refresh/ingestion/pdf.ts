@@ -4,9 +4,9 @@ import path from 'node:path';
 
 import { PdfData, VerbosityLevel } from 'pdfdataextract';
 
-import type { CorpusChunk, CorpusSource } from '@/types.js';
+import { CorpusChunk, CorpusSource } from '@/types.js';
 
-import type { PdfParser, RuntimePaths, SourceChangeSet } from '../types.js';
+import { PdfParser, RuntimePaths, SourceChangeSet } from '../types.js';
 import { chunkText, normalizeText } from './chunking.js';
 
 /**

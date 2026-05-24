@@ -1,6 +1,6 @@
-import type { Selectable, Updateable } from 'kysely';
+import { Selectable, Updateable } from 'kysely';
 
-import type {
+import {
     ConsoleLevel,
     RefreshOperationKind,
     RefreshStatus,

@@ -31,7 +31,7 @@ export default tseslint.config(
             react
         },
         rules: {
-            '@typescript-eslint/consistent-type-imports': 'off',
+            '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'no-type-imports', disallowTypeAnnotations: false }],
             '@typescript-eslint/no-deprecated': 'error',
             '@typescript-eslint/no-floating-promises': 'error',
             '@typescript-eslint/no-unused-vars': [
@@ -44,6 +44,13 @@ export default tseslint.config(
             ],
             '@typescript-eslint/only-throw-error': 'off',
             'arrow-body-style': ['error', 'as-needed'],
+            'no-duplicate-imports': 'error',
+            'no-restricted-imports': ['error', {
+                patterns: [{
+                    group: ['../../*', '../../**'],
+                    message: 'Use @, @client, or @server path aliases instead of multi-level relative imports.'
+                }]
+            }],
             'func-style': ['error', 'expression', {'allowArrowFunctions': true}],
             'jsx-quotes': ['error', 'prefer-single'],
             'no-restricted-syntax': [

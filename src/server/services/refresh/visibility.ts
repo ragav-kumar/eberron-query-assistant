@@ -1,8 +1,8 @@
-import type { ProgressReporter } from '@server/db/corpus/index.js';
-import type { RefreshOperationKind } from '@/types.js';
+import { ProgressReporter } from '@server/db/corpus/index.js';
+import { RefreshOperationKind } from '@/types.js';
 
-import type { ConsoleEventPublisher } from '../console-event-publisher.js';
-import { createRefreshOperationEvent, type RuntimeEventPublisher } from '../runtime-event-publisher.js';
+import { ConsoleEventPublisher } from '../console-event-publisher.js';
+import { createRefreshOperationEvent, RuntimeEventPublisher } from '../runtime-event-publisher.js';
 
 export interface RefreshVisibility {
     publishCompleted(kind: RefreshOperationKind, timestamp: string): void;

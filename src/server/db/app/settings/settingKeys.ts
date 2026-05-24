@@ -1,5 +1,5 @@
 import { Kysely } from 'kysely';
-import type { AppDatabaseSchema } from '../schema.js';
+import { AppDatabaseSchema } from '../schema.js';
 
 export const settingKeys = {
     additionalContext: 'additional-context',

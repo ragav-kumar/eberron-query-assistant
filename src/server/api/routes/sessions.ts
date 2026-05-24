@@ -1,4 +1,4 @@
-import type { RouteDefinition } from './shared.js';
+import { RouteDefinition } from './shared.js';
 import { writeNotFound } from '../not-found.js';
 import { writeJson } from '../response.js';
 import { SessionMode } from '@/types.js';

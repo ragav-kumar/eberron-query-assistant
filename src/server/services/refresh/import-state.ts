@@ -1,5 +1,5 @@
-import type { AppDb } from '@server/db/app/db.js';
-import type { IngestedArticle, SelectRow } from '@server/db/app/schema.js';
+import { AppDb } from '@server/db/app/db.js';
+import { IngestedArticle, SelectRow } from '@server/db/app/schema.js';
 import { settingsStore } from '@server/db/app/index.js';
 
 /**

@@ -1,21 +1,21 @@
 import { randomUUID } from 'node:crypto';
 
-import { type Insertable, type Kysely, type Transaction } from 'kysely';
+import { Insertable, Kysely, Transaction } from 'kysely';
 
-import type { CreateRunDto, RunDto, SessionDto, SessionEntryDto, SessionMode } from '@/dto/index.js';
+import { CreateRunDto, RunDto, SessionDto, SessionEntryDto, SessionMode } from '@/dto/index.js';
 import { createTaggedError, formatThrownValue } from '@/errors.js';
-import { settingsStore, type AppDatabaseSchema, type SessionEntry, type UpdateRow } from '@server/db/app/index.js';
-import type { AppDb } from '@server/db/app/db.js';
-import type { PartyContextService } from '@server/db/corpus/party-context.js';
-import type { CorpusRetrievalService } from '@server/db/corpus/retrieval-service.js';
+import { settingsStore, AppDatabaseSchema, SessionEntry, UpdateRow } from '@server/db/app/index.js';
+import { AppDb } from '@server/db/app/db.js';
+import { PartyContextService } from '@server/db/corpus/party-context.js';
+import { CorpusRetrievalService } from '@server/db/corpus/retrieval-service.js';
 
 import {
     buildChatHistoryFromSessionEntries,
     executeAssistantRun,
     loadPromptAssets,
 } from './run-runtime.js';
-import type { ChatAdapter } from './provider.js';
-import type { RuntimeEventPublisher } from './runtime-event-publisher.js';
+import { ChatAdapter } from './provider.js';
+import { RuntimeEventPublisher } from './runtime-event-publisher.js';
 
 export interface RunCoordinator {
     startRun(request: CreateRunDto): Promise<RunDto>;

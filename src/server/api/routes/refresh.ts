@@ -1,7 +1,7 @@
-import type { RouteDefinition } from './shared.js';
+import { RouteDefinition } from './shared.js';
 import { readJson } from '../request.js';
 import { writeJson } from '../response.js';
-import type { CreateRefreshDto } from '@/dto/index.js';
+import { CreateRefreshDto } from '@/dto/index.js';
 
 export const refreshRoutes: RouteDefinition[] = [
     {

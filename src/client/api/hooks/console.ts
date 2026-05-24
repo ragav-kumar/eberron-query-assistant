@@ -1,6 +1,6 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useSyncExternalStore } from 'react';
-import type { ConsoleEntryDto } from '@/dto/index.js';
+import { ConsoleEntryDto } from '@/dto/index.js';
 
 import { contracts } from '@/contract/index.js';
 

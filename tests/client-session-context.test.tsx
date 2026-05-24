@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act, cleanup } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { SessionProvider } from '@client/components/SessionContext/SessionProvider.js';
 import { useSessionContext } from '@client/components/SessionContext/SessionContext.js';
-import type { SessionDto, SessionFeedDto, RunDto } from '@/client/api/index.js';
+import { SessionDto, SessionFeedDto, RunDto } from '@/client/api/index.js';
 
 vi.mock('react-markdown', () => ({
     default: ({ children }: { children: ReactNode }) => <>{children}</>,

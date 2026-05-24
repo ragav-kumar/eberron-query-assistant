@@ -1,6 +1,6 @@
 import { fileURLToPath, URL } from 'node:url';
 import react from '@vitejs/plugin-react';
-import { defineConfig, type PluginOption } from 'vite';
+import { defineConfig, PluginOption } from 'vite';
 import checker from 'vite-plugin-checker';
 
 import { eberronApiPlugin } from './src/server/vite-plugin.js';

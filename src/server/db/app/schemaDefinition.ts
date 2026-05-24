@@ -1,8 +1,8 @@
-import { sql, type Kysely } from 'kysely';
+import { sql, Kysely } from 'kysely';
 
 import { sessionModes } from '@/types.js';
 
-import type { AppDatabaseSchema } from './schema.js';
+import { AppDatabaseSchema } from './schema.js';
 
 const refreshOperationKinds = ['refresh', 'reingest'] as const;
 const refreshStatuses = ['pending', 'running', 'completed', 'failed'] as const;

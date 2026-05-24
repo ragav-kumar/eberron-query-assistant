@@ -2,7 +2,7 @@ import { fs, vol } from 'memfs';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AppDb } from '@server/db/app/db.js';
+import { AppDb } from '@server/db/app/db.js';
 import { settingsStore } from '@server/db/app/index.js';
 import { createRefreshCoordinator } from '@server/services/refresh/coordinator.js';
 import { createRefreshPipeline } from '@server/services/refresh/pipeline.js';

@@ -3,8 +3,8 @@ import path from 'node:path';
 
 import { createTaggedError, formatThrownValue, isRecord } from '@/errors.js';
 
-import type { FoundryImportState } from '../import-state.js';
-import type { FoundryDiscoveryResult, FoundryExportMarker } from '../types.js';
+import { FoundryImportState } from '../import-state.js';
+import { FoundryDiscoveryResult, FoundryExportMarker } from '../types.js';
 
 const FOUNDRY_MANIFEST_READ_CHUNK_BYTES = 64 * 1024;
 const SUPPORTED_FOUNDRY_EXPORT_SCHEMA_VERSION = '2.0.0';

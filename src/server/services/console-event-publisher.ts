@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
-import type { ConsoleEntryDto } from '@/dto/index.js';
+import { ConsoleEntryDto } from '@/dto/index.js';
 import { AppDb, settingsStore } from '@server/db/app/index.js';
-import type { ConsoleLevel } from '@/types.js';
+import { ConsoleLevel } from '@/types.js';
 
 type ConsoleEventSubscriber = (entry: ConsoleEntryDto) => void;
 

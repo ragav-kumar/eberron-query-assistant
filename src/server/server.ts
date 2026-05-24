@@ -1,8 +1,8 @@
-import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import { createServer, IncomingMessage, Server, ServerResponse } from 'node:http';
 
 import {
     createApp,
-    type CreateAppDependencies,
+    CreateAppDependencies,
 } from './app.js';
 import { createApiHandler } from './api/index.js';
 import {

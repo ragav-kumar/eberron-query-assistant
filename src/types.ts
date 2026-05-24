@@ -1,4 +1,4 @@
-import type { TimingContext } from './timing.js';
+import { TimingContext } from './timing.js';
 
 export const sessionModes = ['assistant', 'npc'] as const;
 export type SessionMode = typeof sessionModes[number];

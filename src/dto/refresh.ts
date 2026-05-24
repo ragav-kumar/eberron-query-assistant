@@ -1,4 +1,4 @@
-import type { RefreshOperationKind, RefreshStatus } from '@/types.js';
+import { RefreshOperationKind, RefreshStatus } from '@/types.js';
 
 export interface CreateRefreshDto {
     kind: RefreshOperationKind;

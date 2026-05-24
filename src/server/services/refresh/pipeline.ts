@@ -1,26 +1,26 @@
 import path from 'node:path';
 
 import { createTaggedError, throwIfAborted } from '@/errors.js';
-import { initializeSettingsStore, settingsStore, type AppDb } from '@server/db/app/index.js';
+import { initializeSettingsStore, settingsStore, AppDb } from '@server/db/app/index.js';
 import {
     createCorpusRetrievalService,
     createCorpusStore,
-    type CorpusRetrievalService,
-    type CorpusStore,
-    type ProgressReporter,
+    CorpusRetrievalService,
+    CorpusStore,
+    ProgressReporter,
 } from '@server/db/corpus/index.js';
-import type { RefreshOperationKind } from '@/types.js';
+import { RefreshOperationKind } from '@/types.js';
 
 import { discoverRefreshWork } from './discovery/index.js';
 import { createOpenAiEmbeddingAdapter } from './embedding-adapter.js';
-import type { ArticleFetcher } from './ingestion/article.js';
+import { ArticleFetcher } from './ingestion/article.js';
 import { createFetchArticleFetcher } from './ingestion/article.js';
 import { buildRefreshIngestion } from './ingestion/index.js';
-import { createImportStateStore, type ImportStateStore } from './import-state.js';
-import type { PdfParser, RuntimePaths } from './types.js';
+import { createImportStateStore, ImportStateStore } from './import-state.js';
+import { PdfParser, RuntimePaths } from './types.js';
 import { createPdfDataExtractParser } from './ingestion/pdf.js';
-import type { RefreshPipelineResult } from './types.js';
-import type { OpenAiEmbeddingConfig } from './embedding-adapter.js';
+import { RefreshPipelineResult } from './types.js';
+import { OpenAiEmbeddingConfig } from './embedding-adapter.js';
 
 /**
  * Optional seams for composing or testing the refresh pipeline.

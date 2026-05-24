@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { ReactNode } from 'react';
 
 export interface TabContentProps<T extends string> {
     children: ReactNode;

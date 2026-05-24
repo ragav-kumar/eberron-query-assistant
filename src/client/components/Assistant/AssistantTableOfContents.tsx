@@ -1,4 +1,4 @@
-import type { RunDto, SessionEntryResponseDto } from '@/dto/index.js';
+import { RunDto, SessionEntryResponseDto } from '@/dto/index.js';
 import styles from './Assistant.module.css';
 
 interface AssistantTableOfContentsProps {

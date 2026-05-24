@@ -1,4 +1,4 @@
-import type { ConsoleLevel } from '../types.js';
+import { ConsoleLevel } from '../types.js';
 
 export interface ConsoleEntryDto {
     id: string;

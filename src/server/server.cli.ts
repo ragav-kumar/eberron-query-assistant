@@ -1,6 +1,6 @@
 import {
     startServer,
-    type StartedServer,
+    StartedServer,
 } from './server.js';
 
 const registerShutdownHandlers = (startedServer: StartedServer): void => {

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { useConsoleSubscription, useRuntimeSubscription } from '@/client/api/index.js';
 import { SessionProvider } from './components/SessionContext/index.js';
 

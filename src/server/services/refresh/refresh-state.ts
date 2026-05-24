@@ -1,6 +1,6 @@
-import type { RefreshOperationKind } from '@/types.js';
-import type { AppDb } from '@server/db/app/db.js';
-import type { RefreshState } from '@server/db/app/schema.js';
+import { RefreshOperationKind } from '@/types.js';
+import { AppDb } from '@server/db/app/db.js';
+import { RefreshState } from '@server/db/app/schema.js';
 
 const SINGLETON_KEY = 1;
 

@@ -1,12 +1,12 @@
-import type { CreateRefreshDto, RefreshDto } from '@/dto/index.js';
+import { CreateRefreshDto, RefreshDto } from '@/dto/index.js';
 import { createTaggedError, isOperationAbortedError } from '@/errors.js';
-import type { AppDb, SelectRow } from '@server/db/app/index.js';
-import type { RefreshOperationKind } from '@/types.js';
+import { AppDb, SelectRow } from '@server/db/app/index.js';
+import { RefreshOperationKind } from '@/types.js';
 
-import { createRefreshPipeline, type RefreshPipeline } from './pipeline.js';
-import { createRefreshStateStore, type RefreshStateStore } from './refresh-state.js';
+import { createRefreshPipeline, RefreshPipeline } from './pipeline.js';
+import { createRefreshStateStore, RefreshStateStore } from './refresh-state.js';
 import { assertCanStartOperation } from './state-machine.js';
-import type { RefreshVisibility } from './visibility.js';
+import { RefreshVisibility } from './visibility.js';
 
 /**
  * API-facing entrypoint for the refresh feature.

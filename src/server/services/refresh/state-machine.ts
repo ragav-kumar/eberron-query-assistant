@@ -1,6 +1,6 @@
 import { createTaggedError } from '@/errors.js';
-import type { RefreshOperationKind } from '@/types.js';
-import type { RefreshState } from '@server/db/app/index.js';
+import { RefreshOperationKind } from '@/types.js';
+import { RefreshState } from '@server/db/app/index.js';
 
 /**
  * Enforces the top-level refresh/reingest exclusivity rules.
