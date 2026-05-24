@@ -27,7 +27,7 @@ High-level roadmap for the remaining V2 work. This document is intentionally sho
 - Add a short `Repo state after completion:` note with 2-4 bullets describing what is now true in the repo.
 - Adjust later phases if the completed work changes the most sensible order or narrows the remaining scope.
 
-## Phase 1: Run Execution Foundation
+## Phase 1: Run Execution Foundation — COMPLETE
 
 - Replace the stubbed `runCoordinator` with a real V2 run entrypoint.
 - Make `POST /api/v2/runs` able to continue an existing persisted session and persist run/session-entry data for completed runs.
@@ -53,7 +53,7 @@ Repo state after completion:
 - A private `fetchSessionDto` helper in the coordinator re-fetches the session with entry count for session event payloads.
 - The client `useRuntimeSubscription` now receives live run/session-entry/session events and invalidates the correct query caches without a manual reload.
 
-## Phase 3: Assistant Session Workflow
+## Phase 3: Assistant Session Workflow — COMPLETE
 
 - Finish assistant submit wiring so the input actually drives the V2 run flow.
 - Implement UI-local new-session behavior and first-run promotion into a persisted titled session.
@@ -64,6 +64,13 @@ Repo state after completion:
   - Create a new assistant session.
   - Submit the first prompt and watch it promote into a titled saved session.
   - Submit a later prompt and confirm party-context locking is enforced.
+
+Repo state after completion:
+- `useRun` submits without a `sessionId` for temp sessions and calls `promoteSession` once the first run resolves, switching the active session to the real persisted one.
+- `SessionProvider` manages the temp-to-persisted transition via `createTempSession` / `promoteSession`; `TEMP_SESSION_ID` is the sentinel that guards the lock check.
+- `Input.tsx` disables the "Include party context" checkbox whenever the active session is a real (non-temp) persisted session.
+- `Assistant.tsx` renders the feed grouped by run with user, reasoning, and response entries styled via `Assistant.module.css`; shows a `Thinking…` indicator while `activeRunId` is set; includes a sticky table-of-contents hover panel (`AssistantTableOfContents`).
+- All Phase 3 behaviors are covered by passing tests in `tests/client-components.test.tsx` and `tests/client-session-context.test.tsx`.
 
 ## Phase 4: NPC Workflow Completion
 
