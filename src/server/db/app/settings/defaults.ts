@@ -106,9 +106,9 @@ export const appDbPath = env.EQA_APP_DB_PATH;
  * Hardcoded to loopback defaults; set EQA_V2_SERVER_HOST / EQA_V2_SERVER_PORT
  * in the environment to override without touching source.
  */
-export const serverHost = process.env['EQA_V2_SERVER_HOST'] ?? '127.0.0.1';
+export const serverHost = process.env['EQA_SERVER_HOST'] ?? '127.0.0.1';
 export const serverPort: number = (() => {
-    const raw = process.env['EQA_V2_SERVER_PORT'];
+    const raw = process.env['EQA_SERVER_PORT'];
     if (raw == null) return 3001;
     const n = Number(raw);
     return Number.isInteger(n) && n >= 0 && n <= 65535 ? n : 3001;

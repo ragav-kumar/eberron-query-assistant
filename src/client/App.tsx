@@ -21,7 +21,7 @@ export const App = () => (
     <QueryClientProvider client={queryClient}>
         <AppContext>
             <main className={styles.wrap}>
-                <title>Eberron Query Assistant V2</title>
+                <title>Eberron Query Assistant</title>
                 <section className={styles.column}>
                     <LeftColumnHeader />
                     <LeftColumnTabs />

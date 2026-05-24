@@ -87,7 +87,7 @@ export const startServer = async (
             });
         });
         await runtime.close();
-        throw new Error('V2 server did not report a TCP address.');
+        throw new Error('Server did not report a TCP address.');
     }
 
     let closed = false;
