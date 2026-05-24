@@ -61,10 +61,16 @@
     text-align: center;
 }
 
+@keyframes thinking-pulse {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.7; }
+}
+
 .thinking {
-    opacity: 0.6;
     padding: 0.5rem 0;
     font-style: italic;
+    color: var(--color-text-muted);
+    animation: thinking-pulse 1.4s ease-in-out infinite;
 }
 
 /**

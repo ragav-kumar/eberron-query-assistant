@@ -37,7 +37,7 @@ export const SessionSelector = ({mode}:SessionSelectorProps) => {
                         key={session.id}
                         value={session.id}
                     >
-                        {session.createdAt} - {session.title} ({session.runCount})
+                        {session.createdAt.slice(0, 10)} ({session.runCount}) - {session.title}
                     </option>
                 ))}
             </select>
