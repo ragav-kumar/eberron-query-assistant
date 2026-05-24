@@ -36,7 +36,7 @@ const waitForChildExit = (child: ChildProcess): Promise<void> => {
 
 const main = async (): Promise<void> => {
     const managedProcesses = [
-        spawnManagedProcess('V2 API server', [viteNodeCliPath, 'src/server/v2/server.cli.ts']),
+        spawnManagedProcess('API server', [viteNodeCliPath, 'src/server/server.cli.ts']),
         spawnManagedProcess('Vite dev server', [viteCliPath]),
     ];
     let shuttingDown = false;

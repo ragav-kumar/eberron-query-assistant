@@ -6,7 +6,7 @@ import { Assistant } from '@client/components/Assistant/Assistant.js';
 import { Input } from '@client/components/Input/Input.js';
 import { SessionSelector } from '@client/components/SessionSelector.js';
 import { TEMP_SESSION_ID } from '@client/components/SessionContext/SessionProvider.js';
-import type { RunDto, SessionDto } from '@/client/v2/api/index.js';
+import type { RunDto, SessionDto } from '@/client/api/index.js';
 import type { SessionData } from '@client/components/SessionContext/SessionContext.js';
 import type { SessionMode } from '@/types.js';
 import type { SessionEntryDto } from '@/dto/runs.js';
@@ -26,7 +26,7 @@ vi.mock('@client/components/SessionContext/index.js', () => ({
     TEMP_SESSION_ID: '__temp__',
 }));
 
-vi.mock('@/client/v2/api/index.js', () => ({
+vi.mock('@/client/api/index.js', () => ({
     sessionModes: ['assistant', 'npc'],
     useRunsMutation: mocks.useRunsMutation,
     useSessionsQuery: vi.fn().mockReturnValue({ data: [], isLoading: false, isPending: false }),

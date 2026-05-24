@@ -4,7 +4,7 @@ import { renderHook, act, cleanup } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { SessionProvider } from '@client/components/SessionContext/SessionProvider.js';
 import { useSessionContext } from '@client/components/SessionContext/SessionContext.js';
-import type { SessionDto, SessionFeedDto, RunDto } from '@/client/v2/api/index.js';
+import type { SessionDto, SessionFeedDto, RunDto } from '@/client/api/index.js';
 
 vi.mock('react-markdown', () => ({
     default: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -16,7 +16,7 @@ const apiMocks = vi.hoisted(() => ({
     useSessionFeedsQuery: vi.fn(),
 }));
 
-vi.mock('@/client/v2/api/index.js', () => ({
+vi.mock('@/client/api/index.js', () => ({
     sessionModes: ['assistant', 'npc'],
     useSessionsQuery: apiMocks.useSessionsQuery,
     useSessionFeedsQuery: apiMocks.useSessionFeedsQuery,

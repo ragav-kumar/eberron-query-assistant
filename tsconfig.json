@@ -15,8 +15,8 @@
     "noUncheckedIndexedAccess": true,
     "paths": {
       "@/*": ["src/*"],
-      "@client/*": ["src/client/v2/*"],
-      "@server/*": ["src/server/v2/*"]
+      "@client/*": ["src/client/*"],
+      "@server/*": ["src/server/*"]
     },
     "types": ["node", "vite/client"]
   },

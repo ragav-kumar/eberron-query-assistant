@@ -10,7 +10,7 @@
     "migrate:v1-to-v2": "vite-node src/server/migrate-v1-to-v2.cli.ts",
     "prestart": "tsc --noEmit",
     "start": "vite",
-    "start:v2-server": "vite-node src/server/v2/server.cli.ts",
+    "start:server": "vite-node src/server/server.cli.ts",
     "test": "vitest run",
     "verify": "npm audit --audit-level=moderate && npm run lint && tsc --noEmit && npm run test"
   },

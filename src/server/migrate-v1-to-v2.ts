@@ -7,8 +7,8 @@ import path from 'node:path';
 
 import type { Insertable, Transaction } from 'kysely';
 
-import { createAppDb, AppDatabaseSchema, AppDb } from './v2/db/app/index.js';
-import { settingKeys } from './v2/db/app/settings/settingKeys.js';
+import { createAppDb, AppDatabaseSchema, AppDb } from './db/app/index.js';
+import { settingKeys } from './db/app/settings/settingKeys.js';
 
 interface LegacyMigrationConfig {
     assistant: {

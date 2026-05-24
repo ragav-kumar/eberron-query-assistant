@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-describe('V2 API router', () => {
+describe('API router', () => {
     it('lists sessions and coerces includePartyContext to boolean', () => {
         expect.fail('Not implemented.');
     });

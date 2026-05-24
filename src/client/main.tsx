@@ -4,7 +4,7 @@ import type { ComponentType } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 
 const loadV2App = async (): Promise<ComponentType> => {
-  const module = await import('./v2/App.js');
+  const module = await import('./App.js');
   return module.App;
 };
 
