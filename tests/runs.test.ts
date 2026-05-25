@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { settingsStore } from '@server/db/app/index.js';
-import { createRunCoordinator } from '@server/services/run-coordinator.js';
+import { createRunCoordinator } from '@server/services/run/index.js';
 
 import { createInMemoryAppDb } from './support/app-db.js';
 
@@ -80,16 +80,78 @@ describe('V2 run coordinator', () => {
         expect(run.sessionId).not.toBe('session-1');
     });
 
-    it('rejects unsupported run modes', async () => {
-        const coordinator = createCoordinator(appDb);
+    it('creates a new npc-mode session and persists the run when no sessionId is provided for npc mode', async () => {
+        const coordinator = createCoordinator(appDb, { chat: createNpcChat() });
 
-        await expect(coordinator.startRun({
+        const run = await coordinator.startRun({
             includePartyContext: false,
             mode: 'npc',
-            prompt: 'Question',
+            prompt: 'Generate a guard',
             retrievalTurnLimit: 1,
-            sessionId: 'session-1',
-        })).rejects.toThrow('Only assistant runs are supported in Phase 1.');
+            sessionId: undefined,
+        });
+
+        const session = await appDb.db
+            .selectFrom('sessions')
+            .selectAll()
+            .where('id', '=', run.sessionId)
+            .executeTakeFirst();
+        expect(session).toBeDefined();
+        expect(session?.mode).toBe('npc');
+        expect(run.sessionId).not.toBe('session-1');
+    });
+
+    it('persists npc records to the npcs table after a successful npc run', async () => {
+        await insertSession(appDb, { id: 'npc-session', mode: 'npc', title: '' });
+        const coordinator = createCoordinator(appDb, { chat: createNpcChat() });
+
+        await coordinator.startRun({
+            includePartyContext: false,
+            mode: 'npc',
+            prompt: 'Generate a guard',
+            retrievalTurnLimit: 0,
+            sessionId: 'npc-session',
+        });
+
+        const npcs = await appDb.db.selectFrom('npcs').selectAll().execute();
+        expect(npcs).toHaveLength(1);
+        expect(npcs[0]).toMatchObject({ name: 'Mira Tannen', species: 'Human', sessionId: 'npc-session' });
+    });
+
+    it('persists multiple npc records when the response contains several npc elements', async () => {
+        await insertSession(appDb, { id: 'npc-session', mode: 'npc', title: '' });
+        const chat = {
+            complete: vi.fn(),
+            completeStructured: vi.fn().mockResolvedValue({
+                content: [
+                    '<response>',
+                    '  <session-title>Guards of Sharn</session-title>',
+                    '  <response-title>Two guards</response-title>',
+                    '  <npcs>',
+                    '    <npc><id>1</id><name>Rael</name><bio>A veteran.</bio><description>Tall human.</description></npc>',
+                    '    <npc><id>2</id><name>Sorn</name><species>Half-Orc</species><bio>Gruff.</bio><description>Broad shoulders.</description></npc>',
+                    '  </npcs>',
+                    '  <notes>Two guards generated.</notes>',
+                    '</response>',
+                ].join('\n'),
+                kind: 'text',
+            }),
+        };
+        const coordinator = createCoordinator(appDb, { chat });
+
+        await coordinator.startRun({
+            includePartyContext: false,
+            mode: 'npc',
+            prompt: 'Generate two guards',
+            retrievalTurnLimit: 0,
+            sessionId: 'npc-session',
+        });
+
+        const npcs = await appDb.db.selectFrom('npcs').selectAll().orderBy('id', 'asc').execute();
+        expect(npcs).toHaveLength(2);
+        expect(npcs[0]?.name).toBe('Rael');
+        expect(npcs[1]?.name).toBe('Sorn');
+        expect(npcs[1]?.species).toBe('Half-Orc');
     });
 
     it('rejects missing sessions', async () => {
@@ -98,12 +160,18 @@ describe('V2 run coordinator', () => {
         await expect(coordinator.startRun(createRequest({ sessionId: 'missing-session' }))).rejects.toThrow('does not exist');
     });
 
-    it('rejects session mode mismatches', async () => {
+    it('rejects an assistant run against an npc session', async () => {
         await appDb.db.deleteFrom('sessions').where('id', '=', 'session-1').execute();
         await insertSession(appDb, { id: 'session-1', mode: 'npc', title: 'NPC session' });
         const coordinator = createCoordinator(appDb);
 
         await expect(coordinator.startRun(createRequest())).rejects.toThrow('does not support assistant runs');
+    });
+
+    it('rejects an npc run against an assistant session', async () => {
+        const coordinator = createCoordinator(appDb);
+
+        await expect(coordinator.startRun(createRequest({ mode: 'npc' }))).rejects.toThrow('does not support npc runs');
     });
 
     it('persists the run row session row update and user entry before model execution', async () => {
@@ -301,3 +369,20 @@ const insertSession = async (
         updatedAt: now,
     }).execute();
 };
+
+const createNpcChat = () => ({
+    complete: vi.fn(),
+    completeStructured: vi.fn().mockResolvedValue({
+        content: [
+            '<response>',
+            '  <session-title>Session title</session-title>',
+            '  <response-title>One guard</response-title>',
+            '  <npcs>',
+            '    <npc><id>1</id><name>Mira Tannen</name><species>Human</species><bio>A city guard.</bio><description>Average height, alert eyes.</description></npc>',
+            '  </npcs>',
+            '  <notes>One guard generated.</notes>',
+            '</response>',
+        ].join('\n'),
+        kind: 'text',
+    }),
+});

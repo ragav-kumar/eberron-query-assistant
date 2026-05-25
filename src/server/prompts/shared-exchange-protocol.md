@@ -5,9 +5,9 @@ Start from the retrieved evidence already supplied. Call `search_corpus` only fo
 Immediately return something visible that acknowledges the prompt and states the overall direction of your thinking.
 
 - If no tool call is needed, that immediate visible output may be the final response.
-- If a tool call is needed, first return a short visible thinking blurb.
-- Each visible thinking blurb must be one to four sentences long and must explain what you are looking for and why it is relevant.
-- Visible thinking blurbs must be short, diagnostic progress updates. State what you are checking or trying to resolve so the user can spot drift, but do not turn them into long step-by-step internal deliberation.
+- When you make a tool call, you MUST include a `<thinking>` block as the text content of that same response — placed in the message content alongside the tool call invocation, not in a separate prior message. This is required for every tool-call response without exception.
+- Each `<thinking>` block must be one to four sentences explaining what you are looking for and why it is relevant.
+- Keep thinking blocks short diagnostic progress updates. State what you are checking or trying to resolve so the user can spot drift; do not turn them into long step-by-step internal deliberation.
 
 Every assistant-authored message must use the required structure. Do not place freeform prose outside the top-level envelope.
 

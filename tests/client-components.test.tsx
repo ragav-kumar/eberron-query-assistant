@@ -197,6 +197,47 @@ describe('V2 client components', () => {
         expect(screen.getByText('Loading...')).toBeTruthy();
     });
 
+    it('shows no-npcs message when npc data is loaded but the list is empty', () => {
+        mocks.useNpcsQuery.mockReturnValue({ data: { npcs: [], totalCount: 0, skip: 0, take: 20, filter: '' }, isLoading: false, isPending: false });
+
+        render(<NpcCards />);
+
+        expect(screen.getByText('No NPCs found.')).toBeTruthy();
+    });
+
+    it('renders a filter input in the npc panel', () => {
+        render(<NpcCards />);
+
+        expect(screen.getByRole('textbox')).toBeTruthy();
+    });
+
+    it('renders pagination controls when there are more npcs than the page size', () => {
+        mocks.useNpcsQuery.mockReturnValue({
+            data: { npcs: [makeNpc(1, 'session-1')], totalCount: 25, skip: 0, take: 20, filter: '' },
+            isLoading: false,
+            isPending: false,
+        });
+
+        render(<NpcCards />);
+
+        expect(screen.getByRole('button', { name: 'Next' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Prev' })).toBeTruthy();
+        expect(screen.getByText(/1–20 of 25/)).toBeTruthy();
+    });
+
+    it('disables Prev at the first page and Next at the last page', () => {
+        mocks.useNpcsQuery.mockReturnValue({
+            data: { npcs: [makeNpc(1, 'session-1')], totalCount: 1, skip: 0, take: 20, filter: '' },
+            isLoading: false,
+            isPending: false,
+        });
+
+        render(<NpcCards />);
+
+        expect(screen.getByRole('button', { name: 'Prev' }).hasAttribute('disabled')).toBe(true);
+        expect(screen.getByRole('button', { name: 'Next' }).hasAttribute('disabled')).toBe(true);
+    });
+
     it('disables submit while the session context is busy', () => {
         mocks.useSessionContext.mockReturnValue(makeContext({ isBusy: true }));
 

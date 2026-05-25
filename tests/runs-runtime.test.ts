@@ -5,10 +5,14 @@ import { settingsStore } from '@server/db/app/index.js';
 import {
     buildAssistantMessages,
     buildChatHistoryFromSessionEntries,
+    buildNpcMessages,
     executeAssistantRun,
+    executeNpcRun,
+    loadNpcPromptAssets,
     loadPromptAssets,
+    NpcPromptAssets,
     PromptAssets,
-} from '@server/services/run-runtime.js';
+} from '@server/services/run/index.js';
 
 import { createInMemoryAppDb } from './support/app-db.js';
 
@@ -132,20 +136,24 @@ describe('V2 run runtime', () => {
         expect(result.sessionTitle).toBe('Session title');
     });
 
-    it('fails when a tool-call reply omits a valid thinking block', async () => {
-        const chat = {
-            complete: vi.fn(),
-            completeStructured: vi.fn().mockResolvedValue({
-                content: '<response>bad</response>',
+    it('skips reasoning entry and continues when a tool-call reply omits a thinking block', async () => {
+        const chat = createSequencedChat([
+            {
+                content: '',
                 kind: 'tool-calls',
-                toolCalls: [{ arguments: '{}', id: 'call-1', name: 'search_corpus' }],
-            }),
-        };
-
-        await expect(executeAssistantRun(createRunDependencies({
+                toolCalls: [{ arguments: JSON.stringify({ query: 'Sharn', userMessage: 'Searching' }), id: 'call-1', name: 'search_corpus' }],
+            },
+            { content: toFinalEnvelope('Answer', 'Resp title', 'Session title'), kind: 'text' },
+        ]);
+        const deps = createRunDependencies({
             chat,
             retrieval: { search: vi.fn().mockResolvedValue([]) },
-        }))).rejects.toThrow('Assistant tool call response did not include a valid <thinking> block.');
+        });
+
+        const result = await executeAssistantRun(deps);
+
+        expect(deps.callbacks.onReasoning).not.toHaveBeenCalled();
+        expect(result.response.content).toBe('Answer');
     });
 
     it('consumes retrieval turns only for valid search_corpus calls', async () => {
@@ -360,10 +368,153 @@ describe('V2 run runtime', () => {
             { content: 'Assistant answer', role: 'assistant' },
         ]);
     });
+
+    it('loads npc prompt assets from tracked markdown files', async () => {
+        const assets = await loadNpcPromptAssets();
+
+        expect(assets.shared.length).toBeGreaterThan(0);
+        expect(assets.npc.length).toBeGreaterThan(0);
+        expect(assets.sessionTitling.length).toBeGreaterThan(0);
+    });
+
+    it('builds npc messages with the npc prompt instead of the assistant prompt', () => {
+        const messages = buildNpcMessages({
+            additionalContext: '',
+            evidence: [],
+            history: [],
+            includePartyContext: false,
+            partyContext: '',
+            prompt: 'Generate a guard',
+            promptAssets: createNpcPromptAssets(),
+            requestSessionTitle: false,
+            retrievalTurnLimit: 0,
+        });
+
+        expect(messages[0]?.role).toBe('system');
+        expect(messages[0]?.content).toContain('NPC instructions');
+        expect(messages[0]?.content).not.toContain('Assistant instructions');
+    });
+
+    it('executeNpcRun returns parsed npc records and stores full xml as response content', async () => {
+        const rawXml = [
+            '<response>',
+            '  <session-title>Guards</session-title>',
+            '  <response-title>One guard</response-title>',
+            '  <npcs>',
+            '    <npc><id>1</id><name>Rael</name><species>Human</species><gender>male</gender><bio>A steady guard.</bio><description>Average build, watchful.</description></npc>',
+            '  </npcs>',
+            '  <notes>One guard generated.</notes>',
+            '</response>',
+        ].join('\n');
+        const chat = {
+            complete: vi.fn(),
+            completeStructured: vi.fn().mockResolvedValue({ content: rawXml, kind: 'text' }),
+        };
+
+        const result = await executeNpcRun(createNpcRunDependencies({ chat, retrieval: { search: vi.fn().mockResolvedValue([]) } }));
+
+        expect(result.npcs).toHaveLength(1);
+        expect(result.npcs[0]).toMatchObject({ name: 'Rael', species: 'Human', gender: 'male', bio: 'A steady guard.' });
+        expect(result.response.content).toBe(rawXml);
+        expect(result.response.kind).toBe('response');
+        expect(result.sessionTitle).toBe('Guards');
+    });
+
+    it('executeNpcRun correctly extracts all optional npc fields', async () => {
+        const chat = {
+            complete: vi.fn(),
+            completeStructured: vi.fn().mockResolvedValue({
+                content: [
+                    '<response>',
+                    '  <session-title>Crew</session-title>',
+                    '  <response-title>Dockworker</response-title>',
+                    '  <npcs>',
+                    '    <npc>',
+                    '      <id>1</id><name>Gorrak</name><species>Half-Orc</species>',
+                    '      <ethnicity>Lhazaar</ethnicity><gender>male</gender>',
+                    '      <role>Dockworker</role><age>34</age>',
+                    '      <bio>Weathered.</bio><description>Thick arms.</description>',
+                    '    </npc>',
+                    '  </npcs>',
+                    '  <notes>One dockworker.</notes>',
+                    '</response>',
+                ].join('\n'),
+                kind: 'text',
+            }),
+        };
+
+        const result = await executeNpcRun(createNpcRunDependencies({ chat, retrieval: { search: vi.fn().mockResolvedValue([]) } }));
+
+        expect(result.npcs[0]).toMatchObject({ name: 'Gorrak', species: 'Half-Orc', ethnicity: 'Lhazaar', gender: 'male', role: 'Dockworker', age: '34' });
+    });
+
+    it('executeNpcRun omits optional fields not present in the model response', async () => {
+        const chat = {
+            complete: vi.fn(),
+            completeStructured: vi.fn().mockResolvedValue({
+                content: [
+                    '<response>',
+                    '  <session-title>Mystery</session-title>',
+                    '  <response-title>Unknown figure</response-title>',
+                    '  <npcs>',
+                    '    <npc><id>1</id><name>Stranger</name><bio>Unknown past.</bio><description>Cloaked.</description></npc>',
+                    '  </npcs>',
+                    '  <notes>No optional fields.</notes>',
+                    '</response>',
+                ].join('\n'),
+                kind: 'text',
+            }),
+        };
+
+        const result = await executeNpcRun(createNpcRunDependencies({ chat, retrieval: { search: vi.fn().mockResolvedValue([]) } }));
+
+        expect(result.npcs[0]?.name).toBe('Stranger');
+        expect(result.npcs[0]?.species).toBeUndefined();
+        expect(result.npcs[0]?.age).toBeUndefined();
+    });
+
+    it('executeNpcRun handles search_corpus tool calls before producing the final response', async () => {
+        const retrieval = { search: vi.fn().mockResolvedValue([]) };
+        const chat = createSequencedChat([
+            {
+                content: '<thinking>Need evidence.</thinking>',
+                kind: 'tool-calls',
+                toolCalls: [{ arguments: JSON.stringify({ query: 'city guard', userMessage: 'Searching' }), id: 'tc-1', name: 'search_corpus' }],
+            },
+            {
+                content: toNpcEnvelope('Guard', 'Rael', 'Session title'),
+                kind: 'text',
+            },
+        ]);
+
+        const result = await executeNpcRun(createNpcRunDependencies({ chat, retrieval }));
+
+        expect(retrieval.search).toHaveBeenCalledTimes(2);
+        expect(result.npcs[0]?.name).toBe('Rael');
+    });
+
+    it('executeNpcRun repairs an invalid npc response envelope before failing', async () => {
+        const rawXml = toNpcEnvelope('Guard', 'Rael', 'Session title');
+        const chat = {
+            complete: vi.fn().mockResolvedValue(rawXml),
+            completeStructured: vi.fn().mockResolvedValue({ content: '<response>missing nested tags</response>', kind: 'text' }),
+        };
+
+        const result = await executeNpcRun(createNpcRunDependencies({ chat, retrieval: { search: vi.fn().mockResolvedValue([]) } }));
+
+        expect(chat.complete).toHaveBeenCalledTimes(1);
+        expect(result.npcs[0]?.name).toBe('Rael');
+    });
 });
 
 const createPromptAssets = (): PromptAssets => ({
     assistant: 'Assistant instructions',
+    sessionTitling: 'Title instructions',
+    shared: 'Shared instructions',
+});
+
+const createNpcPromptAssets = (): NpcPromptAssets => ({
+    npc: 'NPC instructions',
     sessionTitling: 'Title instructions',
     shared: 'Shared instructions',
 });
@@ -459,3 +610,55 @@ const toFinalEnvelope = (answer: string, responseTitle: string, sessionTitle: st
     `  <answer>${answer}</answer>`,
     '</response>',
 ].join('\n');
+
+const toNpcEnvelope = (responseTitle: string, npcName: string, sessionTitle: string): string => [
+    '<response>',
+    `  <session-title>${sessionTitle}</session-title>`,
+    `  <response-title>${responseTitle}</response-title>`,
+    '  <npcs>',
+    `    <npc><id>1</id><name>${npcName}</name><bio>A guard.</bio><description>Tall figure.</description></npc>`,
+    '  </npcs>',
+    '  <notes>Generated.</notes>',
+    '</response>',
+].join('\n');
+
+const createNpcRunDependencies = (overrides: {
+    chat: {
+        complete: ReturnType<typeof vi.fn>;
+        completeStructured: ReturnType<typeof vi.fn>;
+    };
+    inputs?: Partial<{
+        additionalContext: string;
+        history: Array<{ content: string; role: 'assistant' | 'system' | 'tool' | 'user' }>;
+        includePartyContext: boolean;
+        partyContext: string;
+        prompt: string;
+        requestSessionTitle: boolean;
+        retrievalTurnLimit: number;
+    }>;
+    retrieval: {
+        search: ReturnType<typeof vi.fn>;
+    };
+}) => ({
+    callbacks: {
+        onReasoning: vi.fn(() => Promise.resolve(undefined)),
+    },
+    context: {
+        runId: 'run-1',
+        sessionId: 'session-1',
+    },
+    inputs: {
+        additionalContext: overrides.inputs?.additionalContext ?? '',
+        history: overrides.inputs?.history ?? [],
+        includePartyContext: overrides.inputs?.includePartyContext ?? false,
+        partyContext: overrides.inputs?.partyContext ?? '',
+        prompt: overrides.inputs?.prompt ?? 'Generate a guard',
+        promptAssets: createNpcPromptAssets(),
+        requestSessionTitle: overrides.inputs?.requestSessionTitle ?? true,
+        retrievalTurnLimit: overrides.inputs?.retrievalTurnLimit ?? 1,
+    },
+    services: {
+        chat: overrides.chat,
+        retrieval: overrides.retrieval,
+    },
+});

@@ -6,7 +6,7 @@ import {
     ChatMessage,
     ChatStructuredResult,
     ChatToolDefinition,
-} from './provider.js';
+} from './provider/index.js';
 
 /**
  * HASTILY COPIED FROM V1 TO PURGE A FORBIDDEN V2 -> V1 REFERENCE.

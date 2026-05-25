@@ -6,6 +6,7 @@ import { ReactNode } from 'react';
 
 import { sessionQueryKey, useSessionFeedsQuery } from '@/client/api/hooks/sessions.js';
 import { refreshQueryKey, useRefreshMutation } from '@/client/api/hooks/refresh.js';
+import { npcQueryKey, useNpcsQuery } from '@/client/api/hooks/npc.js';
 import { useAdditionalContextMutation } from '@/client/api/hooks/additionalContext.js';
 import { useRuntimeSubscription } from '@/client/api/hooks/runtime.js';
 import { useConsoleEntries, useConsoleSubscription } from '@/client/api/hooks/console.js';
@@ -96,7 +97,7 @@ describe('V2 client API hooks', () => {
         expect(queryClient.getQueryData(['api', 'context'])).toBe('original');
     });
 
-    it('invalidates session and feed queries for run runtime events', () => {
+    it('invalidates session, feed, and npc queries for run runtime events', () => {
         const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
 
         renderHook(() => useRuntimeSubscription(), { wrapper });
@@ -112,6 +113,29 @@ describe('V2 client API hooks', () => {
         );
         expect(invalidateQueries).toHaveBeenCalledWith(
             expect.objectContaining({ queryKey: [...sessionQueryKey, 'sess-1', 'feed'] }),
+        );
+        expect(invalidateQueries).toHaveBeenCalledWith(
+            expect.objectContaining({ queryKey: npcQueryKey }),
+        );
+    });
+
+    it('passes filter skip and take params to the npc query', () => {
+        vi.spyOn(global, 'fetch').mockResolvedValue(
+            new Response(JSON.stringify({ npcs: [], totalCount: 0, skip: 20, take: 10, filter: 'rael' }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            }),
+        );
+
+        renderHook(() => useNpcsQuery({ filter: 'rael', skip: '20', take: '10' }), { wrapper });
+
+        expect(global.fetch).toHaveBeenCalledWith(
+            expect.stringContaining('filter=rael'),
+            expect.anything(),
+        );
+        expect(global.fetch).toHaveBeenCalledWith(
+            expect.stringContaining('skip=20'),
+            expect.anything(),
         );
     });
 

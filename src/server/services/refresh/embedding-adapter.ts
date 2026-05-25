@@ -2,4 +2,4 @@ export {
     createOpenAiEmbeddingAdapter,
     type OpenAiEmbeddingConfig,
     type OpenAiProviderOptions,
-} from '../provider.js';
+} from '../provider/index.js';

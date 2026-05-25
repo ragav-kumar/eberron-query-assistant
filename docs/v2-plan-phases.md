@@ -72,7 +72,7 @@ Repo state after completion:
 - `Assistant.tsx` renders the feed grouped by run with user, reasoning, and response entries styled via `Assistant.module.css`; shows a `Thinking…` indicator while `activeRunId` is set; includes a sticky table-of-contents hover panel (`AssistantTableOfContents`).
 - All Phase 3 behaviors are covered by passing tests in `tests/client-components.test.tsx` and `tests/client-session-context.test.tsx`.
 
-## Phase 4: NPC Workflow Completion
+## Phase 4: NPC Workflow Completion — IN PROGRESS
 
 - Finish the shared run path for NPC mode, including NPC persistence/finalization behavior.
 - Replace placeholder NPC-session workflow behavior with the real V2 session/run flow.
@@ -82,6 +82,19 @@ Repo state after completion:
   - Generate NPCs in one session.
   - Confirm cards persist after reload.
   - Filter or page through the list and verify active-session cards are visibly distinguished.
+
+Repo state after completion:
+- `executeNpcRun` (in `src/server/services/run/runtime-npc.ts`) implements the full NPC retrieval + tool-call loop, XML parsing, and a repair step if the first parse fails. `run-runtime-npc.ts` is isolated from the shared assistant runtime.
+- `createRunCoordinator` no longer throws `run-unsupported-mode` for NPC sessions; it branches on `normalized.mode === 'npc'` and inserts parsed NPC records into the `npcs` table within the completion transaction.
+- `useNpcsQuery` accepts `{ filter?, skip?, take? }` params and extends the query key to include them.
+- `npcQueryKey` is invalidated in `useRuntimeSubscription` whenever a `run` event is received, keeping the NPC card list live.
+- `NpcCards` renders a filter input, pagination controls (Prev / Next with "Showing X–Y of Z"), and distinct loading vs. empty states.
+- All Phase 4 behaviors are covered by passing tests across `tests/runs.test.ts`, `tests/runs-runtime.test.ts`, `tests/client-api.test.tsx`, and `tests/client-components.test.tsx`.
+
+Known gaps not addressed in this phase:
+- **Active-session card distinction**: NPC cards belonging to the current session are not visually distinguished from older ones. The plan called for this; it was missed.
+- **No Thinking animation during runs**: `POST /runs` is still synchronous — the mutation awaits the full model execution before returning, so `activeRunId` is never set during the run and the Thinking indicator never fires. This requires the async early-return architectural change (see project memory).
+- **Legacy NPC session data**: Sessions created before Phase 4 have NPC XML in their session entries but no corresponding rows in the `npcs` table. Those cards will not appear in the NPC list without a backfill.
 
 ## Phase 5: V2 Readiness Pass
 

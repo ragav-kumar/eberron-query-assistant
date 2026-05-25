@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     createOpenAiChatAdapter,
     createOpenAiEmbeddingAdapter,
-} from '@server/services/provider.js';
+} from '@server/services/provider/index.js';
 
 describe('V2 provider transport', () => {
     it('retries retryable embedding failures and preserves vector ordering', async () => {

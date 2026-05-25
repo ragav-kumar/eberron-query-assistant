@@ -6,7 +6,7 @@ import {
     OpenAiProviderTransportOptions,
     readEmbeddings,
     readJsonResponse,
-} from './provider-transport.js';
+} from './transport.js';
 
 /**
  * HASTILY COPIED FROM V1 TO PURGE A FORBIDDEN V2 -> V1 REFERENCE.

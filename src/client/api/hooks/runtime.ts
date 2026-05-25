@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { OperationEventDto } from '@/dto/index.js';
+import { npcQueryKey } from './npc.js';
 import { refreshQueryKey } from './refresh.js';
 import { sessionQueryKey } from './sessions.js';
 
@@ -22,6 +23,7 @@ export const useRuntimeSubscription = () => {
                 case 'run':
                     void queryClient.invalidateQueries({queryKey: sessionQueryKey});
                     void queryClient.invalidateQueries({queryKey: [...sessionQueryKey, operationEvent.sessionId, 'feed']});
+                    void queryClient.invalidateQueries({queryKey: npcQueryKey});
                     break;
                 case 'refresh':
                     void queryClient.invalidateQueries({queryKey: refreshQueryKey});

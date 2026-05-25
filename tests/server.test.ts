@@ -102,7 +102,7 @@ describe('V2 server runtime', () => {
             createRuntimeEventPublisher,
             createStartupOrchestrator,
         }));
-        vi.doMock('@server/services/provider.js', () => ({
+        vi.doMock('@server/services/provider/index.js', () => ({
             createOpenAiChatAdapter,
             createOpenAiEmbeddingAdapter,
         }));
@@ -174,7 +174,7 @@ describe('V2 server runtime', () => {
                 startBackgroundRefresh: vi.fn(),
             }),
         }));
-        vi.doMock('@server/services/provider.js', () => ({
+        vi.doMock('@server/services/provider/index.js', () => ({
             createOpenAiChatAdapter: vi.fn(),
             createOpenAiEmbeddingAdapter: vi.fn(),
         }));

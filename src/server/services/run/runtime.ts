@@ -11,15 +11,15 @@ import {
     clampRetrievalTurnLimit,
     completeStructured,
     isSourceType,
-} from './retrieval-tool.js';
+} from '../retrieval-tool.js';
 import {
     ChatAdapter,
     ChatMessage,
     ChatStructuredResult,
     ChatToolCall,
-} from './provider.js';
+} from '../provider/index.js';
 
-import { listPromptAssets } from '../prompts/index.js';
+import { listPromptAssets } from '@server/prompts/index.js';
 
 export interface PromptAssets {
     assistant: string;
@@ -210,17 +210,16 @@ export const executeAssistantRun = async (
 
     while (response.kind === 'tool-calls') {
         const thinking = parseThinkingResponse(response.content);
-        if (!thinking) {
-            throw createTaggedError('run-invalid-thinking', 'Assistant tool call response did not include a valid <thinking> block.');
+        if (thinking) {
+            await dependencies.callbacks.onReasoning({
+                content: thinking.content,
+                createdAt: new Date().toISOString(),
+                kind: 'reasoning',
+                runId: dependencies.context.runId,
+                sessionId: dependencies.context.sessionId,
+                toolCallId: response.toolCalls[0]?.id ?? null,
+            });
         }
-        await dependencies.callbacks.onReasoning({
-            content: thinking.content,
-            createdAt: new Date().toISOString(),
-            kind: 'reasoning',
-            runId: dependencies.context.runId,
-            sessionId: dependencies.context.sessionId,
-            toolCallId: response.toolCalls[0]?.id ?? null,
-        });
         messages.push({
             content: response.content,
             role: 'assistant',
@@ -324,7 +323,7 @@ const parseFinalResponse = (rawResponse: string, expectSessionTitle: boolean): P
     };
 };
 
-const readTag = (text: string, tagName: string): string | null => {
+export const readTag = (text: string, tagName: string): string | null => {
     const match = new RegExp(`<${tagName}>\\s*([\\s\\S]*?)\\s*<\\/${tagName}>`, 'i').exec(text);
     const content = match?.[1]?.trim();
     return content && content.length > 0 ? content : null;
@@ -373,7 +372,7 @@ const buildMetadataRepairPrompt = (expectSessionTitle: boolean): string => [
     'Do not add commentary outside the tags.',
 ].join('\n');
 
-const executeSearchCorpusToolCall = async (request: {
+export const executeSearchCorpusToolCall = async (request: {
     maxEvidenceResults: number;
     remainingTurns: number;
     retrieval: ExecuteAssistantRunDependencies['services']['retrieval'];
@@ -527,7 +526,7 @@ const clampEvidenceLimit = (value: unknown, maxEvidenceResults: number): number 
     return Math.min(maxEvidenceResults, Math.max(1, Math.trunc(value)));
 };
 
-const formatEvidence = (results: RetrievalResult[]): string => {
+export const formatEvidence = (results: RetrievalResult[]): string => {
     if (results.length === 0) {
         return 'No relevant retrieval results were found. Say when the answer is not supported by the local corpus.';
     }

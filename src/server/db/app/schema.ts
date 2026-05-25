@@ -1,4 +1,4 @@
-import { Selectable, Updateable } from 'kysely';
+import { Generated, Selectable, Updateable } from 'kysely';
 
 import {
     ConsoleLevel,
@@ -90,7 +90,7 @@ export interface Run {
 }
 
 export interface Npc {
-    id: number;
+    id: Generated<number>;
     sessionId: string;
     runId: string;
     name: string;

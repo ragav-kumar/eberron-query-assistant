@@ -18,7 +18,7 @@ import {
     createOpenAiChatAdapter,
     createOpenAiEmbeddingAdapter,
     ProviderConfig,
-} from './services/provider.js';
+} from './services/provider/index.js';
 import { createTaggedError } from '@/errors.js';
 
 /**

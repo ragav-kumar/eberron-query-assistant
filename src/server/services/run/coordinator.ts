@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { Insertable, Kysely, Transaction } from 'kysely';
 
-import { CreateRunDto, RunDto, SessionDto, SessionEntryDto, SessionMode } from '@/dto/index.js';
+import { CreateRunDto, RunDto, SessionDto, SessionEntryDto, SessionEntryReasoningDto, SessionMode } from '@/dto/index.js';
 import { createTaggedError, formatThrownValue } from '@/errors.js';
 import { settingsStore, AppDatabaseSchema, SessionEntry, UpdateRow } from '@server/db/app/index.js';
 import { AppDb } from '@server/db/app/db.js';
@@ -10,12 +10,14 @@ import { PartyContextService } from '@server/db/corpus/party-context.js';
 import { CorpusRetrievalService } from '@server/db/corpus/retrieval-service.js';
 
 import {
+    AssistantRunResult,
     buildChatHistoryFromSessionEntries,
     executeAssistantRun,
     loadPromptAssets,
-} from './run-runtime.js';
-import { ChatAdapter } from './provider.js';
-import { RuntimeEventPublisher } from './runtime-event-publisher.js';
+} from './runtime.js';
+import { executeNpcRun, loadNpcPromptAssets, NpcRunResult } from './runtime-npc.js';
+import { ChatAdapter } from '../provider/index.js';
+import { RuntimeEventPublisher } from '../events/index.js';
 
 export interface RunCoordinator {
     startRun(request: CreateRunDto): Promise<RunDto>;
@@ -37,15 +39,11 @@ export interface RunCoordinatorDependencies {
 export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): RunCoordinator => ({
     startRun: async (request) => {
         const normalized = normalizeCreateRunRequest(request);
-        if (normalized.mode !== 'assistant') {
-            throw createTaggedError('run-unsupported-mode', 'Only assistant runs are supported in Phase 1.');
-        }
 
         await assertRunNotBlocked(dependencies.appDb.db);
         await dependencies.retrieval.prepare(dependencies.retrievalDir);
 
         const runId = randomUUID();
-        const promptAssets = await loadPromptAssets();
         const now = new Date().toISOString();
         const sessionId = normalized.sessionId ?? await insertNewSession(dependencies.appDb.db, normalized.mode, normalized.includePartyContext, now);
         const persistedEntries: SessionEntryDto[] = [];
@@ -57,8 +55,8 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
         if (!session) {
             throw createTaggedError('run-session-missing', `Session "${sessionId}" does not exist.`);
         }
-        if (session.mode !== 'assistant') {
-            throw createTaggedError('run-session-mode-mismatch', `Session "${sessionId}" does not support assistant runs.`);
+        if (session.mode !== normalized.mode) {
+            throw createTaggedError('run-session-mode-mismatch', `Session "${sessionId}" does not support ${normalized.mode} runs.`);
         }
 
         const existingEntries = await dependencies.appDb.db
@@ -125,66 +123,96 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
         });
 
         try {
-            const assistantResult = await executeAssistantRun({
-                callbacks: {
-                    onReasoning: async reasoning => {
-                        const entry = await dependencies.appDb.db.transaction().execute(async trx => appendSessionEntry(trx, {
-                            content: reasoning.content,
-                            createdAt: reasoning.createdAt,
-                            kind: 'reasoning',
-                            runId,
-                            sequenceIndex: nextSequenceIndex,
-                            sessionId,
-                            title: null,
-                            toolCallId: reasoning.toolCallId,
-                        }));
-                        const reasoningEntry = toSessionEntryDto(entry);
-                        persistedEntries.push(reasoningEntry);
-                        nextSequenceIndex += 1;
-                        dependencies.runtimeEvents.publish({
-                            resource: 'session-entry',
-                            action: 'appended',
-                            resourceId: reasoningEntry.id,
-                            sessionId,
-                            runId,
-                            entry: reasoningEntry,
-                            timestamp: reasoningEntry.createdAt,
-                        });
-                    },
-                },
-                context: {
+            const onReasoning = async (reasoning: Omit<SessionEntryReasoningDto, 'id'>) => {
+                const entry = await dependencies.appDb.db.transaction().execute(async trx => appendSessionEntry(trx, {
+                    content: reasoning.content,
+                    createdAt: reasoning.createdAt,
+                    kind: 'reasoning',
                     runId,
+                    sequenceIndex: nextSequenceIndex,
                     sessionId,
-                },
-                inputs: {
-                    additionalContext,
-                    history: buildChatHistoryFromSessionEntries(existingEntries),
-                    includePartyContext: normalized.includePartyContext,
-                    partyContext,
-                    prompt: normalized.prompt,
-                    promptAssets,
-                    requestSessionTitle,
-                    retrievalTurnLimit: normalized.retrievalTurnLimit,
-                },
-                services: {
-                    chat: dependencies.chat,
-                    retrieval: dependencies.retrieval,
-                },
-            });
+                    title: null,
+                    toolCallId: reasoning.toolCallId,
+                }));
+                const reasoningEntry = toSessionEntryDto(entry);
+                persistedEntries.push(reasoningEntry);
+                nextSequenceIndex += 1;
+                dependencies.runtimeEvents.publish({
+                    resource: 'session-entry',
+                    action: 'appended',
+                    resourceId: reasoningEntry.id,
+                    sessionId,
+                    runId,
+                    entry: reasoningEntry,
+                    timestamp: reasoningEntry.createdAt,
+                });
+            };
+            const runHistory = buildChatHistoryFromSessionEntries(existingEntries);
+            const sharedRunInputs = {
+                additionalContext,
+                history: runHistory,
+                includePartyContext: normalized.includePartyContext,
+                partyContext,
+                prompt: normalized.prompt,
+                requestSessionTitle,
+                retrievalTurnLimit: normalized.retrievalTurnLimit,
+            };
+            const sharedRunServices = { chat: dependencies.chat, retrieval: dependencies.retrieval };
+            const sharedRunContext = { runId, sessionId };
+
+            let runResult: AssistantRunResult;
+            if (normalized.mode === 'npc') {
+                const npcPromptAssets = await loadNpcPromptAssets();
+                runResult = await executeNpcRun({
+                    callbacks: { onReasoning },
+                    context: sharedRunContext,
+                    inputs: { ...sharedRunInputs, promptAssets: npcPromptAssets },
+                    services: sharedRunServices,
+                });
+            } else {
+                const assistantPromptAssets = await loadPromptAssets();
+                runResult = await executeAssistantRun({
+                    callbacks: { onReasoning },
+                    context: sharedRunContext,
+                    inputs: { ...sharedRunInputs, promptAssets: assistantPromptAssets },
+                    services: sharedRunServices,
+                });
+            }
 
             const completedAt = new Date().toISOString();
             await dependencies.appDb.db.transaction().execute(async trx => {
                 const responseEntry = await appendSessionEntry(trx, {
-                    content: assistantResult.response.content,
-                    createdAt: assistantResult.response.createdAt,
+                    content: runResult.response.content,
+                    createdAt: runResult.response.createdAt,
                     kind: 'response',
                     runId,
                     sequenceIndex: nextSequenceIndex,
                     sessionId,
-                    title: assistantResult.response.title ?? null,
+                    title: runResult.response.title ?? null,
                     toolCallId: null,
                 });
                 persistedEntries.push(toSessionEntryDto(responseEntry));
+
+                // NPC mode: persist the structured NPC records generated in this run
+                if (normalized.mode === 'npc') {
+                    const npcResult = runResult as NpcRunResult;
+                    for (const npc of npcResult.npcs) {
+                        await trx.insertInto('npcs').values({
+                            age: npc.age ?? null,
+                            bio: npc.bio,
+                            createdAt: completedAt,
+                            description: npc.description,
+                            ethnicity: npc.ethnicity ?? null,
+                            gender: npc.gender ?? null,
+                            name: npc.name,
+                            role: npc.role ?? null,
+                            runId,
+                            sessionId,
+                            species: npc.species ?? null,
+                            updatedAt: completedAt,
+                        }).execute();
+                    }
+                }
 
                 await trx
                     .updateTable('runs')
@@ -199,7 +227,7 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
                     .updateTable('sessions')
                     .set({
                         activeRunId: null,
-                        title: requestSessionTitle && assistantResult.sessionTitle ? assistantResult.sessionTitle : session.title,
+                        title: requestSessionTitle && runResult.sessionTitle ? runResult.sessionTitle : session.title,
                         updatedAt: completedAt,
                     })
                     .where('id', '=', sessionId)
