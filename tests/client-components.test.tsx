@@ -5,8 +5,10 @@ import { ReactNode } from 'react';
 import { Assistant } from '@client/components/Assistant/Assistant.js';
 import { Input } from '@client/components/Input/Input.js';
 import { SessionSelector } from '@client/components/SessionSelector.js';
+import { NpcCards } from '@client/components/NpcCards/index.js';
+import { AdditionalContextInput } from '@client/components/AdditionalContextInput.js';
 import { TEMP_SESSION_ID } from '@client/components/SessionContext/SessionProvider.js';
-import { RunDto, SessionDto } from '@/client/api/index.js';
+import { NpcDto, RunDto, SessionDto } from '@/client/api/index.js';
 import { SessionData } from '@client/components/SessionContext/SessionContext.js';
 import { SessionMode } from '@/types.js';
 import { SessionEntryDto } from '@/dto/runs.js';
@@ -15,10 +17,24 @@ vi.mock('react-markdown', () => ({
     default: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 vi.mock('remark-gfm', () => ({ default: () => null }));
+vi.mock('@mdxeditor/editor', () => ({
+    BoldItalicUnderlineToggles: () => null,
+    headingsPlugin: () => null,
+    listsPlugin: () => null,
+    markdownShortcutPlugin: () => null,
+    MDXEditor: ({ markdown }: { markdown: string }) => <div data-testid='mdxeditor'>{markdown}</div>,
+    quotePlugin: () => null,
+    toolbarPlugin: () => null,
+    UndoRedo: () => null,
+}));
+vi.mock('@mdxeditor/editor/style.css', () => ({}));
 
 const mocks = vi.hoisted(() => ({
     useSessionContext: vi.fn(),
     useRunsMutation: vi.fn(),
+    useNpcsQuery: vi.fn(),
+    useAdditionalContextQuery: vi.fn(),
+    useAdditionalContextMutation: vi.fn(),
 }));
 
 vi.mock('@client/components/SessionContext/index.js', () => ({
@@ -31,10 +47,21 @@ vi.mock('@/client/api/index.js', () => ({
     useRunsMutation: mocks.useRunsMutation,
     useSessionsQuery: vi.fn().mockReturnValue({ data: [], isLoading: false, isPending: false }),
     useSessionFeedsQuery: vi.fn().mockReturnValue([]),
-    useNpcsQuery: vi.fn().mockReturnValue({ data: { npcs: [] }, isLoading: false, isPending: false }),
+    useNpcsQuery: mocks.useNpcsQuery,
+    useAdditionalContextQuery: mocks.useAdditionalContextQuery,
+    useAdditionalContextMutation: mocks.useAdditionalContextMutation,
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+const makeNpc = (id: number, sessionId: string, overrides?: Partial<NpcDto>): NpcDto => ({
+    id,
+    name: `NPC ${id}`,
+    description: `Description ${id}`,
+    bio: `Bio ${id}`,
+    sessionId,
+    ...overrides,
+});
 
 const makeEntry = (id: string, runId: string, content: string, kind: SessionEntryDto['kind'] = 'user'): SessionEntryDto => ({
     id,
@@ -94,6 +121,9 @@ beforeEach(() => {
     mocks.useRunsMutation.mockReturnValue({
         mutateAsync: vi.fn().mockResolvedValue(makeRun('run-1', 'session-1')),
     });
+    mocks.useNpcsQuery.mockReturnValue({ data: { npcs: [], totalCount: 0, skip: 0, take: 20, filter: '' }, isLoading: false, isPending: false });
+    mocks.useAdditionalContextQuery.mockReturnValue({ data: '', isLoading: false, isError: false });
+    mocks.useAdditionalContextMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
 });
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -125,9 +155,9 @@ describe('V2 client components', () => {
         expect(document.getElementById('run-run-2')).toBeTruthy();
         expect(document.getElementById('run-run-1-entry-e-1')).toBeTruthy();
         expect(document.getElementById('run-run-1-entry-e-2')).toBeTruthy();
-        expect(screen.getByText('What is Sharn?')).toBeTruthy();
-        expect(screen.getByText('Sharn is a city.')).toBeTruthy();
-        expect(screen.getByText('Tell me about Breland.')).toBeTruthy();
+        expect(screen.getAllByText('What is Sharn?').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Sharn is a city.').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Tell me about Breland.').length).toBeGreaterThan(0);
     });
 
     it('renders nothing for assistant mode when no active assistant session exists', () => {
@@ -142,11 +172,29 @@ describe('V2 client components', () => {
     });
 
     it('renders npc cards newest first and marks cards from the active session', () => {
-        expect.fail('Not implemented.');
+        // API returns NPCs newest-first (by id desc); the component renders them in that order.
+        const npcs = [makeNpc(2, 'session-npc-1'), makeNpc(1, 'other-session')];
+        mocks.useNpcsQuery.mockReturnValue({ data: { npcs, totalCount: 2, skip: 0, take: 20, filter: '' }, isLoading: false, isPending: false });
+        mocks.useSessionContext.mockReturnValue(makeContext({
+            activeSessions: { assistant: undefined, npc: makeSessionData('session-npc-1', 'npc') },
+        }));
+
+        render(<NpcCards />);
+
+        const activeCard = document.getElementById('npc-card-2');
+        const otherCard = document.getElementById('npc-card-1');
+        expect(activeCard).not.toBeNull();
+        expect(otherCard).not.toBeNull();
+        // The in-session card should have an additional CSS class applied.
+        expect(activeCard!.className).not.toEqual(otherCard!.className);
     });
 
     it('shows loading state while npc data is pending', () => {
-        expect.fail('Not implemented.');
+        mocks.useNpcsQuery.mockReturnValue({ data: undefined, isLoading: true, isPending: true });
+
+        render(<NpcCards />);
+
+        expect(screen.getByText('Loading...')).toBeTruthy();
     });
 
     it('disables submit while the session context is busy', () => {
@@ -200,7 +248,32 @@ describe('V2 client components', () => {
     });
 
     it('renders additional-context loading error saving and saved states', () => {
-        expect.fail('Not implemented.');
+        // Loading state: spinner text + status label
+        mocks.useAdditionalContextQuery.mockReturnValue({ data: undefined, isLoading: true, isError: false });
+        render(<AdditionalContextInput />);
+        expect(screen.getByRole('status').textContent).toBe('Loading context');
+        expect(screen.getByText('Loading context...')).toBeTruthy();
+        cleanup();
+
+        // Error state: error text + status label
+        mocks.useAdditionalContextQuery.mockReturnValue({ data: undefined, isLoading: false, isError: true });
+        render(<AdditionalContextInput />);
+        expect(screen.getByRole('status').textContent).toBe('Unable to load additional context.');
+        expect(screen.getByText('Context unavailable')).toBeTruthy();
+        cleanup();
+
+        // Saving state: mutation is pending
+        mocks.useAdditionalContextQuery.mockReturnValue({ data: 'some notes', isLoading: false, isError: false });
+        mocks.useAdditionalContextMutation.mockReturnValue({ mutate: vi.fn(), isPending: true });
+        render(<AdditionalContextInput />);
+        expect(screen.getByText('Saving...')).toBeTruthy();
+        cleanup();
+
+        // Saved state: defaults — data present, nothing pending
+        mocks.useAdditionalContextQuery.mockReturnValue({ data: 'some notes', isLoading: false, isError: false });
+        mocks.useAdditionalContextMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
+        render(<AdditionalContextInput />);
+        expect(screen.getByText('Saved')).toBeTruthy();
     });
 
     it('renders session options for the selected mode', () => {

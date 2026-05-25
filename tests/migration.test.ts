@@ -157,7 +157,7 @@ describe('migrateV1DiskToV2Db', () => {
         expect(activeRunIds.every(row => row.activeRunId === null)).toBe(true);
     });
 
-    it('does not create new V1-only product coverage beyond migration compatibility', async () => {
+    it('migrates NPC records from legacy markdown log format', async () => {
         await writeLegacyNpcMarkdown([
             '### 9. Seren Guide',
             '',

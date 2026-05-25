@@ -35,7 +35,7 @@ export const sessionRoutes: RouteDefinition[] = [
                     'sessions.updatedAt',
                 ]);
             if (mode != null) {
-                query = query.where('mode', '=', mode as SessionMode);
+                query = query.where('sessions.mode', '=', mode as SessionMode);
             }
             const sessionRows = await query.execute();
 
