@@ -104,12 +104,12 @@ Repo state after completion:
   - ~~Add an `orderBy` clause to `GET /api/v2/sessions` so sessions appear newest-first in the selector.~~ Done.
   - ~~Resolve the `provider.ts` and `retrieval-tool.ts` technical-debt markers.~~ Done.
 - Client items:
-  - NPC mode needs a console-like feed of intermediate reasoning entries rendered during and after a run, ordered oldest-to-newest with the Thinking… indicator at the end. The feed data is already fetched via the session feed query; it just needs to be surfaced in `NpcCards`. (Moved to its own task.)
+  - ~~NPC mode needs a console-like feed of intermediate reasoning entries rendered during and after a run, ordered oldest-to-newest with the Thinking… indicator at the end. The feed data is already fetched via the session feed query; it just needs to be surfaced in `NpcCards`. (Moved to its own task.)~~ Done: resizable bottom drawer in the NPC tab renders the exchange feed. Response entries extract `<thinking>` (reasoning style) and `<notes>` (response style); raw `<npcs>` XML is dropped. NPC cards compacted (smaller body text, metadata truncation with tooltip). `dev.ts` updated to wait for the API server port before spawning Vite, eliminating the startup race that caused proxy errors.
   - ~~Disable Submit while a refresh or reingest is active. The server already blocks the run correctly; this closes the UX gap.~~ Done: wired into `isBusy` in `SessionProvider.tsx`.
 - Human testable:
   - ~~Submit a first prompt on a new session that fails mid-run; reload and confirm no orphan session row appears in the selector.~~
   - ~~Create several sessions; confirm the selector lists them newest-first.~~
-  - Start an NPC run; confirm intermediate reasoning steps appear in a console-like feed above the card grid while the run is in progress.
+  - ~~Start an NPC run; confirm intermediate reasoning steps appear in a console-like feed above the card grid while the run is in progress.~~
   - ~~Trigger a manual refresh; confirm Submit is visibly disabled for the duration.~~
 
 ## Phase 6: V1 Purge and Final Cleanup
