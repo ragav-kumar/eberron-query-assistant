@@ -1,0 +1,27 @@
+/**
+ * Flex-filling wrapper for the NPC tab's vertical panel group. Mirrors the
+ * role of .leftPanelContainer in App.module.css — gives the react-resizable-panels
+ * Group a proper flex context so it can fill the remaining tab content height.
+ */
+.npcTabContainer {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/** Horizontal drag handle between the NPC card grid and the exchange feed. */
+.feedResizeHandle {
+    height: 5px;
+    background-color: var(--color-surface-panel);
+    border-top: 1px solid var(--color-border-subtle);
+    cursor: row-resize;
+    transition: border-top-color 120ms ease, background-color 120ms ease;
+}
+
+.feedResizeHandle[data-separator='hover'],
+.feedResizeHandle[data-separator='active'] {
+    border-top-color: var(--color-accent-primary);
+    background-color: var(--color-surface-panel-subtle);
+}

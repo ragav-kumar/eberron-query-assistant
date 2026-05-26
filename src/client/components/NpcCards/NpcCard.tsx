@@ -48,7 +48,7 @@ export const NpcCard = ({npc, isInSession}: NpcCardProps) => {
                     {metadata.map(detail => (
                         <div className={styles.metadataItem} key={detail.label}>
                             <dt>{detail.label}</dt>
-                            <dd>{detail.value}</dd>
+                            <dd title={String(detail.value)}>{detail.value}</dd>
                         </div>
                     ))}
                 </dl>
