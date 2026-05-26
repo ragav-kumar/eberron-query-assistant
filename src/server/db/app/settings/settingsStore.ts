@@ -16,7 +16,7 @@ interface TypedSettings {
     foundryLastSuccessfulExportUpsertCount: number | undefined;
 
     partyActorUuids: string[];
-    providerDebug: boolean;
+    consolePersist: boolean;
     retrievalMaxEvidenceResults: number;
     retrievalMaxToolTurns: number;
     retrievalMaxVectorCacheDatabaseBytes: number;

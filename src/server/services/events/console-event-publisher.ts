@@ -7,6 +7,12 @@ import { ConsoleLevel } from '@/types.js';
 type ConsoleEventSubscriber = (entry: ConsoleEntryDto) => void;
 
 export interface ConsoleEventPublisher {
+    /**
+     * Emits a debug-level entry. Primarily useful when `consolePersist` is
+     * enabled and you want fine-grained output persisted to the DB for direct
+     * inspection, without surfacing it at info/warn/error severity in normal
+     * operation.
+     */
     debug(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
     error(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
     info(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
@@ -15,9 +21,9 @@ export interface ConsoleEventPublisher {
     warn(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
 }
 
-export const createConsoleEventPublisher = (appDb: AppDb): Promise<ConsoleEventPublisher> => {
+export const createConsoleEventPublisher = (appDb: AppDb): ConsoleEventPublisher => {
     const subscribers = new Set<ConsoleEventSubscriber>();
-    const shouldPersist = settingsStore().read('providerDebug');
+    const shouldPersist = settingsStore().read('consolePersist');
     const inMemoryEntries: ConsoleEntryDto[] = [];
 
     const publish = async (
@@ -49,7 +55,7 @@ export const createConsoleEventPublisher = (appDb: AppDb): Promise<ConsoleEventP
         return entry;
     };
 
-    return Promise.resolve({
+    return {
         debug: (message, timestamp) => publish('debug', message, timestamp),
         error: (message, timestamp) => publish('error', message, timestamp),
         info: (message, timestamp) => publish('info', message, timestamp),
@@ -79,5 +85,5 @@ export const createConsoleEventPublisher = (appDb: AppDb): Promise<ConsoleEventP
             };
         },
         warn: (message, timestamp) => publish('warn', message, timestamp),
-    });
+    };
 };

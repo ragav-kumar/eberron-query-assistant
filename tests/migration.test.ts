@@ -44,7 +44,7 @@ describe('migrateV1DiskToV2Db', () => {
         await initializeSettingsStore(appDb);
 
         expect(settingsStore().read('partyActorUuids')).toEqual(['actor-1', 'actor-2']);
-        expect(settingsStore().read('providerDebug')).toBe(true);
+        expect(settingsStore().read('consolePersist')).toBe(true);
     });
 
     it('serializes typed settings back to storage', async () => {
@@ -56,7 +56,7 @@ describe('migrateV1DiskToV2Db', () => {
         });
 
         expect(await readSetting(settingKeys.partyActorUuids)).toBe('["actor-1","actor-2"]');
-        expect(await readSetting(settingKeys.providerDebug)).toBe('true');
+        expect(await readSetting(settingKeys.consolePersist)).toBe('true');
     });
 
     it('migrates V1 session and transcript data that still matters to V2', async () => {

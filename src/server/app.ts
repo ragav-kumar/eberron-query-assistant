@@ -42,13 +42,13 @@ export const createApp = async (dependencies: CreateAppDependencies = {}): Promi
     const repoRoot = dependencies.repoRoot ?? process.cwd();
     const appDb = await createAppDb();
     await initializeSettingsStore(appDb);
-    const consoleEvents = await createConsoleEventPublisher(appDb);
+    const consoleEvents = createConsoleEventPublisher(appDb);
     const runtimeEvents = createRuntimeEventPublisher();
     const refreshCoordinator = createRefreshCoordinator(appDb, {
         visibility: createRefreshVisibility(consoleEvents, runtimeEvents),
     });
     const store = settingsStore();
-    const runtimePaths = resolveRuntimePaths(repoRoot);
+    const retrievalDir = resolvePersistedRelativePath(repoRoot, store.read('retrievalDir'), 'retrievalDir');
     const providerConfig: ProviderConfig = {
         apiKey: store.read('providerApiKey'),
         baseUrl: store.read('providerBaseUrl'),
@@ -74,8 +74,7 @@ export const createApp = async (dependencies: CreateAppDependencies = {}): Promi
         runtimeEvents,
     });
 
-    await startupOrchestrator.bootstrap();
-    startupOrchestrator.startBackgroundRefresh();
+    await startupOrchestrator.initialize();
 
     return {
         db: appDb.db,
@@ -86,28 +85,13 @@ export const createApp = async (dependencies: CreateAppDependencies = {}): Promi
             chat: createOpenAiChatAdapter(providerConfig),
             partyContext,
             retrieval,
-            retrievalDir: runtimePaths.retrievalDir,
+            retrievalDir,
             runtimeEvents,
         }),
         consoleEvents,
         runtimeEvents,
     };
 };
-
-/** Resolves persisted relative runtime paths against the active repo root. */
-const resolveRuntimePaths = (repoRoot: string): {
-    articleHtmlCacheDir: string;
-    foundryExportDir: string;
-    pdfDir: string;
-    repoRoot: string;
-    retrievalDir: string;
-} => ({
-    articleHtmlCacheDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('articleHtmlCacheDir'), 'articleHtmlCacheDir'),
-    foundryExportDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('foundrySourceDir'), 'foundrySourceDir'),
-    pdfDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('pdfSourceDir'), 'pdfSourceDir'),
-    repoRoot,
-    retrievalDir: resolvePersistedRelativePath(repoRoot, settingsStore().read('retrievalDir'), 'retrievalDir'),
-});
 
 const resolvePersistedRelativePath = (
     repoRoot: string,

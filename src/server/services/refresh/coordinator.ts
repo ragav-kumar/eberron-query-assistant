@@ -28,7 +28,7 @@ export interface RefreshCoordinatorDependencies {
     now?: () => Date;
     pipeline?: RefreshPipeline;
     refreshStateStore?: RefreshStateStore;
-    visibility?: RefreshVisibility;
+    visibility: RefreshVisibility;
 }
 
 /**
@@ -40,20 +40,16 @@ export interface RefreshCoordinatorDependencies {
  */
 export const createRefreshCoordinator = (
     appDb: AppDb,
-    dependencies: RefreshCoordinatorDependencies = {},
+    dependencies: RefreshCoordinatorDependencies,
 ): RefreshCoordinator => {
     const now = dependencies.now ?? (() => new Date());
     const refreshStateStore = dependencies.refreshStateStore ?? createRefreshStateStore(appDb);
-    const visibility = dependencies.visibility;
+    const { visibility } = dependencies;
     const pipeline = dependencies.pipeline ?? createRefreshPipeline(appDb);
-    if (!visibility) {
-        throw new Error('Refresh coordinator requires a visibility publisher.');
-    }
     let activeOperation: ActiveRefreshOperation | null = null;
 
     return {
         startRefresh: async request => {
-            await refreshStateStore.ensure();
 
             let snapshot = await refreshStateStore.read();
             if (snapshot.activeOperation && !activeOperation) {

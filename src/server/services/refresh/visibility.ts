@@ -106,11 +106,6 @@ export const createRefreshVisibility = (
                 void consoleEvents.info(message, timestamp);
                 publishRunningUpdate(kind, timestamp);
             },
-            progress: message => {
-                const timestamp = new Date().toISOString();
-                void consoleEvents.info(message, timestamp);
-                publishRunningUpdate(kind, timestamp);
-            },
             warn: message => {
                 const timestamp = new Date().toISOString();
                 void consoleEvents.warn(message, timestamp);

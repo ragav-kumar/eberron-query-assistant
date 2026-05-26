@@ -19,7 +19,7 @@ export const parseSetting = <K extends SettingKeyName>(key: K, stringValue: stri
         case 'partyActorUuids':
             return JSON.parse(stringValue) as Settings[K];
 
-        case 'providerDebug':
+        case 'consolePersist':
             return (stringValue === 'true') as Settings[K];
 
         default:
@@ -45,7 +45,7 @@ export const serializeSetting = <K extends SettingKeyName>(key: K, value: Settin
         case 'partyActorUuids':
             return JSON.stringify(value);
 
-        case 'providerDebug':
+        case 'consolePersist':
             return value ? 'true' : 'false';
 
         default:

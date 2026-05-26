@@ -201,7 +201,7 @@ const migrateEnvSettings = async (config: LegacyMigrationConfig, trx: DbTransact
         [settingKeys.providerApiKey, config.provider.apiKey ?? ''],
         [settingKeys.providerBaseUrl, config.provider.baseUrl],
         [settingKeys.providerChatModel, config.provider.chatModel],
-        [settingKeys.providerDebug, String(config.provider.debug)],
+        [settingKeys.consolePersist, String(config.provider.debug)],
         [settingKeys.providerEmbeddingModel, config.provider.embeddingModel],
     ];
 

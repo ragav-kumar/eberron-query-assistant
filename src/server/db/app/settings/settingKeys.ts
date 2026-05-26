@@ -21,7 +21,7 @@ export const settingKeys = {
     providerApiKey: 'provider-api-key',
     providerBaseUrl: 'provider-base-url',
     providerChatModel: 'provider-chat-model',
-    providerDebug: 'provider-debug',
+    consolePersist: 'console-persist',
     providerEmbeddingModel: 'provider-embedding-model',
     questsJournal: 'quests-journal',
     retrievalDir: 'retrieval-dir',

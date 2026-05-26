@@ -34,7 +34,6 @@ export interface EmbeddingAdapter {
 // from v1 runtime, consider culling
 export interface ProgressReporter {
     info(message: string): void;
-    progress?(message: string): void;
     warn(message: string): void;
 }
 
@@ -611,11 +610,6 @@ const syncVectorStore = async (
 };
 
 const reportProgress = (reporter: ProgressReporter, message: string): void => {
-    if (reporter.progress) {
-        reporter.progress(message);
-        return;
-    }
-
     reporter.info(message);
 };
 

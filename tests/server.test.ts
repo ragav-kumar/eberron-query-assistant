@@ -58,13 +58,12 @@ describe('V2 server runtime', () => {
         };
         const initializeSettingsStore = vi.fn().mockResolvedValue(undefined);
         const createAppDb = vi.fn().mockResolvedValue(appDb);
-        const createConsoleEventPublisher = vi.fn().mockResolvedValue({ kind: 'console' });
+        const createConsoleEventPublisher = vi.fn().mockReturnValue({ kind: 'console' });
         const createRuntimeEventPublisher = vi.fn().mockReturnValue({ kind: 'runtime' });
         const createRefreshVisibility = vi.fn().mockReturnValue({ kind: 'visibility' });
         const createRefreshCoordinator = vi.fn().mockReturnValue({ kind: 'refresh' });
         const createStartupOrchestrator = vi.fn().mockReturnValue({
-            bootstrap: vi.fn().mockResolvedValue(undefined),
-            startBackgroundRefresh: vi.fn(),
+            initialize: vi.fn().mockResolvedValue(undefined),
         });
         const createRunCoordinator = vi.fn().mockReturnValue({ kind: 'run' });
         const createCorpusRetrievalService = vi.fn().mockReturnValue({ kind: 'retrieval' });
@@ -164,14 +163,13 @@ describe('V2 server runtime', () => {
             createPartyContextService: vi.fn(),
         }));
         vi.doMock('@server/services/index.js', () => ({
-            createConsoleEventPublisher: vi.fn().mockResolvedValue({}),
+            createConsoleEventPublisher: vi.fn().mockReturnValue({}),
             createRefreshCoordinator: vi.fn().mockReturnValue({}),
             createRefreshVisibility: vi.fn().mockReturnValue({}),
             createRunCoordinator: vi.fn().mockReturnValue({}),
             createRuntimeEventPublisher: vi.fn().mockReturnValue({}),
             createStartupOrchestrator: vi.fn().mockReturnValue({
-                bootstrap: vi.fn().mockResolvedValue(undefined),
-                startBackgroundRefresh: vi.fn(),
+                initialize: vi.fn().mockResolvedValue(undefined),
             }),
         }));
         vi.doMock('@server/services/provider/index.js', () => ({

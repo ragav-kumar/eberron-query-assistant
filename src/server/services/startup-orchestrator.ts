@@ -9,8 +9,7 @@ import { AppDb, initializeSettingsStore } from '@server/db/app/index.js';
  * singleton bootstrap plus the background startup refresh kickoff.
  */
 export interface StartupOrchestrator {
-    bootstrap(): Promise<void>;
-    startBackgroundRefresh(): void;
+    initialize(): Promise<void>;
 }
 
 export interface StartupOrchestratorDependencies {
@@ -37,11 +36,9 @@ export const createStartupOrchestrator = (
     };
 
     return {
-        bootstrap: async () => {
+        initialize: async () => {
             await refreshStateStore.ensure();
             await initializeSettingsStore(appDb);
-        },
-        startBackgroundRefresh: () => {
             void runStartupRefresh().catch(error => {
                 console.error('Failed to start V2 startup refresh.', error);
             });

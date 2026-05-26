@@ -52,7 +52,7 @@ export const settingKeysToInitialize = [
     'additionalContext',
     'campaignJournalFolder',
     'partyActorUuids',
-    'providerDebug',
+    'consolePersist',
     'sessionNotesJournal'
 ] as const satisfies SettingKeyName[];
 
@@ -93,7 +93,7 @@ export const defaults = Object.freeze({
     sessionNotesJournal: 'Session Notes',
     questsJournal: 'Quests',
     campaignJournalFolder: 'Legacy',
-    providerDebug: env.EQA_PROVIDER_DEBUG,
+    consolePersist: env.EQA_PROVIDER_DEBUG,
     additionalContext: '',
     partyActorUuids: env.EQA_PARTY_ACTOR_UUIDS,
 
