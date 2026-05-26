@@ -83,6 +83,8 @@
 - On Windows, cleanup verification for agent-started dev or server runs is incomplete until the repo-local `vite.js` check, the repo-local V2 API server process check, and the per-port listener checks all pass.
 - For any task in which any code was changed, use `npm run verify` as the final acceptance command unless the user explicitly says otherwise.
 - For any task that will affect the UI, perform a browser smoke test before handoff unless the user confirms the UI is already running.
+- When using the Playwright MCP for browser smoke tests, always pass an absolute path under `$CLAUDE_JOB_DIR` as the screenshot `filename`. Relative filenames resolve to the repo root and pollute the working tree.
+- After any browser smoke test session, verify that no Playwright MCP artifacts remain in the repo working directory: delete any `.playwright-mcp/` directory and any screenshot files that were created there. This check is required even when the smoke test itself passed.
 - For server changes, also follow the startup and process-cleanup verification steps in `src/server/CLAUDE.md`.
 
 ## Review

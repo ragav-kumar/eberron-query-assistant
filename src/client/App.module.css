@@ -1,44 +1,96 @@
 .wrap {
     box-sizing: border-box;
-    display: flex;
     height: 100vh;
     overflow: hidden;
     background-color: var(--color-app-background);
     width: 100%;
-    > * {
-        width: 100%;
-        background-color: var(--color-surface-app);
-    }
 }
 
+/** Flex column for left/right pane contents — height: 100% fills the Panel inner div */
 .column {
     display: flex;
-    flex: 1 1 0;
     flex-direction: column;
-    gap: 1rem;
+    height: 100%;
     overflow: hidden;
-    min-height: 0;
     min-width: 0;
 }
 
-.leftTabs.leftTabs,
-.rightTabs.rightTabs {
+/**
+ * Fills remaining left-column height below the fixed header so the inner vertical
+ * Group can stretch to occupy it. Without flex: 1 1 auto the Group would size to
+ * its intrinsic height and ignore the available Panel space.
+ */
+.leftPanelContainer {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+/**
+ * Provides the flex-column context that LeftColumnTabs (flex: 1 1 auto) requires
+ * to fill the Panel. The Panel inner div uses overflow: auto by default, so this
+ * wrapper overrides that intent for the tab area where scrolling is handled internally.
+ */
+.panelFill {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+}
+
+/** Preserve the legacy className applied by LeftColumnTabs.tsx */
+.leftTabs.leftTabs {
     flex: 1 1 auto;
     min-height: 0;
 }
 
 .rightTabs.rightTabs {
     --tabs-active-surface: #24282b;
+    flex: 1 1 auto;
+    min-height: 0;
 }
 
-@media (max-width: 900px) {
-    .wrap {
-        flex-direction: column;
-        height: auto;
-        min-height: 100vh;
-    }
+/* ─── Resize handles ──────────────────────────────────────────────────────── */
 
-    .rightColumn {
-        min-height: 26rem;
-    }
+/**
+ * Vertical handle between the left and right columns.
+ * react-resizable-panels sets flex-grow/shrink via inline style; width is controlled here.
+ * The ::after pseudo-element provides the visible 2px drag bar.
+ */
+.columnResizeHandle {
+    position: relative;
+    width: 6px;
+    background-color: var(--color-app-background);
+    cursor: col-resize;
+}
+
+.columnResizeHandle::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    background-color: var(--color-border-subtle);
+    transition: background-color 120ms ease;
+}
+
+.columnResizeHandle[data-separator='hover']::after,
+.columnResizeHandle[data-separator='active']::after {
+    background-color: var(--color-accent-primary);
+}
+
+/** Horizontal handle between the left-column tab area and the console. */
+.consoleResizeHandle {
+    height: 5px;
+    background-color: #101820;
+    border-top: 1px solid #1d2b37;
+    cursor: row-resize;
+    transition: border-top-color 120ms ease, background-color 120ms ease;
+}
+
+.consoleResizeHandle[data-separator='hover'],
+.consoleResizeHandle[data-separator='active'] {
+    border-top-color: var(--color-accent-primary);
+    background-color: #141f28;
 }
