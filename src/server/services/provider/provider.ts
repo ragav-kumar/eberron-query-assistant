@@ -1,4 +1,4 @@
-import { createTaggedError, formatThrownValue, isRecord } from '@/errors.js';
+import { createTaggedError, isRecord } from '@/errors.js';
 import {
     createOpenAiRequestConfig,
     fetchWithRetry,
@@ -8,14 +8,6 @@ import {
     readJsonResponse,
 } from './transport.js';
 
-/**
- * HASTILY COPIED FROM V1 TO PURGE A FORBIDDEN V2 -> V1 REFERENCE.
- *
- * Treat this module as a priority refactor target. It is intentionally local to
- * V2 so V2 no longer depends on V1, but the current contents were duplicated
- * with minimal redesign and should not be treated as the intended long-term
- * V2 provider boundary.
- */
 export interface ProviderConfig {
     apiKey: string;
     baseUrl: string;
@@ -62,39 +54,13 @@ export interface ChatStructuredToolCallResult {
 
 export type ChatStructuredResult = ChatStructuredTextResult | ChatStructuredToolCallResult;
 
-export interface ChatCompletionDebugContext {
-    operation: string;
-    operationId: string;
-    purpose: string;
-}
-
-export interface ChatCompletionDiagnostic {
-    assistantContent?: string;
-    endpoint: string;
-    error?: string;
-    ok: boolean;
-    operation: string;
-    operationId: string;
-    purpose: string;
-    requestBody: {
-        messages: unknown[];
-        model: string;
-        tools?: unknown[];
-    };
-    responseBody?: unknown;
-    status?: number;
-    timestamp: string;
-}
-
 export interface ChatCompletionOptions {
-    debug?: ChatCompletionDebugContext;
-    onDiagnostic?: ((diagnostic: ChatCompletionDiagnostic) => void) | undefined;
     tools?: ChatToolDefinition[] | undefined;
 }
 
 export interface ChatAdapter {
     complete(messages: ChatMessage[], options?: ChatCompletionOptions): Promise<string>;
-    completeStructured?(messages: ChatMessage[], options?: ChatCompletionOptions): Promise<ChatStructuredResult>;
+    completeStructured(messages: ChatMessage[], options?: ChatCompletionOptions): Promise<ChatStructuredResult>;
 }
 
 export interface EmbeddingAdapter {
@@ -125,70 +91,28 @@ export const createOpenAiChatAdapter = (
                 ? { tools: completionOptions.tools.map(serializeToolDefinition) }
                 : {}),
         };
-        const emitDiagnostic = (
-            diagnostic: Omit<ChatCompletionDiagnostic, 'endpoint' | 'operation' | 'operationId' | 'purpose' | 'requestBody' | 'timestamp'>,
-        ): void => {
-            if (!completionOptions.debug || !completionOptions.onDiagnostic) {
-                return;
-            }
 
-            completionOptions.onDiagnostic({
-                ...completionOptions.debug,
-                ...diagnostic,
-                endpoint,
-                requestBody,
-                timestamp: new Date().toISOString(),
-            });
-        };
-
-        let response: Response;
-        try {
-            response = await fetchWithRetry(
-                endpoint,
-                {
-                    method: 'POST',
-                    headers: provider.headers,
-                    body: JSON.stringify(requestBody),
-                },
-                options,
-            );
-        } catch (error) {
-            emitDiagnostic({
-                error: formatThrownValue(error),
-                ok: false,
-            });
-            throw error;
-        }
+        const response = await fetchWithRetry(
+            endpoint,
+            {
+                method: 'POST',
+                headers: provider.headers,
+                body: JSON.stringify(requestBody),
+            },
+            options,
+        );
 
         const body = await readJsonResponse(response);
         if (!response.ok) {
             const message = formatProviderError('Chat completion failed', body);
-            emitDiagnostic({
-                error: message,
-                ok: false,
-                responseBody: body,
-                status: response.status,
-            });
             throw createTaggedError('provider-chat-failed', message);
         }
 
         const result = readChatCompletionResult(body);
         if (!result) {
-            emitDiagnostic({
-                error: 'Chat completion response did not include assistant content.',
-                ok: false,
-                responseBody: body,
-                status: response.status,
-            });
             throw createTaggedError('provider-chat-empty', 'Chat completion response did not include assistant content.');
         }
 
-        emitDiagnostic({
-            ...(result.kind === 'text' ? { assistantContent: result.content } : {}),
-            ok: true,
-            responseBody: body,
-            status: response.status,
-        });
         return result;
     };
 

@@ -9,7 +9,6 @@ import {
     buildRetrievalTool,
     buildRetrievalToolInstructions,
     clampRetrievalTurnLimit,
-    completeStructured,
 } from '../retrieval-tool.js';
 import { ChatAdapter, ChatMessage, ChatStructuredResult } from '../provider/index.js';
 import { listPromptAssets } from '@server/prompts/index.js';
@@ -183,14 +182,10 @@ export const executeNpcRun = async (
         retrievalTurnLimit,
     });
 
-    let response = await completeStructured(dependencies.services.chat, messages, {
-        debug: {
-            operation: timing.operation,
-            operationId: timing.operationId,
-            purpose: 'npc',
-        },
-        ...(retrievalTurnLimit > 0 ? {tools: [retrievalTool]} : {}),
-    });
+    let response = await dependencies.services.chat.completeStructured(
+        messages,
+        retrievalTurnLimit > 0 ? {tools: [retrievalTool]} : {},
+    );
     let remainingTurns = retrievalTurnLimit;
 
     while (response.kind === 'tool-calls') {
@@ -230,14 +225,10 @@ export const executeNpcRun = async (
             });
         }
 
-        response = await completeStructured(dependencies.services.chat, messages, {
-            debug: {
-                operation: timing.operation,
-                operationId: timing.operationId,
-                purpose: 'npc',
-            },
-            ...(remainingTurns > 0 ? {tools: [retrievalTool]} : {}),
-        });
+        response = await dependencies.services.chat.completeStructured(
+            messages,
+            remainingTurns > 0 ? {tools: [retrievalTool]} : {},
+        );
     }
 
     const finalResponse = await repairNpcResponseIfNeeded({
@@ -245,7 +236,6 @@ export const executeNpcRun = async (
         expectSessionTitle: dependencies.inputs.requestSessionTitle,
         messages,
         rawResponse: response,
-        timing,
     });
 
     return {
@@ -328,7 +318,6 @@ const repairNpcResponseIfNeeded = async (request: {
     expectSessionTitle: boolean;
     messages: ChatMessage[];
     rawResponse: ChatStructuredResult;
-    timing: TimingContext;
 }): Promise<ParsedNpcResponse> => {
     const parsed = parseNpcResponse(request.rawResponse.content, request.expectSessionTitle);
     if (parsed) {
@@ -342,13 +331,7 @@ const repairNpcResponseIfNeeded = async (request: {
             content: buildNpcMetadataRepairPrompt(request.expectSessionTitle),
             role: 'user',
         },
-    ], {
-        debug: {
-            operation: request.timing.operation,
-            operationId: request.timing.operationId,
-            purpose: 'npc-metadata-repair',
-        },
-    });
+    ]);
     const repairedParsed = parseNpcResponse(repaired, request.expectSessionTitle);
     if (!repairedParsed) {
         throw createTaggedError('run-invalid-response', 'NPC generator response did not include the required V2 response envelope.');

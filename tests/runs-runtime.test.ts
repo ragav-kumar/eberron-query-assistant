@@ -337,7 +337,6 @@ describe('V2 run runtime', () => {
         }));
 
         const secondCallOptions = getChatOptions(chat.completeStructured, 1);
-        expect(secondCallOptions.debug).toBeTruthy();
         expect(secondCallOptions.tools).toBeUndefined();
     });
 
@@ -599,8 +598,8 @@ const getChatMessages = (
 const getChatOptions = (
     completeStructured: ReturnType<typeof vi.fn>,
     callIndex: number,
-): { debug?: object; tools?: unknown[] } => (
-    completeStructured.mock.calls[callIndex]?.[1] as { debug?: object; tools?: unknown[] } ?? {}
+): { tools?: unknown[] } => (
+    completeStructured.mock.calls[callIndex]?.[1] as { tools?: unknown[] } ?? {}
 );
 
 const toFinalEnvelope = (answer: string, responseTitle: string, sessionTitle: string): string => [
