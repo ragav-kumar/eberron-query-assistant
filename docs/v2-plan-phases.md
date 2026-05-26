@@ -117,9 +117,9 @@ Repo state after completion:
 
 ## Phase 7: Agent-Governance Cleanup
 
-- Treat this phase as separate follow-up work because it may require `Introspection` mode.
+- Treat this phase as separate follow-up work because it will require `Introspection` mode.
 - Remove this temporary planning document once it is no longer needed.
-- Clean up `AGENTS.md`, `docs/agent-modes.md`, and any other transition-era agent instructions that only existed to support the V1 to V2 migration.
+- Clean up `CLAUDE.md`, `docs/agent-modes.md`, and any other transition-era agent instructions that only existed to support the V1 to V2 migration.
 - Leave the remaining agent-governance docs aligned with the repo's post-migration steady state.
 - Human testable:
   - Not applicable beyond confirming the product still works after the prior phase; this phase is primarily documentation and workflow cleanup.
