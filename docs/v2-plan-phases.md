@@ -4,12 +4,12 @@ High-level roadmap for the remaining V2 work. This document is intentionally sho
 
 ## Working Rules For Future Sessions
 
-- Prefer server-side work. Most agent implementation work should stay within `src/server/v2` and related tests.
+- Prefer server-side work. Most agent implementation work should stay within `src/server` and related tests.
 - Before taking on client-side V2 work, first explain what is ready to be implemented and give the user a chance to handle that client work personally.
 - Do not change DTOs, API contracts, or database schemas without explicit user approval.
 - Keep the V2 architecture aligned with the intentional Node-server-backed application shape; do not plan around a browser-only shortcut.
-- Keep the top-level folder structure within `src/server/v2` tight and domain-oriented. A little depth is acceptable when it keeps domain ownership clear.
-- If a proposed change materially expands work outside `src/server/v2` and tests, get approval first unless the user explicitly requested that broader scope.
+- Keep the top-level folder structure within `src/server` tight and domain-oriented. A little depth is acceptable when it keeps domain ownership clear.
+- If a proposed change materially expands work outside `src/server` and tests, get approval first unless the user explicitly requested that broader scope.
 
 ## Baseline prior to phase 1
 
@@ -96,24 +96,31 @@ Repo state after completion:
 - All Phase 4 behaviors are covered by passing tests across `tests/runs.test.ts`, `tests/runs-runtime.test.ts`, `tests/client-api.test.tsx`, `tests/client-components.test.tsx`, `tests/api.test.ts`, and `tests/migration.test.ts`.
 - `POST /api/v2/runs` now returns immediately after the fast path (validation, session setup, initial transaction, first SSE events) with a partial `RunDto` (`status: 'running'`, user entry only). Model execution runs in `executeRunBackground` (fire-and-forget). The Thinking… animation now fires correctly during runs. `RunCoordinator` gained a `drain()` method for test synchronization.
 
-## Phase 5: V2 Readiness Pass
+## Phase 5: V2 Product Completion
 
-- Reconcile the remaining client/server mismatches uncovered during the earlier phases.
-- Remove stale assumptions from this roadmap so it reflects the actual end state before final cleanup begins.
-- Confirm the normal V2 assistant and NPC workflows are complete enough that V1 removal can be treated as a separate follow-up phase rather than a live dependency.
-- Keep any remaining V1 reuse narrowly limited to transition-era support that will be removed in Phase 6.
+- Close all known product gaps before declaring V2 complete. Phases 1–4 delivered the core workflows; this phase addresses the correctness bugs and missing surfaces that fell outside those phase scopes.
+- Server items:
+  - Fix the orphan-session bug: move `insertNewSession` inside the main run transaction in `src/server/services/run/coordinator.ts` so a failed run never leaves a stranded empty session row in the selector.
+  - Add an `orderBy` clause to `GET /api/v2/sessions` so sessions appear newest-first in the selector.
+  - Resolve the `provider.ts` and `retrieval-tool.ts` technical-debt markers: both are annotated `HASTILY COPIED FROM V1 … priority refactor target`. Either refactor the provider boundary or accept the current shape as clean V2 code and remove the warning comments. Do not leave this annotation standing after this phase.
+- Client items (explain what is ready, let the user decide whether to implement personally):
+  - NPC mode needs a console-like feed of intermediate reasoning entries rendered during and after a run, ordered oldest-to-newest with the Thinking… indicator at the end. The feed data is already fetched via the session feed query; it just needs to be surfaced in `NpcCards`.
+  - `Input.tsx` should disable Submit while a refresh or reingest is active. The server already blocks the run correctly; this closes the UX gap. Wire `useRefreshQuery` into the Submit disabled state alongside the existing checks.
 - Human testable:
-  - The main V2 assistant and NPC workflows run as a coherent product slice with no known placeholder path for normal use.
-  - There is no remaining normal-user workflow that still requires V1 to stay in place before Phase 6 starts.
+  - Submit a first prompt on a new session that fails mid-run; reload and confirm no orphan session row appears in the selector.
+  - Create several sessions; confirm the selector lists them newest-first.
+  - Start an NPC run; confirm intermediate reasoning steps appear in a console-like feed above the card grid while the run is in progress.
+  - Trigger a manual refresh; confirm Submit is visibly disabled for the duration.
 
-## Phase 6: Final Cleanup And V1 Purge
+## Phase 6: V1 Purge and Final Cleanup
 
-- Only begin this phase once the normal V2 assistant and NPC workflows are fully working end to end.
-- Update `docs/fdd-v2.md` if final implementation reality or settled product behavior needs to be captured there.
-- Purge the remaining V1 application code and obsolete transition-era wiring after V2 is confirmed ready to stand alone.
-- Leave the repo in a V2-only product state, while allowing temporary agent-governance cleanup work to happen afterward in a separate phase.
+- Only begin this phase once Phase 5 is complete.
+- Remove the migration CLI: delete `src/server/migrate-v1-to-v2.ts` and `src/server/migrate-v1-to-v2.cli.ts` (both carry explicit "delete during the v1 purge" comments), and remove the `migrate:v1-to-v2` npm script from `package.json`.
+- Update `docs/fdd-v2.md` to close the open console-GET question (SSE-only is correct; no GET endpoint needed) and capture any other settled-behavior notes that drifted during implementation.
+- Leave the repo in a V2-only product state. The `LEGACY_NPC_SESSION_ID` protection (session selector label, `POST /api/v2/runs` 400 guard) is permanent data protection for migrated users and must not be removed.
 - Human testable:
-  - V2 still runs correctly after V1 removal, and there is no remaining normal-user path that depends on V1 behavior or assets.
+  - V2 still starts and runs correctly with the migration scripts absent.
+  - `npm run verify` passes.
 
 ## Phase 7: Agent-Governance Cleanup
 
