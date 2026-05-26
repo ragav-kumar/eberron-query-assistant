@@ -2,11 +2,7 @@
 
 ## Scope
 - This file is primarily relevant during `Development`, and secondarily during `Review` when evaluating or making small scoped server changes.
-- During the V2 transition, treat new user-requested server behavior changes as targeting `/src/server/v2` unless the user explicitly says otherwise.
 - Keep the Node layer as thin as practical. Put filesystem access, process/runtime concerns, persistence, and other host-only capabilities in the server layer.
-- No repo-local V1 server implementation remains in this repository.
-- Do not use removed, archived, or external historical V1 server implementation as a general reference for V2 server work.
-- Server-side historical V1 consultation is allowed only for migration or legacy-data compatibility work, and it must be disclosed with specific file references.
 
 ## Server Structure
 - Keep durable model prompt instructions in tracked Markdown files under `assistant/` as much as is reasonable. Code may assemble those prompt assets with dynamic runtime context, retrieved evidence, saved state, user input, and validation-specific constraints, but reusable assistant behavior instructions should not live as large string literals in source files.

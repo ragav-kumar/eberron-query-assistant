@@ -7,8 +7,7 @@
 ## Docs Structure
 - Treat `docs/fdd-v1.md` as the intended design for V1.
 - Treat `docs/fdd-v2.md` as the intended design for V2.
-- Treat `docs/fdd-v1.md`, `docs/bugs.md`, and `docs/v1-legacy-reference.md` as acceptable V1-era references for product behavior and migration compatibility.
-- `docs/bugs.md` contains known, but deferred, bugs from both v1 and v2.
+- Treat `docs/fdd-v1.md` as historical product behavior documentation for V1.
 - No repo-local V1 implementation remains in this repository.
 - Do not treat removed, archived, or external historical V1 implementation as a normal documentation source for V2 decisions.
 - Keep each versioned design doc focused on the theoretical intended behavior and requirements for that version.

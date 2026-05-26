@@ -33,28 +33,17 @@
 - Documentation changes are permitted only when the user explicitly requests documentation changes.
 - Agent-governance files may not be edited in this mode.
 - Prefer to consult relevant specifications before drawing conclusions about intended behavior.
-- No repo-local V1 implementation remains in this repository.
-- Do not consult external or archived historical V1 implementation unless the analysis task is specifically about migration or legacy-data compatibility.
-- When historical V1 code is consulted for that purpose, explicitly disclose the consulted file or files and why they were needed.
 - Path-specific `CLAUDE.md` files are usually not the main source for this mode unless they contain relevant architectural or verification constraints needed for analysis.
 
 ## Development
 - Purpose: implement behavior changes.
 - Code changes are expected in this mode.
-- During the V2 transition, default to V2 unless the user explicitly requires V1 work or V1 changes are necessary to unblock compilation or runtime behavior.
-- For non-trivial V2 work, consult `docs/fdd-v2.md` before making changes.
-- For non-trivial V1 work that is explicitly required, consult `docs/fdd-v1.md` before making changes.
+- For non-trivial work, consult `docs/fdd-v2.md` before making changes.
 - Follow the root `CLAUDE.md` plus any relevant path-specific `CLAUDE.md` files for the areas being changed.
 - Documentation changes are not permitted in this mode.
 - Agent-governance files may not be edited in this mode.
 
 ## Development Guardrails
-- During the V2 transition, treat user-requested changes as targeting V2 by default.
-- During the V2 transition, `server/v2` and `client/v2` code may not reference V1 behavior or recreate removed V1 implementation patterns under any circumstances. This prohibition is absolute.
-- Do not use removed, archived, or external historical V1 implementation as a general design reference for V2 work.
-- Historical V1 code may be consulted only for migration or legacy-data compatibility work, and that consultation must be disclosed to the user with specific file references.
-- Preserve legacy V1 user data and migration-relevant files unless the user explicitly asks to delete or rewrite them.
-- Do not remove, rewrite, or "clean up" compatibility inputs such as `.eberron-query-assistant/state/runtime-state.json`, `.eberron-query-assistant/state/generated-npcs.json`, `logs/*.json`, `logs/generated_npcs.md`, or `assistant/additional-context.md` during ordinary V2 work.
 - If an attempted Vite start reports that the port is already in use, do not change the port. Treat that as a stale-session cleanup failure. You may only attempt to end the conflicting process when it belongs to this repository; if it does not belong to this repository, report that you cannot run the smoke check.
   - Under no circumstances should you ever change the port Vite runs on.
 - Prefer plain functions, hooks, modules, and object literals over project-authored classes.
@@ -97,8 +86,7 @@
 - If a requested or necessary change would exceed either limit, stop and ask to switch to `Development`.
 - Documentation changes are not permitted in this mode.
 - Agent-governance files may not be edited in this mode.
-- Review may use docs and V2 code freely.
-- Review may consult historical V1 code only when the review is about migration or legacy-data compatibility, and that consultation must be disclosed to the user with specific file references.
+- Review may use docs and code freely.
 - Path-specific `CLAUDE.md` files are relevant when they affect correctness, architecture, verification expectations, or whether a requested fix remains small enough to stay in review mode.
 
 ## Introspection
