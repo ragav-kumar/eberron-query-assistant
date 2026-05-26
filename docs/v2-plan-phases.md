@@ -94,9 +94,7 @@ Repo state after completion:
 - `LEGACY_NPC_SESSION_ID` is exported from `src/dto/sessions.ts`. `POST /api/v2/runs` returns 400 for this session ID; `SessionSelector` appends "(read-only)" to its option label; `Input.tsx` disables Submit when the legacy session is active.
 - Legacy NPC migration (`migrateLegacyNpcs`) preserves original V1 NPC IDs from both the JSON state file and the legacy markdown log format.
 - All Phase 4 behaviors are covered by passing tests across `tests/runs.test.ts`, `tests/runs-runtime.test.ts`, `tests/client-api.test.tsx`, `tests/client-components.test.tsx`, `tests/api.test.ts`, and `tests/migration.test.ts`.
-
-Known gaps not addressed in this phase:
-- **No Thinking animation during runs**: `POST /runs` is still synchronous — the mutation awaits the full model execution before returning, so `activeRunId` is never set during the run and the Thinking indicator never fires. This requires the async early-return architectural change (see project memory).
+- `POST /api/v2/runs` now returns immediately after the fast path (validation, session setup, initial transaction, first SSE events) with a partial `RunDto` (`status: 'running'`, user entry only). Model execution runs in `executeRunBackground` (fire-and-forget). The Thinking… animation now fires correctly during runs. `RunCoordinator` gained a `drain()` method for test synchronization.
 
 ## Phase 5: V2 Readiness Pass
 

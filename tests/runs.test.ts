@@ -37,6 +37,7 @@ describe('V2 run coordinator', () => {
             prompt: 'Ask about Sharn',
             retrievalTurnLimit: 999,
         }));
+        await coordinator.drain();
 
         const run = await appDb.db.selectFrom('runs').selectAll().executeTakeFirstOrThrow();
         expect(run.retrievalTurnLimit).toBe(settingsStore().read('retrievalMaxToolTurns'));
@@ -68,6 +69,7 @@ describe('V2 run coordinator', () => {
             retrievalTurnLimit: 1,
             sessionId: undefined,
         });
+        await coordinator.drain();
 
         const session = await appDb.db
             .selectFrom('sessions')
@@ -90,6 +92,7 @@ describe('V2 run coordinator', () => {
             retrievalTurnLimit: 1,
             sessionId: undefined,
         });
+        await coordinator.drain();
 
         const session = await appDb.db
             .selectFrom('sessions')
@@ -112,6 +115,7 @@ describe('V2 run coordinator', () => {
             retrievalTurnLimit: 0,
             sessionId: 'npc-session',
         });
+        await coordinator.drain();
 
         const npcs = await appDb.db.selectFrom('npcs').selectAll().execute();
         expect(npcs).toHaveLength(1);
@@ -146,6 +150,7 @@ describe('V2 run coordinator', () => {
             retrievalTurnLimit: 0,
             sessionId: 'npc-session',
         });
+        await coordinator.drain();
 
         const npcs = await appDb.db.selectFrom('npcs').selectAll().orderBy('id', 'asc').execute();
         expect(npcs).toHaveLength(2);
@@ -193,6 +198,7 @@ describe('V2 run coordinator', () => {
         const coordinator = createCoordinator(appDb, { retrieval });
 
         await coordinator.startRun(createRequest());
+        await coordinator.drain();
     });
 
     it('persists reasoning entries in sequence order as tool calls arrive', async () => {
@@ -214,6 +220,7 @@ describe('V2 run coordinator', () => {
         const coordinator = createCoordinator(appDb, { chat });
 
         await coordinator.startRun(createRequest());
+        await coordinator.drain();
 
         const entries = await appDb.db.selectFrom('sessionEntries').selectAll().orderBy('sequenceIndex', 'asc').execute();
         expect(entries.map(entry => entry.kind)).toEqual(['user', 'reasoning', 'response']);
@@ -224,18 +231,21 @@ describe('V2 run coordinator', () => {
         const coordinator = createCoordinator(appDb);
 
         const run = await coordinator.startRun(createRequest());
+        await coordinator.drain();
 
         const session = await appDb.db.selectFrom('sessions').selectAll().where('id', '=', 'session-1').executeTakeFirstOrThrow();
         const persistedRun = await appDb.db.selectFrom('runs').selectAll().where('id', '=', run.id).executeTakeFirstOrThrow();
+        const entries = await appDb.db.selectFrom('sessionEntries').selectAll().orderBy('sequenceIndex', 'asc').execute();
         expect(session.activeRunId).toBeNull();
         expect(persistedRun.status).toBe('completed');
-        expect(run.sessionEntries.at(-1)).toMatchObject({ kind: 'response' });
+        expect(entries.at(-1)).toMatchObject({ kind: 'response' });
     });
 
     it('updates the session title only on the first assistant response', async () => {
         const coordinator = createCoordinator(appDb);
 
         await coordinator.startRun(createRequest());
+        await coordinator.drain();
 
         const session = await appDb.db.selectFrom('sessions').selectAll().where('id', '=', 'session-1').executeTakeFirstOrThrow();
         expect(session.title).toBe('Session title');
@@ -244,8 +254,10 @@ describe('V2 run coordinator', () => {
     it('preserves the existing session title on later runs', async () => {
         const coordinator = createCoordinator(appDb);
         await coordinator.startRun(createRequest());
+        await coordinator.drain();
 
         await coordinator.startRun(createRequest({ prompt: 'Second question' }));
+        await coordinator.drain();
 
         const runs = await appDb.db.selectFrom('runs').selectAll().orderBy('createdAt', 'asc').execute();
         const session = await appDb.db.selectFrom('sessions').selectAll().where('id', '=', 'session-1').executeTakeFirstOrThrow();
@@ -260,7 +272,8 @@ describe('V2 run coordinator', () => {
         };
         const coordinator = createCoordinator(appDb, { chat });
 
-        await expect(coordinator.startRun(createRequest())).rejects.toThrow('provider exploded');
+        await coordinator.startRun(createRequest());
+        await coordinator.drain();
 
         const run = await appDb.db.selectFrom('runs').selectAll().executeTakeFirstOrThrow();
         const session = await appDb.db.selectFrom('sessions').selectAll().where('id', '=', 'session-1').executeTakeFirstOrThrow();
@@ -274,7 +287,9 @@ describe('V2 run coordinator', () => {
         const coordinator = createCoordinator(appDb, { partyContext });
 
         await coordinator.startRun(createRequest({ includePartyContext: true }));
+        await coordinator.drain();
         await coordinator.startRun(createRequest({ includePartyContext: false, prompt: 'Without party context' }));
+        await coordinator.drain();
 
         expect(partyContext.build).toHaveBeenCalledTimes(1);
         expect(partyContext.build).toHaveBeenCalledWith('.retrieval');

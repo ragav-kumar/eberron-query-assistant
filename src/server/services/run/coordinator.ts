@@ -21,6 +21,8 @@ import { RuntimeEventPublisher } from '../events/index.js';
 
 export interface RunCoordinator {
     startRun(request: CreateRunDto): Promise<RunDto>;
+    /** Resolves when any in-flight background run execution has finished. Used in tests to drain async work before assertions. */
+    drain(): Promise<void>;
 }
 
 export interface RunCoordinatorDependencies {
@@ -35,292 +37,353 @@ export interface RunCoordinatorDependencies {
 /**
  * Coordinates one persisted V2 run from validation through durable transcript
  * persistence, while keeping all writes on the V2 app-database path.
+ *
+ * The fast path (validation, session setup, initial DB writes, first SSE events)
+ * completes synchronously before the HTTP response is sent. Model execution runs
+ * in a fire-and-forget background path and publishes remaining SSE events as it
+ * progresses.
  */
-export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): RunCoordinator => ({
-    startRun: async (request) => {
-        const normalized = normalizeCreateRunRequest(request);
+export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): RunCoordinator => {
+    let backgroundWork: Promise<void> | null = null;
 
-        await assertRunNotBlocked(dependencies.appDb.db);
-        await dependencies.retrieval.prepare(dependencies.retrievalDir);
+    return {
+        startRun: async (request) => {
+            const normalized = normalizeCreateRunRequest(request);
 
-        const runId = randomUUID();
-        const now = new Date().toISOString();
-        const sessionId = normalized.sessionId ?? await insertNewSession(dependencies.appDb.db, normalized.mode, normalized.includePartyContext, now);
-        const persistedEntries: SessionEntryDto[] = [];
-        const session = await dependencies.appDb.db
-            .selectFrom('sessions')
-            .selectAll()
-            .where('id', '=', sessionId)
-            .executeTakeFirst();
-        if (!session) {
-            throw createTaggedError('run-session-missing', `Session "${sessionId}" does not exist.`);
-        }
-        if (session.mode !== normalized.mode) {
-            throw createTaggedError('run-session-mode-mismatch', `Session "${sessionId}" does not support ${normalized.mode} runs.`);
-        }
+            await assertRunNotBlocked(dependencies.appDb.db);
+            await dependencies.retrieval.prepare(dependencies.retrievalDir);
 
-        const existingEntries = await dependencies.appDb.db
-            .selectFrom('sessionEntries')
-            .selectAll()
-            .where('sessionId', '=', sessionId)
-            .orderBy('sequenceIndex', 'asc')
-            .execute();
-        let nextSequenceIndex = (existingEntries.at(-1)?.sequenceIndex ?? 0) + 1;
-        const requestSessionTitle = existingEntries.filter(entry => entry.kind === 'response').length === 0;
-        const settings = settingsStore();
-        const additionalContext = settings.read('additionalContext');
-        const partyContext = normalized.includePartyContext
-            ? await dependencies.partyContext.build(dependencies.retrievalDir)
-            : '';
+            const runId = randomUUID();
+            const now = new Date().toISOString();
+            const sessionId = normalized.sessionId ?? await insertNewSession(dependencies.appDb.db, normalized.mode, normalized.includePartyContext, now);
+            const session = await dependencies.appDb.db
+                .selectFrom('sessions')
+                .selectAll()
+                .where('id', '=', sessionId)
+                .executeTakeFirst();
+            if (!session) {
+                throw createTaggedError('run-session-missing', `Session "${sessionId}" does not exist.`);
+            }
+            if (session.mode !== normalized.mode) {
+                throw createTaggedError('run-session-mode-mismatch', `Session "${sessionId}" does not support ${normalized.mode} runs.`);
+            }
 
-        await dependencies.appDb.db.transaction().execute(async trx => {
-            await insertRun(trx, {
-                createdAt: now,
-                id: runId,
-                includePartyContext: normalized.includePartyContext ? 1 : 0,
-                mode: normalized.mode,
-                prompt: normalized.prompt,
-                retrievalTurnLimit: normalized.retrievalTurnLimit,
-                sessionId,
-                startedAt: now,
-                status: 'running',
-                updatedAt: now,
-            });
-            await updateSessionForRunningRun(trx, sessionId, runId, {
-                includePartyContext: normalized.includePartyContext ? 1 : 0,
-                updatedAt: now,
-            });
-            const userEntry = await appendSessionEntry(trx, {
-                content: normalized.prompt,
-                createdAt: now,
-                kind: 'user',
-                runId,
-                sequenceIndex: nextSequenceIndex,
-                sessionId,
-                title: null,
-                toolCallId: null,
-            });
-            persistedEntries.push(toSessionEntryDto(userEntry));
-        });
-        nextSequenceIndex += 1;
-        const startedUserEntry = persistedEntries[0]!;
-        dependencies.runtimeEvents.publish({
-            resource: 'run',
-            action: 'created',
-            resourceId: runId,
-            sessionId,
-            status: 'running',
-            timestamp: now,
-        });
-        dependencies.runtimeEvents.publish({
-            resource: 'session-entry',
-            action: 'appended',
-            resourceId: startedUserEntry.id,
-            sessionId,
-            runId,
-            entry: startedUserEntry,
-            timestamp: now,
-        });
+            const existingEntries = await dependencies.appDb.db
+                .selectFrom('sessionEntries')
+                .selectAll()
+                .where('sessionId', '=', sessionId)
+                .orderBy('sequenceIndex', 'asc')
+                .execute();
+            let nextSequenceIndex = (existingEntries.at(-1)?.sequenceIndex ?? 0) + 1;
+            const requestSessionTitle = existingEntries.filter(entry => entry.kind === 'response').length === 0;
+            const settings = settingsStore();
+            const additionalContext = settings.read('additionalContext');
+            const partyContext = normalized.includePartyContext
+                ? await dependencies.partyContext.build(dependencies.retrievalDir)
+                : '';
 
-        try {
-            const onReasoning = async (reasoning: Omit<SessionEntryReasoningDto, 'id'>) => {
-                const entry = await dependencies.appDb.db.transaction().execute(async trx => appendSessionEntry(trx, {
-                    content: reasoning.content,
-                    createdAt: reasoning.createdAt,
-                    kind: 'reasoning',
+            let userEntryDto!: SessionEntryDto;
+            await dependencies.appDb.db.transaction().execute(async trx => {
+                await insertRun(trx, {
+                    createdAt: now,
+                    id: runId,
+                    includePartyContext: normalized.includePartyContext ? 1 : 0,
+                    mode: normalized.mode,
+                    prompt: normalized.prompt,
+                    retrievalTurnLimit: normalized.retrievalTurnLimit,
+                    sessionId,
+                    startedAt: now,
+                    status: 'running',
+                    updatedAt: now,
+                });
+                await updateSessionForRunningRun(trx, sessionId, runId, {
+                    includePartyContext: normalized.includePartyContext ? 1 : 0,
+                    updatedAt: now,
+                });
+                const userEntry = await appendSessionEntry(trx, {
+                    content: normalized.prompt,
+                    createdAt: now,
+                    kind: 'user',
                     runId,
                     sequenceIndex: nextSequenceIndex,
                     sessionId,
                     title: null,
-                    toolCallId: reasoning.toolCallId,
-                }));
-                const reasoningEntry = toSessionEntryDto(entry);
-                persistedEntries.push(reasoningEntry);
-                nextSequenceIndex += 1;
-                dependencies.runtimeEvents.publish({
-                    resource: 'session-entry',
-                    action: 'appended',
-                    resourceId: reasoningEntry.id,
-                    sessionId,
-                    runId,
-                    entry: reasoningEntry,
-                    timestamp: reasoningEntry.createdAt,
-                });
-            };
-            const runHistory = buildChatHistoryFromSessionEntries(existingEntries);
-            const sharedRunInputs = {
-                additionalContext,
-                history: runHistory,
-                includePartyContext: normalized.includePartyContext,
-                partyContext,
-                prompt: normalized.prompt,
-                requestSessionTitle,
-                retrievalTurnLimit: normalized.retrievalTurnLimit,
-            };
-            const sharedRunServices = { chat: dependencies.chat, retrieval: dependencies.retrieval };
-            const sharedRunContext = { runId, sessionId };
-
-            let runResult: AssistantRunResult;
-            if (normalized.mode === 'npc') {
-                const npcPromptAssets = await loadNpcPromptAssets();
-                runResult = await executeNpcRun({
-                    callbacks: { onReasoning },
-                    context: sharedRunContext,
-                    inputs: { ...sharedRunInputs, promptAssets: npcPromptAssets },
-                    services: sharedRunServices,
-                });
-            } else {
-                const assistantPromptAssets = await loadPromptAssets();
-                runResult = await executeAssistantRun({
-                    callbacks: { onReasoning },
-                    context: sharedRunContext,
-                    inputs: { ...sharedRunInputs, promptAssets: assistantPromptAssets },
-                    services: sharedRunServices,
-                });
-            }
-
-            const completedAt = new Date().toISOString();
-            await dependencies.appDb.db.transaction().execute(async trx => {
-                const responseEntry = await appendSessionEntry(trx, {
-                    content: runResult.response.content,
-                    createdAt: runResult.response.createdAt,
-                    kind: 'response',
-                    runId,
-                    sequenceIndex: nextSequenceIndex,
-                    sessionId,
-                    title: runResult.response.title ?? null,
                     toolCallId: null,
                 });
-                persistedEntries.push(toSessionEntryDto(responseEntry));
-
-                // NPC mode: persist the structured NPC records generated in this run
-                if (normalized.mode === 'npc') {
-                    const npcResult = runResult as NpcRunResult;
-                    for (const npc of npcResult.npcs) {
-                        await trx.insertInto('npcs').values({
-                            age: npc.age ?? null,
-                            bio: npc.bio,
-                            createdAt: completedAt,
-                            description: npc.description,
-                            ethnicity: npc.ethnicity ?? null,
-                            gender: npc.gender ?? null,
-                            name: npc.name,
-                            role: npc.role ?? null,
-                            runId,
-                            sessionId,
-                            species: npc.species ?? null,
-                            updatedAt: completedAt,
-                        }).execute();
-                    }
-                }
-
-                await trx
-                    .updateTable('runs')
-                    .set({
-                        completedAt,
-                        status: 'completed',
-                        updatedAt: completedAt,
-                    })
-                    .where('id', '=', runId)
-                    .execute();
-                await trx
-                    .updateTable('sessions')
-                    .set({
-                        activeRunId: null,
-                        title: requestSessionTitle && runResult.sessionTitle ? runResult.sessionTitle : session.title,
-                        updatedAt: completedAt,
-                    })
-                    .where('id', '=', sessionId)
-                    .execute();
+                userEntryDto = toSessionEntryDto(userEntry);
             });
-            const responseEntry = persistedEntries.at(-1)!;
-            const updatedSessionDto = await fetchSessionDto(dependencies.appDb.db, sessionId);
+            nextSequenceIndex += 1;
+
+            dependencies.runtimeEvents.publish({
+                resource: 'run',
+                action: 'created',
+                resourceId: runId,
+                sessionId,
+                status: 'running',
+                timestamp: now,
+            });
             dependencies.runtimeEvents.publish({
                 resource: 'session-entry',
                 action: 'appended',
-                resourceId: responseEntry.id,
+                resourceId: userEntryDto.id,
                 sessionId,
                 runId,
-                entry: responseEntry,
-                timestamp: completedAt,
+                entry: userEntryDto,
+                timestamp: now,
             });
-            dependencies.runtimeEvents.publish({
-                resource: 'run',
-                action: 'completed',
-                resourceId: runId,
+
+            backgroundWork = executeRunBackground({
+                additionalContext,
+                chat: dependencies.chat,
+                db: dependencies.appDb.db,
+                existingEntries,
+                nextSequenceIndex,
+                normalized,
+                originalSessionTitle: session.title,
+                partyContext,
+                requestSessionTitle,
+                retrieval: dependencies.retrieval,
+                runtimeEvents: dependencies.runtimeEvents,
+                runId,
                 sessionId,
-                status: 'completed',
-                timestamp: completedAt,
+            }).finally(() => {
+                backgroundWork = null;
             });
-            dependencies.runtimeEvents.publish({
-                resource: 'session',
-                action: 'updated',
-                resourceId: sessionId,
+            void backgroundWork;
+
+            return {
+                createdAt: now,
+                id: runId,
+                mode: normalized.mode,
+                sessionEntries: [userEntryDto],
                 sessionId,
-                mode: updatedSessionDto.mode,
-                state: updatedSessionDto,
-                timestamp: completedAt,
+                status: 'running',
+                updatedAt: now,
+            };
+        },
+
+        drain: () => backgroundWork ?? Promise.resolve(),
+    };
+};
+
+interface BackgroundRunInputs {
+    additionalContext: string;
+    chat: ChatAdapter;
+    db: Kysely<AppDatabaseSchema>;
+    existingEntries: SessionEntry[];
+    nextSequenceIndex: number;
+    normalized: CreateRunDto & { prompt: string; retrievalTurnLimit: number };
+    originalSessionTitle: string;
+    partyContext: string;
+    requestSessionTitle: boolean;
+    retrieval: CorpusRetrievalService;
+    runtimeEvents: RuntimeEventPublisher;
+    runId: string;
+    sessionId: string;
+}
+
+/**
+ * Executes the slow path of a run (model execution, reasoning persistence, final
+ * writes) after the HTTP response has already been sent. All progress and
+ * completion state is communicated to connected clients exclusively via SSE.
+ * Errors are persisted and published via SSE; they are not re-thrown.
+ */
+const executeRunBackground = async (inputs: BackgroundRunInputs): Promise<void> => {
+    const {
+        additionalContext,
+        chat,
+        db,
+        existingEntries,
+        normalized,
+        originalSessionTitle,
+        partyContext,
+        requestSessionTitle,
+        retrieval,
+        runtimeEvents,
+        runId,
+        sessionId,
+    } = inputs;
+
+    let nextSequenceIndex = inputs.nextSequenceIndex;
+
+    try {
+        const onReasoning = async (reasoning: Omit<SessionEntryReasoningDto, 'id'>) => {
+            const entry = await db.transaction().execute(async trx => appendSessionEntry(trx, {
+                content: reasoning.content,
+                createdAt: reasoning.createdAt,
+                kind: 'reasoning',
+                runId,
+                sequenceIndex: nextSequenceIndex,
+                sessionId,
+                title: null,
+                toolCallId: reasoning.toolCallId,
+            }));
+            const reasoningEntry = toSessionEntryDto(entry);
+            nextSequenceIndex += 1;
+            runtimeEvents.publish({
+                resource: 'session-entry',
+                action: 'appended',
+                resourceId: reasoningEntry.id,
+                sessionId,
+                runId,
+                entry: reasoningEntry,
+                timestamp: reasoningEntry.createdAt,
             });
-        } catch (error) {
-            const failedAt = new Date().toISOString();
-            await dependencies.appDb.db
+        };
+        const runHistory = buildChatHistoryFromSessionEntries(existingEntries);
+        const sharedRunInputs = {
+            additionalContext,
+            history: runHistory,
+            includePartyContext: normalized.includePartyContext,
+            partyContext,
+            prompt: normalized.prompt,
+            requestSessionTitle,
+            retrievalTurnLimit: normalized.retrievalTurnLimit,
+        };
+        const sharedRunServices = { chat, retrieval };
+        const sharedRunContext = { runId, sessionId };
+
+        let runResult: AssistantRunResult;
+        if (normalized.mode === 'npc') {
+            const npcPromptAssets = await loadNpcPromptAssets();
+            runResult = await executeNpcRun({
+                callbacks: { onReasoning },
+                context: sharedRunContext,
+                inputs: { ...sharedRunInputs, promptAssets: npcPromptAssets },
+                services: sharedRunServices,
+            });
+        } else {
+            const assistantPromptAssets = await loadPromptAssets();
+            runResult = await executeAssistantRun({
+                callbacks: { onReasoning },
+                context: sharedRunContext,
+                inputs: { ...sharedRunInputs, promptAssets: assistantPromptAssets },
+                services: sharedRunServices,
+            });
+        }
+
+        const completedAt = new Date().toISOString();
+        let responseEntryDto!: SessionEntryDto;
+        await db.transaction().execute(async trx => {
+            const responseEntry = await appendSessionEntry(trx, {
+                content: runResult.response.content,
+                createdAt: runResult.response.createdAt,
+                kind: 'response',
+                runId,
+                sequenceIndex: nextSequenceIndex,
+                sessionId,
+                title: runResult.response.title ?? null,
+                toolCallId: null,
+            });
+            responseEntryDto = toSessionEntryDto(responseEntry);
+
+            // NPC mode: persist the structured NPC records generated in this run
+            if (normalized.mode === 'npc') {
+                const npcResult = runResult as NpcRunResult;
+                for (const npc of npcResult.npcs) {
+                    await trx.insertInto('npcs').values({
+                        age: npc.age ?? null,
+                        bio: npc.bio,
+                        createdAt: completedAt,
+                        description: npc.description,
+                        ethnicity: npc.ethnicity ?? null,
+                        gender: npc.gender ?? null,
+                        name: npc.name,
+                        role: npc.role ?? null,
+                        runId,
+                        sessionId,
+                        species: npc.species ?? null,
+                        updatedAt: completedAt,
+                    }).execute();
+                }
+            }
+
+            await trx
                 .updateTable('runs')
                 .set({
-                    error: formatThrownValue(error),
-                    failedAt,
-                    status: 'failed',
-                    updatedAt: failedAt,
+                    completedAt,
+                    status: 'completed',
+                    updatedAt: completedAt,
                 })
                 .where('id', '=', runId)
                 .execute();
-            await dependencies.appDb.db
+            await trx
                 .updateTable('sessions')
                 .set({
                     activeRunId: null,
-                    updatedAt: failedAt,
+                    title: requestSessionTitle && runResult.sessionTitle ? runResult.sessionTitle : originalSessionTitle,
+                    updatedAt: completedAt,
                 })
                 .where('id', '=', sessionId)
                 .execute();
-            const failedSessionDto = await fetchSessionDto(dependencies.appDb.db, sessionId);
-            dependencies.runtimeEvents.publish({
-                resource: 'run',
-                action: 'failed',
-                resourceId: runId,
-                sessionId,
+        });
+        const updatedSessionDto = await fetchSessionDto(db, sessionId);
+        runtimeEvents.publish({
+            resource: 'session-entry',
+            action: 'appended',
+            resourceId: responseEntryDto.id,
+            sessionId,
+            runId,
+            entry: responseEntryDto,
+            timestamp: completedAt,
+        });
+        runtimeEvents.publish({
+            resource: 'run',
+            action: 'completed',
+            resourceId: runId,
+            sessionId,
+            status: 'completed',
+            timestamp: completedAt,
+        });
+        runtimeEvents.publish({
+            resource: 'session',
+            action: 'updated',
+            resourceId: sessionId,
+            sessionId,
+            mode: updatedSessionDto.mode,
+            state: updatedSessionDto,
+            timestamp: completedAt,
+        });
+    } catch (error) {
+        const failedAt = new Date().toISOString();
+        await db
+            .updateTable('runs')
+            .set({
+                error: formatThrownValue(error),
+                failedAt,
                 status: 'failed',
-                timestamp: failedAt,
-            });
-            dependencies.runtimeEvents.publish({
-                resource: 'session',
-                action: 'updated',
-                resourceId: sessionId,
-                sessionId,
-                mode: failedSessionDto.mode,
-                state: failedSessionDto,
-                timestamp: failedAt,
-            });
-            throw error;
-        }
-
-        const run = await dependencies.appDb.db
-            .selectFrom('runs')
-            .selectAll()
+                updatedAt: failedAt,
+            })
             .where('id', '=', runId)
-            .executeTakeFirstOrThrow();
-
-        return {
-            createdAt: run.startedAt ?? undefined,
-            error: run.error ?? undefined,
-            failedAt: run.failedAt ?? undefined,
-            id: run.id,
-            mode: run.mode,
-            sessionEntries: persistedEntries,
-            sessionId: run.sessionId,
-            status: run.status,
-            updatedAt: run.updatedAt,
-        };
-    },
-});
+            .execute();
+        await db
+            .updateTable('sessions')
+            .set({
+                activeRunId: null,
+                updatedAt: failedAt,
+            })
+            .where('id', '=', sessionId)
+            .execute();
+        const failedSessionDto = await fetchSessionDto(db, sessionId);
+        runtimeEvents.publish({
+            resource: 'run',
+            action: 'failed',
+            resourceId: runId,
+            sessionId,
+            status: 'failed',
+            timestamp: failedAt,
+        });
+        runtimeEvents.publish({
+            resource: 'session',
+            action: 'updated',
+            resourceId: sessionId,
+            sessionId,
+            mode: failedSessionDto.mode,
+            state: failedSessionDto,
+            timestamp: failedAt,
+        });
+    }
+};
 
 const normalizeCreateRunRequest = (request: CreateRunDto): CreateRunDto & { prompt: string; retrievalTurnLimit: number } => {
     const prompt = request.prompt.trim();
