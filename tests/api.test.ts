@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiHandler } from '@server/api/index.js';
 import { createTaggedError } from '@/errors.js';
 import { AppContext } from '@server/app.js';
-import { RunDto } from '@/dto/index.js';
+import { RunDto, LEGACY_NPC_SESSION_ID } from '@/dto/index.js';
 import { createInMemoryAppDb } from './support/app-db.js';
 
 // ── Inline mock helpers ───────────────────────────────────────────────────────
@@ -203,6 +203,19 @@ describe('API router', () => {
             expect.objectContaining({ sessionId: 'sess-1', prompt: 'hello' }),
         );
         expect(res.json<{ id: string }>().id).toBe('run-1');
+    });
+
+    it('rejects POST /api/v2/runs for the legacy NPC session', async () => {
+        const body = JSON.stringify({ sessionId: LEGACY_NPC_SESSION_ID, prompt: 'hello', mode: 'npc', retrievalTurnLimit: 1 });
+        const req = makeRequest('POST', '/api/v2/runs', body);
+        const res = makeResponse();
+
+        handler(req, res as unknown as ServerResponse);
+
+        await vi.waitFor(() => expect(res.writableEnded).toBe(true));
+
+        expect(res.statusCode).toBe(400);
+        expect(mockStartRun).not.toHaveBeenCalled();
     });
 
     it('reads refresh state from GET /api/v2/refresh', async () => {

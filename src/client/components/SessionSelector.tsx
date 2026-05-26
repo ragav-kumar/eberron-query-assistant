@@ -1,5 +1,5 @@
 import { useSessionContext, TEMP_SESSION_ID } from './SessionContext/index.js';
-import { SessionMode } from '@/dto/index.js';
+import { SessionMode, LEGACY_NPC_SESSION_ID } from '@/dto/index.js';
 import styles from './SessionSelector.module.css';
 import { ChangeEvent } from 'react';
 import { Button } from './Button.js';
@@ -37,7 +37,7 @@ export const SessionSelector = ({mode}:SessionSelectorProps) => {
                         key={session.id}
                         value={session.id}
                     >
-                        {session.createdAt.slice(0, 10)} ({session.runCount}) - {session.title}
+                        {session.createdAt.slice(0, 10)} ({session.runCount}) - {session.title}{session.id === LEGACY_NPC_SESSION_ID ? ' (read-only)' : ''}
                     </option>
                 ))}
             </select>

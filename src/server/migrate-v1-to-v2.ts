@@ -9,6 +9,7 @@ import { Insertable, Transaction } from 'kysely';
 
 import { createAppDb, AppDatabaseSchema, AppDb } from './db/app/index.js';
 import { settingKeys } from './db/app/settings/settingKeys.js';
+import { LEGACY_NPC_SESSION_ID } from '@/dto/index.js';
 
 interface LegacyMigrationConfig {
     assistant: {
@@ -120,7 +121,6 @@ interface NormalizedLogFile {
 
 const LEGACY_LOG_SESSION_ID_PREFIX = 'legacy-log-';
 const LEGACY_NPC_RUN_ID = 'legacy-v1-npc-run';
-const LEGACY_NPC_SESSION_ID = 'legacy-v1-npc-session';
 const LEGACY_GENERATED_NPCS_LOG_FILE = 'generated_npcs.md';
 const LEGACY_RESPONSE_TITLE = 'Untitled Response';
 const LEGACY_LOG_FILENAME_PATTERN = /^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})\s+(.+)$/;
@@ -364,6 +364,7 @@ const migrateLegacyNpcs = async (config: LegacyMigrationConfig, trx: DbTransacti
     await trx
         .insertInto('npcs')
         .values(legacyNpcs.map<Insertable<AppDatabaseSchema['npcs']>>(npc => ({
+            id: npc.id,
             age: npc.age ?? null,
             bio: npc.bio,
             createdAt: npc.createdAt,

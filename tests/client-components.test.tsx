@@ -9,6 +9,7 @@ import { NpcCards } from '@client/components/NpcCards/index.js';
 import { AdditionalContextInput } from '@client/components/AdditionalContextInput.js';
 import { TEMP_SESSION_ID } from '@client/components/SessionContext/SessionProvider.js';
 import { NpcDto, RunDto, SessionDto } from '@/client/api/index.js';
+import { LEGACY_NPC_SESSION_ID } from '@/dto/index.js';
 import { SessionData } from '@client/components/SessionContext/SessionContext.js';
 import { SessionMode } from '@/types.js';
 import { SessionEntryDto } from '@/dto/runs.js';
@@ -246,6 +247,17 @@ describe('V2 client components', () => {
         expect(screen.getByRole('button', { name: 'Submit' }).hasAttribute('disabled')).toBe(true);
     });
 
+    it('disables submit when the active session is the legacy NPC session', () => {
+        mocks.useSessionContext.mockReturnValue(makeContext({
+            activeSessions: { assistant: undefined, npc: makeSessionData(LEGACY_NPC_SESSION_ID, 'npc') },
+            activeTabState: { key: 'npc' as SessionMode, prompt: 'test', includePartyContext: false, retrievalTurnLimit: 1 },
+        }));
+
+        render(<Input />);
+
+        expect(screen.getByRole('button', { name: 'Submit' }).hasAttribute('disabled')).toBe(true);
+    });
+
     it('updates prompt retrievalTurnLimit and includePartyContext from input controls', () => {
         const patchActiveTabState = vi.fn();
         mocks.useSessionContext.mockReturnValue(makeContext({ patchActiveTabState }));
@@ -315,6 +327,19 @@ describe('V2 client components', () => {
         mocks.useAdditionalContextMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
         render(<AdditionalContextInput />);
         expect(screen.getByText('Saved')).toBeTruthy();
+    });
+
+    it('appends (read-only) to the label for the legacy NPC session', () => {
+        const sessions: SessionDto[] = [
+            { id: LEGACY_NPC_SESSION_ID, mode: 'npc', title: 'Legacy NPC Imports', runCount: 1, createdAt: '2024-01-01', updatedAt: '2024-01-01', activeRunId: null, includePartyContext: null },
+            { id: 's-2', mode: 'npc', title: 'Normal Session', runCount: 2, createdAt: '2024-01-02', updatedAt: '2024-01-02', activeRunId: null, includePartyContext: null },
+        ];
+        mocks.useSessionContext.mockReturnValue(makeContext({ sessionsByMode: vi.fn().mockReturnValue(sessions) }));
+
+        render(<SessionSelector mode='npc' />);
+
+        expect(screen.getByRole('option', { name: /Legacy NPC Imports \(read-only\)/ })).toBeTruthy();
+        expect(screen.queryByRole('option', { name: /Normal Session \(read-only\)/ })).toBeNull();
     });
 
     it('renders session options for the selected mode', () => {

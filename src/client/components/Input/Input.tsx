@@ -1,5 +1,6 @@
 import { useSessionContext } from '../SessionContext/index.js';
 import { TEMP_SESSION_ID } from '../SessionContext/SessionProvider.js';
+import { LEGACY_NPC_SESSION_ID } from '@/dto/index.js';
 import { Button } from '../Button.js';
 import styles from './Input.module.css';
 import { useRun } from './useRun.js';
@@ -50,7 +51,7 @@ export const Input = () => {
             <Button
                 variant='primary'
                 className={styles.button}
-                disabled={isBusy}
+                disabled={isBusy || activeSession?.id === LEGACY_NPC_SESSION_ID}
                 onClick={() => void submit()}
             >
                 Submit

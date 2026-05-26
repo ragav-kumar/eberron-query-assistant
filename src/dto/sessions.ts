@@ -1,6 +1,8 @@
 import { SessionMode } from '@/types.js';
 import { RunDto } from './runs.js';
 
+export const LEGACY_NPC_SESSION_ID = 'legacy-v1-npc-session';
+
 export interface SessionDto {
     id: string;
     mode: SessionMode;
