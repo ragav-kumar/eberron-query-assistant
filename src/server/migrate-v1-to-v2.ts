@@ -370,7 +370,6 @@ const migrateLegacyNpcs = async (config: LegacyMigrationConfig, trx: DbTransacti
             description: npc.description,
             ethnicity: npc.ethnicity ?? null,
             gender: npc.gender ?? null,
-            id: npc.id,
             name: npc.name,
             role: npc.role ?? null,
             runId: LEGACY_NPC_RUN_ID,
