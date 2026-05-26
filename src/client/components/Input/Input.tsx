@@ -1,5 +1,4 @@
-import { useSessionContext } from '../SessionContext/index.js';
-import { TEMP_SESSION_ID } from '../SessionContext/SessionProvider.js';
+import { useSessionContext, TEMP_SESSION_ID } from '../SessionContext/index.js';
 import { LEGACY_NPC_SESSION_ID } from '@/dto/index.js';
 import { Button } from '../Button.js';
 import styles from './Input.module.css';
