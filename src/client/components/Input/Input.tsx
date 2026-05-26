@@ -3,6 +3,7 @@ import { LEGACY_NPC_SESSION_ID } from '@/dto/index.js';
 import { Button } from '../Button.js';
 import styles from './Input.module.css';
 import { useRun } from './useRun.js';
+import { KeyboardEvent } from 'react';
 
 export const Input = () => {
     const { isBusy, activeTabState, patchActiveTabState, activeSessions } = useSessionContext();
@@ -10,6 +11,15 @@ export const Input = () => {
     const activeSession = activeSessions[activeTabState.key];
     // A real persisted session (not the temp sentinel) means a run has already been submitted.
     const isPartyContextLocked = activeSession != null && activeSession.id !== TEMP_SESSION_ID;
+    const isSubmitDisabled = isBusy || activeSession?.id === LEGACY_NPC_SESSION_ID;
+
+    /** Submits the form when Ctrl+Enter is pressed, mirroring the Submit button's disabled state. */
+    const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Enter' && e.ctrlKey && !isSubmitDisabled) {
+            e.preventDefault();
+            void submit();
+        }
+    };
 
     return (
         <div className={styles.wrap}>
@@ -45,12 +55,13 @@ export const Input = () => {
                 rows={8}
                 value={activeTabState.prompt}
                 onChange={(e) => patchActiveTabState({prompt: e.target.value})}
+                onKeyDown={handleKeyDown}
                 placeholder='Ask about Eberron lore, campaign notes, PDFs, or articles.'
             />
             <Button
                 variant='primary'
                 className={styles.button}
-                disabled={isBusy || activeSession?.id === LEGACY_NPC_SESSION_ID}
+                disabled={isSubmitDisabled}
                 onClick={() => void submit()}
             >
                 Submit
