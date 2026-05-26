@@ -100,17 +100,17 @@ Repo state after completion:
 
 - Close all known product gaps before declaring V2 complete. Phases 1–4 delivered the core workflows; this phase addresses the correctness bugs and missing surfaces that fell outside those phase scopes.
 - Server items:
-  - Fix the orphan-session bug: move `insertNewSession` inside the main run transaction in `src/server/services/run/coordinator.ts` so a failed run never leaves a stranded empty session row in the selector.
-  - Add an `orderBy` clause to `GET /api/v2/sessions` so sessions appear newest-first in the selector.
-  - ~~Resolve the `provider.ts` and `retrieval-tool.ts` technical-debt markers.~~ Done: both files were fully refactored. The diagnostic system (`ChatCompletionDiagnostic`, `onDiagnostic`, `debug` option) was removed as dead V1 overhead, `completeStructured` was made required on `ChatAdapter` (eliminating the optional-method wrapper in `retrieval-tool.ts`), and a broader overengineering review of the server produced eight additional cleanups: `visibility` made required in `RefreshCoordinatorDependencies`, `createConsoleEventPublisher` made synchronous, `ProgressReporter.progress` removed, `app.ts` path resolution simplified to resolve only `retrievalDir`, `refreshStateStore.ensure()` removed from `startRefresh()`, `StartupOrchestrator` merged into a single `initialize()`, `providerDebug` renamed to `consolePersist`, and a JSDoc comment added to `ConsoleEventPublisher.debug()`.
-- Client items (explain what is ready, let the user decide whether to implement personally):
-  - NPC mode needs a console-like feed of intermediate reasoning entries rendered during and after a run, ordered oldest-to-newest with the Thinking… indicator at the end. The feed data is already fetched via the session feed query; it just needs to be surfaced in `NpcCards`.
-  - `Input.tsx` should disable Submit while a refresh or reingest is active. The server already blocks the run correctly; this closes the UX gap. Wire `useRefreshQuery` into the Submit disabled state alongside the existing checks.
+  - ~~Fix the orphan-session bug: move `insertNewSession` inside the main run transaction in `src/server/services/run/coordinator.ts` so a failed run never leaves a stranded empty session row in the selector.~~ Done.
+  - ~~Add an `orderBy` clause to `GET /api/v2/sessions` so sessions appear newest-first in the selector.~~ Done.
+  - ~~Resolve the `provider.ts` and `retrieval-tool.ts` technical-debt markers.~~ Done.
+- Client items:
+  - NPC mode needs a console-like feed of intermediate reasoning entries rendered during and after a run, ordered oldest-to-newest with the Thinking… indicator at the end. The feed data is already fetched via the session feed query; it just needs to be surfaced in `NpcCards`. (Moved to its own task.)
+  - ~~Disable Submit while a refresh or reingest is active. The server already blocks the run correctly; this closes the UX gap.~~ Done: wired into `isBusy` in `SessionProvider.tsx`.
 - Human testable:
-  - Submit a first prompt on a new session that fails mid-run; reload and confirm no orphan session row appears in the selector.
-  - Create several sessions; confirm the selector lists them newest-first.
+  - ~~Submit a first prompt on a new session that fails mid-run; reload and confirm no orphan session row appears in the selector.~~
+  - ~~Create several sessions; confirm the selector lists them newest-first.~~
   - Start an NPC run; confirm intermediate reasoning steps appear in a console-like feed above the card grid while the run is in progress.
-  - Trigger a manual refresh; confirm Submit is visibly disabled for the duration.
+  - ~~Trigger a manual refresh; confirm Submit is visibly disabled for the duration.~~
 
 ## Phase 6: V1 Purge and Final Cleanup
 

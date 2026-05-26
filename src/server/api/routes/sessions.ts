@@ -37,7 +37,7 @@ export const sessionRoutes: RouteDefinition[] = [
             if (mode != null) {
                 query = query.where('sessions.mode', '=', mode as SessionMode);
             }
-            const sessionRows = await query.execute();
+            const sessionRows = await query.orderBy('sessions.updatedAt', 'desc').execute();
 
             const sessionDtos = sessionRows.map<SessionDto>(session => ({
                 ...session,

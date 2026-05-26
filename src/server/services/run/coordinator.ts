@@ -55,35 +55,45 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
 
             const runId = randomUUID();
             const now = new Date().toISOString();
-            const sessionId = normalized.sessionId ?? await insertNewSession(dependencies.appDb.db, normalized.mode, normalized.includePartyContext, now);
-            const session = await dependencies.appDb.db
-                .selectFrom('sessions')
-                .selectAll()
-                .where('id', '=', sessionId)
-                .executeTakeFirst();
-            if (!session) {
-                throw createTaggedError('run-session-missing', `Session "${sessionId}" does not exist.`);
-            }
-            if (session.mode !== normalized.mode) {
-                throw createTaggedError('run-session-mode-mismatch', `Session "${sessionId}" does not support ${normalized.mode} runs.`);
-            }
-
-            const existingEntries = await dependencies.appDb.db
-                .selectFrom('sessionEntries')
-                .selectAll()
-                .where('sessionId', '=', sessionId)
-                .orderBy('sequenceIndex', 'asc')
-                .execute();
-            let nextSequenceIndex = (existingEntries.at(-1)?.sequenceIndex ?? 0) + 1;
-            const requestSessionTitle = existingEntries.filter(entry => entry.kind === 'response').length === 0;
             const settings = settingsStore();
             const additionalContext = settings.read('additionalContext');
             const partyContext = normalized.includePartyContext
                 ? await dependencies.partyContext.build(dependencies.retrievalDir)
                 : '';
 
+            // All session setup and run writes are inside a single transaction so
+            // a new session insert is never left stranded if a later write fails.
+            let sessionId!: string;
+            let originalSessionTitle!: string;
+            let existingEntries!: SessionEntry[];
+            let nextSequenceIndex!: number;
+            let requestSessionTitle!: boolean;
             let userEntryDto!: SessionEntryDto;
+
             await dependencies.appDb.db.transaction().execute(async trx => {
+                sessionId = normalized.sessionId ?? await insertNewSession(trx, normalized.mode, normalized.includePartyContext, now);
+                const session = await trx
+                    .selectFrom('sessions')
+                    .selectAll()
+                    .where('id', '=', sessionId)
+                    .executeTakeFirst();
+                if (!session) {
+                    throw createTaggedError('run-session-missing', `Session "${sessionId}" does not exist.`);
+                }
+                if (session.mode !== normalized.mode) {
+                    throw createTaggedError('run-session-mode-mismatch', `Session "${sessionId}" does not support ${normalized.mode} runs.`);
+                }
+                originalSessionTitle = session.title;
+
+                existingEntries = await trx
+                    .selectFrom('sessionEntries')
+                    .selectAll()
+                    .where('sessionId', '=', sessionId)
+                    .orderBy('sequenceIndex', 'asc')
+                    .execute();
+                nextSequenceIndex = (existingEntries.at(-1)?.sequenceIndex ?? 0) + 1;
+                requestSessionTitle = existingEntries.filter(entry => entry.kind === 'response').length === 0;
+
                 await insertRun(trx, {
                     createdAt: now,
                     id: runId,
@@ -110,9 +120,9 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
                     title: null,
                     toolCallId: null,
                 });
+                nextSequenceIndex += 1;
                 userEntryDto = toSessionEntryDto(userEntry);
             });
-            nextSequenceIndex += 1;
 
             dependencies.runtimeEvents.publish({
                 resource: 'run',
@@ -139,7 +149,7 @@ export const createRunCoordinator = (dependencies: RunCoordinatorDependencies): 
                 existingEntries,
                 nextSequenceIndex,
                 normalized,
-                originalSessionTitle: session.title,
+                originalSessionTitle,
                 partyContext,
                 requestSessionTitle,
                 retrieval: dependencies.retrieval,
@@ -485,9 +495,9 @@ const toSessionEntryDto = (entry: SessionEntry): SessionEntryDto => ({
 
 /**
  * Inserts a new session row and returns its generated ID.
- * Called when a run arrives without a sessionId so that a durable session
- * exists before the transaction writes begin. includePartyContext is set
- * immediately from the run request so it is never null.
+ * Called within the run transaction when no sessionId is provided so the
+ * session insert and all run writes are committed atomically. includePartyContext
+ * is set from the run request so it is never null on the new session.
  */
 const insertNewSession = async (
     db: Kysely<AppDatabaseSchema>,

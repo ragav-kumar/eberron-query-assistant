@@ -14,12 +14,14 @@ vi.mock('remark-gfm', () => ({ default: () => null }));
 const apiMocks = vi.hoisted(() => ({
     useSessionsQuery: vi.fn(),
     useSessionFeedsQuery: vi.fn(),
+    useRefreshQuery: vi.fn(),
 }));
 
 vi.mock('@/client/api/index.js', () => ({
     sessionModes: ['assistant', 'npc'],
     useSessionsQuery: apiMocks.useSessionsQuery,
     useSessionFeedsQuery: apiMocks.useSessionFeedsQuery,
+    useRefreshQuery: apiMocks.useRefreshQuery,
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -72,6 +74,7 @@ beforeEach(() => {
     apiMocks.useSessionFeedsQuery.mockImplementation((ids: string[]) =>
         ids.map(id => ({ data: feedMap[id], isLoading: false, isPending: false })),
     );
+    apiMocks.useRefreshQuery.mockReturnValue({ data: { refreshStatus: 'completed', reingestStatus: 'pending' }, isLoading: false, isPending: false });
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────────
@@ -156,6 +159,30 @@ describe('V2 client session context', () => {
 
     it('reports busy while sessions or feeds are loading', () => {
         apiMocks.useSessionsQuery.mockReturnValue({ data: undefined, isLoading: true, isPending: true });
+
+        const { result } = renderHook(() => useSessionContext(), { wrapper });
+
+        expect(result.current.isBusy).toBe(true);
+    });
+
+    it('reports busy while a refresh operation is running', () => {
+        apiMocks.useRefreshQuery.mockReturnValue({
+            data: { refreshStatus: 'running', reingestStatus: 'pending' },
+            isLoading: false,
+            isPending: false,
+        });
+
+        const { result } = renderHook(() => useSessionContext(), { wrapper });
+
+        expect(result.current.isBusy).toBe(true);
+    });
+
+    it('reports busy while a reingest operation is running', () => {
+        apiMocks.useRefreshQuery.mockReturnValue({
+            data: { refreshStatus: 'completed', reingestStatus: 'running' },
+            isLoading: false,
+            isPending: false,
+        });
 
         const { result } = renderHook(() => useSessionContext(), { wrapper });
 

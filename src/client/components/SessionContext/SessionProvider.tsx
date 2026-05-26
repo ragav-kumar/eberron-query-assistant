@@ -6,6 +6,7 @@ import {
     SessionFeedDto,
     SessionMode,
     sessionModes,
+    useRefreshQuery,
     useSessionFeedsQuery,
     useSessionsQuery,
 } from '@/client/api/index.js';
@@ -30,9 +31,12 @@ export const SessionProvider = ({children}: { children: ReactNode }) => {
     const sessionFeedData = sessionFeedQueries
         .map(query => query.data)
         .filter((feed): feed is SessionFeedDto => feed != null);
+    const refreshQuery = useRefreshQuery();
     const isBusy =
         sessionsQuery.isLoading || sessionsQuery.isPending ||
-        sessionFeedQueries.some(q => q.isLoading || q.isPending);
+        sessionFeedQueries.some(q => q.isLoading || q.isPending) ||
+        refreshQuery.data?.refreshStatus === 'running' ||
+        refreshQuery.data?.reingestStatus === 'running';
 
     const patchActiveTabState = (patch: Partial<TabInputState>) => {
         setTabInputStates(prev => ({

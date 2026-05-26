@@ -123,6 +123,25 @@ describe('API router', () => {
         expect(sessions[0]!.includePartyContext).toBe(true);
     });
 
+    it('returns sessions ordered by updatedAt descending', async () => {
+        await appDb.db.insertInto('sessions').values([
+            { id: 's-older', mode: 'assistant', title: 'Older', activeRunId: null, includePartyContext: 1, archivedAt: null, createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
+            { id: 's-newer', mode: 'assistant', title: 'Newer', activeRunId: null, includePartyContext: 1, archivedAt: null, createdAt: '2024-02-01T00:00:00.000Z', updatedAt: '2024-02-01T00:00:00.000Z' },
+        ]).execute();
+
+        const req = makeRequest('GET', '/api/v2/sessions');
+        const res = makeResponse();
+
+        handler(req, res as unknown as ServerResponse);
+
+        await vi.waitFor(() => expect(res.writableEnded).toBe(true));
+
+        const sessions = res.json<Array<{ id: string }>>();
+        expect(sessions).toHaveLength(2);
+        expect(sessions[0]!.id).toBe('s-newer');
+        expect(sessions[1]!.id).toBe('s-older');
+    });
+
     it('filters sessions by mode', async () => {
         await appDb.db.insertInto('sessions').values([
             { id: 's-1', mode: 'assistant', title: 'A', activeRunId: null, includePartyContext: 1, archivedAt: null, createdAt: '2024-01-01T00:00:00.000Z', updatedAt: '2024-01-01T00:00:00.000Z' },
