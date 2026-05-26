@@ -50,36 +50,6 @@
     min-height: 0;
 }
 
-/* ─── Resize handles ──────────────────────────────────────────────────────── */
-
-/**
- * Vertical handle between the left and right columns.
- * react-resizable-panels sets flex-grow/shrink via inline style; width is controlled here.
- * The ::after pseudo-element provides the visible 2px drag bar.
- */
-.columnResizeHandle {
-    position: relative;
-    width: 6px;
-    background-color: var(--color-app-background);
-    cursor: col-resize;
-}
-
-.columnResizeHandle::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 2px;
-    background-color: var(--color-border-subtle);
-    transition: background-color 120ms ease;
-}
-
-.columnResizeHandle[data-separator='hover']::after,
-.columnResizeHandle[data-separator='active']::after {
-    background-color: var(--color-accent-primary);
-}
-
 /** Horizontal handle between the left-column tab area and the console. */
 .consoleResizeHandle {
     height: 5px;

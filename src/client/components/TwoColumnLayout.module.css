@@ -1,0 +1,22 @@
+.handle {
+    position: relative;
+    width: 6px;
+    background-color: var(--color-app-background);
+    cursor: col-resize;
+}
+
+.handle::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 2px;
+    background-color: var(--color-border-subtle);
+    transition: background-color 120ms ease;
+}
+
+.handle[data-separator='hover']::after,
+.handle[data-separator='active']::after {
+    background-color: var(--color-accent-primary);
+}
