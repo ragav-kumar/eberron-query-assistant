@@ -7,7 +7,6 @@
     "dev": "vite-node src/dev.ts",
     "dev:vite": "vite",
     "lint": "eslint .",
-    "migrate:v1-to-v2": "vite-node src/server/migrate-v1-to-v2.cli.ts",
     "prestart": "tsc --noEmit",
     "start": "vite",
     "start:server": "vite-node src/server/server.cli.ts",
