@@ -112,7 +112,7 @@ Repo state after completion:
   - ~~Start an NPC run; confirm intermediate reasoning steps appear in a console-like feed above the card grid while the run is in progress.~~
   - ~~Trigger a manual refresh; confirm Submit is visibly disabled for the duration.~~
 
-## Phase 6: V1 Purge and Final Cleanup
+## Phase 6: V1 Purge and Final Cleanup — COMPLETE
 
 - Only begin this phase once Phase 5 is complete.
 - Remove the migration CLI: delete `src/server/migrate-v1-to-v2.ts` and `src/server/migrate-v1-to-v2.cli.ts` (both carry explicit "delete during the v1 purge" comments), and remove the `migrate:v1-to-v2` npm script from `package.json`.
@@ -122,11 +122,22 @@ Repo state after completion:
   - V2 still starts and runs correctly with the migration scripts absent.
   - `npm run verify` passes.
 
+Repo state after completion:
+- `src/server/migrate-v1-to-v2.ts`, `src/server/migrate-v1-to-v2.cli.ts`, and `tests/migration.test.ts` are deleted; the `migrate:v1-to-v2` npm script is removed from `package.json`.
+- `docs/fdd-v2.md` console section updated: SSE-only confirmed, open GET question closed.
+- `docs/v1-legacy-reference.md` updated: dead migration entrypoint reference removed; legacy user data is preserved on disk.
+- The corpus database is at its permanent location (configured in app settings); no code changes required.
+- `LEGACY_NPC_SESSION_ID` protections remain in place as permanent data-layer guards for migrated users.
+
 ## Phase 7: Agent-Governance Cleanup
 
 - Treat this phase as separate follow-up work because it will require `Introspection` mode.
 - Remove this temporary planning document once it is no longer needed.
 - Clean up `CLAUDE.md`, `docs/agent-modes.md`, and any other transition-era agent instructions that only existed to support the V1 to V2 migration.
+- Delete `docs/v1-legacy-reference.md`: it was transition-era scaffolding; all V1 user data has been deleted and no migration-relevant content remains.
+  - Remove the dead reference to it from `docs/CLAUDE.md` (line referencing it as an acceptable V1-era reference).
+  - Remove the dead reference to it from `docs/AGENTS.md` (same).
+  - Remove the now-stale V1 user data preservation rules from root `CLAUDE.md` (the list of `.eberron-query-assistant/state/runtime-state.json`, `logs/*.json`, etc.).
 - Leave the remaining agent-governance docs aligned with the repo's post-migration steady state.
 - Human testable:
   - Not applicable beyond confirming the product still works after the prior phase; this phase is primarily documentation and workflow cleanup.

@@ -12,9 +12,7 @@ The following V1 artefacts are intentionally preserved for now:
 
 - `docs/fdd-v1.md` as historical product-behavior documentation for V1
 - `docs/known-v1-bugs.md` as a record of V1 pitfalls that should not be reintroduced
-- V1 user data on disk that may still need to be migrated into V2
-- the V1-to-V2 migration entrypoint under `src/server/migrate-v1-to-v2.ts`
-- only the minimum legacy parsing or config logic still needed to support re-migration
+- V1 user data on disk that has been migrated into V2 and must remain preserved
 
 ## Artefacts Intended For Removal
 
