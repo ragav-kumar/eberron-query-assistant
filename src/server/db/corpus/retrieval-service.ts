@@ -195,8 +195,10 @@ export const createCorpusRetrievalService = (
 
             if (options.forceRebuild) {
                 database.prepare('DELETE FROM chunk_vectors').run();
+                clearEmbeddingCheckpoint(database);
             }
 
+            backfillChunkContentHashes(database);
             deleteStaleVectorRows(database);
             const summary = await syncVectorStore(database, dependencies.embeddingAdapter, dependencies.reporter, options.abortSignal);
 
@@ -324,6 +326,13 @@ const initializeVectorStore = (database: Database.Database): void => {
 
     CREATE INDEX IF NOT EXISTS idx_chunk_vectors_compatibility
       ON chunk_vectors (embedding_model_id, embedding_schema_version, content_hash);
+
+    CREATE TABLE IF NOT EXISTS embedding_checkpoint (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      row_id INTEGER NOT NULL,
+      model_id TEXT NOT NULL,
+      schema_version TEXT NOT NULL
+    );
   `);
 
     database
@@ -523,8 +532,17 @@ const mergeResults = (
 /**
  * Synchronizes stored embedding rows with the current chunk contents.
  *
- * This is the core maintenance step that allows retrieval to reuse compatible
- * vectors across refreshes while only embedding changed or missing chunks.
+ * Combines a checkpoint with a pre-checkpoint content-hash scan so that
+ * interrupted runs can resume quickly:
+ *
+ * 1. Pre-checkpoint phase: a single SQL query finds any chunks before the
+ *    saved checkpoint whose content has changed since the prior run. These are
+ *    the only chunks that need API calls — the rest are verified without
+ *    touching the embedding adapter.
+ *
+ * 2. Post-checkpoint phase: normal batch loop starting where the last run
+ *    stopped. The checkpoint is advanced after every batch so an interruption
+ *    here loses at most one batch of work.
  */
 const syncVectorStore = async (
     database: Database.Database,
@@ -537,12 +555,52 @@ const syncVectorStore = async (
     let reusedEmbeddings = 0;
     let regeneratedEmbeddings = 0;
 
+    const checkpointRowId = readEmbeddingCheckpoint(database, embeddingAdapter);
+    const resumeNote = checkpointRowId > 0 ? `, resumeCheckpoint=${checkpointRowId}` : '';
     reporter.info(
-        `Retrieval embedding sync started: chunks=${chunkCount}, reused=0, remaining=${chunkCount}, model=${embeddingAdapter.modelId}.`,
+        `Retrieval embedding sync started: chunks=${chunkCount}${resumeNote}, model=${embeddingAdapter.modelId}.`,
     );
 
-    let lastRowId = 0;
-    let processedChunks = 0;
+    // Pre-checkpoint phase: verify chunks from a prior completed pass.
+    // In the common case (no content edits) the query returns nothing and this
+    // phase costs only one SQL round-trip.
+    const priorCount = checkpointRowId > 0 ? countChunksUpToRowId(database, checkpointRowId) : 0;
+    if (checkpointRowId > 0) {
+        const staleChunks = readStaleChunksBeforeCheckpoint(database, embeddingAdapter, checkpointRowId);
+        reusedEmbeddings += priorCount - staleChunks.length;
+
+        if (staleChunks.length > 0) {
+            reporter.info(
+                `Pre-checkpoint scan: ${staleChunks.length} stale chunk(s) before checkpoint row ${checkpointRowId}; re-embedding.`,
+            );
+            for (let offset = 0; offset < staleChunks.length; offset += EMBEDDING_BATCH_SIZE) {
+                throwIfAborted(abortSignal);
+                const embeddingBatch = staleChunks.slice(offset, offset + EMBEDDING_BATCH_SIZE);
+                const embeddings = await embeddingAdapter.embedBatch(embeddingBatch.map(chunk => toEmbeddingInput(chunk.content)));
+                throwIfAborted(abortSignal);
+
+                if (embeddings.length !== embeddingBatch.length) {
+                    throw new Error(`Embedding adapter returned ${embeddings.length} vectors for ${embeddingBatch.length} chunks.`);
+                }
+
+                const entries = embeddingBatch.map((chunk, index) => {
+                    const embedding = embeddings[index];
+                    if (!embedding) {
+                        throw new Error(`Embedding adapter did not return a vector for chunk ${chunk.chunkId}.`);
+                    }
+                    return { chunkId: chunk.chunkId, contentHash: chunk.contentHash, embedding };
+                });
+
+                upsertVectorRows(database, entries, embeddingAdapter);
+                regeneratedEmbeddings += entries.length;
+            }
+        }
+    }
+
+    // Post-checkpoint phase: pick up from the saved position and advance the
+    // checkpoint after each batch so restarts never lose more than one batch.
+    let lastRowId = checkpointRowId;
+    let processedChunks = priorCount;
     while (true) {
         throwIfAborted(abortSignal);
         const chunkBatch = readChunkEmbeddingBatch(database, lastRowId, REFRESH_CHUNK_BATCH_SIZE);
@@ -563,7 +621,6 @@ const syncVectorStore = async (
                 reusedEmbeddings += 1;
                 return false;
             }
-
             return true;
         });
 
@@ -582,12 +639,7 @@ const syncVectorStore = async (
                 if (!embedding) {
                     throw new Error(`Embedding adapter did not return a vector for chunk ${chunk.chunkId}.`);
                 }
-
-                return {
-                    chunkId: chunk.chunkId,
-                    contentHash: chunk.contentHash,
-                    embedding,
-                };
+                return { chunkId: chunk.chunkId, contentHash: chunk.contentHash, embedding };
             });
 
             upsertVectorRows(database, entries, embeddingAdapter);
@@ -596,6 +648,7 @@ const syncVectorStore = async (
 
         processedChunks += chunkBatch.length;
         lastRowId = chunkBatch[chunkBatch.length - 1]?.rowId ?? lastRowId;
+        writeEmbeddingCheckpoint(database, lastRowId, embeddingAdapter);
         reportProgress(
             reporter,
             `Retrieval embedding sync progress: processed=${processedChunks}/${chunkCount}, reused=${reusedEmbeddings}, regenerated=${regeneratedEmbeddings}, remaining=${chunkCount - processedChunks}, failedRetries=${embeddingAdapter.failedRetries ?? 0}, model=${embeddingAdapter.modelId}.`,
@@ -623,6 +676,122 @@ const countChunks = (database: Database.Database): number => {
     return result.count;
 };
 
+/**
+ * Counts how many chunks have a rowid at or below the given value.
+ *
+ * Used to initialize the progress counter when resuming from a checkpoint so
+ * the display starts at the number of already-verified chunks rather than zero.
+ */
+const countChunksUpToRowId = (database: Database.Database, rowId: number): number => {
+    const result = database
+        .prepare('SELECT COUNT(*) AS count FROM chunks WHERE rowid <= ?')
+        .get(rowId) as { count: number };
+    return result.count;
+};
+
+/**
+ * Fills any NULL content_hash values in the chunks table.
+ *
+ * Runs once after the column migration on existing installations. After this,
+ * all new chunks written by insertSource carry the hash at write time, so
+ * subsequent runs find nothing to backfill and return immediately.
+ */
+const backfillChunkContentHashes = (database: Database.Database): void => {
+    const rows = database
+        .prepare('SELECT rowid AS rowId, text AS content FROM chunks WHERE content_hash IS NULL')
+        .all() as Array<{ rowId: number; content: string }>;
+
+    if (rows.length === 0) {
+        return;
+    }
+
+    const update = database.prepare('UPDATE chunks SET content_hash = ? WHERE rowid = ?');
+    database.transaction(() => {
+        for (const row of rows) {
+            update.run(hashContent(row.content), row.rowId);
+        }
+    })();
+};
+
+/** Reads the saved checkpoint rowid for the current embedding adapter, or 0 if none exists. */
+const readEmbeddingCheckpoint = (database: Database.Database, embeddingAdapter: EmbeddingAdapter): number => {
+    const row = database
+        .prepare(
+            'SELECT row_id FROM embedding_checkpoint WHERE id = 1 AND model_id = ? AND schema_version = ?',
+        )
+        .get(embeddingAdapter.modelId, embeddingAdapter.schemaVersion) as { row_id: number } | undefined;
+    return row?.row_id ?? 0;
+};
+
+/** Persists the current embedding position so a future run can resume from here. */
+const writeEmbeddingCheckpoint = (
+    database: Database.Database,
+    rowId: number,
+    embeddingAdapter: EmbeddingAdapter,
+): void => {
+    database
+        .prepare(
+            `INSERT INTO embedding_checkpoint (id, row_id, model_id, schema_version)
+             VALUES (1, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+               row_id = excluded.row_id,
+               model_id = excluded.model_id,
+               schema_version = excluded.schema_version`,
+        )
+        .run(rowId, embeddingAdapter.modelId, embeddingAdapter.schemaVersion);
+};
+
+/** Clears the saved checkpoint. Called before a force-rebuild so the next run starts from zero. */
+const clearEmbeddingCheckpoint = (database: Database.Database): void => {
+    database.prepare('DELETE FROM embedding_checkpoint WHERE id = 1').run();
+};
+
+/**
+ * Returns all chunks at or before the checkpoint rowid whose stored content_hash
+ * no longer matches any compatible vector row.
+ *
+ * This is the fast pre-checkpoint verification pass: a single SQL query that
+ * short-circuits to nothing when all prior chunks are still up to date, and
+ * returns only the few that changed when content has been edited.
+ */
+const readStaleChunksBeforeCheckpoint = (
+    database: Database.Database,
+    embeddingAdapter: EmbeddingAdapter,
+    checkpointRowId: number,
+): EmbeddingChunk[] => {
+    const rows = database
+        .prepare(
+            `SELECT
+               c.rowid AS rowId,
+               c.chunk_id AS chunkId,
+               c.content_hash AS contentHash,
+               c.text AS content
+             FROM chunks c
+             WHERE c.rowid <= ?
+               AND NOT EXISTS (
+                 SELECT 1 FROM chunk_vectors cv
+                 WHERE cv.chunk_id = c.chunk_id
+                   AND cv.embedding_model_id = ?
+                   AND cv.embedding_schema_version = ?
+                   AND cv.content_hash = c.content_hash
+               )
+             ORDER BY c.rowid`,
+        )
+        .all(checkpointRowId, embeddingAdapter.modelId, embeddingAdapter.schemaVersion) as Array<{
+            rowId: number;
+            chunkId: string;
+            contentHash: string;
+            content: string;
+        }>;
+
+    return rows.map(row => ({
+        chunkId: row.chunkId,
+        content: row.content,
+        contentHash: row.contentHash,
+        rowId: row.rowId,
+    }));
+};
+
 const readChunkEmbeddingBatch = (
     database: Database.Database,
     afterRowId: number,
@@ -633,6 +802,7 @@ const readChunkEmbeddingBatch = (
             `SELECT
         rowid AS rowId,
         chunk_id AS chunkId,
+        content_hash AS contentHash,
         text AS content
       FROM chunks
       WHERE rowid > ?
@@ -642,13 +812,14 @@ const readChunkEmbeddingBatch = (
         .all(afterRowId, limit) as Array<{
             chunkId: string;
             content: string;
+            contentHash: string | null;
             rowId: number;
         }>;
 
     return rows.map(row => ({
         chunkId: row.chunkId,
         content: row.content,
-        contentHash: hashContent(row.content),
+        contentHash: row.contentHash ?? hashContent(row.content),
         rowId: row.rowId,
     }));
 };

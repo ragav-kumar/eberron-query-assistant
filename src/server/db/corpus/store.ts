@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { rm } from 'node:fs/promises';
 
 import { Database as BetterSqliteDatabase } from 'better-sqlite3';
@@ -264,9 +265,10 @@ const insertSource = (database: BetterSqliteDatabase, source: CorpusSource, chun
           source_id,
           chunk_index,
           text,
+          content_hash,
           citation_json,
           metadata_json
-        ) VALUES (?, ?, ?, ?, ?, ?)`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
     );
 
     for (const chunk of chunks) {
@@ -275,6 +277,7 @@ const insertSource = (database: BetterSqliteDatabase, source: CorpusSource, chun
             chunk.sourceId,
             chunk.chunkIndex,
             chunk.text,
+            createHash('sha256').update(chunk.text).digest('hex'),
             JSON.stringify(chunk.citation),
             JSON.stringify(chunk.metadata),
         );

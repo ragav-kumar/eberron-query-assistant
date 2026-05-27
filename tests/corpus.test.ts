@@ -12,6 +12,7 @@ import {
     createCorpusRetrievalService,
     createCorpusStore,
     createPartyContextService,
+    getCorpusDatabasePath,
     getVectorIndexPath,
     CorpusStore,
     EmbeddingAdapter,
@@ -228,6 +229,34 @@ describe('v2 corpus boundary', () => {
             expect(second.chunkCount).toBe(1);
             expect(second.reusedEmbeddings).toBe(1);
             expect(second.regeneratedEmbeddings).toBe(0);
+        });
+
+        it('re-embeds chunks whose content changed since the checkpoint was written', async () => {
+            // Two chunks are embedded on the first pass. Then the first chunk's
+            // vector row is manually deleted to simulate content-driven staleness
+            // — the same scenario that occurs when source material is edited in an
+            // area the checkpoint has already passed. The pre-checkpoint scan on
+            // the second pass must detect and re-embed the stale chunk without
+            // needing to iterate through all batches from scratch.
+            const source = makeSource('sharn-1');
+            const chunk0 = makeChunk(source, 'Sharn is a vertical city.');
+            const chunk1 = makeChunk({ ...source, sourceId: `${source.sourceType}:sharn-2`, sourceKey: 'sharn-2' }, 'Breland is a kingdom.');
+            await store.replaceSource(tmpDir, source, [chunk0]);
+            await store.replaceSource(tmpDir, { ...source, sourceId: `${source.sourceType}:sharn-2`, sourceKey: 'sharn-2' }, [chunk1]);
+
+            const service = createCorpusRetrievalService({ embeddingAdapter: mockAdapter, reporter: mockReporter });
+            await service.refresh(tmpDir);
+
+            // Simulate a stale vector: delete one chunk's embedding from chunk_vectors,
+            // as though the content changed between runs and the vector is now outdated.
+            const Database = (await import('better-sqlite3')).default;
+            const db = new Database(getCorpusDatabasePath(tmpDir));
+            db.prepare('DELETE FROM chunk_vectors WHERE chunk_id = ?').run(chunk0.chunkId);
+            db.close();
+
+            const second = await service.refresh(tmpDir);
+            expect(second.regeneratedEmbeddings).toBe(1);
+            expect(second.reusedEmbeddings).toBe(1);
         });
 
         it('deletes the legacy vector-index sidecar during force rebuild', async () => {

@@ -40,6 +40,14 @@ export const createCorpusSchema = (database: Database.Database): void => {
       );
     `);
 
+    // Additive migration: add content_hash column to chunks for existing databases.
+    // CREATE TABLE above uses IF NOT EXISTS, so this ALTER TABLE handles pre-existing installations.
+    try {
+        database.prepare('ALTER TABLE chunks ADD COLUMN content_hash TEXT').run();
+    } catch {
+        // Column already exists — safe to ignore.
+    }
+
     rebuildCorpusFts(database);
 };
 

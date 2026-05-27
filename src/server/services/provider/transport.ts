@@ -81,10 +81,16 @@ export const fetchWithRetry = async (
     let lastError: unknown = null;
 
     for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+        let retryAfterMs: number | null = null;
         try {
             const response = await fetchWithTimeout(url, init, options);
             if (!isRetryableStatus(response.status) || attempt === maxRetries) {
                 return response;
+            }
+            // Honor the provider's requested wait time on rate-limit responses so
+            // retries don't fire before the window actually resets.
+            if (response.status === 429) {
+                retryAfterMs = readRetryAfterMs(response.headers);
             }
             lastError = createTaggedError('provider-retryable-status', `Provider returned retryable status ${response.status}.`);
         } catch (error) {
@@ -95,7 +101,8 @@ export const fetchWithRetry = async (
         }
 
         options.onRetry?.();
-        await delay(retryDelayMs * 2 ** attempt);
+        const backoffMs = retryDelayMs * 2 ** attempt;
+        await delay(retryAfterMs !== null ? Math.max(backoffMs, retryAfterMs) : backoffMs);
     }
 
     throw lastError ?? createTaggedError('provider-request-failed', 'Provider request failed.');
@@ -133,4 +140,19 @@ const delay = async (durationMs: number): Promise<void> => {
     await new Promise<void>(resolve => {
         setTimeout(resolve, durationMs);
     });
+};
+
+/**
+ * Parses the `Retry-After` header into milliseconds.
+ *
+ * OpenAI returns this as a decimal-seconds string (e.g. "1.125") on 429
+ * responses. Returns null when the header is absent or cannot be parsed.
+ */
+const readRetryAfterMs = (headers: Headers): number | null => {
+    const value = headers.get('retry-after');
+    if (!value) {
+        return null;
+    }
+    const seconds = parseFloat(value);
+    return isNaN(seconds) || seconds <= 0 ? null : Math.ceil(seconds * 1000);
 };
