@@ -45,3 +45,17 @@ These are "standard" actions. Players can absolutely use their RAW actions as we
 - Roll vs Resolve DC, usually with modifiers based on whether the offer respects their Lever/Armor.
 - Success: take the Compromise outcome now.
 - Failure: NPC worsens the terms or uses a move.
+
+# Settings modal
+- Add a settings modal to allow configuring items from the Settings DB table.
+- Move "Additional Context" into this modal as a resizable textarea.
+
+# Reclaim left pane
+- Discard the left pane.
+- The console is now a collapsible left-sidebar, which auto expands during refresh or reingest.
+- Input will now work like in normal ai chatbots: an input area at the bottom of the feed.
+  - Figure out how to integrate all current controls into it
+- As part of this, there will be only one chat component. Assistant tab maximizes this component, but all components render it.
+
+# Third mode
+- Uh... I can't remember what my plan for this was...
