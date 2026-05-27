@@ -57,5 +57,12 @@ These are "standard" actions. Players can absolutely use their RAW actions as we
   - Figure out how to integrate all current controls into it
 - As part of this, there will be only one chat component. Assistant tab maximizes this component, but all components render it.
 
-# Third mode
-- Uh... I can't remember what my plan for this was...
+# NPC <-> Assistant integration
+- An assistant session can, on demand, be used for NPC generation.
+  - Easiest by providing a mechanism to feed the assistant conversation, or perhaps a compact version of it, into an NPC session
+  - But it'd be cool if the npc was still linked to the actual assistant session
+  - would require blurring the line between session kinds
+- Also the other direction: an assistant session can see NPC cards
+  - Possibly by marking them to be included in the session
+  - Or via a tool which lets it search for them.
+  - Would require curation tools: marking NPCs as searchable or not, and maybe also NPC deletion.
