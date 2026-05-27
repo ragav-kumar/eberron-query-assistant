@@ -231,6 +231,55 @@ describe('v2 corpus boundary', () => {
             expect(second.regeneratedEmbeddings).toBe(0);
         });
 
+        it('preserves chunk_vectors for unchanged chunks when a source is re-ingested', async () => {
+            // Simulates the mid-run restart scenario: a source was ingested and
+            // partially embedded, then the pipeline restarted and re-scheduled the
+            // same source for re-ingestion. Without preservation the CASCADE delete
+            // on the source row wipes all chunk_vectors, forcing a full re-embed.
+            const source = makeSource('sharn-1');
+            const chunk = makeChunk(source, 'Sharn is a vertical city.');
+
+            await store.applySourceChanges(tmpDir, {
+                changes: [{ kind: 'upsert', source, chunks: [chunk] }],
+            });
+            const service = createCorpusRetrievalService({ embeddingAdapter: mockAdapter, reporter: mockReporter });
+            await service.refresh(tmpDir);
+            expect((mockAdapter.embedBatch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+
+            // Re-ingest the same source with the same chunk content (no content change).
+            await store.applySourceChanges(tmpDir, {
+                changes: [{ kind: 'upsert', source, chunks: [chunk] }],
+            });
+
+            // The second refresh must reuse the preserved vector without any new API calls.
+            const second = await service.refresh(tmpDir);
+            expect(second.reusedEmbeddings).toBe(1);
+            expect(second.regeneratedEmbeddings).toBe(0);
+            expect((mockAdapter.embedBatch as ReturnType<typeof vi.fn>).mock.calls.length).toBe(1);
+        });
+
+        it('drops chunk_vectors for chunks whose content changed on re-ingestion', async () => {
+            // When re-ingesting with changed chunk text, the vector must be discarded
+            // so the retrieval service re-embeds the new content.
+            const source = makeSource('sharn-1');
+            const originalChunk = makeChunk(source, 'Sharn is a vertical city.');
+
+            await store.applySourceChanges(tmpDir, {
+                changes: [{ kind: 'upsert', source, chunks: [originalChunk] }],
+            });
+            const service = createCorpusRetrievalService({ embeddingAdapter: mockAdapter, reporter: mockReporter });
+            await service.refresh(tmpDir);
+
+            const changedChunk = makeChunk(source, 'Sharn is the City of Towers, soaring above the Dagger River.');
+            await store.applySourceChanges(tmpDir, {
+                changes: [{ kind: 'upsert', source, chunks: [changedChunk] }],
+            });
+
+            const second = await service.refresh(tmpDir);
+            expect(second.regeneratedEmbeddings).toBe(1);
+            expect(second.reusedEmbeddings).toBe(0);
+        });
+
         it('re-embeds chunks whose content changed since the checkpoint was written', async () => {
             // Two chunks are embedded on the first pass. Then the first chunk's
             // vector row is manually deleted to simulate content-driven staleness

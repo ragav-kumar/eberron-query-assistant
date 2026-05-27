@@ -6,6 +6,15 @@ import { Database as BetterSqliteDatabase } from 'better-sqlite3';
 import { createTaggedError } from '@/errors.js';
 import { CorpusChunk, CorpusSource, SourceType } from '@/types.js';
 
+interface SavedVectorRow {
+    chunkId: string;
+    contentHash: string;
+    embeddingModelId: string;
+    embeddingSchemaVersion: string;
+    embeddingJson: string;
+    updatedAt: string;
+}
+
 import { createCorpusDatabase, getCorpusDatabasePath } from './database.js';
 import { createCorpusSchema, isCompatibleCorpusSchema, rebuildCorpusFts } from './schema.js';
 
@@ -156,11 +165,13 @@ export const createCorpusStore = (): CorpusStore => {
                             change.sourceKey,
                         );
                     } else {
+                        const restoreVectors = makeChunkVectorPreserver(database, change.source.sourceId);
                         database.prepare('DELETE FROM sources WHERE source_type = ? AND source_key = ?').run(
                             change.source.sourceType,
                             change.source.sourceKey,
                         );
                         insertSource(database, change.source, change.chunks);
+                        restoreVectors(change.chunks);
                     }
                 }
                 rebuildCorpusFts(database);
@@ -179,8 +190,10 @@ export const createCorpusStore = (): CorpusStore => {
         replaceSource: async (retrievalDir, source, chunks) => {
             const database = await corpusDatabase.open(retrievalDir);
             database.transaction(() => {
+                const restoreVectors = makeChunkVectorPreserver(database, source.sourceId);
                 database.prepare('DELETE FROM sources WHERE source_type = ? AND source_key = ?').run(source.sourceType, source.sourceKey);
                 insertSource(database, source, chunks);
+                restoreVectors(chunks);
                 rebuildCorpusFts(database);
             })();
         },
@@ -224,6 +237,75 @@ export const createCorpusStore = (): CorpusStore => {
         },
 
         close: corpusDatabase.close,
+    };
+};
+
+/**
+ * Captures existing chunk_vectors rows for one source before it is deleted,
+ * returning a restore function that re-inserts those rows after the source is
+ * replaced, but only for chunks whose chunk_id and content_hash still match.
+ *
+ * This prevents the CASCADE delete on sources from destroying embedding work
+ * for chunks whose content did not actually change across a re-ingestion pass.
+ * Chunks with changed content are correctly left without a vector so the
+ * retrieval refresh will re-embed them.
+ *
+ * Because corpus store writes run before the retrieval service initializes,
+ * chunk_vectors may not exist yet. When the table is absent this is a no-op.
+ */
+const makeChunkVectorPreserver = (
+    database: BetterSqliteDatabase,
+    sourceId: string,
+): (newChunks: CorpusChunk[]) => void => {
+    const tableExists = database
+        .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='chunk_vectors'")
+        .get();
+    if (!tableExists) {
+        return () => undefined;
+    }
+
+    const savedRows = database
+        .prepare(
+            `SELECT cv.chunk_id AS chunkId,
+                    cv.content_hash AS contentHash,
+                    cv.embedding_model_id AS embeddingModelId,
+                    cv.embedding_schema_version AS embeddingSchemaVersion,
+                    cv.embedding_json AS embeddingJson,
+                    cv.updated_at AS updatedAt
+             FROM chunk_vectors cv
+             INNER JOIN chunks c ON c.chunk_id = cv.chunk_id
+             WHERE c.source_id = ?`,
+        )
+        .all(sourceId) as SavedVectorRow[];
+
+    if (savedRows.length === 0) {
+        return () => undefined;
+    }
+
+    const savedByChunkId = new Map(savedRows.map(row => [row.chunkId, row]));
+    const insertVector = database.prepare(
+        `INSERT INTO chunk_vectors (
+             chunk_id, content_hash, embedding_model_id,
+             embedding_schema_version, embedding_json, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(chunk_id) DO NOTHING`,
+    );
+
+    return (newChunks: CorpusChunk[]) => {
+        for (const chunk of newChunks) {
+            const newContentHash = createHash('sha256').update(chunk.text).digest('hex');
+            const saved = savedByChunkId.get(chunk.chunkId);
+            if (saved && saved.contentHash === newContentHash) {
+                insertVector.run(
+                    chunk.chunkId,
+                    saved.contentHash,
+                    saved.embeddingModelId,
+                    saved.embeddingSchemaVersion,
+                    saved.embeddingJson,
+                    saved.updatedAt,
+                );
+            }
+        }
     };
 };
 
