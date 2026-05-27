@@ -1,0 +1,32 @@
+.overlay {
+    align-items: center;
+    background: rgb(0 0 0 / 0.55);
+    display: flex;
+    inset: 0;
+    justify-content: center;
+    opacity: 0;
+    position: fixed;
+    transition: opacity 150ms ease;
+    z-index: 1000;
+}
+
+.overlay[data-visible='true'] {
+    opacity: 1;
+}
+
+.modal {
+    background: var(--color-surface-raised);
+    border: 1px solid var(--color-border-default);
+    border-radius: 8px;
+    box-shadow: var(--shadow-panel);
+    max-height: 90vh;
+    max-width: 90vw;
+    overflow: auto;
+    padding: 1.5rem;
+    transform: scale(0.95);
+    transition: transform 150ms ease;
+}
+
+.overlay[data-visible='true'] .modal {
+    transform: scale(1);
+}
