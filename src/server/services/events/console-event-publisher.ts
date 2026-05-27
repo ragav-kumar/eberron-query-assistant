@@ -13,12 +13,12 @@ export interface ConsoleEventPublisher {
      * inspection, without surfacing it at info/warn/error severity in normal
      * operation.
      */
-    debug(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
-    error(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
-    info(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
+    debug(message: string, timestamp?: string, template?: string): Promise<ConsoleEntryDto>;
+    error(message: string, timestamp?: string, template?: string): Promise<ConsoleEntryDto>;
+    info(message: string, timestamp?: string, template?: string): Promise<ConsoleEntryDto>;
     snapshot(): Promise<ConsoleEntryDto[]>;
     subscribe(listener: ConsoleEventSubscriber): () => void;
-    warn(message: string, timestamp?: string): Promise<ConsoleEntryDto>;
+    warn(message: string, timestamp?: string, template?: string): Promise<ConsoleEntryDto>;
 }
 
 export const createConsoleEventPublisher = (appDb: AppDb): ConsoleEventPublisher => {
@@ -30,12 +30,14 @@ export const createConsoleEventPublisher = (appDb: AppDb): ConsoleEventPublisher
         level: ConsoleLevel,
         message: string,
         timestamp = new Date().toISOString(),
+        template?: string,
     ): Promise<ConsoleEntryDto> => {
         const entry: ConsoleEntryDto = {
             id: randomUUID(),
             level,
             message,
             timestamp,
+            ...(template !== undefined ? { template } : {}),
         };
 
         inMemoryEntries.push(entry);
@@ -45,6 +47,7 @@ export const createConsoleEventPublisher = (appDb: AppDb): ConsoleEventPublisher
                 id: entry.id,
                 level: entry.level,
                 message: entry.message,
+                template: entry.template ?? null,
             }).execute();
         }
 
@@ -56,9 +59,9 @@ export const createConsoleEventPublisher = (appDb: AppDb): ConsoleEventPublisher
     };
 
     return {
-        debug: (message, timestamp) => publish('debug', message, timestamp),
-        error: (message, timestamp) => publish('error', message, timestamp),
-        info: (message, timestamp) => publish('info', message, timestamp),
+        debug: (message, timestamp, template) => publish('debug', message, timestamp, template),
+        error: (message, timestamp, template) => publish('error', message, timestamp, template),
+        info: (message, timestamp, template) => publish('info', message, timestamp, template),
         snapshot: async () => {
             if (!shouldPersist) {
                 return [...inMemoryEntries];
@@ -76,6 +79,7 @@ export const createConsoleEventPublisher = (appDb: AppDb): ConsoleEventPublisher
                 level: entry.level,
                 message: entry.message,
                 timestamp: entry.createdAt,
+                ...(entry.template !== null ? { template: entry.template } : {}),
             }));
         },
         subscribe: listener => {
@@ -84,6 +88,6 @@ export const createConsoleEventPublisher = (appDb: AppDb): ConsoleEventPublisher
                 subscribers.delete(listener);
             };
         },
-        warn: (message, timestamp) => publish('warn', message, timestamp),
+        warn: (message, timestamp, template) => publish('warn', message, timestamp, template),
     };
 };

@@ -33,8 +33,8 @@ export interface EmbeddingAdapter {
 
 // from v1 runtime, consider culling
 export interface ProgressReporter {
-    info(message: string): void;
-    warn(message: string): void;
+    info(message: string, template?: string): void;
+    warn(message: string, template?: string): void;
 }
 
 
@@ -599,6 +599,7 @@ const syncVectorStore = async (
         reportProgress(
             reporter,
             `Retrieval embedding sync progress: processed=${processedChunks}/${chunkCount}, reused=${reusedEmbeddings}, regenerated=${regeneratedEmbeddings}, remaining=${chunkCount - processedChunks}, failedRetries=${embeddingAdapter.failedRetries ?? 0}, model=${embeddingAdapter.modelId}.`,
+            'retrieval-embedding-sync-progress',
         );
     }
 
@@ -609,8 +610,8 @@ const syncVectorStore = async (
     };
 };
 
-const reportProgress = (reporter: ProgressReporter, message: string): void => {
-    reporter.info(message);
+const reportProgress = (reporter: ProgressReporter, message: string, template?: string): void => {
+    reporter.info(message, template);
 };
 
 const deleteStaleVectorRows = (database: Database.Database): void => {

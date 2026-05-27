@@ -1,9 +1,16 @@
+import { useEffect, useRef } from 'react';
+
 import styles from './Console.module.css';
 import { useConsoleEntries } from '../api/index.js';
 import { joinClassNames } from '@/client/utils.js';
 
 export const Console = () => {
     const consoleLines = useConsoleEntries();
+    const bottomRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        bottomRef.current?.scrollIntoView();
+    }, [consoleLines]);
 
     return (
         <footer className={styles.wrap} data-testid='console-feed'>
@@ -16,6 +23,7 @@ export const Console = () => {
                     <span className={styles.message}>{entry.message}</span>
                 </div>
             ))}
+            <div ref={bottomRef} />
         </footer>
     );
 };

@@ -110,6 +110,7 @@ export interface ConsoleEntry {
     level: ConsoleLevel;
     message: string;
     createdAt: string;
+    template: string | null;
 }
 
 export interface AppDatabaseSchema {

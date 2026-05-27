@@ -127,6 +127,7 @@ export const createSchema = async (db: Kysely<AppDatabaseSchema>): Promise<void>
         .addColumn('level', 'text', column => column.notNull().check(sql`level in ('debug', 'error', 'info', 'warn')`))
         .addColumn('message', 'text', column => column.notNull())
         .addColumn('createdAt', 'text', column => column.notNull())
+        .addColumn('template', 'text')
         .execute();
 
     await db.schema
@@ -184,4 +185,12 @@ export const createSchema = async (db: Kysely<AppDatabaseSchema>): Promise<void>
         .on('ingestedArticles')
         .columns(['scrapeStatus', 'canonicalUrl'])
         .execute();
+
+    // Additive migration: add template column to consoleEntries for existing databases.
+    // CREATE TABLE above uses ifNotExists, so this ALTER TABLE handles pre-existing installations.
+    try {
+        await sql`ALTER TABLE consoleEntries ADD COLUMN template TEXT`.execute(db);
+    } catch {
+        // Column already exists — safe to ignore.
+    }
 };

@@ -101,14 +101,14 @@ export const createRefreshVisibility = (
             }));
         },
         reporterFor: kind => ({
-            info: message => {
+            info: (message, template) => {
                 const timestamp = new Date().toISOString();
-                void consoleEvents.info(message, timestamp);
+                void consoleEvents.info(message, timestamp, template);
                 publishRunningUpdate(kind, timestamp);
             },
-            warn: message => {
+            warn: (message, template) => {
                 const timestamp = new Date().toISOString();
-                void consoleEvents.warn(message, timestamp);
+                void consoleEvents.warn(message, timestamp, template);
                 publishRunningUpdate(kind, timestamp);
             },
         }),

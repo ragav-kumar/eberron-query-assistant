@@ -36,6 +36,11 @@ export const useConsoleSubscription = () => {
                 if (prev.some(e => e.id === entry.id)) {
                     return prev;
                 }
+                // Overwrite the last entry when both share a template (collapses progress-style spam).
+                const last = prev[prev.length - 1];
+                if (entry.template && last?.template === entry.template) {
+                    return [...prev.slice(0, -1), entry];
+                }
                 return [...prev, entry];
             });
         };

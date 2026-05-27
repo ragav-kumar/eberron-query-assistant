@@ -5,4 +5,6 @@ export interface ConsoleEntryDto {
     level: ConsoleLevel;
     message: string;
     timestamp: string;
+    /** When set, identifies the message shape. Consecutive entries sharing the same template are collapsed in the console UI rather than appended. */
+    template?: string;
 }
