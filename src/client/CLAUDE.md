@@ -17,10 +17,10 @@
 - A folder with a barrel `index` should share one stylesheet across the folder rather than having per-file stylesheets.
 - Keep simple one-off render helpers private to the module instead of promoting them into shared utilities too early.
 - Prefer CSS Modules for component-scoped styles, with a nearby `*.module.css` file and `styles.foo` access.
-- Prefer color tokens from `/src/client/v2/themes.css` instead of component-local hex values or one-off RGB literals. Add to the shared theme file first when a new reusable color is needed.
+- Prefer color tokens from `/src/client/themes.css` instead of component-local hex values or one-off RGB literals. Add to the shared theme file first when a new reusable color is needed.
 - Use shared utilities like `joinClassNames` for conditional class assembly instead of inline string building.
 - Prefer barrel exports such as local `index.ts` files when they simplify a component family or API surface without hiding ownership.
-- All API interactions must happen within `/src/client/v2/api`. Build custom API hooks around `queryApi`, `mutateApi`, contract definitions, and stable query-key exports.
+- All API interactions must happen within `/src/client/api`. Build custom API hooks around `queryApi`, `mutateApi`, contract definitions, and stable query-key exports.
 - Prefer colocated context modules that expose both the context object and a dedicated hook for consuming it.
 
 ## Testing and Verification

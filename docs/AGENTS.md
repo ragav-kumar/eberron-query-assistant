@@ -5,13 +5,7 @@
 - This file is primarily relevant during `Analysis` and `Introspection`.
 
 ## Docs Structure
-- Treat `docs/fdd-v1.md` as the intended design for V1.
-- Treat `docs/fdd-v2.md` as the intended design for V2.
-- Treat `docs/fdd-v1.md` as historical product behavior documentation for V1.
-- No repo-local V1 implementation remains in this repository.
-- Do not treat removed, archived, or external historical V1 implementation as a normal documentation source for V2 decisions.
-- Keep each versioned design doc focused on the theoretical intended behavior and requirements for that version.
-- Keep versioned design docs aligned with intended behavior, including documentation rules established through direct user discussion, rather than with known implementation bugs.
+- Treat `docs/SPEC.md` as the single authoritative specification for product behavior and requirements. Consult it first when preparing for any implementation or review task.
 - Treat `docs/agent-modes.md` as the single source of truth for mode behavior unless it becomes hard to scan or meaningfully unbalanced.
 - If `docs/agent-modes.md` grows enough that one mode dominates it, mode-specific examples or edge cases accumulate substantially, or routine edits start touching only one mode section, warn the user that it is time to consider splitting the mode doc.
 

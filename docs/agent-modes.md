@@ -28,7 +28,7 @@
 
 ## Analysis
 - Purpose: understand current and intended behavior before implementation.
-- Typical work includes reading docs, comparing V1 and V2 behavior, inferring V2 goals from specifications and existing code, and evaluating current state.
+- Typical work includes consulting `docs/SPEC.md` and other relevant docs, evaluating current behavior against the specification, and understanding the implementation before a task begins.
 - Code changes are not permitted.
 - Documentation changes are permitted only when the user explicitly requests documentation changes.
 - Agent-governance files may not be edited in this mode.
@@ -38,7 +38,7 @@
 ## Development
 - Purpose: implement behavior changes.
 - Code changes are expected in this mode.
-- For non-trivial work, consult `docs/fdd-v2.md` before making changes.
+- For non-trivial work, consult `docs/SPEC.md` before making changes.
 - Follow the root `CLAUDE.md` plus any relevant path-specific `CLAUDE.md` files for the areas being changed.
 - Documentation changes are not permitted in this mode.
 - Agent-governance files may not be edited in this mode.
@@ -66,10 +66,10 @@
 - Treat `npm audit` findings as actionable quality issues, not incidental noise. A vulnerability that can be fixed with an audit-driven dependency update is expected to be addressed when it is in scope to do so.
 - Treat any high or critical vulnerability that cannot currently be fixed as a serious concern that must be surfaced clearly to the user, even when it is unrelated to the code being changed.
 - If `npm audit` fails for vulnerabilities unrelated to the requested task, do not silently waive the failure. Report the failing audit result, explain whether it appears task-related, and let the user decide whether to treat the work as blocked or to narrow the acceptance scope for that task.
-- Always close any agent-started dev or server processes before finalizing, including repo-local Vite and V2 API server processes.
-- On Windows, do not treat a timed-out `npm run start`, `npm run start:v2-server`, or `npm run dev`, a stopped wrapper process, or a returned shell command as proof of cleanup.
-- After every agent-started dev or server run on Windows, explicitly verify cleanup by confirming that no repo-local `vite.js` process remains, no repo-local `vite-node` process running `src/server/v2/server.cli.ts` remains, and no listener remains on each port used for the check.
-- On Windows, cleanup verification for agent-started dev or server runs is incomplete until the repo-local `vite.js` check, the repo-local V2 API server process check, and the per-port listener checks all pass.
+- Always close any agent-started dev or server processes before finalizing, including repo-local Vite and API server processes.
+- On Windows, do not treat a timed-out `npm run start`, `npm run start:server`, or `npm run dev`, a stopped wrapper process, or a returned shell command as proof of cleanup.
+- After every agent-started dev or server run on Windows, explicitly verify cleanup by confirming that no repo-local `vite.js` process remains, no repo-local `vite-node` process running `src/server/server.cli.ts` remains, and no listener remains on each port used for the check.
+- On Windows, cleanup verification for agent-started dev or server runs is incomplete until the repo-local `vite.js` check, the repo-local API server process check, and the per-port listener checks all pass.
 - For any task in which any code was changed, use `npm run verify` as the final acceptance command unless the user explicitly says otherwise.
 - For any task that will affect the UI, perform a browser smoke test before handoff unless the user confirms the UI is already running.
 - When using the Playwright MCP for browser smoke tests, always pass an absolute path under `$CLAUDE_JOB_DIR` as the screenshot `filename`. Relative filenames resolve to the repo root and pollute the working tree.

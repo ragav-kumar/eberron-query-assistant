@@ -45,7 +45,3 @@
 - Execute `npm run test` when the task depends on automated test acceptance.
 - Any test failure whose reason is not `Not implemented.` is a blocking acceptance failure.
 - A `Not implemented.` failure is also blocking when the failing test is affected by the current task.
-
-## V1 and V2
-- V1 is frozen. Do not add new V1 tests.
-- New tests should target V2 behavior unless the user explicitly requests otherwise.
