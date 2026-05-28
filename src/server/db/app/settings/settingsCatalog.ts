@@ -13,7 +13,9 @@ export type SettingCatalogEntry =
     | { key: SettingKeyName; settingType: 'number';   label: string; section: string; description?: string; min?: number; max?: number }
     | { key: SettingKeyName; settingType: 'boolean';  label: string; section: string; description?: string }
     | { key: SettingKeyName; settingType: 'textarea'; label: string; section: string; description?: string }
-    | { key: SettingKeyName; settingType: 'array';    label: string; section: string; description?: string };
+    | { key: SettingKeyName; settingType: 'array';    label: string; section: string; description?: string }
+    | { key: SettingKeyName; settingType: 'url';      label: string; section: string; description?: string; placeholder?: string }
+    | { key: SettingKeyName; settingType: 'path';     label: string; section: string; description?: string; placeholder?: string };
 
 /**
  * Ordered list of all settings exposed through `GET /api/v2/settings`.
@@ -31,7 +33,7 @@ export const settingsCatalog: readonly SettingCatalogEntry[] = [
     },
     {
         key: 'providerBaseUrl',
-        settingType: 'string',
+        settingType: 'url',
         label: 'Base URL',
         section: 'Provider',
         description: 'Provider base address. Defaults to the OpenAI API.',

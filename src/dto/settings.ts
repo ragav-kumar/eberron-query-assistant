@@ -12,8 +12,10 @@
  *   'boolean'  → BooleanInput (checkbox)
  *   'textarea' → TextareaInput (resizable textarea)
  *   'array'    → ArrayInput (one entry per line, serialised as string[])
+ *   'url'      → UrlInput (<input type="url">, validates URL format)
+ *   'path'     → PathInput (plain text, validates non-empty and basic path syntax)
  */
-export type SettingType = 'string' | 'password' | 'number' | 'boolean' | 'textarea' | 'array';
+export type SettingType = 'string' | 'password' | 'number' | 'boolean' | 'textarea' | 'array' | 'url' | 'path';
 
 interface BaseSettingDto {
     /** Matches the camelCase key name in settingKeys.ts. */
@@ -66,10 +68,26 @@ export interface ArraySettingDto extends BaseSettingDto {
     value: string[];
 }
 
+export interface UrlSettingDto extends BaseSettingDto {
+    settingType: 'url';
+    value: string;
+    /** Forwarded to the input element as the HTML placeholder attribute. */
+    placeholder?: string;
+}
+
+export interface PathSettingDto extends BaseSettingDto {
+    settingType: 'path';
+    value: string;
+    /** Forwarded to the input element as the HTML placeholder attribute. */
+    placeholder?: string;
+}
+
 export type SettingDto =
     | StringSettingDto
     | PasswordSettingDto
     | NumberSettingDto
     | BooleanSettingDto
     | TextareaSettingDto
-    | ArraySettingDto;
+    | ArraySettingDto
+    | UrlSettingDto
+    | PathSettingDto;

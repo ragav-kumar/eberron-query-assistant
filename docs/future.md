@@ -80,6 +80,8 @@ Each takes `value`, `onChange`, `onBlur`, `label`, optional `description`, optio
 | `BooleanInput` | `<input type="checkbox">` with label to the right |
 | `TextareaInput` | `<textarea style="resize: vertical">` |
 | `ArrayInput` | `<textarea>`, one entry per line, serializes to `string[]` |
+| `UrlInput` | `<input type="url">` with URL format validation |
+| `PathInput` | `<input type="text">` with filesystem path validation |
 
 ### Save on blur — no Save button
 - Each field's `onBlur` calls `useSettingsMutation` with the full updated `SettingDto` if the value changed since the last server-confirmed state.
