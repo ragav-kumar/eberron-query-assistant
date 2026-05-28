@@ -10,7 +10,8 @@
       "PowerShell(Get-ChildItem -Path C:\\\\repos\\\\eberron-query-assistant\\\\src\\\\client -Force | Select-Object Name, @{Name='Type'; Expression={if\\($_.PSIsContainer\\){'DIR'}else{'FILE'}}} | Format-Table -AutoSize)",
       "PowerShell(Get-ChildItem -Path C:\\\\repos\\\\eberron-query-assistant\\\\src\\\\server\\\\v2 -Force | Select-Object Name, @{Name='Type'; Expression={if\\($_.PSIsContainer\\){'DIR'}else{'FILE'}}} | Format-Table -AutoSize)",
       "PowerShell(Get-ChildItem -Path C:\\\\repos\\\\eberron-query-assistant\\\\src\\\\client\\\\v2 -Force | Select-Object Name, @{Name='Type'; Expression={if\\($_.PSIsContainer\\){'DIR'}else{'FILE'}}} | Format-Table -AutoSize)",
-      "PowerShell(Get-ChildItem -Path C:\\\\repos\\\\eberron-query-assistant\\\\tests -Force | Select-Object Name, @{Name='Type'; Expression={if\\($_.PSIsContainer\\){'DIR'}else{'FILE'}}} | Format-Table -AutoSize)"
+      "PowerShell(Get-ChildItem -Path C:\\\\repos\\\\eberron-query-assistant\\\\tests -Force | Select-Object Name, @{Name='Type'; Expression={if\\($_.PSIsContainer\\){'DIR'}else{'FILE'}}} | Format-Table -AutoSize)",
+      "Bash(npm run *)"
     ]
   }
 }

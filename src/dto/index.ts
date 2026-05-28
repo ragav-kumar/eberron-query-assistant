@@ -1,5 +1,6 @@
 export * from './console.js';
 export * from './errors.js';
+export * from './settings.js';
 export * from './events.js';
 export * from './npcs.js';
 export * from './refresh.js';

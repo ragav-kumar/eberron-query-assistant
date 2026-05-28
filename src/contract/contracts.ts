@@ -10,10 +10,31 @@ import {
     SessionDto,
     SessionFeedDto,
     SessionMode,
+    SettingDto,
 } from '@/dto/index.js';
 import { defineEndpoint, defineEndpointWithQuery, defineSseEndpoint, EmptyParams } from './helpers.js';
 
 export const contracts = {
+    /**
+     * Settings expose the user-configurable subset of the Settings DB table.
+     * Each entry is a typed DTO carrying metadata (label, section, constraints)
+     * alongside the current value, so the client can render the correct input
+     * without any per-key hardcoding.
+     */
+    settings: {
+        /** Returns the full list of user-configurable settings with current values. */
+        get: defineEndpoint<null, SettingDto[]>({
+            method: 'GET',
+            path: '/api/v2/settings',
+        }),
+        /** Updates a single setting and returns the updated entry. */
+        put: defineEndpoint<SettingDto, SettingDto, { key: string }>({
+            method: 'PUT',
+            path: '/api/v2/settings/:key',
+            pathParams: ['key'],
+        }),
+    },
+
     /**
      * Additional context is a singleton Markdown document persisted on the local
      * disk and included in later assistant work.

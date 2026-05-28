@@ -16,6 +16,14 @@ export interface ConsoleEventPublisher {
     debug(message: string, timestamp?: string, template?: string): Promise<ConsoleEntryDto>;
     error(message: string, timestamp?: string, template?: string): Promise<ConsoleEntryDto>;
     info(message: string, timestamp?: string, template?: string): Promise<ConsoleEntryDto>;
+    /**
+     * Emits a console entry that is always persisted to the database,
+     * regardless of the `consolePersist` setting.
+     *
+     * Use for events that must survive process restarts, such as settings
+     * changes, which serve as an audit trail for accidental misconfiguration.
+     */
+    record(level: ConsoleLevel, message: string, timestamp?: string): Promise<ConsoleEntryDto>;
     snapshot(): Promise<ConsoleEntryDto[]>;
     subscribe(listener: ConsoleEventSubscriber): () => void;
     warn(message: string, timestamp?: string, template?: string): Promise<ConsoleEntryDto>;
@@ -58,10 +66,34 @@ export const createConsoleEventPublisher = (appDb: AppDb): ConsoleEventPublisher
         return entry;
     };
 
+    const persistAndPublish = async (
+        level: ConsoleLevel,
+        message: string,
+        timestamp = new Date().toISOString(),
+    ): Promise<ConsoleEntryDto> => {
+        const entry: ConsoleEntryDto = { id: randomUUID(), level, message, timestamp };
+
+        inMemoryEntries.push(entry);
+        await appDb.db.insertInto('consoleEntries').values({
+            createdAt: entry.timestamp,
+            id: entry.id,
+            level: entry.level,
+            message: entry.message,
+            template: null,
+        }).execute();
+
+        for (const subscriber of subscribers) {
+            subscriber(entry);
+        }
+
+        return entry;
+    };
+
     return {
         debug: (message, timestamp, template) => publish('debug', message, timestamp, template),
         error: (message, timestamp, template) => publish('error', message, timestamp, template),
         info: (message, timestamp, template) => publish('info', message, timestamp, template),
+        record: (level, message, timestamp) => persistAndPublish(level, message, timestamp),
         snapshot: async () => {
             if (!shouldPersist) {
                 return [...inMemoryEntries];
