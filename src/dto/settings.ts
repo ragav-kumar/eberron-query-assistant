@@ -14,8 +14,10 @@
  *   'array'    → ArrayInput (one entry per line, serialised as string[])
  *   'url'      → UrlInput (<input type="url">, validates URL format)
  *   'path'     → PathInput (plain text, validates non-empty and basic path syntax)
+ *   'readonly' → static display only; PUT returns 405. Value is string | null
+ *               (null = unset). Used for app state exposed for debugging.
  */
-export type SettingType = 'string' | 'password' | 'number' | 'boolean' | 'textarea' | 'array' | 'url' | 'path';
+export type SettingType = 'string' | 'password' | 'number' | 'boolean' | 'textarea' | 'array' | 'url' | 'path' | 'readonly';
 
 interface BaseSettingDto {
     /** Matches the camelCase key name in settingKeys.ts. */
@@ -82,6 +84,16 @@ export interface PathSettingDto extends BaseSettingDto {
     placeholder?: string;
 }
 
+export interface ReadonlySettingDto extends BaseSettingDto {
+    settingType: 'readonly';
+    /**
+     * Serialized current value. Null when the setting has no value yet
+     * (e.g. before the first successful ingestion run).
+     * Dates are formatted as ISO strings. Numbers and booleans are stringified.
+     */
+    value: string | null;
+}
+
 export type SettingDto =
     | StringSettingDto
     | PasswordSettingDto
@@ -90,4 +102,5 @@ export type SettingDto =
     | TextareaSettingDto
     | ArraySettingDto
     | UrlSettingDto
-    | PathSettingDto;
+    | PathSettingDto
+    | ReadonlySettingDto;
