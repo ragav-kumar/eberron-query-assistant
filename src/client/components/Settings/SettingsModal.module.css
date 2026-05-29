@@ -1,0 +1,200 @@
+/* ------------------------------------------------------------------ Modal */
+
+.modalContent {
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+    width: 540px;
+}
+
+.header {
+    align-items: center;
+    display: flex;
+    gap: 1rem;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+}
+
+.title {
+    color: var(--color-text-primary);
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0;
+}
+
+.body {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+    overflow-y: auto;
+}
+
+.loadStatus {
+    color: var(--color-text-muted);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+/* ----------------------------------------------------------------- Section */
+
+.section {
+    display: flex;
+    flex-direction: column;
+    gap: 0.875rem;
+}
+
+.sectionHeading {
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-tertiary);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.07em;
+    margin: 0;
+    padding-bottom: 0.5rem;
+    text-transform: uppercase;
+}
+
+/* ------------------------------------------------------------------- Field */
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.fieldLabel {
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+.fieldDescription {
+    color: var(--color-text-muted);
+    font-size: 0.78rem;
+    margin: 0 0 0.2rem;
+}
+
+.fieldStatus {
+    color: var(--color-text-subtle);
+    font-size: 0.75rem;
+    margin-top: 0.2rem;
+    min-height: 1em;
+}
+
+.fieldStatusError {
+    color: var(--color-danger-text);
+}
+
+/* --------------------------------------------------------------- Text input */
+
+.input {
+    background: var(--color-surface-panel);
+    border: 1px solid var(--color-border-default);
+    border-radius: 4px;
+    box-sizing: border-box;
+    color: var(--color-text-primary);
+    font-family: inherit;
+    font-size: 0.875rem;
+    line-height: 1.4;
+    padding: 0.4rem 0.6rem;
+    width: 100%;
+}
+
+.input:focus {
+    border-color: var(--color-accent-border);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+    outline: none;
+}
+
+.input[aria-invalid='true'] {
+    border-color: var(--color-danger-border);
+}
+
+.textarea {
+    min-height: 5rem;
+    resize: vertical;
+}
+
+/* ------------------------------------------------------------ Password input */
+
+.passwordWrap {
+    position: relative;
+}
+
+.passwordInput {
+    padding-right: 2.4rem;
+}
+
+.passwordToggle {
+    align-items: center;
+    background: none;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    display: flex;
+    line-height: 1;
+    padding: 0.25rem;
+    position: absolute;
+    right: 0.35rem;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.passwordToggle:hover {
+    color: var(--color-text-primary);
+}
+
+/* -------------------------------------------------------------- Readonly value */
+
+.readonlyValue {
+    color: var(--color-text-muted);
+    font-family: monospace;
+    font-size: 0.85rem;
+    margin: 0;
+    word-break: break-all;
+}
+
+/* ------------------------------------------------------- Boolean toggle (Radix) */
+
+.switchRoot {
+    background: var(--color-border-strong);
+    border: none;
+    border-radius: 11px;
+    cursor: pointer;
+    flex-shrink: 0;
+    height: 22px;
+    position: relative;
+    transition: background 180ms ease;
+    width: 40px;
+}
+
+.switchRoot:focus-visible {
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+    outline: none;
+}
+
+.switchRoot[data-state='checked'] {
+    background: var(--color-accent-primary);
+}
+
+.switchRoot:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+}
+
+.switchThumb {
+    background: var(--color-text-primary);
+    border-radius: 50%;
+    display: block;
+    height: 16px;
+    left: 3px;
+    position: absolute;
+    top: 3px;
+    transition: transform 180ms ease;
+    width: 16px;
+}
+
+.switchThumb[data-state='checked'] {
+    transform: translateX(18px);
+}
