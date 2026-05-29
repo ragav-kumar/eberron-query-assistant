@@ -89,13 +89,21 @@ All optional. If absent, incomplete, or referring to missing Foundry content: om
 
 ### Left Column
 
-- **Header area:** refresh controls and refresh status (last result: success, failure, or in-progress).
-- **Input tab:**
+- **Header area:** refresh controls, refresh status (last result: success, failure, or in-progress), and a gear button that opens the Settings modal.
+- **Input area:**
   - Include party info toggle. Locked after the first prompt is sent in a session; party context is only included in the first prompt of a conversation.
   - Extra retrieval turns control (range `0`–`3`, default `1`).
   - Prompt textarea. The controls and prompt area always reflect the active right-column mode tab.
-- **Additional Context tab:** editor for local assistant-only notes; not ingested as corpus content.
 - **Console panel:** persistent footer panel at the bottom of the left column, always visible and resizable. Receives SSE events via the runtime `console` stream. Fundamentally transient; output is not persisted beyond the process lifetime. No GET endpoint is needed.
+
+### Settings Modal
+
+- Accessible via the gear icon in the header.
+- Displays all user-configurable settings grouped by section.
+- Each field saves individually on blur; boolean toggles save on change. No explicit Save button.
+- A field with a validation error blocks save and prevents the modal from being dismissed.
+- The modal cannot be dismissed while any save is in progress.
+- Every write is logged to the console regardless of the consolePersist setting — this is the recovery path for accidental misconfiguration.
 
 ### Right Column
 
@@ -267,11 +275,8 @@ The NPC response must be a structured XML envelope conforming to this shape:
 - Local prompt guidance authored by the user; not part of the retrieval corpus and not cited as a source.
 - Intended for campaign notes, style guidance, local assumptions, or other assistant-only instructions.
 - There is exactly one additional context document, shared across all modes and sessions.
-- Fetched via GET automatically on app launch.
-- All subsequent changes are via PUT.
-- Created empty if it does not yet exist.
 - Included in prompts only when it contains text.
-- Editable in-app.
+- Editable via the Settings modal.
 - Local-only; not treated as transcript memory.
 
 ---
@@ -284,10 +289,10 @@ The NPC response must be a structured XML envelope conforming to this shape:
 - **POST refresh** — triggers routine refresh. Called automatically on app launch and by the Refresh UI button.
 - **POST reingest** — triggers force reingest. Called by the Force Reingest UI button after confirmation. Interrupts an ongoing refresh.
 
-### Additional Context
+### Settings
 
-- **GET additional context** — fetches the current additional context document. Called automatically on app launch.
-- **PUT additional context** — updates the additional context document.
+- **GET settings** — returns the full list of user-configurable settings with current values and metadata (type, label, section, constraints). Called on app launch.
+- **PUT settings** — updates a single setting by key. Every write is logged to the console.
 
 ### Sessions
 
