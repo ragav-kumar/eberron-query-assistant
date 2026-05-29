@@ -3,7 +3,6 @@ import { IncomingMessage, ServerResponse } from 'node:http';
 import FindMyWay from 'find-my-way';
 import { AppContext } from '../app.js';
 import { writeNotFound } from './not-found.js';
-import { additionalContextRoutes } from './routes/additional-context.js';
 import { settingsRoutes } from './routes/settings.js';
 import { eventRoutes } from './routes/events.js';
 import { npcRoutes } from './routes/npcs.js';
@@ -15,7 +14,6 @@ import { toApiErrorResponse, writeErrorJson } from './response.js';
 
 const routes: RouteDefinition[] = [
     ...settingsRoutes,
-    ...additionalContextRoutes,
     ...sessionRoutes,
     ...runRoutes,
     ...npcRoutes,

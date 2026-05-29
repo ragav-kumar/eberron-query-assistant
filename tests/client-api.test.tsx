@@ -7,7 +7,6 @@ import { ReactNode } from 'react';
 import { sessionQueryKey, useSessionFeedsQuery } from '@/client/api/hooks/sessions.js';
 import { refreshQueryKey, useRefreshMutation } from '@/client/api/hooks/refresh.js';
 import { npcQueryKey, useNpcsQuery } from '@/client/api/hooks/npc.js';
-import { useAdditionalContextMutation } from '@/client/api/hooks/additionalContext.js';
 import { useRuntimeSubscription } from '@/client/api/hooks/runtime.js';
 import { useConsoleEntries, useConsoleSubscription } from '@/client/api/hooks/console.js';
 import { RefreshDto } from '@/dto/index.js';
@@ -82,19 +81,6 @@ describe('V2 client API hooks', () => {
         await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
         expect(queryClient.getQueryData(refreshQueryKey)).toEqual(refreshDto);
-    });
-
-    it('optimistically updates additional context and rolls back on mutation failure', async () => {
-        queryClient.setQueryData(['api', 'context'], 'original');
-        vi.spyOn(global, 'fetch').mockRejectedValue(new Error('Network error'));
-
-        const { result } = renderHook(() => useAdditionalContextMutation(), { wrapper });
-
-        act(() => { result.current.mutate('new text'); });
-
-        await waitFor(() => expect(result.current.isError).toBe(true));
-
-        expect(queryClient.getQueryData(['api', 'context'])).toBe('original');
     });
 
     it('invalidates session, feed, and npc queries for run runtime events', () => {

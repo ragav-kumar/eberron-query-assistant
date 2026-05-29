@@ -1,5 +1,4 @@
 export * from '@/dto/index.js';
-export * from './hooks/additionalContext.js';
 export * from './hooks/settings.js';
 export * from './hooks/npc.js';
 export * from './hooks/console.js';

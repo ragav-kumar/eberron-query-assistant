@@ -6,7 +6,6 @@ import { Assistant } from '@client/components/Assistant/Assistant.js';
 import { Input } from '@client/components/Input/Input.js';
 import { SessionSelector } from '@client/components/SessionSelector.js';
 import { NpcCards } from '@client/components/NpcCards/index.js';
-import { AdditionalContextInput } from '@client/components/AdditionalContextInput.js';
 import { TEMP_SESSION_ID } from '@client/components/SessionContext/SessionProvider.js';
 import { NpcDto, RunDto, SessionDto } from '@/client/api/index.js';
 import { LEGACY_NPC_SESSION_ID } from '@/dto/index.js';
@@ -18,24 +17,11 @@ vi.mock('react-markdown', () => ({
     default: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
 vi.mock('remark-gfm', () => ({ default: () => null }));
-vi.mock('@mdxeditor/editor', () => ({
-    BoldItalicUnderlineToggles: () => null,
-    headingsPlugin: () => null,
-    listsPlugin: () => null,
-    markdownShortcutPlugin: () => null,
-    MDXEditor: ({ markdown }: { markdown: string }) => <div data-testid='mdxeditor'>{markdown}</div>,
-    quotePlugin: () => null,
-    toolbarPlugin: () => null,
-    UndoRedo: () => null,
-}));
-vi.mock('@mdxeditor/editor/style.css', () => ({}));
 
 const mocks = vi.hoisted(() => ({
     useSessionContext: vi.fn(),
     useRunsMutation: vi.fn(),
     useNpcsQuery: vi.fn(),
-    useAdditionalContextQuery: vi.fn(),
-    useAdditionalContextMutation: vi.fn(),
 }));
 
 vi.mock('@client/components/SessionContext/index.js', () => ({
@@ -49,8 +35,6 @@ vi.mock('@/client/api/index.js', () => ({
     useSessionsQuery: vi.fn().mockReturnValue({ data: [], isLoading: false, isPending: false }),
     useSessionFeedsQuery: vi.fn().mockReturnValue([]),
     useNpcsQuery: mocks.useNpcsQuery,
-    useAdditionalContextQuery: mocks.useAdditionalContextQuery,
-    useAdditionalContextMutation: mocks.useAdditionalContextMutation,
 }));
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -123,8 +107,6 @@ beforeEach(() => {
         mutateAsync: vi.fn().mockResolvedValue(makeRun('run-1', 'session-1')),
     });
     mocks.useNpcsQuery.mockReturnValue({ data: { npcs: [], totalCount: 0, skip: 0, take: 20, filter: '' }, isLoading: false, isPending: false });
-    mocks.useAdditionalContextQuery.mockReturnValue({ data: '', isLoading: false, isError: false });
-    mocks.useAdditionalContextMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
 });
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -298,35 +280,6 @@ describe('V2 client components', () => {
             }));
             expect(patchActiveTabState).toHaveBeenCalledWith({ prompt: '' });
         });
-    });
-
-    it('renders additional-context loading error saving and saved states', () => {
-        // Loading state: spinner text + status label
-        mocks.useAdditionalContextQuery.mockReturnValue({ data: undefined, isLoading: true, isError: false });
-        render(<AdditionalContextInput />);
-        expect(screen.getByRole('status').textContent).toBe('Loading context');
-        expect(screen.getByText('Loading context...')).toBeTruthy();
-        cleanup();
-
-        // Error state: error text + status label
-        mocks.useAdditionalContextQuery.mockReturnValue({ data: undefined, isLoading: false, isError: true });
-        render(<AdditionalContextInput />);
-        expect(screen.getByRole('status').textContent).toBe('Unable to load additional context.');
-        expect(screen.getByText('Context unavailable')).toBeTruthy();
-        cleanup();
-
-        // Saving state: mutation is pending
-        mocks.useAdditionalContextQuery.mockReturnValue({ data: 'some notes', isLoading: false, isError: false });
-        mocks.useAdditionalContextMutation.mockReturnValue({ mutate: vi.fn(), isPending: true });
-        render(<AdditionalContextInput />);
-        expect(screen.getByText('Saving...')).toBeTruthy();
-        cleanup();
-
-        // Saved state: defaults — data present, nothing pending
-        mocks.useAdditionalContextQuery.mockReturnValue({ data: 'some notes', isLoading: false, isError: false });
-        mocks.useAdditionalContextMutation.mockReturnValue({ mutate: vi.fn(), isPending: false });
-        render(<AdditionalContextInput />);
-        expect(screen.getByText('Saved')).toBeTruthy();
     });
 
     it('appends (read-only) to the label for the legacy NPC session', () => {

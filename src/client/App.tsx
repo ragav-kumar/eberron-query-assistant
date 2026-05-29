@@ -7,8 +7,8 @@ import { AppContext } from './AppContext.js';
 import { LeftColumnHeader } from './components/LeftColumnHeader.js';
 import { Console } from './components/Console.js';
 import { RightColumnTabs } from './components/RightColumnTabs.js';
-import { LeftColumnTabs } from './components/LeftColumnTabs.js';
 import { TwoColumnLayout } from './components/TwoColumnLayout.js';
+import { Input } from './components/Input/index.js';
 
 const queryClient = new QueryClient({
     defaultOptions: {
@@ -31,7 +31,7 @@ export const App = () => (
                             <Group orientation='vertical'>
                                 <Panel defaultSize='78%' minSize='6rem'>
                                     <div className={styles.panelFill}>
-                                        <LeftColumnTabs />
+                                        <Input />
                                     </div>
                                 </Panel>
                                 <Separator

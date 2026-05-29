@@ -36,10 +36,6 @@
     flex-direction: column;
     height: 100%;
     overflow: hidden;
-}
-
-/** Preserve the legacy className applied by LeftColumnTabs.tsx */
-.leftTabs.leftTabs {
     flex: 1 1 auto;
     min-height: 0;
 }

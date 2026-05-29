@@ -1,9 +1,13 @@
+import { useState } from 'react';
+import { Settings } from 'lucide-react';
 import { useRefreshMutation, useRefreshQuery } from '@/client/api/index.js';
 import { RefreshDto } from '@/dto/index.js';
 import { Button } from './Button.js';
+import { SettingsModal } from './Settings/index.js';
 import styles from './LeftColumnHeader.module.css';
 
 export const LeftColumnHeader = () => {
+    const [showSettings, setShowSettings] = useState<boolean>(false);
     const query = useRefreshQuery();
     const mutation = useRefreshMutation();
 
@@ -18,34 +22,45 @@ export const LeftColumnHeader = () => {
             }
         }
 
-        mutation.mutate({ kind });
+        mutation.mutate({kind});
     };
 
     return (
-        <header className={styles.header}>
-            <div className={styles.titleBlock}>
-                <h1 className={styles.title}>Eberron Query Assistant</h1>
-                <p className={styles.status}>{renderRefreshStatus(query, refresh)}</p>
-            </div>
-            <div className={styles.actions}>
-                <Button
-                    disabled={isRefreshActive}
-                    onClick={() => onRefresh('refresh')}
-                    title='Check sources and update retrieval artifacts only where needed.'
-                    variant='primary'
-                >
-                    Refresh
-                </Button>
-                <Button
-                    disabled={isRefreshActive && refresh?.activeOperation === 'reingest'}
-                    onClick={() => onRefresh('reingest')}
-                    title='Clear and rebuild app-owned corpus and retrieval artifacts.'
-                    variant='danger'
-                >
-                    Force reingest
-                </Button>
-            </div>
-        </header>
+        <>
+            <header className={styles.header}>
+                <div className={styles.titleBlock}>
+                    <h1 className={styles.title}>Eberron Query Assistant</h1>
+                    <p className={styles.status}>{renderRefreshStatus(query, refresh)}</p>
+                </div>
+                <div className={styles.actions}>
+                    <Button
+                        disabled={isRefreshActive}
+                        onClick={() => onRefresh('refresh')}
+                        title='Check sources and update retrieval artifacts only where needed.'
+                        variant='primary'
+                    >
+                        Refresh
+                    </Button>
+                    <Button
+                        disabled={isRefreshActive && refresh?.activeOperation === 'reingest'}
+                        onClick={() => onRefresh('reingest')}
+                        title='Clear and rebuild app-owned corpus and retrieval artifacts.'
+                        variant='danger'
+                    >
+                        Force reingest
+                    </Button>
+                    <Button
+                        variant='secondary'
+                        onClick={() => setShowSettings(true)}
+                        title='Settings'
+                        aria-label='Settings'
+                    >
+                        <Settings size={16}/>
+                    </Button>
+                </div>
+            </header>
+            <SettingsModal show={showSettings} onClose={() => setShowSettings(false)}/>
+        </>
     );
 };
 

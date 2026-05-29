@@ -36,29 +36,6 @@ export const contracts = {
     },
 
     /**
-     * Additional context is a singleton Markdown document persisted on the local
-     * disk and included in later assistant work.
-     */
-    additionalContext: {
-        /** Reads the current Markdown body of the additional-context document. */
-        get: defineEndpoint<null, string>({
-            headers: {
-                'Content-Type': 'text/markdown',
-            },
-            method: 'GET',
-            path: '/api/v2/additional-context',
-        }),
-        /** Replaces the current Markdown body of the additional-context document. */
-        put: defineEndpoint<string, string>({
-            headers: {
-                'Content-Type': 'text/markdown',
-            },
-            method: 'PUT',
-            path: '/api/v2/additional-context',
-        }),
-    },
-
-    /**
      * Sessions are the primary durable conversation resource in v2.
      *
      * A session is intended to be resumable over time and owns the ordered

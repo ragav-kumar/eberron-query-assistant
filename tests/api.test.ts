@@ -336,29 +336,6 @@ describe('API router', () => {
         expect(collection.take).toBe(5);
     });
 
-    it('reads additional context as markdown', async () => {
-        const req = makeRequest('GET', '/api/v2/additional-context');
-        const res = makeResponse();
-
-        handler(req, res as unknown as ServerResponse);
-
-        await vi.waitFor(() => expect(res.writableEnded).toBe(true));
-
-        expect(res.header('content-type')).toContain('text/markdown');
-    });
-
-    it('writes additional context as markdown', async () => {
-        const req = makeRequest('PUT', '/api/v2/additional-context', '# My notes');
-        const res = makeResponse();
-
-        handler(req, res as unknown as ServerResponse);
-
-        await vi.waitFor(() => expect(res.writableEnded).toBe(true));
-
-        expect(res.body()).toBe('# My notes');
-        expect(res.header('content-type')).toContain('text/markdown');
-    });
-
     it('streams console SSE entries', () => {
         let capturedCallback: ((entry: unknown) => void) | undefined;
         mockConsoleSubscribe.mockImplementation((cb: (entry: unknown) => void) => {
