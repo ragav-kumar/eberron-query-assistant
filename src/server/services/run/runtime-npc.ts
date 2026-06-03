@@ -25,8 +25,11 @@ export interface NpcPromptAssets {
     shared: string;
 }
 
-/** Parsed NPC data extracted from a model response, omitting DB-assigned and context-supplied fields. */
-export type ParsedNpcData = Omit<NpcDto, 'id' | 'sessionId' | 'runId' | 'createdAt' | 'updatedAt'>;
+/**
+ * Parsed NPC data extracted from a model response. `id` is the model-assigned identifier
+ * that the coordinator uses to determine whether to insert or update an existing row.
+ */
+export type ParsedNpcData = Omit<NpcDto, 'id' | 'sessionId' | 'runId' | 'createdAt' | 'updatedAt'> & { id?: number };
 
 /**
  * Every mode's run result extends AssistantRunResult so that session entry
@@ -298,7 +301,12 @@ const parseNpcBlocks = (npcsBlock: string): ParsedNpcData[] => {
         const description = readTag(block, 'description');
         if (!name || !bio || !description) continue;
 
+        const rawId = readTag(block, 'id');
+        const parsedId = rawId != null ? parseInt(rawId, 10) : NaN;
+        const id = Number.isFinite(parsedId) && parsedId > 0 ? parsedId : undefined;
+
         results.push({
+            id,
             age: readTag(block, 'age') ?? undefined,
             bio,
             description,

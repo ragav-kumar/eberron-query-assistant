@@ -413,7 +413,7 @@ describe('V2 run runtime', () => {
         const result = await executeNpcRun(createNpcRunDependencies({ chat, retrieval: { search: vi.fn().mockResolvedValue([]) } }));
 
         expect(result.npcs).toHaveLength(1);
-        expect(result.npcs[0]).toMatchObject({ name: 'Rael', species: 'Human', gender: 'male', bio: 'A steady guard.' });
+        expect(result.npcs[0]).toMatchObject({ id: 1, name: 'Rael', species: 'Human', gender: 'male', bio: 'A steady guard.' });
         expect(result.response.content).toBe(rawXml);
         expect(result.response.kind).toBe('response');
         expect(result.sessionTitle).toBe('Guards');

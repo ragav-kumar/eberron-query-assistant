@@ -159,6 +159,86 @@ describe('V2 run coordinator', () => {
         expect(npcs[1]?.species).toBe('Half-Orc');
     });
 
+    it('inserts an npc with the model-provided id on first run', async () => {
+        await insertSession(appDb, { id: 'npc-session', mode: 'npc', title: '' });
+        const coordinator = createCoordinator(appDb, { chat: createNpcChat() });
+
+        await coordinator.startRun({
+            includePartyContext: false,
+            mode: 'npc',
+            prompt: 'Generate a guard',
+            retrievalTurnLimit: 0,
+            sessionId: 'npc-session',
+        });
+        await coordinator.drain();
+
+        const npc = await appDb.db.selectFrom('npcs').selectAll().executeTakeFirstOrThrow();
+        expect(npc.id).toBe(1);
+    });
+
+    it('updates an existing npc when the model returns its id for the same session', async () => {
+        await insertSession(appDb, { id: 'npc-session', mode: 'npc', title: '' });
+        const chat = {
+            complete: vi.fn(),
+            completeStructured: vi.fn()
+                .mockResolvedValueOnce({
+                    content: [
+                        '<response>',
+                        '  <session-title>Guards</session-title>',
+                        '  <response-title>First run</response-title>',
+                        '  <npcs>',
+                        '    <npc><id>7</id><name>Mira Tannen</name><species>Human</species><bio>Original bio.</bio><description>Alert eyes.</description></npc>',
+                        '  </npcs>',
+                        '  <notes>Created.</notes>',
+                        '</response>',
+                    ].join('\n'),
+                    kind: 'text',
+                })
+                .mockResolvedValueOnce({
+                    content: [
+                        '<response>',
+                        '  <response-title>Second run</response-title>',
+                        '  <npcs>',
+                        '    <npc><id>7</id><name>Mira Tannen</name><species>Human</species><bio>Updated bio.</bio><description>Alert eyes.</description></npc>',
+                        '  </npcs>',
+                        '  <notes>Updated.</notes>',
+                        '</response>',
+                    ].join('\n'),
+                    kind: 'text',
+                }),
+        };
+        const coordinator = createCoordinator(appDb, { chat });
+
+        await coordinator.startRun({ includePartyContext: false, mode: 'npc', prompt: 'Generate a guard', retrievalTurnLimit: 0, sessionId: 'npc-session' });
+        await coordinator.drain();
+        await coordinator.startRun({ includePartyContext: false, mode: 'npc', prompt: 'Update the guard', retrievalTurnLimit: 0, sessionId: 'npc-session' });
+        await coordinator.drain();
+
+        const npcs = await appDb.db.selectFrom('npcs').selectAll().execute();
+        expect(npcs).toHaveLength(1);
+        expect(npcs[0]).toMatchObject({ id: 7, name: 'Mira Tannen', bio: 'Updated bio.' });
+    });
+
+    it('inserts a new npc row without the model id when that id belongs to a different session', async () => {
+        await insertSession(appDb, { id: 'session-a', mode: 'npc', title: '' });
+        await insertSession(appDb, { id: 'session-b', mode: 'npc', title: '' });
+        const chatA = createNpcChatWithId(5);
+        const coordinatorA = createCoordinator(appDb, { chat: chatA });
+        await coordinatorA.startRun({ includePartyContext: false, mode: 'npc', prompt: 'Generate a guard', retrievalTurnLimit: 0, sessionId: 'session-a' });
+        await coordinatorA.drain();
+
+        const chatB = createNpcChatWithId(5);
+        const coordinatorB = createCoordinator(appDb, { chat: chatB });
+        await coordinatorB.startRun({ includePartyContext: false, mode: 'npc', prompt: 'Generate a guard', retrievalTurnLimit: 0, sessionId: 'session-b' });
+        await coordinatorB.drain();
+
+        const npcs = await appDb.db.selectFrom('npcs').selectAll().orderBy('id', 'asc').execute();
+        expect(npcs).toHaveLength(2);
+        expect(npcs[0]).toMatchObject({ id: 5, sessionId: 'session-a' });
+        expect(npcs[1]?.id).not.toBe(5);
+        expect(npcs[1]?.sessionId).toBe('session-b');
+    });
+
     it('rejects missing sessions', async () => {
         const coordinator = createCoordinator(appDb);
 
@@ -385,7 +465,9 @@ const insertSession = async (
     }).execute();
 };
 
-const createNpcChat = () => ({
+const createNpcChat = () => createNpcChatWithId(1);
+
+const createNpcChatWithId = (id: number) => ({
     complete: vi.fn(),
     completeStructured: vi.fn().mockResolvedValue({
         content: [
@@ -393,7 +475,7 @@ const createNpcChat = () => ({
             '  <session-title>Session title</session-title>',
             '  <response-title>One guard</response-title>',
             '  <npcs>',
-            '    <npc><id>1</id><name>Mira Tannen</name><species>Human</species><bio>A city guard.</bio><description>Average height, alert eyes.</description></npc>',
+            `    <npc><id>${id}</id><name>Mira Tannen</name><species>Human</species><bio>A city guard.</bio><description>Average height, alert eyes.</description></npc>`,
             '  </npcs>',
             '  <notes>One guard generated.</notes>',
             '</response>',

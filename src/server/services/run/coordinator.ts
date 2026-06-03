@@ -15,7 +15,7 @@ import {
     executeAssistantRun,
     loadPromptAssets,
 } from './runtime.js';
-import { executeNpcRun, loadNpcPromptAssets, NpcRunResult } from './runtime-npc.js';
+import { executeNpcRun, loadNpcPromptAssets, NpcRunResult, ParsedNpcData } from './runtime-npc.js';
 import { ChatAdapter } from '../provider/index.js';
 import { RuntimeEventPublisher } from '../events/index.js';
 
@@ -291,20 +291,7 @@ const executeRunBackground = async (inputs: BackgroundRunInputs): Promise<void> 
             if (normalized.mode === 'npc') {
                 const npcResult = runResult as NpcRunResult;
                 for (const npc of npcResult.npcs) {
-                    await trx.insertInto('npcs').values({
-                        age: npc.age ?? null,
-                        bio: npc.bio,
-                        createdAt: completedAt,
-                        description: npc.description,
-                        ethnicity: npc.ethnicity ?? null,
-                        gender: npc.gender ?? null,
-                        name: npc.name,
-                        role: npc.role ?? null,
-                        runId,
-                        sessionId,
-                        species: npc.species ?? null,
-                        updatedAt: completedAt,
-                    }).execute();
+                    await persistNpc(trx, npc, sessionId, runId, completedAt);
                 }
             }
 
@@ -517,6 +504,56 @@ const insertNewSession = async (
         updatedAt: now,
     }).execute();
     return id;
+};
+
+/**
+ * Inserts or updates one NPC row based on the model-provided ID.
+ *
+ * - Same-session ID match → update the existing row (model is revising its own NPC).
+ * - Unknown ID → insert with the explicit ID so the model can reference it in future turns.
+ * - Cross-session ID conflict → insert without the model ID (auto-assign) to protect the other session's row.
+ * - No model ID → insert without an explicit ID (auto-assign).
+ */
+const persistNpc = async (
+    trx: Transaction<AppDatabaseSchema>,
+    npc: ParsedNpcData,
+    sessionId: string,
+    runId: string,
+    completedAt: string,
+): Promise<void> => {
+    const fields = {
+        age: npc.age ?? null,
+        bio: npc.bio,
+        description: npc.description,
+        ethnicity: npc.ethnicity ?? null,
+        gender: npc.gender ?? null,
+        name: npc.name,
+        role: npc.role ?? null,
+        species: npc.species ?? null,
+        updatedAt: completedAt,
+    };
+
+    if (npc.id != null) {
+        const existing = await trx
+            .selectFrom('npcs')
+            .select(['id', 'sessionId'])
+            .where('id', '=', npc.id)
+            .executeTakeFirst();
+
+        if (existing != null && existing.sessionId === sessionId) {
+            await trx.updateTable('npcs').set({ ...fields, runId }).where('id', '=', npc.id).execute();
+            return;
+        }
+
+        if (existing == null) {
+            await trx.insertInto('npcs').values({ id: npc.id, sessionId, runId, createdAt: completedAt, ...fields }).execute();
+            return;
+        }
+
+        // Model ID belongs to a different session — fall through to auto-assigned insert.
+    }
+
+    await trx.insertInto('npcs').values({ sessionId, runId, createdAt: completedAt, ...fields }).execute();
 };
 
 /**
